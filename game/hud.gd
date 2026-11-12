@@ -28,6 +28,7 @@ var prompt: HBoxContainer
 var prompt_label: Label
 var _shown_money := -1
 var _shown_strikes := 0
+var _town_open := false
 var _toast_tween: Tween
 
 
@@ -62,6 +63,31 @@ class Icon extends Control:
 			for p: Vector2 in l[0]:
 				pts.append(c + Vector2(p.x, -p.y) * r)
 			draw_colored_polygon(pts, Color(l[1]))
+
+
+## Five pips for where a townsperson stands, with an arrow when it moved today.
+## Read by count and arrow shape, not by colour.
+class Pips extends Control:
+	var filled := 0
+	var trend := 0
+
+	func _init(filled_: int, trend_: int) -> void:
+		filled = filled_
+		trend = trend_
+		custom_minimum_size = Vector2(92, 18)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var y := size.y / 2.0
+		for i in 5:
+			var c := Vector2(7 + i * 14, y)
+			draw_circle(c, 6.0, Hud.INK)
+			draw_circle(c, 4.2, Hud.CORAL if i < filled else Hud.PAPER)
+		if trend != 0:
+			var x := 82.0
+			var d := -float(trend)   # up is negative y
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(x, y + d * 7), Vector2(x - 6, y - d * 3), Vector2(x + 6, y - d * 3)]), Hud.INK)
 
 
 ## The day timer: the sun crosses the sky over a cream dial.
@@ -444,6 +470,7 @@ func _button(box: VBoxContainer, text: String, action: Callable) -> void:
 ## pinned beside it.
 func show_summary(rec: Dictionary) -> void:
 	hide_card()
+	_town_open = false
 	var clip := Sheet.new("clip").pad(26, 46, 26, 26)
 	center.add_child(clip)
 	var stack := VBoxContainer.new()
@@ -472,7 +499,56 @@ func show_summary(rec: Dictionary) -> void:
 	var gossip := _label(note, 16, game.town.headline())
 	gossip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	gossip.custom_minimum_size = Vector2(380, 0)
+	_button(stack, "Town book   (T)", show_town)
 	_button(stack, "Open for day %d   (Enter)" % game.ledger.day, game.start_day)
+	_pop_in(clip)
+
+
+func toggle_town() -> void:
+	if _town_open:
+		show_summary(game.last_day)
+	else:
+		show_town()
+
+
+## The town book: every townsperson, where they stand and whether today moved them.
+func show_town() -> void:
+	hide_card()
+	_town_open = true
+	var clip := Sheet.new("clip").pad(26, 46, 26, 26)
+	center.add_child(clip)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 14)
+	clip.add_child(stack)
+	var page := Sheet.new("note").pad(26, 24, 26, 20)
+	stack.add_child(page)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	page.add_child(box)
+	_ribbon(box, "THE TOWN", INK)
+	var town: Town = game.town
+	var cols := GridContainer.new()
+	cols.columns = 2
+	cols.add_theme_constant_override("h_separation", 34)
+	cols.add_theme_constant_override("v_separation", 7)
+	box.add_child(cols)
+	# Fill down the two columns, not across.
+	var half := ceili(town.people.size() / 2.0)
+	for n in town.people.size():
+		var i := (n / 2) + (half if n % 2 == 1 else 0)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		cols.add_child(row)
+		var name_label := _label(row, 18, town.people[i].name)
+		name_label.custom_minimum_size = Vector2(86, 0)
+		row.add_child(Pips.new(town.standing(i) + 1, town.trend(i)))
+		var word := _label(row, 13, Town.STANDINGS[town.standing(i)])
+		word.custom_minimum_size = Vector2(92, 0)
+		word.modulate.a = 0.7
+	_rule(box)
+	var key := _label(box, 13, "Arrows show who changed their mind today. Friends talk to each other.")
+	key.modulate.a = 0.7
+	_button(stack, "Back   (T)", toggle_town)
 	_pop_in(clip)
 
 

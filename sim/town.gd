@@ -9,6 +9,9 @@ const NAMES: Array[String] = [
 ]
 const SHIRTS: Array[String] = ["#b85c9e", "#3f7f86", "#e9a23b", "#4a6fa5", "#6c5ce7", "#d9534f", "#5fb37a"]
 const FRIEND_SHARE := 0.4
+const STANDINGS: Array[String] = ["Staying away", "Wary", "Undecided", "Likes you", "Loves you"]
+const FLYER_PRICE := 15
+const FLYER_BOOST := 0.25
 
 var people: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
@@ -18,7 +21,7 @@ func _init(seed_value := 1) -> void:
 	rng.seed = seed_value
 	for i in NAMES.size():
 		people.append({
-			"name": NAMES[i], "affinity": 0.0, "friends": [], "visits": 0,
+			"name": NAMES[i], "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
 			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
 		})
 	# A ring of friendships plus a few long-distance ones, so gossip travels.
@@ -67,6 +70,50 @@ func roll_guests(day: int, boost := 0.0) -> Array[int]:
 func _nudge(i: int, amount: float) -> void:
 	var affinity: float = people[i].affinity
 	people[i].affinity = clampf(affinity + amount, -1.0, 1.0)
+	people[i].today += people[i].affinity - affinity
+
+
+## Forgets yesterday's changes. Call when a new day opens.
+func new_day() -> void:
+	for p in people:
+		p.today = 0.0
+
+
+## Where someone stands with the restaurant, from 0 (staying away) to 4 (loves you).
+func standing(i: int) -> int:
+	var a: float = people[i].affinity
+	if a >= 0.4:
+		return 4
+	if a >= 0.1:
+		return 3
+	if a > -0.1:
+		return 2
+	return 1 if a > -0.4 else 0
+
+
+## Which way their opinion moved today: 1, 0 or -1.
+func trend(i: int) -> int:
+	var t: float = people[i].today
+	return 0 if absf(t) < 0.02 else signi(roundi(signf(t)))
+
+
+func friend_names(i: int) -> String:
+	var names: Array[String] = []
+	for f: int in people[i].friends:
+		names.append(people[f].name)
+	if names.size() < 2:
+		return "" if names.is_empty() else names[0]
+	return ", ".join(names.slice(0, -1)) + " and " + names[-1]
+
+
+## What a visit that moved their opinion by `delta` sets going. Empty when nothing much.
+func gossip_line(i: int, delta: float) -> String:
+	var friends := friend_names(i)
+	if friends == "" or absf(delta) < 0.05:
+		return ""
+	if delta > 0.0:
+		return "%s will tell %s." % [people[i].name, friends]
+	return "%s will warn %s." % [people[i].name, friends]
 
 
 ## Records how a visit went. The guest's friends hear about it too.

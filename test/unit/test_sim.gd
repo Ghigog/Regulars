@@ -93,6 +93,34 @@ func test_good_visit_spreads_to_friends_only():
 	assert_eq(t.people[stranger].affinity, 0.0)
 
 
+func test_standing_and_trend_follow_visits():
+	var t := Town.new(7)
+	assert_eq(t.standing(0), 2, "everyone starts undecided")
+	t.record_visit(0, 1.0)
+	t.record_visit(0, 1.0)
+	assert_eq(t.standing(0), 4)
+	assert_eq(t.trend(0), 1)
+	var friend: int = t.people[0].friends[0]
+	assert_eq(t.trend(friend), 1, "friends heard about it")
+	t.new_day()
+	assert_eq(t.trend(0), 0)
+	assert_eq(t.standing(0), 4, "a new day keeps opinions")
+	t.record_visit(1, -0.5)
+	t.record_visit(1, -0.5)
+	t.record_visit(1, -0.5)
+	assert_eq(t.standing(1), 0)
+	assert_eq(t.trend(1), -1)
+
+
+func test_gossip_line_names_the_friends():
+	var t := Town.new(7)
+	var friend: String = t.people[int(t.people[2].friends[0])].name
+	assert_string_contains(t.gossip_line(2, 0.2), "will tell")
+	assert_string_contains(t.gossip_line(2, 0.2), friend)
+	assert_string_contains(t.gossip_line(2, -0.2), "will warn")
+	assert_eq(t.gossip_line(2, 0.01), "", "a so-so visit starts no talk")
+
+
 func test_bad_visit_lowers_visit_chance():
 	var t := Town.new(7)
 	var before := t.visit_chance(3)

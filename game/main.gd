@@ -117,10 +117,16 @@ func _apply_demo(demo: String) -> void:
 		best_path = "user://regulars_best_demo.json"
 		for i in Ledger.MAX_STRIKES:
 			ledger.record_walkout()
-	elif demo == "summary":
+	elif demo == "summary" or demo == "town":
 		ledger.record_sale(BILL, 5)
 		ledger.record_sale(BILL, 3)
 		arrivals.clear()
+		if demo == "town":  # a spread of opinions, then the town book over the receipt
+			for i in town.people.size():
+				town.record_visit(i, [0.9, 0.9, 0.3, -0.5, 0.6][i % 5])
+				if i % 2 == 0:
+					town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
+			get_tree().create_timer(1.5).timeout.connect(hud.show_town)
 
 
 func _demo_fx() -> void:
@@ -340,6 +346,7 @@ func start_day() -> void:
 	phase = Phase.SERVICE
 	clock = 0.0
 	hud.hide_card()
+	town.new_day()
 	var coming := town.roll_guests(ledger.day)
 	arrivals.clear()
 	for i in coming.size():
@@ -489,7 +496,9 @@ func serve(g: Guest, quality: float) -> void:
 func finish_meal(g: Guest) -> void:
 	var tip := g.mood.tip_for(BILL)
 	ledger.record_sale(BILL, tip)
-	town.record_visit(g.idx, g.mood.satisfaction())
+	var talk := town.gossip_line(g.idx, town.record_visit(g.idx, g.mood.satisfaction()))
+	if talk != "":
+		hud.say(talk)
 	g.table.dirty += 1
 	g.table.refresh()
 	popup("+$%d" % (BILL + tip), g.position + Vector3(0, 1.9, 0), Color(Build.TRIM))
@@ -504,8 +513,8 @@ func walk_out(g: Guest) -> void:
 	g.mood.think("I'm never coming back")
 	g.stormed = true
 	ledger.record_walkout()
-	town.record_visit(g.idx, -0.5)
-	hud.say("%s walked out!" % g.info.name)
+	var talk := town.gossip_line(g.idx, town.record_visit(g.idx, -0.5))
+	hud.say(("%s walked out! " % g.info.name) + talk)
 	var mark := Fx.play(g, "anger", Vector3(0, 1.75, 0), 0.3, true)
 	mark.fps = 6.0
 	sfx("fail")
@@ -713,5 +722,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			use_station(stations[player.target_cell()])
 	elif phase == Phase.SUMMARY and confirm:
 		start_day()
+	elif phase == Phase.SUMMARY and key == KEY_T:
+		hud.toggle_town()
 	elif phase == Phase.CLOSED and confirm:
 		restart()
