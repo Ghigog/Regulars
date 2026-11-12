@@ -89,6 +89,63 @@ func test_tip_never_negative():
 	assert_eq(m.face(), "mad")
 
 
+# ---------- Building ----------
+
+func _room() -> Grid:
+	# A 4 x 3 room with the door cell just outside its bottom edge at (1, 3).
+	var g := Grid.new(4, 4)
+	for x in 4:
+		if x != 1:
+			g.walls[Vector3i(x, 3, 0)] = true
+	return g
+
+
+func test_furniture_cannot_block_the_only_way_in():
+	var g := _room()
+	var area := Rect2i(0, 0, 4, 3)
+	var door := Vector2i(1, 3)
+	var chef: Array[Vector2i] = [Vector2i(3, 0)]
+	var none: Array[Vector2i] = []
+	assert_false(g.can_place_block(Vector2i(1, 2), none, area, door, chef, none), "right inside the door")
+	assert_true(g.can_place_block(Vector2i(2, 1), none, area, door, chef, none))
+	assert_false(g.can_place_block(Vector2i(3, 0), none, area, door, chef, none), "on top of the chef")
+	assert_false(g.can_place_block(Vector2i(1, 3), none, area, door, chef, none), "outside the room")
+	assert_false(g.blocked.has(Vector2i(2, 1)), "asking changes nothing")
+
+
+func test_table_needs_room_for_both_seats():
+	var g := _room()
+	var area := Rect2i(0, 0, 4, 3)
+	var none: Array[Vector2i] = []
+	var mid: Array[Vector2i] = [Vector2i(1, 1), Vector2i(3, 1)]
+	var edge: Array[Vector2i] = [Vector2i(-1, 1), Vector2i(1, 1)]
+	assert_true(g.can_place_block(Vector2i(2, 1), mid, area, Vector2i(1, 3), none, none))
+	assert_false(g.can_place_block(Vector2i(0, 1), edge, area, Vector2i(1, 3), none, none), "a seat outside the room")
+	g.reserved[Vector2i(1, 1)] = true
+	assert_false(g.can_place_block(Vector2i(2, 1), mid, area, Vector2i(1, 3), none, none), "a seat already taken")
+	assert_false(g.can_place_block(Vector2i(1, 1), none, area, Vector2i(1, 3), none, none), "nothing goes on a seat")
+
+
+func test_wall_cannot_seal_off_a_seat_or_a_station():
+	var g := _room()
+	var area := Rect2i(0, 0, 4, 3)
+	var door := Vector2i(1, 3)
+	var none: Array[Vector2i] = []
+	var seat: Array[Vector2i] = [Vector2i(0, 0)]
+	g.walls[Vector3i(0, 1, 0)] = true                     # south of the corner seat
+	assert_false(g.can_place_wall(Vector3i(1, 0, 1), area, door, seat, none), "the last way to the seat")
+	assert_true(g.can_place_wall(Vector3i(2, 0, 1), area, door, seat, none))
+	assert_false(g.can_place_wall(Vector3i(0, 1, 0), area, door, seat, none), "already a wall there")
+	assert_false(g.can_place_wall(Vector3i(0, 0, 0), area, door, none, none), "the room's outer edge")
+	# A stove in the corner: walls may not leave it with no side to stand at.
+	g = _room()
+	g.blocked[Vector2i(3, 0)] = true
+	var stove: Array[Vector2i] = [Vector2i(3, 0)]
+	g.walls[Vector3i(3, 1, 0)] = true
+	assert_false(g.can_place_wall(Vector3i(3, 0, 1), area, door, none, stove))
+	assert_false(g.walls.has(Vector3i(3, 0, 1)), "asking changes nothing")
+
+
 # ---------- Town ----------
 
 func test_good_visit_spreads_to_friends_only():

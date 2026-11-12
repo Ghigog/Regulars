@@ -97,3 +97,64 @@ func has_los(a: Vector2i, b: Vector2i) -> bool:
 				return false
 		prev = cur
 	return true
+
+
+# ---------------------------------------------------------------- building
+
+## Every cell that can be walked to from `from`.
+func flood(from: Vector2i) -> Dictionary:
+	var seen := {from: true}
+	var frontier: Array[Vector2i] = [from]
+	while not frontier.is_empty():
+		var cur: Vector2i = frontier.pop_back()
+		for d in DIRS:
+			var n: Vector2i = cur + d
+			if not seen.has(n) and can_step(cur, n):
+				seen[n] = true
+				frontier.append(n)
+	return seen
+
+
+## True when everyone can still get about: each `must_reach` cell can be walked to
+## from the door, and each `must_touch` cell (furniture) has a side someone can stand at.
+func layout_ok(door: Vector2i, must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
+	var seen := flood(door)
+	for c in must_reach:
+		if not seen.has(c):
+			return false
+	for c in must_touch:
+		var open := false
+		for d in DIRS:
+			if seen.has(c + d) and edge_open(c, c + d):
+				open = true
+				break
+		if not open:
+			return false
+	return true
+
+
+## Can furniture go on `c` (with `seats` beside it) inside `area` without cutting anyone off?
+func can_place_block(c: Vector2i, seats: Array[Vector2i], area: Rect2i, door: Vector2i,
+		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
+	if not area.has_point(c) or blocked.has(c) or reserved.has(c):
+		return false
+	for s in seats:
+		if not area.has_point(s) or blocked.has(s) or reserved.has(s):
+			return false
+	blocked[c] = true
+	var ok := layout_ok(door, must_reach + seats, must_touch + ([c] as Array[Vector2i]))
+	blocked.erase(c)
+	return ok
+
+
+## Can a wall go on this edge (x, y, axis)? It must lie between two cells of `area`.
+func can_place_wall(edge: Vector3i, area: Rect2i, door: Vector2i,
+		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
+	var a := Vector2i(edge.x, edge.y)
+	var b := a + (Vector2i(0, -1) if edge.z == 0 else Vector2i(-1, 0))
+	if walls.has(edge) or not area.has_point(a) or not area.has_point(b):
+		return false
+	walls[edge] = true
+	var ok := layout_ok(door, must_reach, must_touch)
+	walls.erase(edge)
+	return ok
