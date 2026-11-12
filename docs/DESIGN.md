@@ -94,14 +94,27 @@ be recovered from the description in section 4.
 
 ## 8. Art and audio
 
-- Toy-diorama cutaway: chunky peg-people, flat colours, soft shadows. See
-  `concept/concept_01.png` and the Blender script beside it.
-- Everything in game is built from primitive meshes in `game/build.gd`. Later: proper
-  Blender models with the same proportions and palette.
-- Sounds are synthesised placeholders. Later: real foley, music per theme.
+- **Art direction is settled.** See `docs/STYLE_GUIDE.md` (rules, resolved conflicts,
+  palette) and the 27 images in `docs/art/`. Toy diorama: legless peg-people with floating
+  mitten hands, bevelled painted-wood props, soft warm shadows, paper-and-wood interface.
+- **The game does not match it yet.** Everything in game is still primitive meshes built in
+  `game/build.gd` from the first mood render. Closing the gap, roughly in order:
+  1. Palette, shadow colour and 3 cm bevels on every box (cheap, large effect).
+  2. Character: one shared body with the big head, face textures for the eight moods,
+     mitten hands, kit parts (hair, hats, glasses, beard, five skin tones, four outfits).
+  3. Doneness dial above each burner in place of the horizontal bar, and the five patty
+     states, plated burger, half-eaten and dirty plate.
+  4. Kitchen and dining props from sheets 8 and 10, the cutaway front wall from sheet 11,
+     wall sconces for light (no hanging lamps).
+  5. Thought bubbles and four-frame effects from sheet 13, replacing the text quotes.
+  6. Paper-and-wood HUD, end-of-day receipt, game-over menu card and the eight icons (sheet 14).
+  7. Shopfront, street and slab edge (sheet 12), then the seaside theme as a re-skin (sheet 16).
+- Models are to be built in Blender (`concept/concept_scene.py` shows the toolchain works)
+  and imported; until then, primitives that follow the rules are acceptable.
+- Sounds are synthesised placeholders (`tools/make_sfx.py`). Later: real foley, music per theme.
 
 ## 9. Open questions
 
-- Is the name "Regulars" staying?
+- The name stays "Regulars" for now. Logo direction is decided; see "Decisions and open items" in `docs/STYLE_GUIDE.md`.
 - Should order-taking be a step (walk to the table first), as in PlateUp?
 - How much of the building happens between days versus live during service?
