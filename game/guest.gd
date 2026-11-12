@@ -26,8 +26,9 @@ var _order: Node3D
 var _meal: Node3D
 var _meal_kind := ""
 var _label: Label3D
-var _thought_time := 0.0
-var _shown_thoughts := 0
+var _gross_time := 0.0
+var _heart_time := 0.0
+var _last_disgust := 0.0
 var _age := 0.0
 
 
@@ -40,23 +41,28 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	_body = Peg.guest(info.name)
 	_body.rotation.y = -PI / 2
 	add_child(_body)
+	# A chunky patience meter under the thought bubble, facing the camera.
 	_bar = Node3D.new()
-	_bar.position = Vector3(0, 1.5, 0)
-	_bar.rotation.y = PI / 4  # face the fixed camera
+	_bar.position = Vector3(0, 1.58, 0)
+	_bar.basis = Build.CAM_BASIS
 	add_child(_bar)
-	Build.box(_bar, Vector3(0, -0.02, -0.02), Vector3(BAR_WIDTH + 0.06, 0.14, 0.02), "#3a2c22")
-	_fill = Build.box(_bar, Vector3.ZERO, Vector3(BAR_WIDTH, 0.1, 0.02), "#ffffff")
-	_order = Build.item("burger")
-	_order.position = Vector3(0, 1.85, 0)
-	_order.visible = false
+	Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH + 0.07, 0.15), Build.TRIM)
+	Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH, 0.08), "#6b5647", 0.003)
+	_fill = Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH, 0.08), "#ffffff", 0.006)
+	_order = Fx.bubble()
+	_order.position = Vector3(0, 2.0, 0)
 	add_child(_order)
+	# A paper name tag.
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.no_depth_test = true
-	_label.font_size = 36
+	_label.font_size = 30
 	_label.outline_size = 10
 	_label.pixel_size = 0.006
-	_label.position = Vector3(0, 2.3, 0)
+	_label.modulate = Color(Build.TRIM)
+	_label.outline_modulate = Color(Build.PAPER)
+	_label.position = Vector3(0, 1.3, 0)
+	_label.text = info.name
 	add_child(_label)
 
 
@@ -93,6 +99,8 @@ func _sit() -> void:
 
 func start_eating(quality: float) -> void:
 	mood.taste(quality)
+	if quality > 0.95:
+		_heart_time = 2.5
 	state = "eating"
 	timer = EAT_TIME
 	_set_meal("burger", quality)
@@ -156,9 +164,9 @@ func _refresh(delta: float) -> void:
 	_bar.visible = state == "queue" or state == "waiting" or state == "to_seat"
 	_fill.scale.x = maxf(p, 0.001)
 	_fill.position.x = (p - 1.0) * BAR_WIDTH / 2.0
-	var shade := snappedf(p, 0.05)  # few distinct colours, so materials stay cached
-	var col := Color("#ff6b5e").lerp(Color("#ffd34e"), clampf(shade * 2.0, 0, 1)).lerp(Color("#5fd38d"), clampf(shade * 2.0 - 1.0, 0, 1))
-	_fill.material_override = Build.mat(col, 0.5)
+	var shade := snappedf(p, 0.1)  # few distinct colours, so materials stay cached
+	var col := Color(Build.DANGER).lerp(Color(Build.WARN), clampf(shade * 2.0, 0, 1)).lerp(Color(Build.GOOD), clampf(shade * 2.0 - 1.0, 0, 1))
+	_fill.material_override = Build.flat_mat(col)
 	# Impatient guests shake a little.
 	_body.position.x = sin(_age * 40.0) * 0.02 if (_bar.visible and p < 0.25) else 0.0
 	_body.set_face(mood.expression(state == "eating", stormed))
@@ -171,13 +179,21 @@ func _refresh(delta: float) -> void:
 		lean = 0.3
 	if state != "eating":
 		_body.rotation.x = lerpf(_body.rotation.x, lean, 1.0 - exp(-8.0 * delta))
-	_order.visible = state == "waiting"
-	_order.position.y = 1.85 + sin(_age * 3.0) * 0.04
-	if mood.thoughts.size() > _shown_thoughts:
-		_shown_thoughts = mood.thoughts.size()
-		_thought_time = 4.0
-	_thought_time -= delta
-	var text: String = info.name
-	if _thought_time > 0.0:
-		text += "\n“%s”" % mood.latest_thought()
-	_label.text = text
+	# One bold icon says what is on their mind (sheet 13).
+	if mood.disgust > _last_disgust + 0.0005:
+		_gross_time = 2.5
+	_last_disgust = mood.disgust
+	_gross_time -= delta
+	_heart_time -= delta
+	var want := ""
+	if _gross_time > 0.0 and (state == "waiting" or state == "eating"):
+		want = "stink"
+	elif state == "waiting":
+		want = "burger"
+	elif state == "queue" and p < 0.6:
+		want = "zzz"
+	elif _heart_time > 0.0:
+		want = "heart"
+	Fx.set_bubble(_order, want)
+	_order.position.y = 2.2 + sin(_age * 3.0) * 0.03
+	_label.position.y = 2.72 if want != "" else (1.84 if _bar.visible else 1.6)

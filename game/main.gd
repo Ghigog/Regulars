@@ -256,29 +256,9 @@ func sfx(id: String, vary := 0.06) -> void:
 		_sfx[id].play()
 
 
-## A puff of little sparks.
-func burst(at: Vector3, col: String, count := 12) -> void:
-	var p := CPUParticles3D.new()
-	p.position = at
-	p.one_shot = true
-	p.explosiveness = 1.0
-	p.amount = count
-	p.lifetime = 0.7
-	p.direction = Vector3.UP
-	p.spread = 70.0
-	p.initial_velocity_min = 1.5
-	p.initial_velocity_max = 3.0
-	p.gravity = Vector3(0, -7, 0)
-	p.scale_amount_min = 0.5
-	p.scale_amount_max = 1.2
-	var m := SphereMesh.new()
-	m.radius = 0.05
-	m.height = 0.1
-	m.material = Build.mat(Color(col), 1.5)
-	p.mesh = m
-	add_child(p)
-	p.emitting = true
-	get_tree().create_timer(1.3).timeout.connect(p.queue_free)
+## A four-frame cut-out effect in the world: stars, bubbles, wisps, anger...
+func burst(at: Vector3, id: String, size := 0.45) -> void:
+	Fx.play(self, id, at, size).drift = Vector3(0, 0.5, 0)
 
 
 func shake(amount := 0.12) -> void:
@@ -305,10 +285,11 @@ func popup(text: String, at: Vector3, col: Color) -> void:
 	l.text = text
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
-	l.font_size = 72
-	l.outline_size = 18
+	l.font_size = 64
+	l.outline_size = 20
 	l.pixel_size = 0.006
 	l.modulate = col
+	l.outline_modulate = Color(Build.PAPER)
 	l.position = at
 	add_child(l)
 	var tw := l.create_tween().set_parallel()
@@ -482,7 +463,7 @@ func serve(g: Guest, quality: float) -> void:
 	sfx("serve")
 	if perfect:
 		sfx("perfect")
-		burst(g.position + Vector3(0, 1.2, 0), "#ffd34e")
+		burst(g.position + Vector3(0, 1.3, 0), "stars")
 
 
 func finish_meal(g: Guest) -> void:
@@ -491,8 +472,10 @@ func finish_meal(g: Guest) -> void:
 	town.record_visit(g.idx, g.mood.satisfaction())
 	g.table.dirty += 1
 	g.table.refresh()
-	popup("+$%d" % (BILL + tip), g.position + Vector3(0, 1.8, 0), Color("#ffd34e"))
-	burst(g.position + Vector3(0, 1.4, 0), "#ffd34e", 8)
+	popup("+$%d" % (BILL + tip), g.position + Vector3(0, 1.9, 0), Color(Build.TRIM))
+	Fx.coin(self, g.position + Vector3(0, 1.5, 0))
+	if g.mood.satisfaction() > 0.5:
+		g._heart_time = 2.5
 	sfx("coin")
 	_leave(g)
 
@@ -503,7 +486,8 @@ func walk_out(g: Guest) -> void:
 	ledger.record_walkout()
 	town.record_visit(g.idx, -0.5)
 	hud.say("%s walked out!" % g.info.name)
-	popup("walked out", g.position + Vector3(0, 1.8, 0), Color("#ff6b5e"))
+	var mark := Fx.play(g, "anger", Vector3(0, 1.75, 0), 0.3, true)
+	mark.fps = 6.0
 	sfx("fail")
 	shake()
 	_leave(g)
@@ -616,7 +600,7 @@ func use_station(st: Station, dry_run := false) -> String:
 		st.used()
 		if act == "Wash":
 			sfx("wash")
-			burst(st.position + Vector3(0, 1.0, 0), "#9fd4ea", 10)
+			burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
 		elif not act.begins_with("Serve"):
 			sfx("pickup" if player.held != "" else "putdown")
 	return act
@@ -628,11 +612,10 @@ func _tick_stoves(delta: float) -> void:
 		var stage := st.tick_cooking(delta)
 		if stage == "cooked_patty":
 			sfx("ding")
-			popup("ready!", st.position + Vector3(0, 2.0, 0), Color("#5fd38d"))
+			burst(st.position + Vector3(0, 1.2, 0), "stars", 0.4)
 		elif stage == "burnt_patty":
 			sfx("burn")
 			shake(0.08)
-			popup("burnt!", st.position + Vector3(0, 2.0, 0), Color("#ff6b5e"))
 		sizzling = sizzling or st.is_cooking()
 	if _sfx.has("sizzle") and _sfx.sizzle.playing != sizzling:
 		_sfx.sizzle.playing = sizzling

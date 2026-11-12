@@ -24,8 +24,7 @@ var _needle: Node3D
 var _ring: MeshInstance3D
 var _shown_look := ""
 var _vis: Node3D
-var _smoke: CPUParticles3D
-var _smoke_mat: StandardMaterial3D
+var _fx := {}
 
 
 static func quality_at(t: float) -> float:
@@ -115,9 +114,11 @@ func tick_cooking(delta: float) -> String:
 	if stage == item:
 		if patty_look(cook) != _shown_look:
 			_show_item(item)
+			_update_cooking_visuals()
 		return ""
 	item = stage
 	_show_item(stage)
+	_update_cooking_visuals()
 	return stage
 
 
@@ -152,28 +153,15 @@ func _make_cook_bar() -> void:
 	_bar.visible = false
 
 
+## The heat ladder (sheet 13): off-white steam, warm grey smoke as the meat
+## dries, charcoal smoke with red sparks and toy flames once it burns.
 func _make_smoke() -> void:
-	_smoke = CPUParticles3D.new()
-	_smoke.position = Vector3(0, 1.0, 0)
-	_smoke.amount = 10
-	_smoke.lifetime = 1.1
-	_smoke.direction = Vector3.UP
-	_smoke.spread = 18.0
-	_smoke.gravity = Vector3(0, 0.5, 0)
-	_smoke.initial_velocity_min = 0.3
-	_smoke.initial_velocity_max = 0.6
-	_smoke.scale_amount_min = 0.6
-	_smoke.scale_amount_max = 1.5
-	var puff := SphereMesh.new()
-	puff.radius = 0.07
-	puff.height = 0.14
-	_smoke_mat = StandardMaterial3D.new()
-	_smoke_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_smoke_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	puff.material = _smoke_mat
-	_smoke.mesh = puff
-	_smoke.emitting = false
-	add_child(_smoke)
+	for id: String in ["steam", "spatter", "smoke", "burn", "flame"]:
+		var at := Vector3(0, 1.0 if id == "spatter" or id == "flame" else 1.12, 0)
+		var fx := Fx.play(self, id, at, 0.26 if id == "spatter" or id == "flame" else 0.34, true)
+		fx.fps = 9.0 if id == "flame" or id == "spatter" else 5.0
+		fx.visible = false
+		_fx[id] = fx
 
 
 func is_cooking() -> bool:
@@ -185,9 +173,12 @@ func _update_cooking_visuals() -> void:
 	_needle.rotation.z = -deg_to_rad(_dial_angle(cook))
 	if _ring:
 		_ring.material_override = Build.mat(Color("#ff8a3c") if is_cooking() else Color(Build.STEEL_DARK), 1.6 if is_cooking() else 0.0)
-	_smoke.emitting = item != "" and item.ends_with("patty")
-	var danger := clampf((cook - PERFECT_END) / (BURN_TIME - PERFECT_END), 0.0, 1.0)
-	_smoke_mat.albedo_color = Color(1, 1, 1, 0.45).lerp(Color(0.12, 0.1, 0.1, 0.8), danger)
+	var look := _shown_look if item.ends_with("patty") else ""
+	_fx.steam.visible = look == "raw" or look == "nearly" or look == "perfect"
+	_fx.spatter.visible = look == "nearly" or look == "perfect"
+	_fx.smoke.visible = look == "dry"
+	_fx.burn.visible = look == "burnt"
+	_fx.flame.visible = look == "burnt"
 
 
 ## Redraws plate stacks and dirty dishes.
