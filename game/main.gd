@@ -35,6 +35,7 @@ var seat_taken := {}             # Vector2i -> Guest
 var arrivals: Array[Dictionary] = []
 var clock := 0.0
 var last_day := {}
+var flyers_out := false          # bought tonight, spent on tomorrow's crowd
 var best_path := "user://regulars_best.json"
 var player: Player
 var hud: Hud
@@ -133,6 +134,10 @@ func _apply_demo(demo: String) -> void:
 				if i % 2 == 0:
 					town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
 			get_tree().create_timer(1.5).timeout.connect(hud.show_town)
+	elif demo == "flyers":
+		ledger.record_sale(BILL, 5)
+		arrivals.clear()
+		get_tree().create_timer(1.5).timeout.connect(buy_flyers)
 
 
 func _demo_kind(offer: bool) -> void:
@@ -365,14 +370,26 @@ func start_day() -> void:
 	clock = 0.0
 	hud.hide_card()
 	town.new_day()
-	var coming := town.roll_guests(ledger.day)
+	var coming := town.roll_guests(ledger.day, Town.FLYER_BOOST if flyers_out else 0.0)
+	var flyered := flyers_out
+	flyers_out = false
 	arrivals.clear()
 	for i in coming.size():
 		var t := 2.0 + (i + town.rng.randf() * 0.6) * (day_length() - 2.0) / coming.size()
 		arrivals.append({"time": t, "idx": coming[i]})
 	hud.show_banner("Day %d" % ledger.day)
-	hud.say("%d guests expected today." % coming.size())
+	hud.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
 	sfx("day")
+
+
+## Flyers: pay tonight for a bigger crowd tomorrow. One batch a night.
+func buy_flyers() -> bool:
+	if phase != Phase.SUMMARY or flyers_out or not ledger.spend(Town.FLYER_PRICE):
+		return false
+	flyers_out = true
+	sfx("coin")
+	hud.show_summary(last_day, false)
+	return true
 
 
 func _end_day() -> void:
@@ -756,6 +773,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			use_station(stations[player.target_cell()])
 	elif phase == Phase.SUMMARY and confirm:
 		start_day()
+	elif phase == Phase.SUMMARY and key == KEY_F:
+		buy_flyers()
 	elif phase == Phase.SUMMARY and key == KEY_T:
 		hud.toggle_town()
 	elif phase == Phase.CLOSED and confirm:

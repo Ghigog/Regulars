@@ -347,6 +347,8 @@ func _theme() -> Theme:
 	t.set_stylebox("normal", "Button", _stamp_button(CORAL))
 	t.set_stylebox("hover", "Button", _stamp_button(CORAL.lightened(0.1)))
 	t.set_stylebox("pressed", "Button", _stamp_button(CORAL.darkened(0.12)))
+	t.set_stylebox("disabled", "Button", _stamp_button(Color("#c9b9a3")))
+	t.set_color("font_disabled_color", "Button", CREAM)
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	t.set_color("font_color", "Button", CREAM)
 	t.set_color("font_hover_color", "Button", CREAM)
@@ -459,16 +461,18 @@ func _rule(box: VBoxContainer) -> void:
 	l.modulate.a = 0.45
 
 
-func _button(box: VBoxContainer, text: String, action: Callable) -> void:
+func _button(box: Container, text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.pressed.connect(action)
 	box.add_child(b)
+	return b
 
 
 ## End of day: a torn diner receipt on a wooden clipboard, with the town gossip
 ## pinned beside it.
-func show_summary(rec: Dictionary) -> void:
+func show_summary(rec: Dictionary, animate := true) -> void:
 	hide_card()
 	_town_open = false
 	var clip := Sheet.new("clip").pad(26, 46, 26, 26)
@@ -489,8 +493,9 @@ func show_summary(rec: Dictionary) -> void:
 	_row(box, "walkout", "Walkouts", str(rec.walkouts))
 	_rule(box)
 	var earned: int = rec.sales + rec.tips
-	var total := _row(box, "", "Earned today", "$0", 30)
-	total.create_tween().tween_method(func(v: float) -> void: total.text = "$%d" % roundi(v), 0.0, float(earned), 0.9) \
+	var total := _row(box, "", "Earned today", "$%d" % earned, 30)
+	if animate:
+		total.create_tween().tween_method(func(v: float) -> void: total.text = "$%d" % roundi(v), 0.0, float(earned), 0.9) \
 		.set_delay(0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	_row(box, "", "In the bank", "$%d" % game.ledger.money)
 	var note := Sheet.new("note").pad(16, 18, 16, 10)
@@ -499,9 +504,20 @@ func show_summary(rec: Dictionary) -> void:
 	var gossip := _label(note, 16, game.town.headline())
 	gossip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	gossip.custom_minimum_size = Vector2(380, 0)
-	_button(stack, "Town book   (T)", show_town)
+	if game.flyers_out:
+		_row(box, "star", "Flyers for tomorrow", "paid")
+	var extras := HBoxContainer.new()
+	extras.add_theme_constant_override("separation", 12)
+	stack.add_child(extras)
+	var flyers := _button(extras, "Flyers  $%d   (F)" % Town.FLYER_PRICE, game.buy_flyers)
+	flyers.disabled = game.flyers_out or game.ledger.money < Town.FLYER_PRICE
+	flyers.tooltip_text = "More guests tomorrow."
+	if game.flyers_out:
+		flyers.text = "Flyers are out"
+	_button(extras, "Town book   (T)", show_town)
 	_button(stack, "Open for day %d   (Enter)" % game.ledger.day, game.start_day)
-	_pop_in(clip)
+	if animate:
+		_pop_in(clip)
 
 
 func toggle_town() -> void:

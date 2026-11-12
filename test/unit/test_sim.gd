@@ -152,6 +152,15 @@ func test_roll_guests_has_minimum_and_no_duplicates():
 		seen[g] = true
 
 
+func test_flyers_bring_a_bigger_crowd():
+	var plain := 0
+	var boosted := 0
+	for seed_value in range(1, 21):
+		plain += Town.new(seed_value).roll_guests(1).size()
+		boosted += Town.new(seed_value).roll_guests(1, Town.FLYER_BOOST).size()
+	assert_gt(boosted, plain + 20, "at least one more guest a day on average")
+
+
 func test_friendships_are_mutual():
 	var t := Town.new(7)
 	for i in t.people.size():

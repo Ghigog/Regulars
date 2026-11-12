@@ -76,6 +76,19 @@ func test_half_price_calms_an_impatient_guest_and_costs_half_the_bill():
 	assert_eq(int(game.ledger.today.sales), 6)
 
 
+func test_flyers_cost_money_once_a_night_and_are_used_up_next_day():
+	assert_false(game.buy_flyers(), "not during service")
+	game.arrivals.clear()
+	_run(0.2)
+	assert_eq(game.phase, game.Phase.SUMMARY)
+	assert_true(game.buy_flyers())
+	assert_eq(game.ledger.money, 50 - Town.FLYER_PRICE)
+	assert_false(game.buy_flyers(), "one batch a night")
+	game.start_day()
+	assert_false(game.flyers_out)
+	assert_eq(int(game.ledger.today.spent), Town.FLYER_PRICE)
+
+
 func test_washing_a_dirty_plate_returns_it_to_the_stack():
 	var table: Station = game.stations[Vector2i(6, 1)]
 	table.dirty = 1
