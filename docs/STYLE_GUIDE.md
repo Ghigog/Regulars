@@ -54,6 +54,49 @@ Implementers should follow these, not the individual drawings.
    Adding a number on each chef or a shape on each mood is suggested but undecided.
 3. **Subtitle.** "Town Diner" appears on the logos and may become a per-theme subtitle.
 
+## As built
+
+The first art pass is in the game. This is where it follows the guide loosely or not at
+all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
+
+**How it is made**
+- Nothing is modelled in Blender yet. Every mesh is generated in GDScript: chamfered
+  boxes (the 3 cm bevel), lathed shapes (bodies, plates, pots, hats) and flat cut-out
+  cards (dial, bubbles, effects). The shapes follow the rules, so pieces can be replaced
+  by Blender models one at a time.
+- Icons and effect frames are polygon artwork in `game/icons.gd`, shared by the world and
+  the HUD. Effects are four frames, flat colour, hard edges, no alpha.
+
+**Departures**
+
+| Topic | What the game does | Why |
+| --- | --- | --- |
+| Faces | Built from small sculpted dots and strokes on the head, not textures. Nose dropped everywhere (the small-size rule). | Stays crisp at any zoom; no texture pipeline. |
+| Mood tint | Tints the whole head (orange about to snap, green disgust, red angry), not a gradient from the top. | Flat colour only; reads the same at 60 px. |
+| Patience | A chunky patience meter stays under the thought bubble. | The face and tint alone were too slow to read across six guests. |
+| Names | A small ink name tag stays over each guest. | "Named townsfolk" is the point of the game; prompts say "Serve Mabel". |
+| Thoughts | Bubbles show one icon (burger, Zzz, green cloud, heart). The written thoughts are still recorded in `sim/` but no longer shown. | Sheet 13. |
+| Popups | "+$12" stays as ink text beside the coin. "ready!", "burnt!" and "walked out" became stars, flames and the anger mark. | Amounts matter; the rest reads without words. |
+| Felix and Nell | Looks invented from the kit (auburn side-sweep and cream collar; top-knot and periwinkle dungarees). | Never drawn. |
+| Stove | Steel body, one large burner with the frying pan always on it. | One cooking slot per stove; a pan over four small burners looked wrong. Steel keeps it distinct from the teal counters. |
+| Patty looks | "Nearly there" and "dry" are looks only. The game still has three item kinds (raw, cooked, burnt) and the same timings. | No gameplay change. |
+| Dial | Shown while a patty cooks; hidden once it burns (flames take over). | The burnt state needs no gauge. |
+| Fridge | Shut, and swings open on use to show the meat. | The "open" state has nothing else to hang on. |
+| Station states | Not built: sink full of suds, overflowing bin. Washing plays the bubble effect. | No gameplay behind them yet. |
+| Outer walls | Stand just outside the floor instead of centred on the grid edge. The front cutaway is centred on its edge. | Keeps the back row of stations and the floor whole. |
+| Cutaway | Wall colour with a dark trim cap, including the right-hand wall, which had no wall before. | "Resolved conflicts": dark cap, no coral face. |
+| Kitchen dressing | Wall cabinets on the left wall, jar shelf by the stoves, no range hood. | Nothing may hide a stove or its dial. |
+| Lighting | Sconces on the far walls, a mushroom lamp on each table, a street lamp. No floor lamp. All come up as the sun goes down. | Every corner in the room is walkable. |
+| Shopfront | The hanging burger sign sits on the coral door frame. No awning or upper wall. | Those only show in title and photo views, which do not exist yet. |
+| Camera | Same angles; the view is a little wider (size 14.5, was 13.5) and centred nearer the street. Characters are about 66 px tall. | So the whole slab and its edge are in frame. |
+| Palette | Brief values nudged toward sheet 7; the dining floor is less saturated than either. | Under warm light the sampled orange glowed. |
+| Font | A rounded system font (Arial Rounded where present). | No licensed hand-lettered face chosen yet. |
+| Themes | Chosen with `REGULARS_THEME=seaside`. Seaside swaps walls (clapboard), windows (portholes), wall art (life ring and paddle), floors, lawn (sand), pavement (boardwalk with rope bollards) and road (sea with foam). Stations are untouched. | Sheet 16. No picker yet because the title screen is open. |
+
+**Not yet done:** Blender kit, hired staff, co-op chefs 2 to 4 (trim colours exist in
+`Peg.PLAYER_TRIM`), future dishes, four-seat table and booth, title screen, colour-blind
+support.
+
 ## Rules so far
 
 | Topic | Rule | Status | From |

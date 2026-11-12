@@ -13,8 +13,8 @@ many days as you can; three walkouts in one day ends the run.
 
 - Direct control of one chef (WASD, E/Space).
 - One dish: a burger. Fridge > stove > plate > table. Dirty plates go to the sink.
-- Meat has doneness. The stove shows a timer with a green "perfect" window; pull it late
-  and it is dry (worse tips), leave it and it burns.
+- Meat has doneness. A radial dial over the stove has a green "perfect" window; pull it late
+  and it is dry (worse tips), leave it and it burns. The patty changes look as it goes.
 - Guests are named townsfolk with patience, disgust, joy and savour. These set the tip.
 - Each day is busier and guests are less patient. Money carries across days but there is
   nothing to spend it on yet.
@@ -97,20 +97,31 @@ be recovered from the description in section 4.
 - **Art direction is settled.** See `docs/STYLE_GUIDE.md` (rules, resolved conflicts,
   palette) and the 27 images in `docs/art/`. Toy diorama: legless peg-people with floating
   mitten hands, bevelled painted-wood props, soft warm shadows, paper-and-wood interface.
-- **The game does not match it yet.** Everything in game is still primitive meshes built in
-  `game/build.gd` from the first mood render. Closing the gap, roughly in order:
-  1. Palette, shadow colour and 3 cm bevels on every box (cheap, large effect).
-  2. Character: one shared body with the big head, face textures for the eight moods,
-     mitten hands, kit parts (hair, hats, glasses, beard, five skin tones, four outfits).
-  3. Doneness dial above each burner in place of the horizontal bar, and the five patty
-     states, plated burger, half-eaten and dirty plate.
-  4. Kitchen and dining props from sheets 8 and 10, the cutaway front wall from sheet 11,
-     wall sconces for light (no hanging lamps).
-  5. Thought bubbles and four-frame effects from sheet 13, replacing the text quotes.
-  6. Paper-and-wood HUD, end-of-day receipt, game-over menu card and the eight icons (sheet 14).
-  7. Shopfront, street and slab edge (sheet 12), then the seaside theme as a re-skin (sheet 16).
-- Models are to be built in Blender (`concept/concept_scene.py` shows the toolchain works)
-  and imported; until then, primitives that follow the rules are acceptable.
+- **The game now follows it.** The first art pass is done, all of it built in code:
+  1. Palette roles, plum-warm soft shadows and 3 cm bevels on every box (`game/build.gd`).
+  2. Peg-people: one shared body, the eight faces, mitten hands with poses, and the kit
+     (5 skins, 8 hair shapes, 6 hats, glasses, beard, 10 outfit colours, 4 patterns). All
+     fourteen townsfolk have a look; the chef has the toque and player trim (`game/peg.gd`).
+  3. Radial doneness dial, five patty looks, pan, tall burger, bitten burger, dirty plate.
+  4. Every station rebuilt (sheets 8 and 10); room kit with full far walls, the 0.55 m
+     cutaway, windows, wall art, sconces and table lamps (`game/scenery.gd`).
+  5. Thought bubbles and four-frame cut-out effects (`game/icons.gd`, `game/fx.gd`).
+  6. Paper-and-wood HUD: day plaque with sun dial, money tag, walkout punch-card, keycap
+     prompt, end-of-day receipt on a clipboard, game-over menu card, icon tokens.
+  7. Floating slab, plot, paved street with kerb furniture; the seaside pier theme as a
+     re-skin (`REGULARS_THEME=seaside`).
+- **Where it departs from the sheets** is listed in the style guide under "As built".
+- **Still to do**
+  - A Blender-built kit. Everything is generated in GDScript (bevelled boxes, lathed
+    shapes, flat cut-out cards). `concept/concept_scene.py` shows the Blender toolchain
+    works; swap pieces in where a sculpted model would beat the generated one (hair, hats,
+    the fridge, the tree are the best candidates).
+  - A theme picker in the game (themes are an environment variable for now).
+  - Station states with no gameplay behind them yet: sink full of suds, overflowing bin.
+  - Hired staff (server, dishwasher, host), co-op chefs 2 to 4 (trim colours exist),
+    future dishes, the four-seat table and booth, floor lamp, awning and photo view.
+  - A bundled hand-lettered font (the HUD uses a rounded system font).
+  - The open items: title screen, colour-blind support, the "Town Diner" subtitle.
 - Sounds are synthesised placeholders (`tools/make_sfx.py`). Later: real foley, music per theme.
 
 ## 9. Open questions
