@@ -64,7 +64,7 @@ func setup(game_) -> void:
 	hint.offset_left = 24
 	hint.offset_top = -40
 	hint.modulate.a = 0.7
-	hint.text = "WASD move     E or Space use"
+	hint.text = "WASD move     E or Space use     M mute"
 
 	banner = _label(root, 96)
 	banner.set_anchors_preset(Control.PRESET_FULL_RECT)

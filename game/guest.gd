@@ -6,6 +6,7 @@ const SPEED := 2.4
 const QUEUE_PATIENCE := 40.0
 const EAT_TIME := 5.0
 const BAR_WIDTH := 0.6
+const SEAT_HEIGHT := 0.3
 
 var game
 var idx := 0
@@ -21,6 +22,7 @@ var _body: Node3D
 var _bar: Node3D
 var _fill: MeshInstance3D
 var _order: Node3D
+var _meal: Node3D
 var _label: Label3D
 var _thought_time := 0.0
 var _shown_thoughts := 0
@@ -34,6 +36,7 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	cell = start
 	position = Grid.center(start)
 	_body = Build.person(info.shirt, info.skin)
+	_body.rotation.y = -PI / 2
 	add_child(_body)
 	_bar = Node3D.new()
 	_bar.position = Vector3(0, 1.5, 0)
@@ -59,12 +62,18 @@ func walk_to(target: Vector2i) -> void:
 	path = game.grid.find_path(cell, target)
 
 
+func _face(dir: Vector3, delta: float) -> void:
+	if dir.length_squared() > 0.0001:
+		_body.rotation.y = lerp_angle(_body.rotation.y, atan2(dir.x, dir.z), 1.0 - exp(-12.0 * delta))
+
+
 ## Moves along the path. Returns true once there is nowhere left to go.
 func _advance(delta: float) -> bool:
 	if path.is_empty():
 		_body.position.y = 0.0
 		return true
 	var target := Grid.center(path[0])
+	_face(target - position, delta)
 	position = position.move_toward(target, SPEED * delta)
 	_body.position.y = absf(sin(_age * 11.0)) * 0.06
 	if position.distance_to(target) < 0.01:
@@ -72,10 +81,33 @@ func _advance(delta: float) -> bool:
 	return path.is_empty()
 
 
-func hop() -> void:
+func _sit() -> void:
+	state = "waiting"
+	mood.patience = minf(1.0, mood.patience + 0.3)
+	_body.create_tween().tween_property(_body, "position:y", SEAT_HEIGHT, 0.2) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	game.on_seated(self)
+
+
+func start_eating(quality: float) -> void:
+	mood.taste(quality)
+	state = "eating"
+	timer = EAT_TIME
+	var to_table := (Grid.center(table.cell) - position).normalized()
+	_meal = Build.item("burger")
+	_meal.position = to_table * 0.6 + Vector3(0, 0.7, 0)
+	add_child(_meal)
 	var tw := _body.create_tween()
-	tw.tween_property(_body, "position:y", 0.35, 0.12).set_ease(Tween.EASE_OUT)
-	tw.tween_property(_body, "position:y", 0.0, 0.2).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_body, "position:y", SEAT_HEIGHT + 0.3, 0.12).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_body, "position:y", SEAT_HEIGHT, 0.25).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+
+
+func stand_up() -> void:
+	state = "leaving"
+	_body.rotation.x = 0.0
+	if _meal:
+		_meal.queue_free()
+		_meal = null
 
 
 func tick(delta: float) -> void:
@@ -88,16 +120,18 @@ func tick(delta: float) -> void:
 				game.walk_out(self)
 		"to_seat":
 			if _advance(delta):
-				state = "waiting"
-				mood.patience = minf(1.0, mood.patience + 0.3)
-				game.on_seated(self)
+				_sit()
 		"waiting":
+			_face(Grid.center(table.cell) - position, delta)
 			mood.wait(delta, game.table_patience())
 			game.apply_surroundings(self, delta)
 			if mood.walked_out():
 				game.walk_out(self)
 		"eating":
 			timer -= delta
+			# Lean in for a bite, and the burger shrinks as it is eaten.
+			_body.rotation.x = maxf(0.0, sin(_age * 7.0)) * 0.22
+			_meal.scale = Vector3.ONE * lerpf(0.35, 1.0, clampf(timer / EAT_TIME, 0.0, 1.0))
 			game.apply_surroundings(self, delta)
 			if timer <= 0.0:
 				game.finish_meal(self)

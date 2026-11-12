@@ -61,9 +61,13 @@ static func ball(parent: Node3D, pos: Vector3, r: float, col: String, emit := 0.
 
 static func person(shirt: String, skin: int, chef := false) -> Node3D:
 	var n := Node3D.new()
+	var tone := SKIN[skin % SKIN.size()]
 	cyl(n, Vector3.ZERO, 0.2, 0.62, shirt)
 	ball(n, Vector3(0, 0.62, 0), 0.2, shirt)
-	ball(n, Vector3(0, 0.96, 0), 0.27, SKIN[skin % SKIN.size()])
+	ball(n, Vector3(0, 0.96, 0), 0.27, tone)
+	for side: float in [-1.0, 1.0]:  # eyes and hands; the person faces +z
+		ball(n, Vector3(side * 0.1, 1.0, 0.235), 0.04, "#2b2220")
+		ball(n, Vector3(side * 0.25, 0.42, 0.07), 0.075, tone)
 	if chef:
 		cyl(n, Vector3(0, 1.14, 0), 0.2, 0.22, "#ffffff")
 		ball(n, Vector3(0, 1.38, 0), 0.23, "#ffffff")
@@ -107,6 +111,8 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			_counter(n, "#8a949a", "#33373b")
 			for d: Vector2 in [Vector2(-0.22, -0.2), Vector2(0.22, -0.2), Vector2(-0.22, 0.2), Vector2(0.22, 0.2)]:
 				cyl(n, Vector3(d.x, 0.88, d.y), 0.13, 0.015, "#ff6b5e", 1.5)
+			for i in 3:
+				ball(n, Vector3(-0.25 + i * 0.25, 0.62, 0.48), 0.05, "#33373b")
 		"counter":
 			_counter(n, "#3f7f86", "#f4ead8")
 		"pass":
@@ -127,7 +133,11 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			cyl(n, Vector3.ZERO, 0.09, 0.62, "#7a5235")
 			cyl(n, Vector3(0, 0.62, 0), 0.6, 0.07, "#f6efe2")
 			box(n, Vector3(-1, 0, 0), Vector3(0.42, 0.34, 0.42), "#d9534f")
+			box(n, Vector3(-1.19, 0.3, 0), Vector3(0.07, 0.5, 0.42), "#c2453f")
 			box(n, Vector3(1, 0, 0), Vector3(0.42, 0.34, 0.42), "#e9a23b")
+			box(n, Vector3(1.19, 0.3, 0), Vector3(0.07, 0.5, 0.42), "#d08a25")
+			cyl(n, Vector3(0, 0.69, 0), 0.06, 0.12, "#8fc7c3")
+			ball(n, Vector3(0, 0.86, 0), 0.07, "#e56b5d")
 	if tier > 1:
 		for i in tier - 1:
 			box(n, Vector3(0, 0.05 + i * 0.1, 0), Vector3(1.02, 0.04, 1.02), "#ffd34e", 0.6)

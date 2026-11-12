@@ -38,6 +38,13 @@ func set_held(kind: String, quality := 1.0) -> void:
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
+## A quick squash and stretch whenever the chef does something.
+func punch() -> void:
+	_body.scale = Vector3(1.15, 0.85, 1.15)
+	_body.create_tween().tween_property(_body, "scale", Vector3.ONE, 0.25) \
+		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
 func carrying_something_gross() -> bool:
 	return GROSS_ITEMS.has(held)
 
@@ -88,6 +95,9 @@ func move(input: Vector2, delta: float) -> void:
 	else:
 		_velocity.z = 0.0
 	var pace := _velocity.length() / SPEED
+	var before := floori(_stride / PI)
 	_stride += delta * 13.0 * pace
+	if floori(_stride / PI) != before and pace > 0.3:
+		game.sfx("step", 0.15)
 	_body.position.y = absf(sin(_stride)) * 0.07 * pace
 	_body.rotation.y = lerp_angle(_body.rotation.y, atan2(float(facing.x), float(facing.y)), 1.0 - exp(-18.0 * delta))

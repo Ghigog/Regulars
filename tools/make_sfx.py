@@ -1,57 +1,201 @@
-"""Synthesises the placeholder sound effects. Run: python3 tools/make_sfx.py"""
+"""Synthesises the game's sound effects and music loop. Run: python3 tools/make_sfx.py"""
 import math, os, random, struct, wave
 
-RATE = 22050
+RATE = 32000
 OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "sfx")
 os.makedirs(OUT, exist_ok=True)
+random.seed(4)
+
+SINE = ((1, 1.0),)
+MARIMBA = ((1, 1.0), (4, 0.22), (10, 0.04))
+BELL = ((1, 1.0), (2.76, 0.5), (5.4, 0.25), (8.93, 0.1))
+SOFT = ((1, 1.0), (2, 0.3), (3, 0.1))
 
 
-def save(name, samples):
+def midi(m):
+    return 440.0 * 2 ** ((m - 69) / 12)
+
+
+def buf(dur):
+    return [0.0] * int(RATE * dur)
+
+
+def tone(b, start, freq, dur, vol, partials=SINE, decay=6.0, attack=0.004, bend=0.0, wrap=False):
+    """Adds a decaying note. bend is the fractional pitch change per second."""
+    n, i0, phase = len(b), int(start * RATE), 0.0
+    for k in range(int(dur * RATE)):
+        t = k / RATE
+        phase += 2 * math.pi * freq * (1 + bend * t) / RATE
+        env = min(1.0, t / attack) * math.exp(-decay * t)
+        v = sum(a * math.sin(phase * m) for m, a in partials)
+        i = i0 + k
+        if wrap:
+            i %= n
+        elif i >= n:
+            break
+        b[i] += v * vol * env
+
+
+def pad(b, start, freq, dur, vol, wrap=False):
+    n, i0 = len(b), int(start * RATE)
+    for k in range(int(dur * RATE)):
+        t = k / RATE
+        env = min(1.0, t / 0.5, (dur - t) / 0.5)
+        i = (i0 + k) % n if wrap else i0 + k
+        if i >= n:
+            break
+        b[i] += math.sin(2 * math.pi * freq * t) * vol * env
+
+
+def noise(b, start, dur, vol, colour=0.5, decay=0.0, wrap=False):
+    """High-passed noise burst. colour near 1 = hissy, near 0 = dull."""
+    n, i0, low = len(b), int(start * RATE), 0.0
+    for k in range(int(dur * RATE)):
+        t = k / RATE
+        x = random.uniform(-1, 1)
+        low += (1 - colour) * (x - low)
+        env = min(1.0, t / 0.003) * math.exp(-decay * t) * min(1.0, (dur - t) / 0.01)
+        i = (i0 + k) % n if wrap else i0 + k
+        if i >= n:
+            break
+        b[i] += (x - low) * vol * env
+
+
+def reverb(b, amount=0.25):
+    out = b + [0.0] * int(RATE * 0.25)
+    for delay, gain in ((0.029, 0.5), (0.047, 0.4), (0.071, 0.3), (0.113, 0.2), (0.171, 0.12)):
+        d = int(delay * RATE)
+        for i in range(len(b)):
+            out[i + d] += b[i] * gain * amount
+    return out
+
+
+def save(name, b, peak=0.8):
+    top = max(1e-9, max(abs(s) for s in b))
+    fade = int(RATE * 0.004)
     with wave.open(os.path.join(OUT, name + ".wav"), "w") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(RATE)
-        w.writeframes(b"".join(struct.pack("<h", int(max(-1, min(1, s)) * 30000)) for s in samples))
+        frames = []
+        for i, s in enumerate(b):
+            edge = min(1.0, (len(b) - i) / fade) if name not in LOOPS else 1.0
+            frames.append(struct.pack("<h", int(s / top * peak * edge * 32767)))
+        w.writeframes(b"".join(frames))
 
 
-def note(freq, dur, vol=0.5, decay=6.0, bend=0.0, shape="sine"):
-    out, phase = [], 0.0
-    for i in range(int(RATE * dur)):
-        t = i / RATE
-        phase += 2 * math.pi * (freq + bend * t) / RATE
-        v = math.sin(phase)
-        if shape == "square":
-            v = 0.6 if v > 0 else -0.6
-        elif shape == "bell":
-            v = 0.7 * v + 0.3 * math.sin(phase * 2.76)
-        out.append(v * vol * math.exp(-decay * t) * min(1.0, i / 60))
-    return out
+LOOPS = {"sizzle", "music"}
 
+# ---------------------------------------------------------------- effects
 
-def seq(*parts):
-    out = []
-    for p in parts:
-        out += p
-    return out
+b = buf(0.16)
+tone(b, 0, 420, 0.14, 1.0, SOFT, decay=22, bend=5.0)
+noise(b, 0, 0.02, 0.3, 0.8, decay=150)
+save("pickup", b, 0.6)
 
+b = buf(0.18)
+tone(b, 0, 190, 0.16, 1.0, SOFT, decay=24, bend=-2.5)
+noise(b, 0, 0.03, 0.5, 0.3, decay=120)
+save("putdown", b, 0.6)
 
-random.seed(4)
-save("pickup", note(520, 0.09, 0.4, 14, bend=2400))
-save("putdown", note(300, 0.09, 0.4, 16, bend=-900))
-save("ding", note(1320, 0.7, 0.5, 5, shape="bell"))
-save("serve", seq(note(660, 0.11, 0.45, 9, shape="bell"), note(990, 0.35, 0.45, 6, shape="bell")))
-save("coin", seq(note(1180, 0.07, 0.4, 10), note(1570, 0.3, 0.4, 8)))
-save("fail", seq(note(300, 0.18, 0.45, 4, bend=-400, shape="square"), note(200, 0.4, 0.45, 5, bend=-250, shape="square")))
-save("burn", seq(note(440, 0.12, 0.4, 3, shape="square"), [0.0] * 1200, note(440, 0.12, 0.4, 3, shape="square")))
-save("day", seq(note(523, 0.13, 0.4, 7, shape="bell"), note(659, 0.13, 0.4, 7, shape="bell"), note(784, 0.5, 0.45, 4, shape="bell")))
-save("wash", [random.uniform(-1, 1) * 0.25 * math.sin(math.pi * i / (RATE * 0.35)) for i in range(int(RATE * 0.35))])
+b = buf(1.1)
+tone(b, 0, midi(88), 1.1, 1.0, BELL, decay=4.5)
+tone(b, 0.09, midi(93), 1.0, 0.6, BELL, decay=5)
+save("ding", reverb(b, 0.4), 0.7)
 
-# Sizzle: crackly filtered noise that loops cleanly.
-sizzle, low = [], 0.0
-for i in range(RATE):
-    n = random.uniform(-1, 1)
-    low += 0.35 * (n - low)
-    crackle = 1.0 if random.random() < 0.004 else 0.0
-    sizzle.append((n - low) * 0.22 + crackle * random.uniform(-0.5, 0.5))
-save("sizzle", sizzle)
-print("wrote", sorted(os.listdir(OUT)))
+b = buf(0.9)
+for i, m in enumerate((72, 76, 79, 84)):
+    tone(b, i * 0.07, midi(m), 0.6, 1.0, MARIMBA, decay=8)
+save("serve", reverb(b, 0.35), 0.75)
+
+b = buf(0.7)
+tone(b, 0, midi(95), 0.12, 0.9, SOFT, decay=14)
+tone(b, 0.075, midi(100), 0.6, 1.0, SOFT, decay=7)
+tone(b, 0.075, midi(107), 0.5, 0.25, SINE, decay=9)
+save("coin", reverb(b, 0.3), 0.7)
+
+b = buf(0.9)
+tone(b, 0, midi(63), 0.3, 1.0, SOFT, decay=5, bend=-0.3)
+tone(b, 0.22, midi(58), 0.6, 1.0, SOFT, decay=4, bend=-0.4)
+tone(b, 0.22, midi(46), 0.6, 0.6, SINE, decay=4)
+save("fail", reverb(b, 0.3), 0.75)
+
+b = buf(0.7)
+noise(b, 0, 0.6, 0.6, 0.9, decay=5)
+for i in range(3):
+    tone(b, i * 0.15, midi(81), 0.09, 0.7, SOFT, decay=6)
+save("burn", b, 0.7)
+
+b = buf(1.3)
+for i, m in enumerate((67, 72, 76, 79)):
+    tone(b, i * 0.13, midi(m), 0.8, 1.0, MARIMBA, decay=5)
+tone(b, 0.52, midi(84), 0.7, 0.7, BELL, decay=5)
+save("day", reverb(b, 0.45), 0.75)
+
+b = buf(0.6)
+noise(b, 0, 0.55, 0.5, 0.75, decay=3)
+for i in range(9):
+    tone(b, random.uniform(0.02, 0.45), random.uniform(700, 1900), 0.05, 0.35, SINE, decay=40, bend=6.0)
+save("wash", b, 0.6)
+
+b = buf(0.09)
+tone(b, 0, 150, 0.07, 1.0, SINE, decay=45, bend=-3.0)
+noise(b, 0, 0.03, 0.5, 0.25, decay=140)
+save("step", b, 0.5)
+
+b = buf(1.2)
+tone(b, 0, midi(96), 1.0, 1.0, BELL, decay=6)
+tone(b, 0.16, midi(91), 1.0, 0.8, BELL, decay=6)
+save("bell", reverb(b, 0.4), 0.55)
+
+b = buf(0.5)
+for i, m in enumerate((84, 88, 91)):
+    tone(b, i * 0.035, midi(m), 0.35, 1.0, BELL, decay=10)
+save("perfect", reverb(b, 0.4), 0.6)
+
+# Sizzle: hiss plus random crackles, cross-faded so it loops without a click.
+n, x = int(RATE * 1.6), int(RATE * 0.2)
+raw = [0.0] * (n + x)
+noise(raw, 0, (n + x) / RATE, 0.35, 0.85)
+for _ in range(110):
+    noise(raw, random.uniform(0, 1.75), random.uniform(0.004, 0.02), random.uniform(0.3, 0.9), 0.6, decay=200)
+sizzle = raw[:n]
+for i in range(x):
+    a = i / x
+    sizzle[i] = raw[i] * a + raw[n + i] * (1 - a)
+save("sizzle", sizzle, 0.5)
+
+# ---------------------------------------------------------------- music loop
+# Eight bars at 100 bpm; every note wraps around the end so the loop is seamless.
+BEAT = 0.6
+music = buf(BEAT * 32)
+CHORDS = [  # (bass note, pad notes)
+    (48, (60, 64, 67, 71)), (45, (57, 60, 64, 67)), (41, (53, 57, 60, 64)), (43, (55, 59, 62, 65)),
+] * 2
+SCALE = [72, 74, 76, 79, 81, 84]
+step_i, phrase = 2, []
+for bar in range(4):
+    notes = []
+    for eighth in range(8):
+        if random.random() < (0.2 if eighth % 2 == 0 else 0.45):
+            notes.append(None)
+            continue
+        step_i = max(0, min(len(SCALE) - 1, step_i + random.choice((-2, -1, -1, 1, 1, 2))))
+        notes.append(SCALE[step_i])
+    phrase.append(notes)
+for bar, (bass, tones) in enumerate(CHORDS):
+    t0 = bar * 4 * BEAT
+    for m in tones:
+        pad(music, t0, midi(m), 4 * BEAT + 0.4, 0.035, wrap=True)
+    for beat, m in ((0, bass), (1.5, bass), (2.5, bass + 7), (3, bass)):
+        tone(music, t0 + beat * BEAT, midi(m), 0.5, 0.3, SOFT, decay=5, attack=0.01, wrap=True)
+    for beat in (0, 2):
+        tone(music, t0 + beat * BEAT, 95, 0.2, 0.3, SINE, decay=20, bend=-2.0, wrap=True)
+    for eighth in range(8):
+        noise(music, t0 + eighth * BEAT / 2, 0.04, 0.05 if eighth % 2 else 0.025, 0.9, decay=70, wrap=True)
+        m = phrase[bar % 4][eighth]
+        if m is not None and not (bar >= 4 and eighth == 7):
+            tone(music, t0 + eighth * BEAT / 2, midi(m), 0.7, 0.16, MARIMBA, decay=7, wrap=True)
+save("music", music, 0.7)
+
+print("wrote", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

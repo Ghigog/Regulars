@@ -10,7 +10,11 @@ const SPAWN := Vector2i(9, 8)
 const EXIT := Vector2i(0, 8)
 const BILL := 12
 const SIGHT_RANGE := 7
-const SOUNDS: Array[String] = ["pickup", "putdown", "ding", "serve", "coin", "fail", "burn", "day", "wash", "sizzle"]
+const SOUNDS := {  # name -> volume in dB
+	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
+	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0, "music": -15.0,
+}
+const LOOPING: Array[String] = ["sizzle", "music"]
 
 var grid: Grid
 var town: Town
@@ -31,6 +35,8 @@ var _cursor: MeshInstance3D
 var _prompt: Label3D
 var _gross: Array[Dictionary] = []
 var _sfx := {}
+var _sun: DirectionalLight3D
+var _env: Environment
 var _shot_path := ""
 var _shot_time := 0.0
 
@@ -89,6 +95,16 @@ func _build_scenery() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color("#fff1e0")
 	env.ambient_light_energy = 0.5
+	env.ssao_enabled = true
+	env.ssao_radius = 0.7
+	env.ssao_intensity = 1.6
+	env.glow_enabled = true
+	env.glow_intensity = 0.35
+	env.glow_bloom = 0.05
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.12
+	_env = env
+	get_viewport().msaa_3d = Viewport.MSAA_4X
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -96,16 +112,21 @@ func _build_scenery() -> void:
 	sun.rotation_degrees = Vector3(-52, -30, 0)
 	sun.light_energy = 0.85
 	sun.shadow_enabled = true
+	sun.shadow_blur = 1.6
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	sun.directional_shadow_max_distance = 60.0
+	_sun = sun
 	add_child(sun)
 	cam = Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
 	cam.size = 13.5
 	add_child(cam)
-	var focus := Vector3(W / 2.0 + 0.3, 0, H / 2.0 + 1.2)
+	var focus := Vector3(W / 2.0 - 0.3, 0, H / 2.0 + 0.6)
 	cam.look_at_from_position(focus + Vector3(14, 15, 14), focus)
 
 	Build.box(self, Vector3(W / 2.0, -0.14, H / 2.0), Vector3(W + 0.5, 0.12, H + 0.5), "#5a4636")
-	Build.box(self, Vector3(W / 2.0, -0.12, H + 1.0), Vector3(W + 0.5, 0.1, 2.0), "#cdbfae")
+	Build.box(self, Vector3(W / 2.0, -0.12, H + 1.0), Vector3(W + 9.0, 0.1, 2.0), "#cdbfae")
+	_build_decor()
 	for x in W:
 		for y in H:
 			var col := "#d9a066" if y % 2 else "#cf9458"
@@ -119,6 +140,51 @@ func _build_scenery() -> void:
 	for wx: float in [5.5, 8.5]:
 		Build.box(self, Vector3(wx, 1.05, 0.04), Vector3(1.3, 0.9, 0.06), "#9fd4ea")
 	Build.box(self, Vector3(DOOR.x + 0.5, 0.0, H + 0.2), Vector3(1.0, 0.02, 0.5), "#d9534f")
+
+
+## Things that are only there to look nice.
+func _build_decor() -> void:
+	# Street: a road with lane dashes, a lamp post and planters by the front wall.
+	Build.box(self, Vector3(W / 2.0, -0.16, H + 3.6), Vector3(W + 9.0, 0.1, 3.2), "#8f8a84")
+	for i in 7:
+		Build.box(self, Vector3(-3.0 + i * 2.6, -0.06, H + 3.6), Vector3(1.1, 0.01, 0.14), "#f6efe2")
+	Build.cyl(self, Vector3(-2.2, 0, H + 1.7), 0.07, 2.6, "#3a3f44")
+	Build.ball(self, Vector3(-2.2, 2.7, H + 1.7), 0.2, "#ffe2a8", 2.0)
+	for px: float in [1.0, 3.0]:
+		Build.box(self, Vector3(px, 0, H + 0.24), Vector3(1.7, 0.32, 0.3), "#7a5235")
+		for i in 4:
+			Build.ball(self, Vector3(px - 0.6 + i * 0.4, 0.42, H + 0.24), 0.2, "#4f9d69" if i % 2 else "#5fb37a")
+	# Doorway: posts, a lintel and a sign.
+	for dx: float in [0.0, 1.0]:
+		Build.cyl(self, Vector3(DOOR.x + dx, 0, H), 0.06, 1.9, "#7a5235")
+	Build.box(self, Vector3(DOOR.x + 0.5, 1.9, H), Vector3(1.2, 0.5, 0.1), "#e56b5d")
+	var open_sign := Label3D.new()
+	open_sign.text = "OPEN"
+	open_sign.font_size = 56
+	open_sign.pixel_size = 0.005
+	open_sign.modulate = Color("#fff6e6")
+	open_sign.outline_size = 0
+	open_sign.position = Vector3(DOOR.x + 0.5, 2.15, H + 0.06)
+	add_child(open_sign)
+	# Kitchen shelf with jars, and a picture between the windows.
+	Build.box(self, Vector3(0.1, 1.5, 3.4), Vector3(0.22, 0.06, 3.4), "#7a5235")
+	var jars := ["#e9a23b", "#d9534f", "#5fd38d", "#ffffff", "#e9a23b", "#8fc7c3"]
+	for i in jars.size():
+		Build.cyl(self, Vector3(0.12, 1.56, 2.1 + i * 0.52), 0.1, 0.2 + 0.05 * (i % 2), jars[i])
+	Build.box(self, Vector3(7, 1.22, 0.05), Vector3(0.9, 0.66, 0.05), "#7a5235")
+	Build.box(self, Vector3(7, 1.29, 0.08), Vector3(0.74, 0.52, 0.03), "#ffd9a0")
+	Build.ball(self, Vector3(7.12, 1.62, 0.1), 0.1, "#e56b5d")
+
+
+## A pool of warm light over each table. (No lamp mesh: from this camera a
+## hanging shade would sit in front of the guests behind it.)
+func _add_lamp(over: Vector3) -> void:
+	var light := OmniLight3D.new()
+	light.position = over + Vector3(0, 1.7, 0)
+	light.light_color = Color("#ffd9a0")
+	light.light_energy = 0.7
+	light.omni_range = 3.2
+	add_child(light)
 
 
 func _build_layout() -> void:
@@ -140,6 +206,8 @@ func add_station(type: String, cell: Vector2i, tier := 1) -> Station:
 	add_child(st)
 	st.setup(type, cell, tier)
 	stations[cell] = st
+	if type == "table":
+		_add_lamp(st.position)
 	grid.blocked[cell] = true
 	for s in st.seats:
 		grid.reserved[s] = true
@@ -164,25 +232,72 @@ func find_station(type: String) -> Station:
 # ---------------------------------------------------------------- sound & feedback
 
 func _load_sounds() -> void:
-	for id in SOUNDS:
+	for id: String in SOUNDS:
 		var path := "res://assets/sfx/%s.wav" % id
 		if not ResourceLoader.exists(path):
 			continue
 		var p := AudioStreamPlayer.new()
 		var stream: AudioStreamWAV = load(path)
-		if id == "sizzle":
+		if LOOPING.has(id):
 			stream = stream.duplicate()
 			stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 			stream.loop_end = stream.data.size() / 2
-			p.volume_db = -8.0
+		else:
+			p.max_polyphony = 4
+		p.volume_db = SOUNDS[id]
 		p.stream = stream
 		add_child(p)
 		_sfx[id] = p
+	if _sfx.has("music"):
+		_sfx.music.play()
 
 
-func sfx(id: String) -> void:
+## Plays a sound with a little random pitch so repeats do not sound identical.
+func sfx(id: String, vary := 0.06) -> void:
 	if _sfx.has(id):
+		_sfx[id].pitch_scale = randf_range(1.0 - vary, 1.0 + vary)
 		_sfx[id].play()
+
+
+## A puff of little sparks.
+func burst(at: Vector3, col: String, count := 12) -> void:
+	var p := CPUParticles3D.new()
+	p.position = at
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.amount = count
+	p.lifetime = 0.7
+	p.direction = Vector3.UP
+	p.spread = 70.0
+	p.initial_velocity_min = 1.5
+	p.initial_velocity_max = 3.0
+	p.gravity = Vector3(0, -7, 0)
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.2
+	var m := SphereMesh.new()
+	m.radius = 0.05
+	m.height = 0.1
+	m.material = Build.mat(Color(col), 1.5)
+	p.mesh = m
+	add_child(p)
+	p.emitting = true
+	get_tree().create_timer(1.3).timeout.connect(p.queue_free)
+
+
+func shake(amount := 0.12) -> void:
+	var tw := cam.create_tween()
+	for i in 5:
+		tw.tween_property(cam, "h_offset", randf_range(-amount, amount), 0.04)
+	tw.tween_property(cam, "h_offset", 0.0, 0.05)
+
+
+## Morning light drifts to a warm, low evening sun as the day goes on.
+func _update_daylight() -> void:
+	var t := smoothstep(0.35, 1.0, day_progress())
+	_sun.light_color = Color("#fff6ea").lerp(Color("#ffb070"), t)
+	_sun.rotation_degrees = Vector3(lerpf(-52, -34, t), lerpf(-30, -62, t), 0)
+	_env.background_color = Color("#f0dfc4").lerp(Color("#eac3a0"), t)
+	_env.ambient_light_color = Color("#fff1e0").lerp(Color("#ffd9c4"), t)
 
 
 func popup(text: String, at: Vector3, col: Color) -> void:
@@ -311,6 +426,7 @@ func _seat_waiting_guests() -> void:
 		seat_taken[g.seat] = g
 		g.state = "to_seat"
 		g.walk_to(g.seat)
+		sfx("bell")
 		_reflow_queue()
 
 
@@ -360,12 +476,13 @@ func _waiting_guest_at(table: Station) -> Guest:
 func serve(g: Guest, quality: float) -> void:
 	if g.mood.patience > 0.65:
 		g.mood.delight(0.15, "That was quick!")
-	g.mood.taste(quality)
-	g.mood.think("Perfectly juicy" if quality > 0.95 else "A bit dry, this")
-	g.state = "eating"
-	g.timer = Guest.EAT_TIME
-	g.hop()
+	var perfect := quality > 0.95
+	g.mood.think("Perfectly juicy" if perfect else "A bit dry, this")
+	g.start_eating(quality)
 	sfx("serve")
+	if perfect:
+		sfx("perfect")
+		burst(g.position + Vector3(0, 1.2, 0), "#ffd34e")
 
 
 func finish_meal(g: Guest) -> void:
@@ -375,6 +492,7 @@ func finish_meal(g: Guest) -> void:
 	g.table.dirty += 1
 	g.table.refresh()
 	popup("+$%d" % (BILL + tip), g.position + Vector3(0, 1.8, 0), Color("#ffd34e"))
+	burst(g.position + Vector3(0, 1.4, 0), "#ffd34e", 8)
 	sfx("coin")
 	_leave(g)
 
@@ -386,6 +504,7 @@ func walk_out(g: Guest) -> void:
 	hud.say("%s walked out!" % g.info.name)
 	popup("walked out", g.position + Vector3(0, 1.8, 0), Color("#ff6b5e"))
 	sfx("fail")
+	shake()
 	_leave(g)
 
 
@@ -394,7 +513,7 @@ func _leave(g: Guest) -> void:
 	if queue.has(g):
 		queue.erase(g)
 		_reflow_queue()
-	g.state = "leaving"
+	g.stand_up()
 	g.walk_to(EXIT)
 
 
@@ -492,8 +611,10 @@ func use_station(st: Station, dry_run := false) -> String:
 					st.refresh()
 					player.set_held("dirty_plate")
 	if act != "" and not dry_run:
+		player.punch()
 		if act == "Wash":
 			sfx("wash")
+			burst(st.position + Vector3(0, 1.0, 0), "#9fd4ea", 10)
 		elif not act.begins_with("Serve"):
 			sfx("pickup" if player.held != "" else "putdown")
 	return act
@@ -508,6 +629,7 @@ func _tick_stoves(delta: float) -> void:
 			popup("ready!", st.position + Vector3(0, 2.0, 0), Color("#5fd38d"))
 		elif stage == "burnt_patty":
 			sfx("burn")
+			shake(0.08)
 			popup("burnt!", st.position + Vector3(0, 2.0, 0), Color("#ff6b5e"))
 		sizzling = sizzling or st.is_cooking()
 	if _sfx.has("sizzle") and _sfx.sizzle.playing != sizzling:
@@ -544,6 +666,7 @@ func _process(delta: float) -> void:
 	player.move(input, delta)
 	step(delta)
 	_update_cursor()
+	_update_daylight()
 	hud.update_status()
 	if _shot_path != "":
 		_shot_time += delta
@@ -569,6 +692,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var key: int = event.physical_keycode
 	var confirm := key == KEY_ENTER or key == KEY_KP_ENTER
+	if key == KEY_M:
+		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
+		return
 	if phase == Phase.SERVICE and (key == KEY_E or key == KEY_SPACE):
 		if stations.has(player.target_cell()):
 			use_station(stations[player.target_cell()])
