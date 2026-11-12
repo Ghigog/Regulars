@@ -300,13 +300,13 @@ static func _pier(root: Node3D, w: int, x1: float) -> void:
 		Build.box(root, Vector3(x + 0.25, -0.1, (7.0 + PAVE_Z) / 2), Vector3(0.485, 0.1, PAVE_Z - 7.0), tones[i % 3], 0.0, Build.R_WOOD)
 		x += 0.5
 		i += 1
-	Build.box(root, Vector3((X0 + x1) / 2, -0.2, (PAVE_Z + Z1) / 2), Vector3(x1 - X0, 0.1, Z1 - PAVE_Z), "#4fc3c8", 0.0, 0.25)
+	Build.box(root, Vector3((X0 + x1) / 2, -0.17, (PAVE_Z + Z1) / 2), Vector3(x1 - X0, 0.1, Z1 - PAVE_Z), "#4fc3c8", 0.0, 0.25)
 	x = X0 + 0.3
 	i = 0
 	while x < x1:
-		Build.ball(root, Vector3(x, -0.12, PAVE_Z + 0.12 + 0.1 * (i % 2)), 0.2 + 0.06 * (i % 3), "#ffffff").scale = Vector3(1.3, 0.25, 1)
+		Build.ball(root, Vector3(x, -0.08, PAVE_Z + 0.12 + 0.1 * (i % 2)), 0.2 + 0.06 * (i % 3), "#ffffff").scale = Vector3(1.3, 0.25, 1)
 		if i % 3 == 0:
-			Build.ball(root, Vector3(x + 0.4, -0.13, PAVE_Z + 1.2 + 0.5 * (i % 2)), 0.3, "#8fdde0").scale = Vector3(1.8, 0.12, 0.5)
+			Build.ball(root, Vector3(x + 0.4, -0.085, PAVE_Z + 1.2 + 0.5 * (i % 2)), 0.3, "#8fdde0").scale = Vector3(1.8, 0.12, 0.5)
 		x += 0.55
 		i += 1
 	var rail := PAVE_Z - 0.2

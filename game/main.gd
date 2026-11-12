@@ -101,6 +101,7 @@ func _apply_demo(demo: String) -> void:
 			c.rotation.y = PI / 4 + i * PI / 2
 			add_child(c)
 	elif demo == "closed":
+		best_path = "user://regulars_best_demo.json"
 		for i in Ledger.MAX_STRIKES:
 			ledger.record_walkout()
 	elif demo == "summary":
