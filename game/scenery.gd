@@ -7,11 +7,42 @@ const WALL_H := 2.4
 const WALL_T := 0.24
 const CUT_H := 0.55
 const KITCHEN_W := 4
+## A theme is a re-skin of the same kit (sheet 16): grid, stations, heights and
+## bevels never change; walls, windows, floors, wall art and the slab edge do.
+const THEMES := {
+	"diner": {
+		"backdrop": "#f0dfc4", "wall": "#f6eee0", "wall_low": "#e3d8c6",
+		"tile_a": "#99c3b5", "tile_b": "#f2ead4", "planks": ["#d3a468", "#c9985c", "#dab078"],
+		"lawn": "#b9c990", "hedge": "#5fa873", "slab": "#4a3a2e",
+	},
+	"seaside": {
+		"backdrop": "#e4ebe0", "wall": "#f3f5ee", "wall_low": "#dde5dc",
+		"tile_a": "#a8dccb", "tile_b": "#f4efe0", "planks": ["#b9b1a4", "#aaa295", "#c6bfb2"],
+		"lawn": "#ead9b0", "hedge": "#8fb98a", "slab": "#4a3a2e",
+	},
+}
+const SEAFOAM := "#bfe0d2"
+const BRASS := "#d9a441"
+const X0 := -2.6    # the slab everything stands on
+const Z0 := -1.2
+const Z1 := 12.5
+const PAVE_Z := 9.9  # where the pavement (or pier) meets the road (or sea)
+
+static var theme_id := "diner"
+
+
+static func t() -> Dictionary:
+	return THEMES[theme_id]
+
+
+static func seaside() -> bool:
+	return theme_id == "seaside"
 
 
 ## Builds the room and returns its practical lights so the day can dim them.
 static func build(root: Node3D, w: int, h: int, door: Vector2i) -> Array[OmniLight3D]:
 	var lights: Array[OmniLight3D] = []
+	_ground(root, w, lights)
 	_floors(root, w, h)
 	# Far walls stand full height, just outside the floor.
 	_wall(root, Vector3(-WALL_T, 0, -WALL_T), Vector3(w + WALL_T * 2, WALL_H, WALL_T))
@@ -30,10 +61,10 @@ static func build(root: Node3D, w: int, h: int, door: Vector2i) -> Array[OmniLig
 static func _floors(root: Node3D, w: int, h: int) -> void:
 	for x in KITCHEN_W:
 		for y in h:
-			var col := Build.TILE_CREAM if (x + y) % 2 else Build.TILE_TEAL
+			var col: String = t().tile_b if (x + y) % 2 else t().tile_a
 			Build.box(root, Vector3(x + 0.5, -0.03, y + 0.5), Vector3(0.985, 0.03, 0.985), col, 0.0, Build.R_GLOSS)
 	# Dining: oak planks, half a metre wide, with staggered joints.
-	var tones := [Build.FLOOR_WOOD, Build.FLOOR_WOOD_2, "#dab078"]
+	var tones: Array = t().planks
 	for r in h * 2:
 		var cuts: Array[float] = [float(KITCHEN_W)]
 		var x := KITCHEN_W + 0.7 + fmod(r * 0.9, 1.6)
@@ -49,10 +80,10 @@ static func _floors(root: Node3D, w: int, h: int) -> void:
 
 
 ## A wall block from its low corner: darker foot, body, dark trim cap.
-static func _wall(root: Node3D, from: Vector3, size: Vector3, body := Build.WALL) -> void:
+static func _wall(root: Node3D, from: Vector3, size: Vector3) -> void:
 	var c := from + Vector3(size.x / 2, 0, size.z / 2)
-	Build.box(root, c, Vector3(size.x, 0.17, size.z), Build.WALL_LOW)
-	Build.box(root, c + Vector3(0, 0.15, 0), Vector3(size.x, size.y - 0.23, size.z), body)
+	Build.box(root, c, Vector3(size.x, 0.17, size.z), t().wall_low)
+	Build.box(root, c + Vector3(0, 0.15, 0), Vector3(size.x, size.y - 0.23, size.z), t().wall)
 	Build.box(root, c + Vector3(0, size.y - 0.1, 0), Vector3(size.x + 0.05, 0.1, size.z + 0.05), Build.TRIM)
 
 
@@ -88,6 +119,12 @@ static func _sconce(root: Node3D, at: Vector3, out: Vector3, lights: Array[OmniL
 
 
 static func _window(root: Node3D, x: float) -> void:
+	if seaside():  # a round brass porthole on the same wall socket
+		var ring := Build.lathe(root, Vector3(x, 1.5, 0.02), [[0.36, 0.0], [0.5, 0.0], [0.52, 0.03], [0.5, 0.09], [0.36, 0.09]], BRASS, 0.0, Build.R_WOOD)
+		ring.rotation.x = PI / 2
+		var glass := Build.lathe(root, Vector3(x, 1.5, 0.02), [[0.0, 0.05], [0.37, 0.05], [0.0, 0.051]], "#bfe6ea", 0.15, Build.R_GLOSS)
+		glass.rotation.x = PI / 2
+		return
 	Build._add(root, Build.bevel_mesh(Vector3(1.5, 1.2, 0.12), 0.06), Vector3(x, 1.55, 0.03), Color(Build.CORAL), 0.0)
 	Build.box(root, Vector3(x, 1.07, 0.05), Vector3(1.26, 0.96, 0.1), "#cfe6e6", 0.15, Build.R_GLOSS)
 	Build.box(root, Vector3(x, 1.07, 0.06), Vector3(0.07, 0.96, 0.1), Build.CORAL)
@@ -97,18 +134,34 @@ static func _window(root: Node3D, x: float) -> void:
 static func _dining_wall(root: Node3D, w: int, lights: Array[OmniLight3D]) -> void:
 	var span := float(w - KITCHEN_W)
 	var mid := KITCHEN_W + span / 2
-	# Teal wainscoting with a wooden rail.
-	Build.box(root, Vector3(mid, 0, 0.02), Vector3(span, 0.82, 0.05), Build.CABINET)
-	Build.box(root, Vector3(mid, 0.8, 0.03), Vector3(span, 0.06, 0.09), Build.WOOD, 0.0, Build.R_WOOD)
+	if seaside():
+		# Painted clapboard: seafoam and white boards the length of the wall.
+		for i in 7:
+			Build.box(root, Vector3(mid, 0.16 + i * 0.3, 0.015), Vector3(span, 0.3, 0.04), SEAFOAM if i % 2 == 0 else "#f6f8f1")
+		# A life ring and a wooden paddle.
+		var ring := Build.lathe(root, Vector3(mid - 0.35, 1.5, 0.03), [[0.2, 0.0], [0.36, 0.0], [0.38, 0.04], [0.36, 0.09], [0.2, 0.09], [0.18, 0.04], [0.2, 0.0]], "#fbf7ee")
+		ring.rotation.x = PI / 2
+		for i in 4:
+			var band := Build.box(root, Vector3(mid - 0.35, 1.5, 0.03) + Vector3(0.28, 0, 0).rotated(Vector3(0, 0, 1), PI / 4 + i * PI / 2) - Vector3(0, 0.06, -0.01), Vector3(0.22, 0.12, 0.12), Build.DANGER)
+			band.rotation.z = PI / 4 + i * PI / 2
+		var paddle := Node3D.new()
+		paddle.position = Vector3(mid + 0.55, 1.5, 0.05)
+		paddle.rotation.z = 0.5
+		root.add_child(paddle)
+		Build.box(paddle, Vector3(0, -0.5, 0), Vector3(0.06, 0.8, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
+		Build.box(paddle, Vector3(0, 0.25, 0), Vector3(0.22, 0.42, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
+	else:
+		# Teal wainscoting with a wooden rail, and two framed abstract prints.
+		Build.box(root, Vector3(mid, 0, 0.02), Vector3(span, 0.82, 0.05), Build.CABINET)
+		Build.box(root, Vector3(mid, 0.8, 0.03), Vector3(span, 0.06, 0.09), Build.WOOD, 0.0, Build.R_WOOD)
+		for i in 2:
+			var x := mid - 0.42 + i * 0.84
+			Build.box(root, Vector3(x, 1.15, 0.02), Vector3(0.66, 0.8, 0.06), Build.TRIM)
+			Build.box(root, Vector3(x, 1.2, 0.03), Vector3(0.56, 0.7, 0.06), Build.PAPER)
+			Build.ball(root, Vector3(x - 0.08 + i * 0.16, 1.66, 0.06), 0.13, Build.CORAL if i == 0 else Build.TILE_TEAL).scale = Vector3(1, 1, 0.3)
+			Build.box(root, Vector3(x, 1.26, 0.04), Vector3(0.4, 0.16, 0.06), Build.CABINET if i == 0 else Build.CORAL)
 	_window(root, KITCHEN_W + 1.55)
 	_window(root, w - 1.55)
-	# Two framed abstract prints.
-	for i in 2:
-		var x := mid - 0.42 + i * 0.84
-		Build.box(root, Vector3(x, 1.15, 0.02), Vector3(0.66, 0.8, 0.06), Build.TRIM)
-		Build.box(root, Vector3(x, 1.2, 0.03), Vector3(0.56, 0.7, 0.06), Build.PAPER)
-		Build.ball(root, Vector3(x - 0.08 + i * 0.16, 1.66, 0.06), 0.13, Build.CORAL if i == 0 else Build.TILE_TEAL).scale = Vector3(1, 1, 0.3)
-		Build.box(root, Vector3(x, 1.26, 0.04), Vector3(0.4, 0.16, 0.06), Build.CABINET if i == 0 else Build.CORAL)
 	_sconce(root, Vector3(KITCHEN_W + 0.5, 1.75, 0), Vector3(0, 0, 1), lights)
 	_sconce(root, Vector3(w - 0.45, 1.75, 0), Vector3(0, 0, 1), lights)
 
@@ -150,3 +203,119 @@ static func _dressing(root: Node3D, w: int, h: int) -> void:
 		board.rotation.x = -lean * 0.22
 		var slate := Build.box(root, Vector3(4.2, 0.14, h + 0.34 + lean * 0.115), Vector3(0.4, 0.5, 0.03), "#3f4a45")
 		slate.rotation.x = -lean * 0.22
+
+
+## The plot, the street and the thick floating slab (sheet 12). Everything ends
+## cleanly at the slab edge: no fade.
+static func _ground(root: Node3D, w: int, lights: Array[OmniLight3D]) -> void:
+	var x1 := w + 2.4
+	var cx := (X0 + x1) / 2
+	var span := x1 - X0
+	Build.box(root, Vector3(cx, -0.85, (Z0 + Z1) / 2), Vector3(span, 0.75, Z1 - Z0), t().slab)
+	Build.box(root, Vector3(cx, -0.26, (Z0 + Z1) / 2), Vector3(span + 0.08, 0.16, Z1 - Z0 + 0.08), Build.WOOD_DARK, 0.0, Build.R_WOOD)
+	Build.box(root, Vector3(cx, -0.1, (Z0 + 7.0) / 2), Vector3(span, 0.08, 7.0 - Z0), t().lawn)
+	# Boundaries: a low hedge and a 0.55 m picket fence. Nothing tall.
+	Build._add(root, Build.bevel_mesh(Vector3(0.5, 0.5, 7.4), 0.12), Vector3(x1 - 0.35, 0.23, 3.0), Color(t().hedge), 0.0)
+	Build._add(root, Build.bevel_mesh(Vector3(2.1, 0.5, 0.5), 0.12), Vector3(X0 + 1.15, 0.23, 6.7), Color(t().hedge), 0.0)
+	for i in 9:
+		var fx := w + 0.42 + i * 0.2
+		Build.box(root, Vector3(fx, -0.02, 6.85), Vector3(0.12, 0.57 if i % 4 else 0.62, 0.05), Build.PAPER)
+	for fy: float in [0.14, 0.36]:
+		Build.box(root, Vector3(w + 1.2, fy, 6.82), Vector3(1.8, 0.06, 0.04), Build.PAPER)
+	if seaside():
+		_pier(root, w, x1)
+	else:
+		_street(root, w, x1, lights)
+
+
+static func _street(root: Node3D, w: int, x1: float, lights: Array[OmniLight3D]) -> void:
+	# Grey paving slabs, with a paler kerb row along the road.
+	var x := X0
+	while x < x1 - 0.01:
+		for row in 3:
+			var depth := 1.0 if row < 2 else PAVE_Z - 9.0
+			var col := "#d9d1c5" if row == 2 else (Build.PAVING if int(absf(x * 2.0) + row) % 2 else "#c8beb1")
+			Build.box(root, Vector3(x + 0.5, -0.1, 7.0 + row + depth / 2), Vector3(0.985, 0.1, depth - 0.015), col)
+		x += 1.0
+	# A two-lane road with white dashes, cut clean at the slab edge.
+	Build.box(root, Vector3((X0 + x1) / 2, -0.17, (PAVE_Z + Z1) / 2), Vector3(x1 - X0, 0.1, Z1 - PAVE_Z), Build.ROAD)
+	x = X0 + 0.7
+	while x < x1 - 1.0:
+		Build.box(root, Vector3(x + 0.5, -0.075, (PAVE_Z + Z1) / 2), Vector3(1.0, 0.012, 0.13), "#f6efe2")
+		x += 2.2
+	# Street furniture sits on the kerb side only, never over the queue line.
+	var kerb := PAVE_Z - 0.45
+	_lamp_post(root, Vector3(-0.7, 0, kerb), lights)
+	# A layered-sphere tree in a stone surround.
+	var tree := Vector3(X0 + 0.75, 0, kerb - 0.05)
+	Build.box(root, tree, Vector3(0.8, 0.16, 0.8), "#bdb5a8")
+	Build.cyl(root, tree, 0.09, 1.1, Build.WOOD_DARK, 0.0, Build.R_WOOD)
+	Build.ball(root, tree + Vector3(0, 1.45, 0), 0.6, Build.LEAF)
+	Build.ball(root, tree + Vector3(0.1, 2.05, 0.05), 0.44, Build.LEAF_2)
+	Build.ball(root, tree + Vector3(-0.3, 1.3, 0.25), 0.36, Build.LEAF_2)
+	# A slatted bench, a teal bin and a coral bike.
+	var bench := Vector3(2.4, 0, kerb)
+	for i in 3:
+		Build.box(root, bench + Vector3(0, 0.36, -0.14 + i * 0.14), Vector3(1.5, 0.045, 0.12), Build.WOOD, 0.0, Build.R_WOOD)
+	for i in 2:
+		Build.box(root, bench + Vector3(0, 0.5 + i * 0.15, 0.3), Vector3(1.5, 0.12, 0.045), Build.WOOD, 0.0, Build.R_WOOD)
+	for sx: float in [-0.6, 0.6]:
+		Build.box(root, bench + Vector3(sx, 0, 0.02), Vector3(0.07, 0.36, 0.4), Build.TRIM)
+		Build.box(root, bench + Vector3(sx, 0.3, 0.3), Vector3(0.07, 0.52, 0.06), Build.TRIM)
+	Build.cyl(root, Vector3(4.2, 0, kerb), 0.22, 0.6, Build.CABINET)
+	Build.cyl(root, Vector3(4.2, 0.6, kerb), 0.25, 0.07, Build._shade(Build.CABINET))
+	var bike := Node3D.new()
+	bike.position = Vector3(w + 1.2, 0, kerb)
+	root.add_child(bike)
+	for sx: float in [-0.42, 0.42]:
+		var wheel := Build.lathe(bike, Vector3(sx, 0.3, 0), [[0.22, -0.025], [0.3, -0.025], [0.3, 0.025], [0.22, 0.025], [0.22, -0.025]], Build.TRIM)
+		wheel.rotation.x = PI / 2
+	Build.box(bike, Vector3(0, 0.36, 0), Vector3(0.6, 0.06, 0.05), Build.CORAL)
+	Build.box(bike, Vector3(-0.12, 0.38, 0), Vector3(0.06, 0.36, 0.05), Build.CORAL).rotation.z = 0.3
+	Build.box(bike, Vector3(0.32, 0.36, 0), Vector3(0.06, 0.5, 0.05), Build.CORAL).rotation.z = -0.3
+	Build.box(bike, Vector3(-0.2, 0.72, 0), Vector3(0.26, 0.06, 0.12), Build.TRIM)
+	Build.box(bike, Vector3(0.24, 0.84, 0), Vector3(0.06, 0.06, 0.4), Build.TRIM)
+
+
+static func _lamp_post(root: Node3D, at: Vector3, lights: Array[OmniLight3D]) -> void:
+	Build.lathe(root, at, [[0.0, 0.0], [0.16, 0.0], [0.18, 0.03], [0.08, 0.2], [0.055, 0.3], [0.055, 2.3], [0.12, 2.36], [0.0, 2.36]], "#3a3f44", 0.0, Build.R_WOOD)
+	Build.box(root, at + Vector3(0, 2.36, 0), Vector3(0.26, 0.3, 0.26), "#ffe9bd", 1.6)
+	Build.lathe(root, at + Vector3(0, 2.64, 0), [[0.0, 0.0], [0.22, 0.0], [0.24, 0.02], [0.06, 0.14], [0.0, 0.16]], "#3a3f44", 0.0, Build.R_WOOD)
+	var light := OmniLight3D.new()
+	light.position = at + Vector3(0, 2.3, 0)
+	light.light_color = Color("#ffd9a0")
+	light.set_meta("full", 0.8)
+	light.omni_range = 4.0
+	root.add_child(light)
+	lights.append(light)
+
+
+## Seaside: a weathered boardwalk with rope-and-post bollards, and a strip of
+## turquoise sea with white foam in place of the road.
+static func _pier(root: Node3D, w: int, x1: float) -> void:
+	var tones := ["#b79a78", "#a98d6c", "#c2a684"]
+	var i := 0
+	var x := X0
+	while x < x1 - 0.01:
+		Build.box(root, Vector3(x + 0.25, -0.1, (7.0 + PAVE_Z) / 2), Vector3(0.485, 0.1, PAVE_Z - 7.0), tones[i % 3], 0.0, Build.R_WOOD)
+		x += 0.5
+		i += 1
+	Build.box(root, Vector3((X0 + x1) / 2, -0.2, (PAVE_Z + Z1) / 2), Vector3(x1 - X0, 0.1, Z1 - PAVE_Z), "#4fc3c8", 0.0, 0.25)
+	x = X0 + 0.3
+	i = 0
+	while x < x1:
+		Build.ball(root, Vector3(x, -0.12, PAVE_Z + 0.12 + 0.1 * (i % 2)), 0.2 + 0.06 * (i % 3), "#ffffff").scale = Vector3(1.3, 0.25, 1)
+		if i % 3 == 0:
+			Build.ball(root, Vector3(x + 0.4, -0.13, PAVE_Z + 1.2 + 0.5 * (i % 2)), 0.3, "#8fdde0").scale = Vector3(1.8, 0.12, 0.5)
+		x += 0.55
+		i += 1
+	var rail := PAVE_Z - 0.2
+	x = X0 + 0.3
+	while x < x1:
+		Build.cyl(root, Vector3(x, 0, rail), 0.09, 0.62, Build.WOOD_DARK, 0.0, Build.R_WOOD)
+		Build.ball(root, Vector3(x, 0.64, rail), 0.11, Build.WOOD_DARK)
+		if x + 1.5 < x1:
+			for k in 5:
+				var u := (k + 0.5) / 5.0
+				Build.ball(root, Vector3(x + u * 1.5, 0.5 - sin(u * PI) * 0.14, rail), 0.045, "#e8dcc0").scale = Vector3(4.0, 1, 1)
+		x += 1.5

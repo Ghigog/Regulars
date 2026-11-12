@@ -100,6 +100,9 @@ func _apply_demo(demo: String) -> void:
 			c.position = Vector3(6.2 + i, 0, 12.2 - i * 0.6)
 			c.rotation.y = PI / 4 + i * PI / 2
 			add_child(c)
+	elif demo == "closed":
+		for i in Ledger.MAX_STRIKES:
+			ledger.record_walkout()
 	elif demo == "summary":
 		ledger.record_sale(BILL, 5)
 		ledger.record_sale(BILL, 3)
@@ -109,9 +112,11 @@ func _apply_demo(demo: String) -> void:
 # ---------------------------------------------------------------- world
 
 func _build_scenery() -> void:
+	if OS.get_environment("REGULARS_THEME") != "":  # dev switch until themes are selectable in game
+		Scenery.theme_id = OS.get_environment("REGULARS_THEME")
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(Build.BACKDROP)
+	env.background_color = Color(Scenery.t().backdrop)
 	# Shadows are never black: the ambient fill carries the warm plum of #5a423a.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color("#f4dcd2")
@@ -143,24 +148,12 @@ func _build_scenery() -> void:
 	add_child(sun)
 	cam = Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
-	cam.size = 13.5
+	cam.size = 14.5
 	add_child(cam)
-	var focus := Vector3(W / 2.0 - 0.3, 0, H / 2.0 + 0.6)
+	var focus := Vector3(W / 2.0 + 0.2, 0, H / 2.0 + 1.7)
 	cam.look_at_from_position(focus + Vector3(14, 15, 14), focus)
 
-	Build.box(self, Vector3(W / 2.0, -0.14, H / 2.0), Vector3(W + 0.5, 0.12, H + 0.5), Build.WOOD_DARK, 0.0, Build.R_WOOD)
-	Build.box(self, Vector3(W / 2.0, -0.12, H + 1.0), Vector3(W + 9.0, 0.1, 2.0), Build.PAVING)
-	_build_decor()
 	_sconces = Scenery.build(self, W, H, DOOR)
-
-
-## The street. (Step 7 of the art plan replaces this.)
-func _build_decor() -> void:
-	Build.box(self, Vector3(W / 2.0, -0.16, H + 3.6), Vector3(W + 9.0, 0.1, 3.2), Build.ROAD)
-	for i in 7:
-		Build.box(self, Vector3(-3.0 + i * 2.6, -0.06, H + 3.6), Vector3(1.1, 0.01, 0.14), "#f6efe2")
-	Build.cyl(self, Vector3(-2.2, 0, H + 1.7), 0.07, 2.6, "#3a3f44")
-	Build.ball(self, Vector3(-2.2, 2.7, H + 1.7), 0.2, "#ffe2a8", 2.0)
 
 
 ## The glow of the mushroom lamp on each table. (No hanging lamps: from this
@@ -267,9 +260,9 @@ func shake(amount := 0.12) -> void:
 ## Morning light drifts to a warm, low evening sun as the day goes on.
 func _update_daylight() -> void:
 	var t := smoothstep(0.35, 1.0, day_progress())
-	_sun.light_color = Color("#fff6ea").lerp(Color("#ffb070"), t)
+	_sun.light_color = Color("#fff6ea").lerp(Color("#ffc08a"), t)
 	_sun.rotation_degrees = Vector3(lerpf(-52, -34, t), lerpf(-30, -62, t), 0)
-	_env.background_color = Color(Build.BACKDROP).lerp(Color("#e6bfa6"), t)
+	_env.background_color = Color(Scenery.t().backdrop).lerp(Color("#dcc0b4"), t)
 	_env.ambient_light_color = Color("#f4dcd2").lerp(Color("#f0c8bc"), t)
 	_sun.light_energy = lerpf(0.62, 0.5, t)
 	for l in _sconces:  # practical lights come up as the sun goes down
