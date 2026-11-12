@@ -60,6 +60,22 @@ func test_guest_is_seated_served_and_pays():
 	assert_gt(float(game.town.people[0].affinity), 0.0, "a good visit makes them like the place")
 
 
+func test_half_price_calms_an_impatient_guest_and_costs_half_the_bill():
+	var g: Guest = game.spawn_guest(0)
+	_run(12.0)
+	assert_eq(game.prompt_for(g.table), "", "no discount for a guest who is still happy to wait")
+	g.mood.patience = 0.3
+	assert_string_contains(game.prompt_for(g.table), "Half price")
+	game.use_station(g.table)
+	assert_gt(g.mood.patience, 0.6)
+	assert_gt(float(game.town.people[0].affinity), 0.0, "kindness is remembered")
+	assert_eq(game.prompt_for(g.table), "", "only once")
+	_cook_burger()
+	game.use_station(g.table)
+	_run(Guest.EAT_TIME + 0.5)
+	assert_eq(int(game.ledger.today.sales), 6)
+
+
 func test_washing_a_dirty_plate_returns_it_to_the_stack():
 	var table: Station = game.stations[Vector2i(6, 1)]
 	table.dirty = 1

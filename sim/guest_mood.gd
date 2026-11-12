@@ -7,6 +7,7 @@ var disgust := 0.0   # rises when they can see something gross
 var joy := 0.5       # atmosphere, friends, kindness
 var savour := 0.0    # how good the food was
 var thoughts: Array[String] = []
+var discounted := false  # the chef offered half price while they waited
 
 
 func think(t: String) -> bool:
@@ -33,6 +34,21 @@ func delight(amount: float, thought := "") -> void:
 	joy = clampf(joy + amount, 0.0, 1.0)
 	if thought != "":
 		think(thought)
+
+
+## An apology for the wait: half price. Buys back some patience and goodwill, once.
+func offer_discount() -> bool:
+	if discounted:
+		return false
+	discounted = true
+	patience = minf(1.0, patience + 0.35)
+	delight(0.1, "Half price? That's decent of them")
+	return true
+
+
+## What they pay for a meal with this list price.
+func bill_for(price: int) -> int:
+	return ceili(price / 2.0) if discounted else price
 
 
 func taste(quality: float) -> void:

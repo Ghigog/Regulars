@@ -70,6 +70,18 @@ func test_thoughts_are_not_repeated():
 	assert_eq(m.thoughts.size(), 1)
 
 
+func test_half_price_is_offered_once_and_halves_the_bill():
+	var m := GuestMood.new()
+	m.wait(8.0, 10.0)
+	assert_true(m.offer_discount())
+	assert_almost_eq(m.patience, 0.55, 0.001, "an apology buys back some patience")
+	assert_false(m.offer_discount(), "only once per visit")
+	assert_almost_eq(m.patience, 0.55, 0.001)
+	assert_eq(m.bill_for(12), 6)
+	assert_eq(m.bill_for(13), 7, "rounds in the house's favour")
+	assert_eq(GuestMood.new().bill_for(12), 12)
+
+
 func test_tip_never_negative():
 	var m := GuestMood.new()
 	m.see_gross(1.0, 1.0, "Ew")

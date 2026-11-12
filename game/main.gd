@@ -10,6 +10,7 @@ const SPAWN := Vector2i(9, 8)
 const EXIT := Vector2i(0, 8)
 const BILL := 12
 const SIGHT_RANGE := 7
+const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
 const SOUNDS := {  # name -> volume in dB
 	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
 	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0, "music": -15.0,
@@ -113,6 +114,11 @@ func _apply_demo(demo: String) -> void:
 		while arrivals.size() < 8:
 			arrivals.append({"time": 0.2, "idx": arrivals.size()})
 		get_tree().create_timer(6.0).timeout.connect(_demo_fx)
+	elif demo == "kind":  # an impatient guest and the half-price prompt; shoot at about 9 and 10.5
+		for a in arrivals:
+			a.time = 0.2
+		get_tree().create_timer(8.0).timeout.connect(_demo_kind.bind(false))
+		get_tree().create_timer(9.5).timeout.connect(_demo_kind.bind(true))
 	elif demo == "closed":
 		best_path = "user://regulars_best_demo.json"
 		for i in Ledger.MAX_STRIKES:
@@ -127,6 +133,18 @@ func _apply_demo(demo: String) -> void:
 				if i % 2 == 0:
 					town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
 			get_tree().create_timer(1.5).timeout.connect(hud.show_town)
+
+
+func _demo_kind(offer: bool) -> void:
+	for g in guests:
+		if g.state == "waiting":
+			if offer:
+				use_station(g.table)
+				return
+			g.mood.patience = 0.3
+			player.position = Grid.center(g.table.cell + Vector2i(0, 1))
+			player.look(Vector2i(0, -1))
+			return
 
 
 func _demo_fx() -> void:
@@ -493,15 +511,27 @@ func serve(g: Guest, quality: float) -> void:
 		burst(g.position + Vector3(0, 1.3, 0), "stars")
 
 
+## Kindness: half price to say sorry for the wait. The town remembers it.
+func offer_discount(g: Guest) -> void:
+	if not g.mood.offer_discount():
+		return
+	town.record_kindness(g.idx)
+	hud.say("Half price for %s. Word gets around." % g.info.name)
+	burst(g.position + Vector3(0, 1.5, 0), "stars", 0.3)
+	g._heart_time = 1.5
+	sfx("coin")
+
+
 func finish_meal(g: Guest) -> void:
-	var tip := g.mood.tip_for(BILL)
-	ledger.record_sale(BILL, tip)
+	var bill := g.mood.bill_for(BILL)
+	var tip := g.mood.tip_for(bill)
+	ledger.record_sale(bill, tip)
 	var talk := town.gossip_line(g.idx, town.record_visit(g.idx, g.mood.satisfaction()))
 	if talk != "":
 		hud.say(talk)
 	g.table.dirty += 1
 	g.table.refresh()
-	popup("+$%d" % (BILL + tip), g.position + Vector3(0, 1.9, 0), Color(Build.TRIM))
+	popup("+$%d" % (bill + tip), g.position + Vector3(0, 1.9, 0), Color(Build.TRIM))
 	Fx.coin(self, g.position + Vector3(0, 1.5, 0))
 	if g.mood.satisfaction() > 0.5:
 		g._heart_time = 2.5
@@ -624,13 +654,17 @@ func use_station(st: Station, dry_run := false) -> String:
 					st.dirty -= 1
 					st.refresh()
 					player.set_held("dirty_plate")
+			elif held == "" and g != null and not g.mood.discounted and g.mood.patience < DISCOUNT_BELOW:
+				act = "Half price for %s" % g.info.name
+				if not dry_run:
+					offer_discount(g)
 	if act != "" and not dry_run:
 		player.punch()
 		st.used()
 		if act == "Wash":
 			sfx("wash")
 			burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
-		elif not act.begins_with("Serve"):
+		elif not (act.begins_with("Serve") or act.begins_with("Half")):
 			sfx("pickup" if player.held != "" else "putdown")
 	return act
 
