@@ -16,8 +16,15 @@ many days as you can; three walkouts in one day ends the run.
 - Meat has doneness. A radial dial over the stove has a green "perfect" window; pull it late
   and it is dry (worse tips), leave it and it burns. The patty changes look as it goes.
 - Guests are named townsfolk with patience, disgust, joy and savour. These set the tip.
-- Each day is busier and guests are less patient. Money carries across days but there is
-  nothing to spend it on yet.
+- Each day is busier and guests are less patient. Money carries across days.
+- **Word of mouth is visible.** A visit that moves a guest's opinion says who they will
+  tell or warn. The end-of-day clipboard has a town book (T): every townsperson's standing
+  (five pips, from "Staying away" to "Loves you") and whether today moved it.
+- **Half price.** With empty hands at the table of a guest whose patience is under half,
+  E offers half price, once per visit: +0.35 patience, a little joy, +0.2 affinity, and
+  they pay half the bill (the tip is worked out on the halved bill).
+- **Flyers.** On the receipt, $15 (F) buys +25% visit chance for everyone tomorrow. One
+  batch a night. It is the only thing to spend money on so far.
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
 
 Code map: `sim/` is pure logic with no scene dependencies (unit-tested with GUT).
@@ -32,9 +39,9 @@ focused. The logic and tests still exist.
 | --- | --- | --- |
 | Blueprint catalog, nightly crate, shelf upgrades | `sim/catalog.gd` | Logic + tests kept. No UI. |
 | Walls on cell edges, line of sight, placement pathing | `sim/grid.gd` | In use for the front wall; player-built walls unhooked. |
-| Word of mouth between friends | `sim/town.gd` | Still running quietly; no UI shows it. |
-| Kindness / discounts | `Town.record_kindness` | Logic kept; the "half price" action was removed. |
-| Flyers (ad boost) | `Town.roll_guests(day, boost)` | Parameter kept; no way to buy it. |
+| Word of mouth between friends | `sim/town.gd` | **Built**, see section 1. |
+| Kindness / discounts | `GuestMood.offer_discount`, `Town.record_kindness` | **Built**, see section 1. Full comps (a free meal) are not. |
+| Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
 
 The first prototype's build phase (pick a crate blueprint, place with the mouse, R to
 rotate walls, catalog buttons) was removed from `game/main.gd` and `game/hud.gd`. It can
@@ -53,7 +60,8 @@ be recovered from the description in section 4.
   A visit moves it; 40% of the change spreads to their friends.
 - **To add**: stay length and order size driven by mood (dessert, second drink), groups
   arriving together, favourite dishes, regulars with a visit streak, grudges, reviews.
-- **Discounts and comps**: give a guest half price to buy goodwill.
+- **Discounts and comps**: half price is built (section 1). To add: a free meal, and
+  guests who come to expect a discount.
 
 ## 4. Building (Sims layer)
 
@@ -79,7 +87,7 @@ be recovered from the description in section 4.
 ## 6. Money (Tycoon layer)
 
 - **Ledger screen**: income, tips, wages, spending, day-by-day history chart.
-- **Investments**: flyers (more guests tomorrow), loans, supplier stakes (cheaper or
+- **Investments**: flyers (built, section 1), loans, supplier stakes (cheaper or
   better ingredients), equipment leases.
 - **Costs**: ingredient cost per dish, wages, rent that rises with the location.
 

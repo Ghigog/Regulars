@@ -93,6 +93,9 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 | Palette | Brief values nudged toward sheet 7; the dining floor is less saturated than either. | Under warm light the sampled orange glowed. |
 | Font | A rounded system font (Arial Rounded where present). | No licensed hand-lettered face chosen yet. |
 | Themes | Chosen with `REGULARS_THEME=seaside`. Seaside swaps walls (clapboard), windows (portholes), wall art (life ring and paddle), floors, lawn (sand), pavement (boardwalk with rope bollards) and road (sea with foam). Stations are untouched. | Sheet 16. No picker yet because the title screen is open. |
+| Town book | A second page on the end-of-day clipboard (T): the gossip-note yellow paper, a dark ribbon, each townsperson's name with five ink-rimmed pips and an up or down arrow for today's change. Standing reads by pip count and a word, never by colour alone. | Sheet 14 suggested the gossip note as the home for reputation; a full list needed its own page. |
+| Receipt buttons | A half-width "Flyers" stamp button beside "Town book"; a spent button turns driftwood grey. A bought flyer prints as a receipt row. | Not on the sheets. |
+| Half price | Uses the keycap prompt ("HALF PRICE FOR GUS"), a small star burst and the heart bubble. No new art. | Not on the sheets. |
 
 **Not yet done:** Blender kit, hired staff, co-op chefs 2 to 4 (trim colours exist in
 `Peg.PLAYER_TRIM`), future dishes, four-seat table and booth, title screen, colour-blind
