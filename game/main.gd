@@ -91,18 +91,20 @@ func _apply_demo(demo: String) -> void:
 func _build_scenery() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#f0dfc4")
+	env.background_color = Color(Build.BACKDROP)
+	# Shadows are never black: the ambient fill carries the warm plum of #5a423a.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#fff1e0")
-	env.ambient_light_energy = 0.5
+	env.ambient_light_color = Color("#f4dcd2")
+	env.ambient_light_energy = 0.62
 	env.ssao_enabled = true
-	env.ssao_radius = 0.7
-	env.ssao_intensity = 1.6
+	env.ssao_radius = 0.9
+	env.ssao_intensity = 1.3
+	env.ssao_power = 1.2
 	env.glow_enabled = true
-	env.glow_intensity = 0.35
-	env.glow_bloom = 0.05
+	env.glow_intensity = 0.3
+	env.glow_bloom = 0.03
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.12
+	env.adjustment_saturation = 1.08
 	_env = env
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 	var we := WorldEnvironment.new()
@@ -110,9 +112,11 @@ func _build_scenery() -> void:
 	add_child(we)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-52, -30, 0)
-	sun.light_energy = 0.85
+	sun.light_energy = 0.62
 	sun.shadow_enabled = true
-	sun.shadow_blur = 1.6
+	sun.shadow_opacity = 0.8
+	sun.shadow_blur = 2.5
+	sun.light_angular_distance = 5.0  # wide, soft penumbra
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 60.0
 	_sun = sun
@@ -124,40 +128,40 @@ func _build_scenery() -> void:
 	var focus := Vector3(W / 2.0 - 0.3, 0, H / 2.0 + 0.6)
 	cam.look_at_from_position(focus + Vector3(14, 15, 14), focus)
 
-	Build.box(self, Vector3(W / 2.0, -0.14, H / 2.0), Vector3(W + 0.5, 0.12, H + 0.5), "#5a4636")
-	Build.box(self, Vector3(W / 2.0, -0.12, H + 1.0), Vector3(W + 9.0, 0.1, 2.0), "#cdbfae")
+	Build.box(self, Vector3(W / 2.0, -0.14, H / 2.0), Vector3(W + 0.5, 0.12, H + 0.5), Build.WOOD_DARK, 0.0, Build.R_WOOD)
+	Build.box(self, Vector3(W / 2.0, -0.12, H + 1.0), Vector3(W + 9.0, 0.1, 2.0), Build.PAVING)
 	_build_decor()
 	for x in W:
 		for y in H:
-			var col := "#d9a066" if y % 2 else "#cf9458"
+			var col := Build.FLOOR_WOOD if y % 2 else Build.FLOOR_WOOD_2
 			if x < 4:
-				col = "#f4ead8" if (x + y) % 2 else "#8fc7c3"
-			Build.box(self, Vector3(x + 0.5, -0.02, y + 0.5), Vector3(0.98, 0.02, 0.98), col)
+				col = Build.TILE_CREAM if (x + y) % 2 else Build.TILE_TEAL
+			Build.box(self, Vector3(x + 0.5, -0.03, y + 0.5), Vector3(0.985, 0.03, 0.985), col, 0.0, Build.R_GLOSS if x < 4 else Build.R_WOOD)
 	# Back and left walls are scenery; the grid bounds already stop movement.
-	Build.box(self, Vector3(W / 2.0, 0, -0.1), Vector3(W + 0.4, 2.2, 0.2), "#fff6e6")
-	Build.box(self, Vector3(-0.1, 0, H / 2.0), Vector3(0.2, 2.2, H + 0.4), "#fff6e6")
-	Build.box(self, Vector3(7, 1.1, 0.02), Vector3(5.8, 0.9, 0.05), "#e56b5d")
+	Build.box(self, Vector3(W / 2.0, 0, -0.1), Vector3(W + 0.4, 2.2, 0.2), Build.WALL)
+	Build.box(self, Vector3(-0.1, 0, H / 2.0), Vector3(0.2, 2.2, H + 0.4), Build.WALL)
+	Build.box(self, Vector3(7, 1.1, 0.02), Vector3(5.8, 0.9, 0.05), Build.CORAL)
 	for wx: float in [5.5, 8.5]:
 		Build.box(self, Vector3(wx, 1.05, 0.04), Vector3(1.3, 0.9, 0.06), "#9fd4ea")
-	Build.box(self, Vector3(DOOR.x + 0.5, 0.0, H + 0.2), Vector3(1.0, 0.02, 0.5), "#d9534f")
+	Build.box(self, Vector3(DOOR.x + 0.5, 0.0, H + 0.2), Vector3(1.0, 0.02, 0.5), Build.CORAL)
 
 
 ## Things that are only there to look nice.
 func _build_decor() -> void:
 	# Street: a road with lane dashes, a lamp post and planters by the front wall.
-	Build.box(self, Vector3(W / 2.0, -0.16, H + 3.6), Vector3(W + 9.0, 0.1, 3.2), "#8f8a84")
+	Build.box(self, Vector3(W / 2.0, -0.16, H + 3.6), Vector3(W + 9.0, 0.1, 3.2), Build.ROAD)
 	for i in 7:
 		Build.box(self, Vector3(-3.0 + i * 2.6, -0.06, H + 3.6), Vector3(1.1, 0.01, 0.14), "#f6efe2")
 	Build.cyl(self, Vector3(-2.2, 0, H + 1.7), 0.07, 2.6, "#3a3f44")
 	Build.ball(self, Vector3(-2.2, 2.7, H + 1.7), 0.2, "#ffe2a8", 2.0)
 	for px: float in [1.0, 3.0]:
-		Build.box(self, Vector3(px, 0, H + 0.24), Vector3(1.7, 0.32, 0.3), "#7a5235")
+		Build.box(self, Vector3(px, 0, H + 0.24), Vector3(1.7, 0.32, 0.3), Build.WOOD_DARK)
 		for i in 4:
-			Build.ball(self, Vector3(px - 0.6 + i * 0.4, 0.42, H + 0.24), 0.2, "#4f9d69" if i % 2 else "#5fb37a")
+			Build.ball(self, Vector3(px - 0.6 + i * 0.4, 0.42, H + 0.24), 0.2, Build.LEAF if i % 2 else Build.LEAF_2)
 	# Doorway: posts, a lintel and a sign.
 	for dx: float in [0.0, 1.0]:
-		Build.cyl(self, Vector3(DOOR.x + dx, 0, H), 0.06, 1.9, "#7a5235")
-	Build.box(self, Vector3(DOOR.x + 0.5, 1.9, H), Vector3(1.2, 0.5, 0.1), "#e56b5d")
+		Build.cyl(self, Vector3(DOOR.x + dx, 0, H), 0.06, 1.9, Build.WOOD_DARK)
+	Build.box(self, Vector3(DOOR.x + 0.5, 1.9, H), Vector3(1.2, 0.5, 0.1), Build.CORAL)
 	var open_sign := Label3D.new()
 	open_sign.text = "OPEN"
 	open_sign.font_size = 56
@@ -167,11 +171,11 @@ func _build_decor() -> void:
 	open_sign.position = Vector3(DOOR.x + 0.5, 2.15, H + 0.06)
 	add_child(open_sign)
 	# Kitchen shelf with jars, and a picture between the windows.
-	Build.box(self, Vector3(0.1, 1.5, 3.4), Vector3(0.22, 0.06, 3.4), "#7a5235")
+	Build.box(self, Vector3(0.1, 1.5, 3.4), Vector3(0.22, 0.06, 3.4), Build.WOOD_DARK)
 	var jars := ["#e9a23b", "#d9534f", "#5fd38d", "#ffffff", "#e9a23b", "#8fc7c3"]
 	for i in jars.size():
 		Build.cyl(self, Vector3(0.12, 1.56, 2.1 + i * 0.52), 0.1, 0.2 + 0.05 * (i % 2), jars[i])
-	Build.box(self, Vector3(7, 1.22, 0.05), Vector3(0.9, 0.66, 0.05), "#7a5235")
+	Build.box(self, Vector3(7, 1.22, 0.05), Vector3(0.9, 0.66, 0.05), Build.WOOD_DARK)
 	Build.box(self, Vector3(7, 1.29, 0.08), Vector3(0.74, 0.52, 0.03), "#ffd9a0")
 	Build.ball(self, Vector3(7.12, 1.62, 0.1), 0.1, "#e56b5d")
 
@@ -217,9 +221,9 @@ func add_station(type: String, cell: Vector2i, tier := 1) -> Station:
 func add_wall(cell: Vector2i, axis: int, height := 1.1) -> void:
 	grid.walls[Vector3i(cell.x, cell.y, axis)] = true
 	if axis == 0:
-		Build.box(self, Vector3(cell.x + 0.5, 0, cell.y), Vector3(1.04, height, 0.12), "#fff6e6")
+		Build.box(self, Vector3(cell.x + 0.5, 0, cell.y), Vector3(1.04, height, 0.12), Build.WALL)
 	else:
-		Build.box(self, Vector3(cell.x, 0, cell.y + 0.5), Vector3(0.12, height, 1.04), "#fff6e6")
+		Build.box(self, Vector3(cell.x, 0, cell.y + 0.5), Vector3(0.12, height, 1.04), Build.WALL)
 
 
 func find_station(type: String) -> Station:
