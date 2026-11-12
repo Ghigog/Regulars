@@ -31,8 +31,7 @@ var best_path := "user://regulars_best.json"
 var player: Player
 var hud: Hud
 var cam: Camera3D
-var _cursor: MeshInstance3D
-var _prompt: Label3D
+var _cursor: Node3D
 var _gross: Array[Dictionary] = []
 var _sfx := {}
 var _sun: DirectionalLight3D
@@ -56,15 +55,12 @@ func _ready() -> void:
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(self)
-	_cursor = Build.box(self, Vector3.ZERO, Vector3(0.96, 0.03, 0.96), "#ffd34e", 1.0)
-	_prompt = Label3D.new()
-	_prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_prompt.no_depth_test = true
-	_prompt.font_size = 44
-	_prompt.outline_size = 14
-	_prompt.pixel_size = 0.006
-	_prompt.modulate = Color("#ffe9a8")
-	add_child(_prompt)
+	# A warm frame around the top of the station the chef is facing.
+	_cursor = Node3D.new()
+	add_child(_cursor)
+	for i in 4:
+		var bar := Build.box(_cursor, Vector3(0, 0, 0.5).rotated(Vector3.UP, i * PI / 2), Vector3(1.06, 0.05, 0.07), Build.WARN, 0.8)
+		bar.rotation.y = i * PI / 2
 	_shot_path = OS.get_environment("REGULARS_SHOT")
 	start_day()
 	_apply_demo(OS.get_environment("REGULARS_DEMO"))
@@ -664,12 +660,12 @@ func _update_cursor() -> void:
 	var st: Station = stations.get(player.target_cell())
 	var action := prompt_for(st) if st != null and phase == Phase.SERVICE else ""
 	_cursor.visible = action != ""
-	_prompt.visible = action != ""
+	var at := Vector2.ZERO
 	if st != null:
-		var top := 1.75 if st.type == "fridge" else 0.9
+		var top := 1.72 if st.type == "fridge" else 0.9
 		_cursor.position = st.position + Vector3(0, top, 0)
-		_prompt.position = st.position + Vector3(0, 2.45 if st.type == "stove" else top + 0.75, 0)
-		_prompt.text = "[E] " + action
+		at = cam.unproject_position(st.position + Vector3(0, 2.25 if st.type == "stove" else top + 0.7, 0))
+	hud.show_prompt(at, action)
 
 
 func _unhandled_input(event: InputEvent) -> void:

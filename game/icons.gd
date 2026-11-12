@@ -72,6 +72,8 @@ static func icon(id: String) -> Array:
 			o.append([PackedVector2Array([Vector2(-0.84, 0.05), Vector2(-0.5, -0.22), Vector2(-0.1, 0.05), Vector2(0.3, -0.22), Vector2(0.84, 0.05), Vector2(0.84, 0.16), Vector2(-0.84, 0.16)]), "#ffd452"])
 			o.append([rect(0, 0.2, 1.86, 0.17), "#6fbf5f"])
 			o.append([ell(0, 0.26, 0.8, 0.62, 0, 180), "#e6a542"])
+		"food":
+			o = _moved(icon("burger"), Vector2.ZERO, 1.0)
 		"zzz":
 			for i in 3:
 				o.append([ell(-0.62 + i * 0.36, -0.55, 0.14), INK])
