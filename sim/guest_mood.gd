@@ -52,6 +52,23 @@ func face() -> String:
 	return "meh" if live > 0.3 else "mad"
 
 
+## Which of the eight faces to wear (style guide, sheet 3).
+func expression(eating := false, stormed := false) -> String:
+	if stormed:
+		return "angry"
+	if eating:
+		return "chewing"
+	if disgust > 0.5:
+		return "disgusted"
+	if patience < 0.25:
+		return "snap"
+	if patience < 0.5:
+		return "impatient"
+	if joy > 0.75:
+		return "delighted"
+	return "content" if joy > 0.55 else "neutral"
+
+
 ## Final verdict on the visit, from -1 (furious) to 1 (delighted).
 func satisfaction() -> float:
 	return clampf(0.35 * savour + 0.3 * joy + 0.2 * patience - 0.5 * disgust, -1.0, 1.0)

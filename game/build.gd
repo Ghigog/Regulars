@@ -2,9 +2,6 @@ class_name Build
 extends RefCounted
 ## Makes every visual in the game out of primitive meshes, in the toy-diorama style.
 
-const SKIN: Array[String] = ["#f2c9a1", "#c68958", "#8a5a3c", "#f7dcc0"]
-const FACE := {"joy": "#5fd38d", "meh": "#ffd34e", "mad": "#ff6b5e"}
-
 ## Palette roles (style guide, sheet 7). Brief values, nudged toward the sampled ones.
 const BACKDROP := "#f0dfc4"
 const WALL := "#f6eee0"
@@ -187,21 +184,6 @@ static func ball(parent: Node3D, pos: Vector3, r: float, col: String, emit := 0.
 		m.rings = 12
 		_meshes[key] = m
 	return _add(parent, _meshes[key], pos, Color(col), emit, rough)
-
-
-static func person(shirt: String, skin: int, chef := false) -> Node3D:
-	var n := Node3D.new()
-	var tone := SKIN[skin % SKIN.size()]
-	cyl(n, Vector3.ZERO, 0.2, 0.62, shirt)
-	ball(n, Vector3(0, 0.62, 0), 0.2, shirt)
-	ball(n, Vector3(0, 0.96, 0), 0.27, tone)
-	for side: float in [-1.0, 1.0]:  # eyes and hands; the person faces +z
-		ball(n, Vector3(side * 0.1, 1.0, 0.235), 0.04, "#2b2220")
-		ball(n, Vector3(side * 0.25, 0.42, 0.07), 0.075, tone)
-	if chef:
-		cyl(n, Vector3(0, 1.14, 0), 0.2, 0.22, "#ffffff")
-		ball(n, Vector3(0, 1.38, 0), 0.23, "#ffffff")
-	return n
 
 
 static func item(kind: String) -> Node3D:

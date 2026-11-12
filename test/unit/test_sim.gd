@@ -205,3 +205,20 @@ func test_cannot_shelve_past_max_tier():
 	var c := Catalog.new()
 	assert_true(c.can_shelve({"id": "plant", "tier": 2}))
 	assert_false(c.can_shelve({"id": "plant", "tier": 3}))
+
+
+func test_expression_follows_the_strongest_feeling():
+	var m := GuestMood.new()
+	assert_eq(m.expression(), "neutral")
+	m.delight(0.1)
+	assert_eq(m.expression(), "content")
+	m.delight(0.3)
+	assert_eq(m.expression(), "delighted")
+	m.patience = 0.4
+	assert_eq(m.expression(), "impatient")
+	m.patience = 0.2
+	assert_eq(m.expression(), "snap")
+	m.disgust = 0.6
+	assert_eq(m.expression(), "disgusted")
+	assert_eq(m.expression(true), "chewing")
+	assert_eq(m.expression(false, true), "angry")

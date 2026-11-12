@@ -12,14 +12,14 @@ var held_quality := 1.0
 var facing := Vector2i(0, 1)
 var _velocity := Vector3.ZERO
 var _held_node: Node3D
-var _body: Node3D
+var _body: Peg
 var _stride := 0.0
 
 
 func setup(game_, start: Vector2i) -> void:
 	game = game_
 	position = Grid.center(start)
-	_body = Build.person("#ffffff", 1, true)
+	_body = Peg.chef(0)
 	add_child(_body)
 
 
@@ -29,9 +29,10 @@ func set_held(kind: String, quality := 1.0) -> void:
 	if _held_node:
 		_held_node.queue_free()
 		_held_node = null
+	_body.pose = "carry" if kind != "" else "idle"
 	if kind != "":
 		_held_node = Build.item(kind)
-		_held_node.position = Vector3(0, 0.55, 0.36)
+		_held_node.position = Vector3(0, 0.42, 0.34)
 		_body.add_child(_held_node)
 		_held_node.scale = Vector3.ONE * 0.4
 		_held_node.create_tween().tween_property(_held_node, "scale", Vector3.ONE, 0.18) \
@@ -100,4 +101,8 @@ func move(input: Vector2, delta: float) -> void:
 	if floori(_stride / PI) != before and pace > 0.3:
 		game.sfx("step", 0.15)
 	_body.position.y = absf(sin(_stride)) * 0.07 * pace
+	# Lean into a run, and tip whatever is carried so its top faces the camera.
+	_body.rotation.x = lerpf(_body.rotation.x, 0.3 * pace, 1.0 - exp(-10.0 * delta))
+	if _held_node:
+		_held_node.global_basis = Basis(Vector3(1, 0, -1).normalized(), deg_to_rad(25.0)).scaled(_held_node.scale)
 	_body.rotation.y = lerp_angle(_body.rotation.y, atan2(float(facing.x), float(facing.y)), 1.0 - exp(-18.0 * delta))

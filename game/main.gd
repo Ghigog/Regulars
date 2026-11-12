@@ -80,6 +80,29 @@ func _apply_demo(demo: String) -> void:
 		player.set_held("plate")
 		for a in arrivals:
 			a.time = 1.0
+	elif demo == "lineup":  # every townsperson and every face, close up
+		arrivals.clear()
+		phase = Phase.SUMMARY
+		cam.size = 6.5
+		cam.position += Vector3(-1.5, 0, 3.4)
+		var names: Array = Peg.LOOKS.keys()
+		for i in names.size():
+			var p := Peg.guest(names[i])
+			p.position = Vector3(1.0 + (i % 7) * 1.0 + (i / 7) * 0.5, 0, 7.6 + (i / 7) * 1.1 - (i % 7) * 0.25)
+			p.rotation.y = PI / 4
+			p.pose = ["idle", "carry", "tap", "wave"][i % 4]
+			add_child(p)
+		for i in Peg.FACES.size():
+			var p := Peg.guest(names[i + 3])
+			p.set_face(Peg.FACES[i])
+			p.position = Vector3(1.6 + i * 0.95, 0, 10.2 - i * 0.3)
+			p.rotation.y = PI / 4
+			add_child(p)
+		for i in 4:
+			var c := Peg.chef(i)
+			c.position = Vector3(6.2 + i, 0, 12.2 - i * 0.6)
+			c.rotation.y = PI / 4 + i * PI / 2
+			add_child(c)
 	elif demo == "summary":
 		ledger.record_sale(BILL, 5)
 		ledger.record_sale(BILL, 3)
@@ -503,6 +526,7 @@ func finish_meal(g: Guest) -> void:
 
 func walk_out(g: Guest) -> void:
 	g.mood.think("I'm never coming back")
+	g.stormed = true
 	ledger.record_walkout()
 	town.record_visit(g.idx, -0.5)
 	hud.say("%s walked out!" % g.info.name)

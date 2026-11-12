@@ -6,7 +6,7 @@ const SPEED := 2.4
 const QUEUE_PATIENCE := 40.0
 const EAT_TIME := 5.0
 const BAR_WIDTH := 0.6
-const SEAT_HEIGHT := 0.3
+const SEAT_HEIGHT := 0.2
 
 var game
 var idx := 0
@@ -18,7 +18,8 @@ var cell := Vector2i.ZERO
 var seat := Vector2i(-1, -1)
 var table: Station
 var timer := 0.0
-var _body: Node3D
+var _body: Peg
+var stormed := false
 var _bar: Node3D
 var _fill: MeshInstance3D
 var _order: Node3D
@@ -35,7 +36,7 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	info = game.town.people[idx]
 	cell = start
 	position = Grid.center(start)
-	_body = Build.person(info.shirt, info.skin)
+	_body = Peg.guest(info.name)
 	_body.rotation.y = -PI / 2
 	add_child(_body)
 	_bar = Node3D.new()
@@ -104,7 +105,6 @@ func start_eating(quality: float) -> void:
 
 func stand_up() -> void:
 	state = "leaving"
-	_body.rotation.x = 0.0
 	if _meal:
 		_meal.queue_free()
 		_meal = null
@@ -152,6 +152,16 @@ func _refresh(delta: float) -> void:
 	_fill.material_override = Build.mat(col, 0.5)
 	# Impatient guests shake a little.
 	_body.position.x = sin(_age * 40.0) * 0.02 if (_bar.visible and p < 0.25) else 0.0
+	_body.set_face(mood.expression(state == "eating", stormed))
+	_body.pose = "eat" if state == "eating" else ("tap" if state == "waiting" and p < 0.35 else "idle")
+	# Bored guests slump; guests about to snap lean in; disgust pitches them back.
+	var lean := 0.0
+	if state == "waiting":
+		lean = -0.2 if mood.disgust > 0.5 else (0.14 if p < 0.25 else (0.07 if p < 0.5 else 0.0))
+	elif state == "leaving" and stormed:
+		lean = 0.3
+	if state != "eating":
+		_body.rotation.x = lerpf(_body.rotation.x, lean, 1.0 - exp(-8.0 * delta))
 	_order.visible = state == "waiting"
 	_order.position.y = 1.85 + sin(_age * 3.0) * 0.04
 	if mood.thoughts.size() > _shown_thoughts:
