@@ -15,6 +15,13 @@ const SOUNDS := {  # name -> volume in dB
 	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0, "music": -15.0,
 }
 const LOOPING: Array[String] = ["sizzle", "music"]
+# The camera sits wide to show the whole diorama between days, and moves in on
+# the room and the queue while guests are being served.
+const CAM_OFFSET := Vector3(14, 15, 14)
+const WIDE_SIZE := 14.5
+const WIDE_FOCUS := Vector3(W / 2.0 + 0.2, 0, H / 2.0 + 1.7)
+const CLOSE_SIZE := 11.5
+const CLOSE_FOCUS := Vector3(W / 2.0 - 0.6, 0, H / 2.0)
 
 var grid: Grid
 var town: Town
@@ -73,7 +80,7 @@ func _apply_demo(demo: String) -> void:
 		find_station("stove").cook = -8.2
 		stations[Vector2i(2, 0)].set_item("raw_patty")
 		player.position = Grid.center(Vector2i(1, 1))
-		player.facing = Vector2i(0, -1)
+		player.look(Vector2i(0, -1))
 		player.set_held("plate")
 		for a in arrivals:
 			a.time = 1.0
@@ -100,6 +107,12 @@ func _apply_demo(demo: String) -> void:
 			c.position = Vector3(6.2 + i, 0, 12.2 - i * 0.6)
 			c.rotation.y = PI / 4 + i * PI / 2
 			add_child(c)
+	elif demo == "fx":  # fires every effect in turn; shoot at about 6.5 and 8.4
+		for a in arrivals:
+			a.time = 0.2
+		while arrivals.size() < 8:
+			arrivals.append({"time": 0.2, "idx": arrivals.size()})
+		get_tree().create_timer(6.0).timeout.connect(_demo_fx)
 	elif demo == "closed":
 		best_path = "user://regulars_best_demo.json"
 		for i in Ledger.MAX_STRIKES:
@@ -108,6 +121,24 @@ func _apply_demo(demo: String) -> void:
 		ledger.record_sale(BILL, 5)
 		ledger.record_sale(BILL, 3)
 		arrivals.clear()
+
+
+func _demo_fx() -> void:
+	var seated: Array[Guest] = []
+	for g in guests:
+		if g.state == "waiting":
+			seated.append(g)
+		elif g.state == "queue":
+			g.mood.patience = 0.5                 # Zzz bubble
+	if seated.size() > 0:
+		serve(seated[0], 1.0)                     # stars, heart, chewing, bitten burger
+		seated[0].timer = 2.0                     # then the coin and a dirty plate
+	if seated.size() > 1:
+		seated[1].mood.patience = 0.0             # walkout: anger mark and a stamp
+	if seated.size() > 2:
+		seated[2]._gross_time = 6.0               # green cloud
+	find_station("fridge").used()                 # door swings open
+	burst(find_station("sink").position + Vector3(0, 1.15, 0), "bubbles", 0.4)
 
 
 # ---------------------------------------------------------------- world
@@ -149,10 +180,9 @@ func _build_scenery() -> void:
 	add_child(sun)
 	cam = Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
-	cam.size = 14.5
+	cam.size = WIDE_SIZE
 	add_child(cam)
-	var focus := Vector3(W / 2.0 + 0.2, 0, H / 2.0 + 1.7)
-	cam.look_at_from_position(focus + Vector3(14, 15, 14), focus)
+	cam.look_at_from_position(WIDE_FOCUS + CAM_OFFSET, WIDE_FOCUS)
 
 	_sconces = Scenery.build(self, W, H, DOOR)
 
@@ -261,10 +291,10 @@ func shake(amount := 0.12) -> void:
 ## Morning light drifts to a warm, low evening sun as the day goes on.
 func _update_daylight() -> void:
 	var t := smoothstep(0.35, 1.0, day_progress())
-	_sun.light_color = Color("#fff6ea").lerp(Color("#ffc08a"), t)
+	_sun.light_color = Color("#fff6ea").lerp(Color("#ffd6ac"), t)
 	_sun.rotation_degrees = Vector3(lerpf(-52, -34, t), lerpf(-30, -62, t), 0)
-	_env.background_color = Color(Scenery.t().backdrop).lerp(Color("#dcc0b4"), t)
-	_env.ambient_light_color = Color("#f4dcd2").lerp(Color("#f0c8bc"), t)
+	_env.background_color = Color(Scenery.t().backdrop).lerp(Color("#d9c9cc"), t)
+	_env.ambient_light_color = Color("#f4dcd2").lerp(Color("#ead6d6"), t)
 	_sun.light_energy = lerpf(0.62, 0.5, t)
 	for l in _sconces:  # practical lights come up as the sun goes down
 		l.light_energy = float(l.get_meta("full", 0.45)) * lerpf(0.35, 1.0, t)
@@ -640,6 +670,7 @@ func _process(delta: float) -> void:
 			- float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)))
 	player.move(input, delta)
 	step(delta)
+	_update_camera(delta)
 	_update_cursor()
 	_update_daylight()
 	hud.update_status()
@@ -648,6 +679,13 @@ func _process(delta: float) -> void:
 		if _shot_time > float(OS.get_environment("REGULARS_SHOT_AT")):
 			get_viewport().get_texture().get_image().save_png(_shot_path)
 			get_tree().quit()
+
+
+func _update_camera(delta: float) -> void:
+	var close := phase == Phase.SERVICE
+	var k := 1.0 - exp(-2.5 * delta)
+	cam.size = lerpf(cam.size, CLOSE_SIZE if close else WIDE_SIZE, k)
+	cam.position = cam.position.lerp((CLOSE_FOCUS if close else WIDE_FOCUS) + CAM_OFFSET, k)
 
 
 func _update_cursor() -> void:

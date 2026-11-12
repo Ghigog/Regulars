@@ -9,7 +9,8 @@ const GROSS_ITEMS: Array[String] = ["dirty_plate", "burnt_patty"]
 var game
 var held := ""
 var held_quality := 1.0
-var facing := Vector2i(0, 1)
+var facing := Vector2i(0, 1)      # nearest grid direction to `aim`
+var aim := Vector3(0, 0, 1)       # the way the chef is really looking (any of 8 ways)
 var _velocity := Vector3.ZERO
 var _held_node: Node3D
 var _body: Peg
@@ -54,8 +55,35 @@ func cell() -> Vector2i:
 	return Grid.to_cell(position)
 
 
+## The cell the chef would use right now. One key moves diagonally across the
+## grid from this camera, so the chef rarely looks square at anything: of the
+## stations beside the chef, pick the one most in front, and prefer one that has
+## something to do.
 func target_cell() -> Vector2i:
-	return cell() + facing
+	var here := cell()
+	var best := here + facing
+	var best_score := -INF
+	for d in Grid.DIRS:
+		var n: Vector2i = here + d
+		if not game.stations.has(n):
+			continue
+		var to := Grid.center(n) - position
+		to.y = 0.0
+		var score := to.normalized().dot(aim)
+		if score < 0.2:
+			continue
+		if game.prompt_for(game.stations[n]) != "":
+			score += 0.6
+		if score > best_score:
+			best_score = score
+			best = n
+	return best
+
+
+## Turns the chef to look along a grid direction (used by tests and demos).
+func look(dir: Vector2i) -> void:
+	facing = dir
+	aim = Vector3(dir.x, 0, dir.y).normalized()
 
 
 func _can_stand(from: Vector3, to: Vector3) -> bool:
@@ -79,10 +107,13 @@ func move(input: Vector2, delta: float) -> void:
 	var dir := Vector3.ZERO
 	if input != Vector2.ZERO:
 		dir = (Vector3(1, 0, -1) * input.x + Vector3(-1, 0, -1) * input.y).normalized()
+		aim = dir  # always turn to face the way we are going
 		if absf(dir.x) > absf(dir.z) + 0.01:
 			facing = Vector2i(signi(roundi(dir.x)), 0)
 		elif absf(dir.z) > absf(dir.x) + 0.01:
 			facing = Vector2i(0, signi(roundi(dir.z)))
+		elif facing.x != signi(roundi(dir.x)) and facing.y != signi(roundi(dir.z)):
+			facing = Vector2i(signi(roundi(dir.x)), 0)
 	_velocity = _velocity.lerp(dir * SPEED, 1.0 - exp(-16.0 * delta))
 	var step := _velocity * delta
 	var next := position + Vector3(step.x, 0, 0)
@@ -105,4 +136,4 @@ func move(input: Vector2, delta: float) -> void:
 	_body.rotation.x = lerpf(_body.rotation.x, 0.3 * pace, 1.0 - exp(-10.0 * delta))
 	if _held_node:
 		_held_node.global_basis = Basis(Vector3(1, 0, -1).normalized(), deg_to_rad(25.0)).scaled(_held_node.scale)
-	_body.rotation.y = lerp_angle(_body.rotation.y, atan2(float(facing.x), float(facing.y)), 1.0 - exp(-18.0 * delta))
+	_body.rotation.y = lerp_angle(_body.rotation.y, atan2(aim.x, aim.z), 1.0 - exp(-18.0 * delta))

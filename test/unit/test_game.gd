@@ -154,3 +154,16 @@ func test_patty_passes_through_five_looks():
 	# The look never promises more than the quality delivers.
 	assert_eq(Station.quality_at(Station.COOK_TIME - 0.1), 0.0)
 	assert_eq(Build.look_for("cooked_patty", Station.quality_at(Station.PERFECT_END + 2.0)), "dry")
+
+
+func test_chef_aims_at_the_station_most_in_front():
+	# Standing at (1, 1) with a stove behind-left and the fridge two cells away.
+	game.player.position = Grid.center(Vector2i(1, 1))
+	game.player.look(Vector2i(0, -1))
+	assert_eq(game.player.target_cell(), Vector2i(1, 0))
+	# One key moves diagonally from this camera; the chef still finds the stove.
+	game.player.move(Vector2(0, 1), 0.0)
+	assert_eq(game.player.target_cell(), Vector2i(1, 0))
+	# Looking away from every station, nothing is picked up by accident.
+	game.player.look(Vector2i(0, 1))
+	assert_false(game.stations.has(game.player.target_cell()))

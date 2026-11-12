@@ -80,6 +80,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 | Felix and Nell | Looks invented from the kit (auburn side-sweep and cream collar; top-knot and periwinkle dungarees). | Never drawn. |
 | Stove | Steel body, one large burner with the frying pan always on it. | One cooking slot per stove; a pan over four small burners looked wrong. Steel keeps it distinct from the teal counters. |
 | Patty looks | "Nearly there" and "dry" are looks only. The game still has three item kinds (raw, cooked, burnt) and the same timings. | No gameplay change. |
+| Controls | The chef turns to face the way it moves (eight ways), and uses whichever neighbouring station is most in front, preferring one with something to do. | One key moves diagonally across the grid from this camera, so the chef almost never faced a station squarely. |
 | Dial | Shown while a patty cooks; hidden once it burns (flames take over). | The burnt state needs no gauge. |
 | Fridge | Shut, and swings open on use to show the meat. | The "open" state has nothing else to hang on. |
 | Station states | Not built: sink full of suds, overflowing bin. Washing plays the bubble effect. | No gameplay behind them yet. |
@@ -88,7 +89,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 | Kitchen dressing | Wall cabinets on the left wall, jar shelf by the stoves, no range hood. | Nothing may hide a stove or its dial. |
 | Lighting | Sconces on the far walls, a mushroom lamp on each table, a street lamp. No floor lamp. All come up as the sun goes down. | Every corner in the room is walkable. |
 | Shopfront | The hanging burger sign sits on the coral door frame. No awning or upper wall. | Those only show in title and photo views, which do not exist yet. |
-| Camera | Same angles; the view is a little wider (size 14.5, was 13.5) and centred nearer the street. Characters are about 66 px tall. | So the whole slab and its edge are in frame. |
+| Camera | Same angles. Between days the view is wide (size 14.5, was 13.5) so the whole slab and its edge are in frame; during service it moves in on the room and queue (size 11.5, characters about 84 px tall). | The diorama reads best wide; play reads best close. |
 | Palette | Brief values nudged toward sheet 7; the dining floor is less saturated than either. | Under warm light the sampled orange glowed. |
 | Font | A rounded system font (Arial Rounded where present). | No licensed hand-lettered face chosen yet. |
 | Themes | Chosen with `REGULARS_THEME=seaside`. Seaside swaps walls (clapboard), windows (portholes), wall art (life ring and paddle), floors, lawn (sand), pavement (boardwalk with rope bollards) and road (sea with foam). Stations are untouched. | Sheet 16. No picker yet because the title screen is open. |

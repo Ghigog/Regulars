@@ -370,6 +370,7 @@ func show_prompt(at: Vector2, text: String) -> void:
 		prompt_label.text = text.to_upper()
 		prompt.reset_size()
 		prompt.position = (at - Vector2(prompt.size.x / 2.0, prompt.size.y)).round()
+		prompt.position.y = maxf(prompt.position.y, 6.0)  # never off the top of the screen
 
 
 func say(s: String) -> void:
