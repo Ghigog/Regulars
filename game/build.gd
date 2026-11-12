@@ -158,6 +158,69 @@ static func _spin(p: Vector2, ang: float) -> Vector3:
 	return Vector3(p.x * cos(ang), p.y, p.x * sin(ang))
 
 
+## The fixed game camera's orientation; flat cards use it to face the screen.
+static var CAM_BASIS := Basis.looking_at(-Vector3(14, 15, 14))
+
+
+static func flat_mat(col: Color) -> StandardMaterial3D:
+	var key := "flat|%s" % col.to_html()
+	if not _mats.has(key):
+		var m := StandardMaterial3D.new()
+		m.albedo_color = col
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_mats[key] = m
+	return _mats[key]
+
+
+## A flat cut-out card in the XY plane (facing +z), from a 2D outline. Layer
+## cards by `z`; crisp edges, no alpha (style guide, sheet 13).
+static func flat(parent: Node3D, pts: PackedVector2Array, col: String, z := 0.0) -> MeshInstance3D:
+	var key := "flat|%s" % [pts]
+	if not _meshes.has(key):
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for i in Geometry2D.triangulate_polygon(pts):
+			st.set_normal(Vector3(0, 0, 1))
+			st.add_vertex(Vector3(pts[i].x, pts[i].y, 0))
+		_meshes[key] = st.commit()
+	var mi := MeshInstance3D.new()
+	mi.mesh = _meshes[key]
+	mi.position.z = z
+	mi.material_override = flat_mat(Color(col))
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	return mi
+
+
+static func disc_pts(r: float, at := Vector2.ZERO, n := 24) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in n:
+		pts.append(at + Vector2(cos(TAU * i / n), sin(TAU * i / n)) * r)
+	return pts
+
+
+## Part of a ring. Angles in degrees, clockwise from straight up.
+static func arc_pts(r0: float, r1: float, a0: float, a1: float, r0_end := -1.0, r1_end := -1.0) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var n := maxi(2, ceili(absf(a1 - a0) / 8.0))
+	for i in n + 1:
+		var a := deg_to_rad(lerpf(a0, a1, float(i) / n))
+		pts.append(Vector2(sin(a), cos(a)) * lerpf(r1, r1 if r1_end < 0.0 else r1_end, float(i) / n))
+	for i in range(n, -1, -1):
+		var a := deg_to_rad(lerpf(a0, a1, float(i) / n))
+		pts.append(Vector2(sin(a), cos(a)) * lerpf(r0, r0 if r0_end < 0.0 else r0_end, float(i) / n))
+	return pts
+
+
+static func star_pts(r: float, points := 4, inner := 0.42, at := Vector2.ZERO) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in points * 2:
+		var a := PI * i / points
+		pts.append(at + Vector2(sin(a), cos(a)) * (r if i % 2 == 0 else r * inner))
+	return pts
+
+
 ## Bevelled box whose base centre sits at `pos`.
 static func box(parent: Node3D, pos: Vector3, size: Vector3, col: String, emit := 0.0, rough := R_MATTE) -> MeshInstance3D:
 	return _add(parent, bevel_mesh(size), pos + Vector3(0, size.y / 2, 0), Color(col), emit, rough)
@@ -186,25 +249,74 @@ static func ball(parent: Node3D, pos: Vector3, r: float, col: String, emit := 0.
 	return _add(parent, _meshes[key], pos, Color(col), emit, rough)
 
 
-static func item(kind: String) -> Node3D:
-	var n := Node3D.new()
+static func _puck(n: Node3D, y: float, r: float, h: float, col: String) -> MeshInstance3D:
+	var e := minf(h * 0.45, 0.03)
+	return lathe(n, Vector3(0, y, 0), [[0.0, 0.0], [r - e, 0.0], [r, e], [r, h - e], [r - e, h], [0.0, h]], col, 0.0, R_GLOSS)
+
+
+static func _plate(n: Node3D) -> void:
+	lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.12, 0.0], [0.21, 0.03], [0.215, 0.042], [0.195, 0.042], [0.12, 0.018], [0.0, 0.018]], "#f6efe0", 0.0, R_GLOSS)
+
+
+## The five patty looks from sheet 9: raw, nearly, perfect, dry, burnt.
+static func patty(n: Node3D, look: String, y := 0.0) -> void:
+	match look:
+		"raw":
+			_puck(n, y, 0.135, 0.075, "#f2a7ad")
+		"nearly":
+			_puck(n, y, 0.135, 0.07, "#c9986a")
+			lathe(n, Vector3(0, y + 0.012, 0), [[0.125, 0.0], [0.14, 0.012], [0.14, 0.036], [0.125, 0.048]], "#e3a63a", 0.0, R_GLOSS)
+		"perfect":
+			_puck(n, y, 0.135, 0.07, "#7a3b22")
+			for dx: float in [-0.045, 0.045]:
+				box(n, Vector3(dx, y + 0.062, 0), Vector3(0.03, 0.014, 0.19), "#4a2414").rotation.y = 0.6
+		"dry":
+			_puck(n, y, 0.14, 0.04, "#b79f88")
+		"burnt":
+			_puck(n, y, 0.125, 0.055, "#2a2523")
+			for i in 6:  # a jagged hockey puck
+				var a := TAU * i / 6.0
+				var lump := box(n, Vector3(cos(a) * 0.09, y + 0.005, sin(a) * 0.09), Vector3(0.09, 0.06 + 0.02 * (i % 2), 0.08), "#1f1b1a")
+				lump.rotation = Vector3(0.3 * (i % 3 - 1), a, 0.25)
+
+
+static func look_for(kind: String, quality: float) -> String:
 	match kind:
 		"raw_patty":
-			cyl(n, Vector3.ZERO, 0.13, 0.06, "#e58a8a")
-		"cooked_patty":
-			cyl(n, Vector3.ZERO, 0.13, 0.06, "#7a4a2b")
+			return "raw"
 		"burnt_patty":
-			cyl(n, Vector3.ZERO, 0.13, 0.06, "#1d1b1a")
+			return "burnt"
+	return "perfect" if quality > 0.95 else "dry"
+
+
+## Anything that can be carried or put down. `look` overrides the patty look
+## (a stove knows more about its patty than the item kind says).
+static func item(kind: String, quality := 1.0, look := "") -> Node3D:
+	var n := Node3D.new()
+	if look == "":
+		look = look_for(kind, quality)
+	match kind:
+		"raw_patty", "cooked_patty", "burnt_patty":
+			patty(n, look)
 		"plate":
-			cyl(n, Vector3.ZERO, 0.19, 0.03, "#ffffff")
+			_plate(n)
 		"dirty_plate":
-			cyl(n, Vector3.ZERO, 0.19, 0.03, "#b9a98a")
-			ball(n, Vector3(0.05, 0.05, 0), 0.04, "#6b4a2b")
-		"burger":
-			cyl(n, Vector3.ZERO, 0.19, 0.03, "#ffffff")
-			cyl(n, Vector3(0, 0.03, 0), 0.12, 0.05, "#e8a23a")
-			cyl(n, Vector3(0, 0.08, 0), 0.13, 0.04, "#7a4a2b")
-			ball(n, Vector3(0, 0.14, 0), 0.12, "#e8a23a")
+			_plate(n)
+			lathe(n, Vector3(0.01, 0.019, 0.0), [[0.05, 0.0], [0.07, 0.008], [0.09, 0.0]], "#7a4a2b", 0.0, R_GLOSS)
+			ball(n, Vector3(-0.03, 0.02, 0.02), 0.022, "#7a4a2b", 0.0, R_GLOSS)
+			for c: Vector3 in [Vector3(0.1, 0.03, 0.06), Vector3(-0.09, 0.03, -0.08), Vector3(0.02, 0.03, -0.13)]:
+				box(n, c, Vector3(0.035, 0.02, 0.03), "#e0a850").rotation.y = c.x * 20.0
+		"burger", "burger_bitten":
+			_plate(n)
+			_puck(n, 0.018, 0.14, 0.055, "#e6a542")                       # bottom bun
+			patty(n, look, 0.07)
+			box(n, Vector3(0, 0.135, 0), Vector3(0.25, 0.022, 0.25), "#ffd452", 0.0, R_GLOSS).rotation.y = PI / 4
+			lathe(n, Vector3(0, 0.152, 0), [[0.0, 0.0], [0.165, 0.0], [0.175, 0.012], [0.165, 0.024], [0.0, 0.024]], "#6fbf5f", 0.0, R_GLOSS)
+			lathe(n, Vector3(0, 0.172, 0), [[0.0, 0.0], [0.135, 0.0], [0.145, 0.03], [0.125, 0.075], [0.07, 0.105], [0.0, 0.112]], "#e6a542", 0.0, R_GLOSS)
+			if kind == "burger_bitten":
+				ball(n, Vector3(0.12, 0.17, 0.09), 0.105, "#f6e2b4")       # the bite
+				for c: Vector3 in [Vector3(0.17, 0.03, -0.06), Vector3(-0.15, 0.03, 0.1)]:
+					box(n, c, Vector3(0.03, 0.02, 0.03), "#e0a850")
 	return n
 
 
@@ -222,10 +334,14 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			box(n, Vector3(0.3, 0.8, 0.46), Vector3(0.06, 0.5, 0.04), STEEL)
 		"stove":
 			_counter(n, STEEL, STEEL_DARK)
-			for d: Vector2 in [Vector2(-0.22, -0.2), Vector2(0.22, -0.2), Vector2(-0.22, 0.2), Vector2(0.22, 0.2)]:
-				cyl(n, Vector3(d.x, 0.88, d.y), 0.13, 0.015, CORAL, 1.5)
+			var ring := lathe(n, Vector3(0, 0.9, 0), [[0.15, 0.0], [0.17, 0.012], [0.21, 0.012], [0.23, 0.0]], STEEL_DARK)
+			ring.name = "ring"
+			# The frying pan lives on the burner; the patty sits in it.
+			lathe(n, Vector3(0, 0.905, 0), [[0.0, 0.0], [0.2, 0.0], [0.25, 0.045], [0.235, 0.045], [0.19, 0.022], [0.0, 0.022]], "#34383b", 0.0, R_WOOD)
+			box(n, Vector3(0.36, 0.925, 0.0), Vector3(0.28, 0.035, 0.06), WOOD_DARK)
+			box(n, Vector3(0, 0.3, 0.455), Vector3(0.62, 0.34, 0.05), STEEL_DARK)
 			for i in 3:
-				ball(n, Vector3(-0.25 + i * 0.25, 0.62, 0.48), 0.05, STEEL_DARK)
+				ball(n, Vector3(-0.25 + i * 0.25, 0.74, 0.48), 0.05, CORAL)
 		"counter":
 			_counter(n, CABINET, WORKTOP)
 		"pass":

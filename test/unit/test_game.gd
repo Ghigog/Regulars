@@ -143,3 +143,14 @@ func test_three_walkouts_end_the_run():
 	assert_eq(game.phase, game.Phase.CLOSED)
 	game.start_day()
 	assert_eq(game.phase, game.Phase.CLOSED, "a closed restaurant stays closed")
+
+
+func test_patty_passes_through_five_looks():
+	assert_eq(Station.patty_look(0.0), "raw")
+	assert_eq(Station.patty_look(Station.COOK_TIME - 0.1), "nearly")
+	assert_eq(Station.patty_look(Station.COOK_TIME + 0.1), "perfect")
+	assert_eq(Station.patty_look(Station.PERFECT_END + 0.5), "dry")
+	assert_eq(Station.patty_look(Station.BURN_TIME), "burnt")
+	# The look never promises more than the quality delivers.
+	assert_eq(Station.quality_at(Station.COOK_TIME - 0.1), 0.0)
+	assert_eq(Build.look_for("cooked_patty", Station.quality_at(Station.PERFECT_END + 2.0)), "dry")

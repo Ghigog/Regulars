@@ -5,7 +5,8 @@ extends Node3D
 const COOK_TIME := 4.0     # raw until here
 const PERFECT_END := 7.5   # juicy until here, then it dries out
 const BURN_TIME := 12.0
-const BAR_WIDTH := 0.9
+const NEARLY_TIME := 2.4   # the raw patty starts to colour
+const DIAL_SWEEP := 150.0  # degrees either side of straight up
 
 var type := ""
 var cell := Vector2i.ZERO
@@ -19,7 +20,9 @@ var seats: Array[Vector2i] = []
 var _item_node: Node3D
 var _stack: Node3D
 var _bar: Node3D
-var _needle: MeshInstance3D
+var _needle: Node3D
+var _ring: MeshInstance3D
+var _shown_look := ""
 var _smoke: CPUParticles3D
 var _smoke_mat: StandardMaterial3D
 
@@ -38,6 +41,17 @@ static func stage_at(t: float) -> String:
 	return "cooked_patty" if t < BURN_TIME else "burnt_patty"
 
 
+## Which of the five patty looks a patty has after `t` seconds on the heat.
+static func patty_look(t: float) -> String:
+	if t < NEARLY_TIME:
+		return "raw"
+	if t < COOK_TIME:
+		return "nearly"
+	if t <= PERFECT_END:
+		return "perfect"
+	return "dry" if t < BURN_TIME else "burnt"
+
+
 func setup(type_: String, cell_: Vector2i, tier_: int) -> void:
 	type = type_
 	cell = cell_
@@ -49,6 +63,7 @@ func setup(type_: String, cell_: Vector2i, tier_: int) -> void:
 	if type == "plates":
 		count = 4
 	if type == "stove":
+		_ring = get_node_or_null("ring")
 		_make_cook_bar()
 		_make_smoke()
 	refresh()
@@ -58,9 +73,12 @@ func _show_item(kind: String) -> void:
 	if _item_node:
 		_item_node.queue_free()
 		_item_node = null
+	_shown_look = ""
 	if kind != "":
-		_item_node = Build.item(kind)
-		_item_node.position = Vector3(0, 0.9, 0)
+		var on_heat := type == "stove" and kind.ends_with("patty")
+		_shown_look = patty_look(cook) if on_heat else Build.look_for(kind, quality)
+		_item_node = Build.item(kind, quality, _shown_look)
+		_item_node.position = Vector3(0, 0.935 if type == "stove" else 0.9, 0)
 		add_child(_item_node)
 		_item_node.scale = Vector3.ONE * 0.4
 		_item_node.create_tween().tween_property(_item_node, "scale", Vector3.ONE, 0.18) \
@@ -70,9 +88,10 @@ func _show_item(kind: String) -> void:
 func set_item(kind: String, q := 1.0) -> void:
 	item = kind
 	quality = q
-	_show_item(kind)
 	if type == "stove":
 		cook = {"cooked_patty": PERFECT_END, "burnt_patty": BURN_TIME}.get(kind, 0.0)
+	_show_item(kind)
+	if type == "stove":
 		_update_cooking_visuals()
 
 
@@ -89,25 +108,42 @@ func tick_cooking(delta: float) -> String:
 	_update_cooking_visuals()
 	var stage := stage_at(cook)
 	if stage == item:
+		if patty_look(cook) != _shown_look:
+			_show_item(item)
 		return ""
 	item = stage
 	_show_item(stage)
 	return stage
 
 
+static func _dial_angle(t: float) -> float:
+	return lerpf(-DIAL_SWEEP, DIAL_SWEEP, clampf(t / BURN_TIME, 0.0, 1.0))
+
+
+## The doneness dial (sheet 9): a chunky ring gauge that faces the camera. Cream
+## warm-up arc, green sweet spot with a star, then yellow shrinking into red.
 func _make_cook_bar() -> void:
 	_bar = Node3D.new()
-	_bar.position = Vector3(0, 1.75, 0)
-	_bar.rotation.y = PI / 4  # face the fixed camera
-	_bar.scale = Vector3.ONE * 1.25
+	_bar.position = Vector3(0, 1.72, 0)
+	_bar.basis = Build.CAM_BASIS
 	add_child(_bar)
-	Build.box(_bar, Vector3(0, -0.03, -0.02), Vector3(BAR_WIDTH + 0.08, 0.2, 0.02), "#3a2c22")
-	var spans := [[0.0, COOK_TIME, "#e58a8a"], [COOK_TIME, PERFECT_END, "#5fd38d"], [PERFECT_END, BURN_TIME, "#e9a23b"]]
-	for s: Array in spans:
-		var w: float = (s[1] - s[0]) / BURN_TIME * BAR_WIDTH
-		var x: float = ((s[0] + s[1]) / 2.0 / BURN_TIME - 0.5) * BAR_WIDTH
-		Build.box(_bar, Vector3(x, 0, 0), Vector3(w, 0.14, 0.02), s[2], 0.4)
-	_needle = Build.box(_bar, Vector3(0, -0.05, 0.02), Vector3(0.05, 0.24, 0.03), "#ffffff", 1.0)
+	Build.flat(_bar, Build.disc_pts(0.37, Vector2.ZERO, 32), Build.TRIM, 0.0)
+	Build.flat(_bar, Build.disc_pts(0.335, Vector2.ZERO, 32), "#5a4636", 0.002)
+	var a_cook := _dial_angle(COOK_TIME)
+	var a_end := _dial_angle(PERFECT_END)
+	var a_mid := _dial_angle((PERFECT_END + BURN_TIME) / 2.0)
+	Build.flat(_bar, Build.arc_pts(0.2, 0.27, -DIAL_SWEEP, a_cook), Build.PAPER, 0.004)
+	Build.flat(_bar, Build.arc_pts(0.17, 0.31, a_cook, a_end), Build.GOOD, 0.004)
+	Build.flat(_bar, Build.arc_pts(0.17, 0.31, a_end, a_mid, 0.19, 0.28), Build.WARN, 0.004)
+	Build.flat(_bar, Build.arc_pts(0.19, 0.28, a_mid, DIAL_SWEEP, 0.21, 0.25), Build.DANGER, 0.004)
+	var a_star := deg_to_rad((a_cook + a_end) / 2.0)
+	Build.flat(_bar, Build.star_pts(0.085, 5, 0.5, Vector2(sin(a_star), cos(a_star)) * 0.24), "#ffffff", 0.006)
+	_needle = Node3D.new()
+	_needle.position.z = 0.008
+	_bar.add_child(_needle)
+	Build.flat(_needle, PackedVector2Array([Vector2(-0.035, -0.05), Vector2(-0.022, 0.27), Vector2(0, 0.3), Vector2(0.022, 0.27), Vector2(0.035, -0.05)]), "#ffffff")
+	Build.flat(_needle, Build.disc_pts(0.065), Build.TRIM, 0.002)
+	Build.flat(_needle, Build.disc_pts(0.03), "#ffffff", 0.004)
 	_bar.visible = false
 
 
@@ -141,7 +177,9 @@ func is_cooking() -> bool:
 
 func _update_cooking_visuals() -> void:
 	_bar.visible = is_cooking()
-	_needle.position.x = (clampf(cook / BURN_TIME, 0.0, 1.0) - 0.5) * BAR_WIDTH
+	_needle.rotation.z = -deg_to_rad(_dial_angle(cook))
+	if _ring:
+		_ring.material_override = Build.mat(Color("#ff8a3c") if is_cooking() else Color(Build.STEEL_DARK), 1.6 if is_cooking() else 0.0)
 	_smoke.emitting = item != "" and item.ends_with("patty")
 	var danger := clampf((cook - PERFECT_END) / (BURN_TIME - PERFECT_END), 0.0, 1.0)
 	_smoke_mat.albedo_color = Color(1, 1, 1, 0.45).lerp(Color(0.12, 0.1, 0.1, 0.8), danger)
@@ -159,5 +197,5 @@ func refresh() -> void:
 	elif type == "table":
 		for i in dirty:
 			var d := Build.item("dirty_plate")
-			d.position = Vector3(-0.25 + i * 0.25, 0.7, 0.25)
+			d.position = Vector3(-0.25 + i * 0.5, 0.72, 0.28)
 			_stack.add_child(d)

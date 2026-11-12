@@ -31,7 +31,7 @@ func set_held(kind: String, quality := 1.0) -> void:
 		_held_node = null
 	_body.pose = "carry" if kind != "" else "idle"
 	if kind != "":
-		_held_node = Build.item(kind)
+		_held_node = Build.item(kind, quality)
 		_held_node.position = Vector3(0, 0.42, 0.34)
 		_body.add_child(_held_node)
 		_held_node.scale = Vector3.ONE * 0.4

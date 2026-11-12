@@ -73,7 +73,7 @@ func _ready() -> void:
 func _apply_demo(demo: String) -> void:
 	if demo == "cook":
 		find_station("stove").set_item("raw_patty")
-		find_station("stove").cook = -8.0
+		find_station("stove").cook = -8.2
 		stations[Vector2i(2, 0)].set_item("raw_patty")
 		player.position = Grid.center(Vector2i(1, 1))
 		player.facing = Vector2i(0, -1)

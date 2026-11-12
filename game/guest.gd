@@ -24,6 +24,7 @@ var _bar: Node3D
 var _fill: MeshInstance3D
 var _order: Node3D
 var _meal: Node3D
+var _meal_kind := ""
 var _label: Label3D
 var _thought_time := 0.0
 var _shown_thoughts := 0
@@ -94,13 +95,20 @@ func start_eating(quality: float) -> void:
 	mood.taste(quality)
 	state = "eating"
 	timer = EAT_TIME
-	var to_table := (Grid.center(table.cell) - position).normalized()
-	_meal = Build.item("burger")
-	_meal.position = to_table * 0.6 + Vector3(0, 0.7, 0)
-	add_child(_meal)
+	_set_meal("burger", quality)
 	var tw := _body.create_tween()
 	tw.tween_property(_body, "position:y", SEAT_HEIGHT + 0.3, 0.12).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_body, "position:y", SEAT_HEIGHT, 0.25).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+
+
+func _set_meal(kind: String, quality: float) -> void:
+	if _meal:
+		_meal.queue_free()
+	_meal_kind = kind
+	var to_table := (Grid.center(table.cell) - position).normalized()
+	_meal = Build.item(kind, quality)
+	_meal.position = to_table * 0.62 + Vector3(0, 0.72, 0)
+	add_child(_meal)
 
 
 func stand_up() -> void:
@@ -131,7 +139,8 @@ func tick(delta: float) -> void:
 			timer -= delta
 			# Lean in for a bite, and the burger shrinks as it is eaten.
 			_body.rotation.x = maxf(0.0, sin(_age * 7.0)) * 0.22
-			_meal.scale = Vector3.ONE * lerpf(0.35, 1.0, clampf(timer / EAT_TIME, 0.0, 1.0))
+			if timer < EAT_TIME * 0.55 and _meal_kind == "burger":
+				_set_meal("burger_bitten", mood.savour)
 			game.apply_surroundings(self, delta)
 			if timer <= 0.0:
 				game.finish_meal(self)
