@@ -1,7 +1,7 @@
 extends Node3D
 ## Regulars vertical slice: an endless run of days. Cook meat, serve guests, get paid.
 
-enum Phase { SERVICE, SUMMARY, CLOSED }
+enum Phase { SERVICE, SUMMARY, CLOSED, BUILD }
 
 const W := 10            # restaurant interior is 10 x 7 cells
 const H := 7             # rows 7 and 8 are the pavement outside
@@ -10,6 +10,7 @@ const SPAWN := Vector2i(9, 8)
 const EXIT := Vector2i(0, 8)
 const BILL := 12
 const SIGHT_RANGE := 7
+const AREA := Rect2i(0, 0, W, H)   # where the player may build
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
 const SOUNDS := {  # name -> volume in dB
 	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
@@ -35,6 +36,14 @@ var seat_taken := {}             # Vector2i -> Guest
 var arrivals: Array[Dictionary] = []
 var clock := 0.0
 var last_day := {}
+var catalog: Catalog
+var crate: Array[Dictionary] = []      # tonight's two blueprints; empty once one is taken
+var inventory: Array[Dictionary] = []  # blueprints owned but not yet placed
+var hand := {}                         # what is being placed: {id, tier, price, owned}
+var _ghost: Node3D
+var _ghost_key := ""
+var _no_mark: Node3D
+var _demo_hover := Vector3.INF
 var flyers_out := false          # bought tonight, spent on tomorrow's crowd
 var best_path := "user://regulars_best.json"
 var player: Player
@@ -55,6 +64,7 @@ func _ready() -> void:
 	grid = Grid.new(W, H + 2)
 	town = Town.new(seed_value)
 	ledger = Ledger.new()
+	catalog = Catalog.new(seed_value)
 	_build_scenery()
 	_build_layout()
 	_load_sounds()
@@ -70,6 +80,17 @@ func _ready() -> void:
 	for i in 4:
 		var bar := Build.box(_cursor, Vector3(0, 0, 0.5).rotated(Vector3.UP, i * PI / 2), Vector3(1.06, 0.05, 0.07), Build.WARN, 0.8)
 		bar.rotation.y = i * PI / 2
+	# Build phase: a coral cross on the floor where the piece in hand cannot go.
+	_no_mark = Node3D.new()
+	_no_mark.visible = false
+	add_child(_no_mark)
+	for turn: float in [PI / 4, -PI / 4]:
+		var arm := Build.box(_no_mark, Vector3(0, 0.02, 0), Vector3(1.2, 0.05, 0.2), Build.DANGER, 0.6)
+		arm.rotation.y = turn
+		var m: StandardMaterial3D = arm.get_active_material(0).duplicate()
+		m.no_depth_test = true          # shows through whatever is already standing there
+		m.render_priority = 5
+		arm.material_override = m
 	_shot_path = OS.get_environment("REGULARS_SHOT")
 	start_day()
 	_apply_demo(OS.get_environment("REGULARS_DEMO"))
@@ -134,10 +155,27 @@ func _apply_demo(demo: String) -> void:
 				if i % 2 == 0:
 					town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
 			get_tree().create_timer(1.5).timeout.connect(hud.show_town)
+	elif demo == "build" or demo == "build_no":  # a furnished room and a piece in hand
+		ledger.record_sale(BILL, 5)
+		ledger.money = 300
+		ledger.xp = 250
+		arrivals.clear()
+		get_tree().create_timer(1.0).timeout.connect(_demo_build.bind(demo == "build_no"))
 	elif demo == "flyers":
 		ledger.record_sale(BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.5).timeout.connect(buy_flyers)
+
+
+func _demo_build(refused: bool) -> void:
+	open_build()
+	take_crate(0)
+	cancel_hand()
+	for step: Array in [["counter", 2, 4, 0], ["screen", 8, 5, 0], ["screen", 9, 5, 0], ["table", 8, 6, 0], ["plant", 9, 2, 0]]:
+		pick_catalog(step[0])
+		place(Vector3i(step[1], step[2], step[3]))
+	pick_catalog("stove")
+	_demo_hover = Vector3(6.5, 0, 5.5) if refused else Vector3(3.5, 0, 5.5)
 
 
 func _demo_kind(offer: bool) -> void:
@@ -260,9 +298,17 @@ func add_station(type: String, cell: Vector2i, tier := 1, facing := 0) -> Statio
 func add_wall(cell: Vector2i, axis: int, height := 1.0) -> void:
 	grid.walls[Vector3i(cell.x, cell.y, axis)] = true
 	var n := Node3D.new()
-	n.position = Vector3(cell.x + 0.5, 0, cell.y) if axis == 0 else Vector3(cell.x, 0, cell.y + 0.5)
-	n.rotation.y = 0.0 if axis == 0 else PI / 2
+	_place_on_edge(n, Vector3i(cell.x, cell.y, axis))
 	add_child(n)
+	_wall_visual(n, height)
+
+
+static func _place_on_edge(n: Node3D, edge: Vector3i) -> void:
+	n.position = Vector3(edge.x + 0.5, 0, edge.y) if edge.z == 0 else Vector3(edge.x, 0, edge.y + 0.5)
+	n.rotation.y = 0.0 if edge.z == 0 else PI / 2
+
+
+static func _wall_visual(n: Node3D, height: float) -> void:
 	Build.box(n, Vector3.ZERO, Vector3(1.0, height - 0.12, 0.24), Build.CABINET)
 	Build.box(n, Vector3(0, height - 0.14, 0), Vector3(1.0, 0.04, 0.26), Build.CORAL)
 	Build.box(n, Vector3(0, height - 0.1, 0), Vector3(1.04, 0.1, 0.3), Build.WORKTOP, 0.0, Build.R_WOOD)
@@ -368,7 +414,9 @@ func start_day() -> void:
 		return
 	phase = Phase.SERVICE
 	clock = 0.0
+	hand = {}
 	hud.hide_card()
+	hud.hide_build()
 	town.new_day()
 	var coming := town.roll_guests(ledger.day, Town.FLYER_BOOST if flyers_out else 0.0)
 	var flyered := flyers_out
@@ -380,6 +428,156 @@ func start_day() -> void:
 	hud.show_banner("Day %d" % ledger.day)
 	hud.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
 	sfx("day")
+
+
+# ---------------------------------------------------------------- building
+
+## After the receipt: the room is yours to change until you open for the day.
+func open_build() -> void:
+	if phase != Phase.SUMMARY:
+		return
+	phase = Phase.BUILD
+	hud.hide_card()
+	hud.show_build()
+
+
+## Takes one of tonight's two blueprints. The other is gone.
+func take_crate(i: int) -> void:
+	if phase != Phase.BUILD or i >= crate.size():
+		return
+	inventory.append(crate[i])
+	crate.clear()
+	pick_owned(inventory.size() - 1)
+
+
+func pick_owned(i: int) -> void:
+	if phase == Phase.BUILD and i < inventory.size():
+		hand = {"id": inventory[i].id, "tier": inventory[i].tier, "price": 0, "owned": i}
+		hud.show_build()
+
+
+func pick_catalog(id: String) -> bool:
+	if phase != Phase.BUILD or not catalog.can_buy(id, ledger.money, ledger.level()):
+		return false
+	hand = {"id": id, "tier": 1, "price": int(Catalog.ITEMS[id].price), "owned": -1}
+	hud.show_build()
+	return true
+
+
+## Puts an owned blueprint away to come back a tier higher.
+func shelve_owned(i: int) -> bool:
+	if phase != Phase.BUILD or i >= inventory.size() or not catalog.can_shelve(inventory[i]):
+		return false
+	catalog.shelve(inventory[i], ledger.day)
+	inventory.remove_at(i)
+	hand = {}
+	sfx("putdown")
+	hud.show_build()
+	return true
+
+
+func cancel_hand() -> void:
+	hand = {}
+	if phase == Phase.BUILD:
+		hud.show_build()
+
+
+## Where the piece in hand would go for a point on the floor: (x, y, axis).
+## Furniture snaps to the cell (axis 0); a partition snaps to the nearest cell edge.
+func snap(p: Vector3) -> Vector3i:
+	var c := Grid.to_cell(p)
+	if hand.get("id", "") != "screen":
+		return Vector3i(c.x, c.y, 0)
+	var fx := p.x - c.x
+	var fz := p.z - c.y
+	if minf(fz, 1.0 - fz) < minf(fx, 1.0 - fx):
+		return Vector3i(c.x, c.y + (1 if fz > 0.5 else 0), 0)
+	return Vector3i(c.x + (1 if fx > 0.5 else 0), c.y, 1)
+
+
+func _seats_for(id: String, cell: Vector2i) -> Array[Vector2i]:
+	var seats: Array[Vector2i] = []
+	if id == "table":
+		seats = [cell + Vector2i(-1, 0), cell + Vector2i(1, 0)]
+	return seats
+
+
+## Would the piece in hand fit at this spot without cutting anyone off?
+func can_place(spot: Vector3i) -> bool:
+	if hand.is_empty():
+		return false
+	var reach: Array[Vector2i] = [player.cell()]
+	reach.assign(reach + grid.reserved.keys())
+	var touch: Array[Vector2i] = []
+	touch.assign(stations.keys())
+	if hand.id == "screen":
+		return grid.can_place_wall(spot, AREA, DOOR, reach, touch)
+	var cell := Vector2i(spot.x, spot.y)
+	return grid.can_place_block(cell, _seats_for(hand.id, cell), AREA, DOOR, reach, touch)
+
+
+## Builds the piece in hand. Catalog pieces are paid for here, so cancelling is free.
+func place(spot: Vector3i) -> bool:
+	if phase != Phase.BUILD or not can_place(spot):
+		return false
+	if int(hand.price) > 0 and not ledger.spend(int(hand.price)):
+		return false
+	var cell := Vector2i(spot.x, spot.y)
+	if hand.id == "screen":
+		add_wall(cell, spot.z, 0.9 + 0.1 * int(hand.tier))
+	else:
+		add_station(hand.id, cell, int(hand.tier))
+	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
+	sfx("putdown")
+	if int(hand.owned) >= 0:
+		inventory.remove_at(int(hand.owned))
+		hand = {}
+	elif not catalog.can_buy(hand.id, ledger.money, ledger.level()):
+		hand = {}
+	hud.show_build()
+	return true
+
+
+func _hover_point() -> Vector3:
+	if _demo_hover != Vector3.INF:
+		return _demo_hover
+	var m := get_viewport().get_mouse_position()
+	var o := cam.project_ray_origin(m)
+	var d := cam.project_ray_normal(m)
+	return o - d * (o.y / d.y) if absf(d.y) > 0.001 else Vector3.INF
+
+
+## The piece in hand follows the mouse; a cross marks spots where it cannot go.
+func _update_ghost() -> void:
+	var key := "%s:%s" % [hand.get("id", ""), hand.get("tier", 0)] if phase == Phase.BUILD and not hand.is_empty() else ""
+	if key != _ghost_key:
+		_ghost_key = key
+		if _ghost:
+			_ghost.queue_free()
+			_ghost = null
+		if key != "":
+			_ghost = Node3D.new()
+			add_child(_ghost)
+			if hand.id == "screen":
+				_wall_visual(_ghost, 0.9 + 0.1 * int(hand.tier))
+			else:
+				Build.station(_ghost, hand.id, int(hand.tier))
+	var p := _hover_point()
+	if _ghost == null or p == Vector3.INF:
+		_no_mark.visible = false
+		if _ghost:
+			_ghost.visible = false
+		return
+	var spot := snap(p)
+	var ok := can_place(spot)
+	if hand.id == "screen":
+		_place_on_edge(_ghost, spot)
+	else:
+		_ghost.position = Grid.center(Vector2i(spot.x, spot.y))
+	_ghost.position.y = 0.12 + 0.04 * sin(Time.get_ticks_msec() / 160.0)   # held just off the floor
+	_ghost.visible = ok
+	_no_mark.visible = not ok
+	_no_mark.position = Vector3(_ghost.position.x, 0, _ghost.position.z)
 
 
 ## Flyers: pay tonight for a bigger crowd tomorrow. One batch a night.
@@ -395,6 +593,8 @@ func buy_flyers() -> bool:
 func _end_day() -> void:
 	phase = Phase.SUMMARY
 	last_day = ledger.end_day()
+	crate = catalog.offer()
+	inventory.append_array(catalog.collect_ready(ledger.day))
 	hud.show_summary(last_day)
 	sfx("coin")
 
@@ -474,6 +674,8 @@ func _seat_waiting_guests() -> void:
 
 
 func on_seated(g: Guest) -> void:
+	if g.table.tier > 1:
+		g.mood.delight(0.05 * (g.table.tier - 1), "What a lovely table")
 	for other in g.table.seats:
 		if other != g.seat and seat_taken.has(other):
 			var mate: Guest = seat_taken[other]
@@ -732,6 +934,7 @@ func _process(delta: float) -> void:
 	step(delta)
 	_update_camera(delta)
 	_update_cursor()
+	_update_ghost()
 	_update_daylight()
 	hud.update_status()
 	if _shot_path != "":
@@ -761,6 +964,13 @@ func _update_cursor() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if phase == Phase.BUILD and event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT and not hand.is_empty() and _hover_point() != Vector3.INF:
+			if not place(snap(_hover_point())):
+				sfx("fail")
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			cancel_hand()
+		return
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	var key: int = event.physical_keycode
@@ -772,7 +982,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if stations.has(player.target_cell()):
 			use_station(stations[player.target_cell()])
 	elif phase == Phase.SUMMARY and confirm:
+		open_build()
+	elif phase == Phase.BUILD and confirm:
 		start_day()
+	elif phase == Phase.BUILD and key == KEY_ESCAPE:
+		cancel_hand()
 	elif phase == Phase.SUMMARY and key == KEY_F:
 		buy_flyers()
 	elif phase == Phase.SUMMARY and key == KEY_T:

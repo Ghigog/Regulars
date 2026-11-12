@@ -23,8 +23,18 @@ many days as you can; three walkouts in one day ends the run.
 - **Half price.** With empty hands at the table of a guest whose patience is under half,
   E offers half price, once per visit: +0.35 patience, a little joy, +0.2 affinity, and
   they pay half the bill (the tip is worked out on the halved bill).
+- **Build phase, between days only.** Receipt, then Enter opens it; Enter again opens the
+  day. A tray along the bottom holds tonight's crate (take one of two; the other is
+  gone), the pieces you own, the shelf and the catalog. Pieces are placed with the mouse:
+  a ghost follows the pointer, left-click places, right-click or Esc cancels. Partitions
+  snap to the nearest cell edge (no rotate key). A spot is refused if it would cut the
+  chef, any seat or any station off from the door. Crate pieces are free; catalog pieces
+  are paid for when placed and gated by level. An owned piece can be shelved for two days
+  and comes back one tier higher. Unplaced pieces keep until later nights.
+- **Tier effects:** faster stove, stronger fern, a tier 2+ table gives seated guests
+  +0.05 joy per tier. Counters and partitions gain nothing but looks.
 - **Flyers.** On the receipt, $15 (F) buys +25% visit chance for everyone tomorrow. One
-  batch a night. It is the only thing to spend money on so far.
+  batch a night. 
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
 
 Code map: `sim/` is pure logic with no scene dependencies (unit-tested with GUT).
@@ -37,15 +47,14 @@ focused. The logic and tests still exist.
 
 | System | Where | State |
 | --- | --- | --- |
-| Blueprint catalog, nightly crate, shelf upgrades | `sim/catalog.gd` | Logic + tests kept. No UI. |
-| Walls on cell edges, line of sight, placement pathing | `sim/grid.gd` | In use for the front wall; player-built walls unhooked. |
+| Blueprint catalog, nightly crate, shelf upgrades | `sim/catalog.gd` | **Built**, see section 1. |
+| Walls on cell edges, line of sight, placement pathing | `sim/grid.gd` | **Built**, see section 1. Placement rules are `Grid.can_place_block` and `can_place_wall`. |
 | Word of mouth between friends | `sim/town.gd` | **Built**, see section 1. |
 | Kindness / discounts | `GuestMood.offer_discount`, `Town.record_kindness` | **Built**, see section 1. Full comps (a free meal) are not. |
 | Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
 
-The first prototype's build phase (pick a crate blueprint, place with the mouse, R to
-rotate walls, catalog buttons) was removed from `game/main.gd` and `game/hud.gd`. It can
-be recovered from the description in section 4.
+Everything in this table is back in the game. Not built: moving, selling or rotating
+furniture; floors and ceilings; the bin as a disgust source now that it can be hidden.
 
 ## 3. Guests (RollerCoaster Tycoon layer)
 
@@ -136,4 +145,4 @@ be recovered from the description in section 4.
 
 - The name stays "Regulars" for now. Logo direction is decided; see "Decisions and open items" in `docs/STYLE_GUIDE.md`.
 - Should order-taking be a step (walk to the table first), as in PlateUp?
-- How much of the building happens between days versus live during service?
+- Building happens between days only (decided). Live building during service is not planned.

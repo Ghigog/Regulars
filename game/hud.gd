@@ -29,6 +29,7 @@ var prompt_label: Label
 var _shown_money := -1
 var _shown_strikes := 0
 var _town_open := false
+var build_bar: Control
 var _toast_tween: Tween
 
 
@@ -465,6 +466,7 @@ func _button(box: Container, text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.focus_mode = Control.FOCUS_NONE   # so Enter always means "carry on"
 	b.pressed.connect(action)
 	box.add_child(b)
 	return b
@@ -515,9 +517,95 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	if game.flyers_out:
 		flyers.text = "Flyers are out"
 	_button(extras, "Town book   (T)", show_town)
-	_button(stack, "Open for day %d   (Enter)" % game.ledger.day, game.start_day)
+	_button(stack, "Build, then day %d   (Enter)" % game.ledger.day, game.open_build)
 	if animate:
 		_pop_in(clip)
+
+
+func hide_build() -> void:
+	if build_bar:
+		build_bar.queue_free()
+		build_bar = null
+	hint.visible = true
+
+
+func _bar_row(box: VBoxContainer, title: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	box.add_child(row)
+	var l := _label(row, 13, title)
+	l.custom_minimum_size = Vector2(118, 0)
+	l.modulate.a = 0.7
+	return row
+
+
+func _bar_button(row: Container, text: String, action: Callable, tip := "") -> Button:
+	var b := _button(row, text, action)
+	b.add_theme_font_size_override("font_size", 15)
+	b.tooltip_text = tip
+	return b
+
+
+## The build phase: a wooden tray along the bottom with tonight's crate, the
+## blueprints waiting to be placed and the catalog. Redrawn whenever anything changes.
+func show_build() -> void:
+	hide_build()
+	hint.visible = false
+	var holder := MarginContainer.new()
+	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
+	holder.add_theme_constant_override("margin_bottom", 14)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(holder)
+	build_bar = holder
+	var wood := Sheet.new("wood", 10, 10)
+	wood.mouse_filter = Control.MOUSE_FILTER_STOP
+	wood.size_flags_vertical = Control.SIZE_SHRINK_END
+	wood.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	holder.add_child(wood)
+	var paper := Sheet.new("paper", 16, 10)
+	wood.add_child(paper)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	paper.add_child(box)
+	var cat: Catalog = game.catalog
+	var l: Ledger = game.ledger
+	if not game.crate.is_empty():
+		var row := _bar_row(box, "TONIGHT'S CRATE\npick one")
+		for i in game.crate.size():
+			_bar_button(row, Catalog.label(game.crate[i]), game.take_crate.bind(i), Catalog.ITEMS[game.crate[i].id].blurb)
+	if not game.inventory.is_empty():
+		var row := _bar_row(box, "YOURS TO PLACE")
+		for i in game.inventory.size():
+			var bp: Dictionary = game.inventory[i]
+			var held: bool = int(game.hand.get("owned", -1)) == i
+			_bar_button(row, ("> %s <" if held else "%s") % Catalog.label(bp), game.pick_owned.bind(i), Catalog.ITEMS[bp.id].blurb)
+			if cat.can_shelve(bp):
+				_bar_button(row, "Shelve it", game.shelve_owned.bind(i),
+					"Comes back in %d days, one tier better." % Catalog.SHELF_DAYS).size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	if not cat.shelf.is_empty():
+		var names: Array[String] = []
+		for sbp in cat.shelf:
+			names.append("%s (day %d)" % [Catalog.label(sbp), sbp.ready_day])
+		var row := _bar_row(box, "ON THE SHELF")
+		_label(row, 15, ", ".join(names))
+	var shop := _bar_row(box, "CATALOG\nlevel %d" % l.level())
+	for id: String in Catalog.ITEMS:
+		var item: Dictionary = Catalog.ITEMS[id]
+		var locked: bool = l.level() < int(item.level)
+		var held: bool = game.hand.get("id", "") == id and int(game.hand.get("owned", -1)) < 0
+		var text := "%s  (level %d)" % [item.name, item.level] if locked else "%s  $%d" % [item.name, item.price]
+		var b := _bar_button(shop, ("> %s <" if held else "%s") % text, game.pick_catalog.bind(id), item.blurb)
+		b.disabled = not cat.can_buy(id, l.money, l.level())
+	var last := HBoxContainer.new()
+	last.add_theme_constant_override("separation", 14)
+	box.add_child(last)
+	var tip := "Pick something to place."
+	if not game.hand.is_empty():
+		tip = "Click the floor to place it. Right-click or Esc puts it back."
+	var tl := _label(last, 15, tip)
+	tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tl.modulate.a = 0.8
+	_button(last, "Open for day %d   (Enter)" % l.day, game.start_day).size_flags_horizontal = Control.SIZE_SHRINK_END
 
 
 func toggle_town() -> void:

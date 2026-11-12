@@ -11,9 +11,9 @@ as many days as possible. Working title. The current build is a vertical slice.
 /Applications/Godot.app/Contents/MacOS/Godot --headless -s addons/gut/gut_cmdln.gd   # tests (GUT 9.7.1)
 ```
 
-All 42 tests should pass before and after any change. Screenshots for checking visuals:
+All 50 tests should pass before and after any change. Screenshots for checking visuals:
 `REGULARS_SHOT=/abs/path.png REGULARS_SHOT_AT=13.5 REGULARS_DEMO=cook godot --path .`
-(`REGULARS_DEMO` is `cook`, `summary`, `closed`, `lineup`, `fx`, `town`, `kind` or `flyers`; see `_apply_demo` in `game/main.gd`.
+(`REGULARS_DEMO` is `cook`, `summary`, `closed`, `lineup`, `fx`, `town`, `kind`, `flyers`, `build` or `build_no`; see `_apply_demo` in `game/main.gd`.
 Add `REGULARS_THEME=seaside` for the second theme.) Run `--headless --import` once after
 adding a script with a new `class_name`.
 

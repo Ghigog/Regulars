@@ -89,6 +89,83 @@ func test_flyers_cost_money_once_a_night_and_are_used_up_next_day():
 	assert_eq(int(game.ledger.today.spent), Town.FLYER_PRICE)
 
 
+func _to_build() -> void:
+	game.arrivals.clear()
+	_run(0.2)
+	game.open_build()
+
+
+func test_crate_blueprint_is_taken_and_placed_for_free():
+	_to_build()
+	assert_eq(game.phase, game.Phase.BUILD)
+	assert_eq(game.crate.size(), 2)
+	game.take_crate(1)
+	assert_eq(game.crate.size(), 0, "the other blueprint is gone")
+	assert_eq(game.inventory.size(), 1)
+	var id: String = game.hand.id
+	var spot := Vector3i(2, 4, 0 if id != "screen" else 1)
+	assert_true(game.place(spot))
+	assert_eq(game.ledger.money, 50, "crate pieces cost nothing")
+	assert_eq(game.inventory.size(), 0)
+	assert_true(game.hand.is_empty())
+	if id == "screen":
+		assert_true(game.grid.walls.has(spot))
+	else:
+		assert_eq(game.stations[Vector2i(2, 4)].type, id)
+
+
+func test_shelved_crate_blueprint_comes_back_a_tier_higher():
+	_to_build()
+	game.take_crate(0)
+	var id: String = game.inventory[0].id
+	assert_true(game.shelve_owned(0))
+	assert_eq(game.inventory.size(), 0)
+	for night in 2:
+		game.start_day()
+		game.arrivals.clear()
+		_run(0.2)
+	assert_eq(game.inventory.size(), 1)
+	assert_eq(game.inventory[0].id, id)
+	assert_eq(int(game.inventory[0].tier), 2)
+
+
+func test_catalog_piece_is_paid_for_when_placed_and_gated_by_level():
+	_to_build()
+	assert_false(game.pick_catalog("stove"), "level 3 and $80")
+	assert_true(game.pick_catalog("counter"))
+	assert_eq(game.ledger.money, 50, "picking is free")
+	assert_false(game.place(Vector3i(5, 6, 0)), "that would block the doorway")
+	assert_false(game.place(Vector3i(1, 0, 0)), "a stove is already there")
+	assert_true(game.place(Vector3i(2, 4, 0)))
+	assert_eq(game.ledger.money, 35)
+	assert_eq(game.stations[Vector2i(2, 4)].type, "counter")
+	game.start_day()
+	assert_eq(game.phase, game.Phase.SERVICE)
+	assert_true(game.hand.is_empty())
+	assert_false(game.place(Vector3i(3, 4, 0)), "no building during service")
+
+
+func test_partition_snaps_to_the_nearest_edge_and_hides_a_dirty_table():
+	_to_build()
+	assert_true(game.pick_catalog("screen"))
+	assert_eq(game.snap(Vector3(5.9, 0, 3.5)), Vector3i(6, 3, 1))
+	assert_eq(game.snap(Vector3(5.5, 0, 3.1)), Vector3i(5, 3, 0))
+	assert_true(game.place(Vector3i(6, 3, 1)))
+	assert_false(game.grid.has_los(Vector2i(5, 3), Vector2i(6, 3)))
+	assert_eq(game.ledger.money, 40)
+
+
+func test_new_table_seats_guests():
+	_to_build()
+	game.ledger.money = 100
+	game.ledger.xp = 100
+	assert_true(game.pick_catalog("table"))
+	assert_false(game.place(Vector3i(9, 5, 0)), "no room for the right-hand seat")
+	assert_true(game.place(Vector3i(2, 4, 0)))
+	assert_true(game.grid.reserved.has(Vector2i(1, 4)))
+	assert_eq(game.ledger.money, 60)
+
+
 func test_washing_a_dirty_plate_returns_it_to_the_stack():
 	var table: Station = game.stations[Vector2i(6, 1)]
 	table.dirty = 1

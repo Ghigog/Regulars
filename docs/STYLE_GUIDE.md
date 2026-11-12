@@ -96,6 +96,9 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 | Town book | A second page on the end-of-day clipboard (T): the gossip-note yellow paper, a dark ribbon, each townsperson's name with five ink-rimmed pips and an up or down arrow for today's change. Standing reads by pip count and a word, never by colour alone. | Sheet 14 suggested the gossip note as the home for reputation; a full list needed its own page. |
 | Receipt buttons | A half-width "Flyers" stamp button beside "Town book"; a spent button turns driftwood grey. A bought flyer prints as a receipt row. | Not on the sheets. |
 | Half price | Uses the keycap prompt ("HALF PRICE FOR GUS"), a small star burst and the heart bubble. No new art. | Not on the sheets. |
+| Build tray | Between days a wooden tray with a paper inset sits along the bottom: crate, pieces to place, shelf, catalog, all stamp buttons. The piece in hand is marked "> name <", not by colour. | Not on the sheets; uses the plaque and receipt materials. |
+| Placement ghost | The real piece bobs just off the floor under the mouse. Where it cannot go the piece is hidden and a red cross lies on the spot, drawn through any furniture already there. | Shape, not colour, says yes or no. |
+| Player-built partitions | The sheet 11 partition, 1.0 m at tier 1 and 10 cm taller per tier. Higher-tier furniture keeps the yellow skirting bands. | Tier dressing is a placeholder. |
 
 **Not yet done:** Blender kit, hired staff, co-op chefs 2 to 4 (trim colours exist in
 `Peg.PLAYER_TRIM`), future dishes, four-seat table and booth, title screen, colour-blind
