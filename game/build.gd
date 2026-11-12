@@ -8,8 +8,8 @@ const WALL := "#f6eee0"
 const WALL_LOW := "#e3d8c6"     # the 15 cm darker band at the foot of walls
 const TILE_TEAL := "#99c3b5"
 const TILE_CREAM := "#f2ead4"
-const FLOOR_WOOD := "#dc9d4e"
-const FLOOR_WOOD_2 := "#d39346"
+const FLOOR_WOOD := "#d3a468"
+const FLOOR_WOOD_2 := "#c9985c"
 const CORAL := "#ee7560"
 const CORAL_DARK := "#d9604d"
 const CABINET := "#30676c"
@@ -320,53 +320,105 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 	return n
 
 
-static func _counter(n: Node3D, body: String, top: String) -> void:
-	box(n, Vector3.ZERO, Vector3(0.9, 0.15, 0.9), Color(body).darkened(0.13).to_html(false))
+static func _shade(col: String, amount := 0.13) -> String:
+	return Color(col).darkened(amount).to_html(false)
+
+
+static func _tint(col: String, amount := 0.08) -> String:
+	return Color(col).lightened(amount).to_html(false)
+
+
+## A 0.9 m counter: darker toe-kick, body with two doors and brass handles on the
+## front (+z), bevelled worktop. Everything that takes a carried item sits flush.
+static func _counter(n: Node3D, body: String, top: String, doors := true, kick := "") -> void:
+	box(n, Vector3.ZERO, Vector3(0.9, 0.15, 0.9), _shade(body) if kick == "" else kick)
 	box(n, Vector3(0, 0.12, 0), Vector3(0.94, 0.7, 0.94), body)
 	box(n, Vector3(0, 0.82, 0), Vector3(1.0, 0.08, 1.0), top, 0.0, R_WOOD)
+	if doors:
+		for sx: float in [-1.0, 1.0]:
+			box(n, Vector3(sx * 0.225, 0.2, 0.462), Vector3(0.4, 0.54, 0.03), _tint(body, 0.07))
+			box(n, Vector3(sx * 0.08, 0.5, 0.48), Vector3(0.035, 0.12, 0.03), "#d9a441", 0.0, R_WOOD)
 
 
-## Furniture visuals centred on a cell. Tier adds a gold trim.
+## Furniture visuals centred on a cell, front facing +z. Tier adds a gold trim.
+## Shapes and heights are shared by every theme (sheets 8 and 10).
 static func station(n: Node3D, type: String, tier: int) -> void:
 	match type:
 		"fridge":
-			box(n, Vector3.ZERO, Vector3(0.9, 1.7, 0.9), "#e8eef0")
-			box(n, Vector3(0.3, 0.8, 0.46), Vector3(0.06, 0.5, 0.04), STEEL)
+			# Rounded retro fridge, 1.7 m: the tall landmark of the kitchen.
+			_add(n, bevel_mesh(Vector3(0.9, 1.7, 0.82), 0.08), Vector3(0, 0.85, -0.03), Color("#f3ecdc"), 0.0)
+			_add(n, bevel_mesh(Vector3(0.84, 0.56, 0.07), 0.03), Vector3(0, 1.38, 0.41), Color("#fbf6ea"), 0.0)
+			box(n, Vector3(0.3, 1.2, 0.45), Vector3(0.05, 0.3, 0.04), STEEL, 0.0, R_WOOD)
+			# Inside: dark shelves of red meat, seen when the lower door swings open.
+			box(n, Vector3(0, 0.12, 0.376), Vector3(0.78, 0.92, 0.01), "#5b4a44")
+			for i in 2:
+				box(n, Vector3(0, 0.36 + i * 0.36, 0.38), Vector3(0.76, 0.03, 0.03), "#d8d2c4")
+				for j in 3:
+					var meat := lathe(n, Vector3(-0.24 + j * 0.24, 0.5 + i * 0.36, 0.385), [[0.0, -0.09], [0.07, -0.09], [0.09, -0.07], [0.09, 0.07], [0.07, 0.09], [0.0, 0.09]], "#e8767c")
+					meat.rotation.x = PI / 2
+					meat.scale = Vector3(1, 0.2, 1)
+			var door := Node3D.new()
+			door.name = "door"
+			door.position = Vector3(-0.42, 0, 0.385)
+			n.add_child(door)
+			_add(door, bevel_mesh(Vector3(0.84, 0.98, 0.07), 0.03), Vector3(0.42, 0.57, 0.035), Color("#fbf6ea"), 0.0)
+			box(door, Vector3(0.72, 0.62, 0.07), Vector3(0.05, 0.3, 0.04), STEEL, 0.0, R_WOOD)
 		"stove":
-			_counter(n, STEEL, STEEL_DARK)
+			_counter(n, STEEL, STEEL_DARK, false)
 			var ring := lathe(n, Vector3(0, 0.9, 0), [[0.15, 0.0], [0.17, 0.012], [0.21, 0.012], [0.23, 0.0]], STEEL_DARK)
 			ring.name = "ring"
 			# The frying pan lives on the burner; the patty sits in it.
 			lathe(n, Vector3(0, 0.905, 0), [[0.0, 0.0], [0.2, 0.0], [0.25, 0.045], [0.235, 0.045], [0.19, 0.022], [0.0, 0.022]], "#34383b", 0.0, R_WOOD)
 			box(n, Vector3(0.36, 0.925, 0.0), Vector3(0.28, 0.035, 0.06), WOOD_DARK)
-			box(n, Vector3(0, 0.3, 0.455), Vector3(0.62, 0.34, 0.05), STEEL_DARK)
+			box(n, Vector3(0, 0.2, 0.455), Vector3(0.66, 0.4, 0.05), STEEL_DARK)
+			box(n, Vector3(0, 0.52, 0.485), Vector3(0.5, 0.035, 0.03), "#d7dcdc", 0.0, R_WOOD)
 			for i in 3:
-				ball(n, Vector3(-0.25 + i * 0.25, 0.74, 0.48), 0.05, CORAL)
+				ball(n, Vector3(-0.25 + i * 0.25, 0.72, 0.47), 0.05, CORAL)
 		"counter":
 			_counter(n, CABINET, WORKTOP)
 		"pass":
-			_counter(n, CORAL, WORKTOP)
+			# Coral block, teal base strip, slot dividers on the tan top.
+			_counter(n, CORAL, WORKTOP, false, CABINET)
+			for sz: float in [-0.5, 0.5]:
+				box(n, Vector3(0, 0.895, sz), Vector3(0.9, 0.035, 0.06), WOOD, 0.0, R_WOOD)
 		"plates":
 			_counter(n, CABINET, WORKTOP)
+			lathe(n, Vector3(0, 0.9, 0), [[0.0, 0.0], [0.25, 0.0], [0.26, 0.008], [0.25, 0.016], [0.0, 0.016]], CORAL)
 		"sink":
 			_counter(n, CABINET, WORKTOP)
-			box(n, Vector3(0, 0.86, 0), Vector3(0.62, 0.04, 0.5), "#7fb8d6")
+			box(n, Vector3(0, 0.885, 0.04), Vector3(0.7, 0.03, 0.56), "#c9d0d1", 0.0, R_WOOD)
+			box(n, Vector3(0, 0.89, 0.04), Vector3(0.58, 0.03, 0.44), "#8fc3cf", 0.0, R_GLOSS)
+			cyl(n, Vector3(0, 0.9, -0.36), 0.035, 0.26, "#c9d0d1", 0.0, R_WOOD)
+			box(n, Vector3(0, 1.12, -0.25), Vector3(0.06, 0.05, 0.26), "#c9d0d1", 0.0, R_WOOD)
 		"bin":
-			cyl(n, Vector3.ZERO, 0.3, 0.7, "#5b6b57")
-			cyl(n, Vector3(0, 0.7, 0), 0.33, 0.06, "#42503f")
+			box(n, Vector3.ZERO, Vector3(0.6, 0.12, 0.6), _shade(WOOD))
+			box(n, Vector3(0, 0.1, 0), Vector3(0.64, 0.56, 0.64), WOOD, 0.0, R_WOOD)
+			box(n, Vector3(0, 0.64, 0), Vector3(0.7, 0.08, 0.7), STEEL, 0.0, R_WOOD)
+			box(n, Vector3(0, 0.7, 0), Vector3(0.52, 0.025, 0.52), TRIM)
 		"plant":
-			cyl(n, Vector3.ZERO, 0.26, 0.4, "#c96f4a")
-			ball(n, Vector3(0, 0.75, 0), 0.38 + 0.05 * tier, LEAF)
-			ball(n, Vector3(0.14, 1.1, 0.08), 0.26, LEAF_2)
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.18, 0.0], [0.2, 0.02], [0.27, 0.36], [0.3, 0.38], [0.3, 0.44], [0.26, 0.46], [0.0, 0.46]], CORAL)
+			lathe(n, Vector3(0, 0.2, 0), [[0.228, 0.0], [0.24, 0.006], [0.256, 0.08], [0.246, 0.086]], PAPER)
+			var size := 0.3 + 0.05 * tier
+			ball(n, Vector3(0, 0.5 + size, 0), size, LEAF)
+			for i in 5:
+				var a := TAU * i / 5.0 + 0.4
+				var frond := ball(n, Vector3(cos(a) * size * 0.8, 0.56 + size * 0.7, sin(a) * size * 0.8), size * 0.62, LEAF_2 if i % 2 else LEAF)
+				frond.scale = Vector3(1, 0.7, 1)
+			ball(n, Vector3(0.05, 0.62 + size * 1.75, 0.03), size * 0.55, LEAF_2)
 		"table":
-			cyl(n, Vector3.ZERO, 0.09, 0.62, WOOD_DARK)
-			cyl(n, Vector3(0, 0.62, 0), 0.6, 0.07, WORKTOP)
-			box(n, Vector3(-1, 0, 0), Vector3(0.42, 0.34, 0.42), CORAL)
-			box(n, Vector3(-1.19, 0.3, 0), Vector3(0.07, 0.5, 0.42), CORAL_DARK)
-			box(n, Vector3(1, 0, 0), Vector3(0.42, 0.34, 0.42), CORAL)
-			box(n, Vector3(1.19, 0.3, 0), Vector3(0.07, 0.5, 0.42), CORAL_DARK)
-			cyl(n, Vector3(0, 0.69, 0), 0.06, 0.12, "#8fc7c3")
-			ball(n, Vector3(0, 0.86, 0), 0.07, CORAL)
+			# Round two-seat table. Chair backs stop at 0.62 m so heads stay visible.
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.26, 0.0], [0.28, 0.02], [0.26, 0.05], [0.09, 0.09], [0.07, 0.5], [0.0, 0.5]], "#4a3a2e", 0.0, R_WOOD)
+			lathe(n, Vector3(0, 0.5, 0), [[0.0, 0.0], [0.6, 0.0], [0.63, 0.03], [0.63, 0.05], [0.6, 0.08], [0.0, 0.08]], "#efd6aa", 0.0, R_WOOD)
+			for sx: float in [-1.0, 1.0]:
+				for lx: float in [-0.17, 0.17]:
+					for lz: float in [-0.17, 0.17]:
+						box(n, Vector3(sx + lx, 0, lz), Vector3(0.06, 0.15, 0.06), WOOD, 0.0, R_WOOD)
+				box(n, Vector3(sx, 0.13, 0), Vector3(0.46, 0.07, 0.46), CORAL)
+				box(n, Vector3(sx * 1.2, 0.18, 0), Vector3(0.07, 0.44, 0.46), CORAL_DARK)
+			# Mushroom table lamp, 0.24 m.
+			box(n, Vector3(0, 0.58, 0), Vector3(0.12, 0.05, 0.12), CABINET)
+			cyl(n, Vector3(0, 0.62, 0), 0.025, 0.1, PAPER)
+			lathe(n, Vector3(0, 0.7, 0), [[0.0, 0.0], [0.1, 0.0], [0.11, 0.02], [0.08, 0.08], [0.03, 0.115], [0.0, 0.12]], CORAL, 0.5)
 	if tier > 1:
 		for i in tier - 1:
 			box(n, Vector3(0, 0.05 + i * 0.1, 0), Vector3(1.02, 0.04, 1.02), WARN, 0.6)

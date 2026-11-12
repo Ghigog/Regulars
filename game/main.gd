@@ -36,6 +36,7 @@ var _prompt: Label3D
 var _gross: Array[Dictionary] = []
 var _sfx := {}
 var _sun: DirectionalLight3D
+var _sconces: Array[OmniLight3D] = []
 var _env: Environment
 var _shot_path := ""
 var _shot_time := 0.0
@@ -127,7 +128,7 @@ func _build_scenery() -> void:
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.03
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.08
+	env.adjustment_saturation = 1.02
 	_env = env
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 	var we := WorldEnvironment.new()
@@ -154,84 +155,49 @@ func _build_scenery() -> void:
 	Build.box(self, Vector3(W / 2.0, -0.14, H / 2.0), Vector3(W + 0.5, 0.12, H + 0.5), Build.WOOD_DARK, 0.0, Build.R_WOOD)
 	Build.box(self, Vector3(W / 2.0, -0.12, H + 1.0), Vector3(W + 9.0, 0.1, 2.0), Build.PAVING)
 	_build_decor()
-	for x in W:
-		for y in H:
-			var col := Build.FLOOR_WOOD if y % 2 else Build.FLOOR_WOOD_2
-			if x < 4:
-				col = Build.TILE_CREAM if (x + y) % 2 else Build.TILE_TEAL
-			Build.box(self, Vector3(x + 0.5, -0.03, y + 0.5), Vector3(0.985, 0.03, 0.985), col, 0.0, Build.R_GLOSS if x < 4 else Build.R_WOOD)
-	# Back and left walls are scenery; the grid bounds already stop movement.
-	Build.box(self, Vector3(W / 2.0, 0, -0.1), Vector3(W + 0.4, 2.2, 0.2), Build.WALL)
-	Build.box(self, Vector3(-0.1, 0, H / 2.0), Vector3(0.2, 2.2, H + 0.4), Build.WALL)
-	Build.box(self, Vector3(7, 1.1, 0.02), Vector3(5.8, 0.9, 0.05), Build.CORAL)
-	for wx: float in [5.5, 8.5]:
-		Build.box(self, Vector3(wx, 1.05, 0.04), Vector3(1.3, 0.9, 0.06), "#9fd4ea")
-	Build.box(self, Vector3(DOOR.x + 0.5, 0.0, H + 0.2), Vector3(1.0, 0.02, 0.5), Build.CORAL)
+	_sconces = Scenery.build(self, W, H, DOOR)
 
 
-## Things that are only there to look nice.
+## The street. (Step 7 of the art plan replaces this.)
 func _build_decor() -> void:
-	# Street: a road with lane dashes, a lamp post and planters by the front wall.
 	Build.box(self, Vector3(W / 2.0, -0.16, H + 3.6), Vector3(W + 9.0, 0.1, 3.2), Build.ROAD)
 	for i in 7:
 		Build.box(self, Vector3(-3.0 + i * 2.6, -0.06, H + 3.6), Vector3(1.1, 0.01, 0.14), "#f6efe2")
 	Build.cyl(self, Vector3(-2.2, 0, H + 1.7), 0.07, 2.6, "#3a3f44")
 	Build.ball(self, Vector3(-2.2, 2.7, H + 1.7), 0.2, "#ffe2a8", 2.0)
-	for px: float in [1.0, 3.0]:
-		Build.box(self, Vector3(px, 0, H + 0.24), Vector3(1.7, 0.32, 0.3), Build.WOOD_DARK)
-		for i in 4:
-			Build.ball(self, Vector3(px - 0.6 + i * 0.4, 0.42, H + 0.24), 0.2, Build.LEAF if i % 2 else Build.LEAF_2)
-	# Doorway: posts, a lintel and a sign.
-	for dx: float in [0.0, 1.0]:
-		Build.cyl(self, Vector3(DOOR.x + dx, 0, H), 0.06, 1.9, Build.WOOD_DARK)
-	Build.box(self, Vector3(DOOR.x + 0.5, 1.9, H), Vector3(1.2, 0.5, 0.1), Build.CORAL)
-	var open_sign := Label3D.new()
-	open_sign.text = "OPEN"
-	open_sign.font_size = 56
-	open_sign.pixel_size = 0.005
-	open_sign.modulate = Color("#fff6e6")
-	open_sign.outline_size = 0
-	open_sign.position = Vector3(DOOR.x + 0.5, 2.15, H + 0.06)
-	add_child(open_sign)
-	# Kitchen shelf with jars, and a picture between the windows.
-	Build.box(self, Vector3(0.1, 1.5, 3.4), Vector3(0.22, 0.06, 3.4), Build.WOOD_DARK)
-	var jars := ["#e9a23b", "#d9534f", "#5fd38d", "#ffffff", "#e9a23b", "#8fc7c3"]
-	for i in jars.size():
-		Build.cyl(self, Vector3(0.12, 1.56, 2.1 + i * 0.52), 0.1, 0.2 + 0.05 * (i % 2), jars[i])
-	Build.box(self, Vector3(7, 1.22, 0.05), Vector3(0.9, 0.66, 0.05), Build.WOOD_DARK)
-	Build.box(self, Vector3(7, 1.29, 0.08), Vector3(0.74, 0.52, 0.03), "#ffd9a0")
-	Build.ball(self, Vector3(7.12, 1.62, 0.1), 0.1, "#e56b5d")
 
 
-## A pool of warm light over each table. (No lamp mesh: from this camera a
-## hanging shade would sit in front of the guests behind it.)
+## The glow of the mushroom lamp on each table. (No hanging lamps: from this
+## camera a shade would sit in front of the guests behind it.)
 func _add_lamp(over: Vector3) -> void:
 	var light := OmniLight3D.new()
-	light.position = over + Vector3(0, 1.7, 0)
+	light.position = over + Vector3(0, 1.0, 0)
 	light.light_color = Color("#ffd9a0")
-	light.light_energy = 0.7
-	light.omni_range = 3.2
+	light.light_energy = 0.45
+	light.omni_range = 2.6
 	add_child(light)
+	_sconces.append(light)
 
 
 func _build_layout() -> void:
 	for spot: Array in [
 		["fridge", 0, 0], ["stove", 1, 0], ["stove", 2, 0], ["counter", 3, 0],
-		["plates", 0, 2], ["sink", 0, 3], ["bin", 0, 5],
+		["plates", 0, 2, 1], ["sink", 0, 3, 1], ["bin", 0, 5, 1],
 		["pass", 4, 0], ["pass", 4, 1], ["pass", 4, 2], ["pass", 4, 3], ["pass", 4, 4],
 		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], ["plant", 9, 0],
 	]:
-		add_station(spot[0], Vector2i(spot[1], spot[2]))
-	# Low front wall with a doorway; guests cannot see or walk through it.
+		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
+	# The front wall (drawn by Scenery as a knee-high cutaway) has a doorway;
+	# guests cannot see or walk through the rest.
 	for x in W:
 		if x != DOOR.x:
-			add_wall(Vector2i(x, H), 0, 0.3)
+			grid.walls[Vector3i(x, H, 0)] = true
 
 
-func add_station(type: String, cell: Vector2i, tier := 1) -> Station:
+func add_station(type: String, cell: Vector2i, tier := 1, facing := 0) -> Station:
 	var st := Station.new()
 	add_child(st)
-	st.setup(type, cell, tier)
+	st.setup(type, cell, tier, facing)
 	stations[cell] = st
 	if type == "table":
 		_add_lamp(st.position)
@@ -241,12 +207,16 @@ func add_station(type: String, cell: Vector2i, tier := 1) -> Station:
 	return st
 
 
-func add_wall(cell: Vector2i, axis: int, height := 1.1) -> void:
+## A low partition (sheet 11): teal panelled base, tan cap, thin coral line.
+func add_wall(cell: Vector2i, axis: int, height := 1.0) -> void:
 	grid.walls[Vector3i(cell.x, cell.y, axis)] = true
-	if axis == 0:
-		Build.box(self, Vector3(cell.x + 0.5, 0, cell.y), Vector3(1.04, height, 0.12), Build.WALL)
-	else:
-		Build.box(self, Vector3(cell.x, 0, cell.y + 0.5), Vector3(0.12, height, 1.04), Build.WALL)
+	var n := Node3D.new()
+	n.position = Vector3(cell.x + 0.5, 0, cell.y) if axis == 0 else Vector3(cell.x, 0, cell.y + 0.5)
+	n.rotation.y = 0.0 if axis == 0 else PI / 2
+	add_child(n)
+	Build.box(n, Vector3.ZERO, Vector3(1.0, height - 0.12, 0.24), Build.CABINET)
+	Build.box(n, Vector3(0, height - 0.14, 0), Vector3(1.0, 0.04, 0.26), Build.CORAL)
+	Build.box(n, Vector3(0, height - 0.1, 0), Vector3(1.04, 0.1, 0.3), Build.WORKTOP, 0.0, Build.R_WOOD)
 
 
 func find_station(type: String) -> Station:
@@ -323,8 +293,11 @@ func _update_daylight() -> void:
 	var t := smoothstep(0.35, 1.0, day_progress())
 	_sun.light_color = Color("#fff6ea").lerp(Color("#ffb070"), t)
 	_sun.rotation_degrees = Vector3(lerpf(-52, -34, t), lerpf(-30, -62, t), 0)
-	_env.background_color = Color("#f0dfc4").lerp(Color("#eac3a0"), t)
-	_env.ambient_light_color = Color("#fff1e0").lerp(Color("#ffd9c4"), t)
+	_env.background_color = Color(Build.BACKDROP).lerp(Color("#e6bfa6"), t)
+	_env.ambient_light_color = Color("#f4dcd2").lerp(Color("#f0c8bc"), t)
+	_sun.light_energy = lerpf(0.62, 0.5, t)
+	for l in _sconces:  # practical lights come up as the sun goes down
+		l.light_energy = float(l.get_meta("full", 0.45)) * lerpf(0.35, 1.0, t)
 
 
 func popup(text: String, at: Vector3, col: Color) -> void:
@@ -640,6 +613,7 @@ func use_station(st: Station, dry_run := false) -> String:
 					player.set_held("dirty_plate")
 	if act != "" and not dry_run:
 		player.punch()
+		st.used()
 		if act == "Wash":
 			sfx("wash")
 			burst(st.position + Vector3(0, 1.0, 0), "#9fd4ea", 10)

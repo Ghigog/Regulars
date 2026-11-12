@@ -23,6 +23,7 @@ var _bar: Node3D
 var _needle: Node3D
 var _ring: MeshInstance3D
 var _shown_look := ""
+var _vis: Node3D
 var _smoke: CPUParticles3D
 var _smoke_mat: StandardMaterial3D
 
@@ -52,18 +53,22 @@ static func patty_look(t: float) -> String:
 	return "dry" if t < BURN_TIME else "burnt"
 
 
-func setup(type_: String, cell_: Vector2i, tier_: int) -> void:
+## `facing` 0 puts the front toward +z; 1 turns it to face +x (for the left wall).
+func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0) -> void:
 	type = type_
 	cell = cell_
 	tier = tier_
 	position = Grid.center(cell)
-	Build.station(self, type, tier)
+	_vis = Node3D.new()
+	_vis.rotation.y = facing * PI / 2
+	add_child(_vis)
+	Build.station(_vis, type, tier)
 	if type == "table":
 		seats = [cell + Vector2i(-1, 0), cell + Vector2i(1, 0)]
 	if type == "plates":
 		count = 4
 	if type == "stove":
-		_ring = get_node_or_null("ring")
+		_ring = _vis.get_node_or_null("ring")
 		_make_cook_bar()
 		_make_smoke()
 	refresh()
@@ -193,9 +198,21 @@ func refresh() -> void:
 	add_child(_stack)
 	if type == "plates":
 		for i in count:
-			Build.cyl(_stack, Vector3(0, 0.88 + i * 0.04, 0), 0.2, 0.03, "#ffffff")
+			var plate := Build.item("plate")
+			plate.position = Vector3(0, 0.916 + i * 0.032, 0)
+			_stack.add_child(plate)
 	elif type == "table":
 		for i in dirty:
 			var d := Build.item("dirty_plate")
-			d.position = Vector3(-0.25 + i * 0.5, 0.72, 0.28)
+			d.position = Vector3(-0.25 + i * 0.5, 0.58, 0.3)
 			_stack.add_child(d)
+
+
+## A little show when the chef uses the station: the fridge door swings open.
+func used() -> void:
+	var door := _vis.get_node_or_null("door") as Node3D
+	if door:
+		var tw := door.create_tween()
+		tw.tween_property(door, "rotation:y", -1.9, 0.16).set_ease(Tween.EASE_OUT)
+		tw.tween_interval(0.35)
+		tw.tween_property(door, "rotation:y", 0.0, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

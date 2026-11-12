@@ -107,7 +107,7 @@ func _set_meal(kind: String, quality: float) -> void:
 	_meal_kind = kind
 	var to_table := (Grid.center(table.cell) - position).normalized()
 	_meal = Build.item(kind, quality)
-	_meal.position = to_table * 0.62 + Vector3(0, 0.72, 0)
+	_meal.position = to_table * 0.62 + Vector3(0, 0.58, 0)
 	add_child(_meal)
 
 
