@@ -8,6 +8,13 @@ var joy := 0.5       # atmosphere, friends, kindness
 var savour := 0.0    # how good the food was
 var thoughts: Array[String] = []
 var discounted := false  # the chef offered half price while they waited
+var comped := false      # the chef made the meal free
+
+## A free meal is for a guest who is very unhappy: nearly out of patience, or disgusted.
+const COMP_BELOW := 0.25     # patience below which a free meal can be offered
+const COMP_PATIENCE := 0.6   # patience a free meal buys back (half price: 0.35)
+const COMP_JOY := 0.25       # joy it adds (half price: 0.1)
+const COMP_CALM := 0.2       # disgust it takes away: they forgive a little
 
 
 func think(t: String) -> bool:
@@ -77,8 +84,26 @@ func offer_discount() -> bool:
 	return true
 
 
+## Upset enough that a free meal is the right apology.
+func very_unhappy() -> bool:
+	return patience < COMP_BELOW or disgust_level() >= 2
+
+
+## The bigger apology: the meal is on the house. Once per visit, only when very unhappy.
+func offer_comp() -> bool:
+	if comped or not very_unhappy():
+		return false
+	comped = true
+	patience = minf(1.0, patience + COMP_PATIENCE)
+	disgust = maxf(0.0, disgust - COMP_CALM)
+	delight(COMP_JOY, "On the house? That's really kind")
+	return true
+
+
 ## What they pay for a meal with this list price.
 func bill_for(price: int) -> int:
+	if comped:
+		return 0
 	return ceili(price / 2.0) if discounted else price
 
 

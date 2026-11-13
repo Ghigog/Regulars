@@ -867,6 +867,8 @@ func show_guest(g: Guest) -> void:
 	var who := "Back after a grudge" if g.info.sore else town.status_word(g.idx, game.ledger.day)
 	var standing := _label(box, 13, "%s  ·  visit %d" % [who, int(g.info.visits) + 1])
 	standing.modulate.a = 0.7
+	if town.expects_deal(g.idx):   # discounting has a cost: they now expect it
+		_label(box, 13, "Expects a deal").add_theme_color_override("font_color", Color(Build.CORAL_DARK))
 	_guest_state = _label(box, 15)
 	_guest_meters.clear()
 	for id: String in ["patience", "joy", "savour", "disgust"]:

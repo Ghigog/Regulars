@@ -28,6 +28,19 @@ many days as you can; three walkouts in one day ends the run.
 - **Half price.** With empty hands at the table of a guest whose patience is under half,
   E offers half price, once per visit: +0.35 patience, a little joy, +0.2 affinity, and
   they pay half the bill (the tip is worked out on the halved bill).
+- **Free meal (comp).** The bigger apology, for a guest who is very unhappy: patience
+  under 0.25 (`GuestMood.COMP_BELOW`) or Disgusted. The same E at their table offers it
+  once half price is used up or not on offer, so a fed-up guest gets half price first and
+  the free meal if they sink again; a disgusted but patient guest gets it straight away.
+  +0.6 patience, +0.25 joy, -0.2 disgust (often enough to drop a stage, so they do not tell
+  friends how dirty it was), +0.4 affinity, and each friend gets half that. They pay
+  nothing, so no tip either. `REGULARS_DEMO=comp`.
+- **Expecting a deal.** `Town` counts deals per person (`deals`: +1 half price, +2 free
+  meal). At 3 they expect one: their card says "Expects a deal", they walk in thinking
+  "They usually knock something off", a deal earns them only half the goodwill, and a
+  full-price meal costs them 0.15 joy ("Full price this time? Hm"). Each full-price visit
+  takes one off the count, so the habit wears off. Constants are at the top of
+  `sim/town.gd`.
 - **Night 0.** The game opens in the build phase, on the night before day 1, with the door
   card on CLOSED and the starting $50 to spend. Tests and `REGULARS_DEMO` shots skip it
   (`first_night` in `game/main.gd`).
@@ -172,7 +185,7 @@ focused. The logic and tests still exist.
 | Nightly crate, shelf upgrades | `Catalog.offer`, `shelve`, `collect_ready` | **Parked again by decision** (no blueprints from the sky, at least for now). Was hooked up briefly on this branch; logic and tests kept, nothing in the game calls them. |
 | Walls on cell edges, line of sight, placement pathing | `sim/grid.gd` | **Built**, see section 1. Placement rules are `Grid.can_place_block` and `can_place_wall`. |
 | Word of mouth between friends | `sim/town.gd` | **Built**, see section 1. |
-| Kindness / discounts | `GuestMood.offer_discount`, `Town.record_kindness` | **Built**, see section 1. Full comps (a free meal) are not. |
+| Kindness / discounts | `GuestMood.offer_discount` / `offer_comp`, `Town.record_kindness` / `paid_full_price` | **Built**, see section 1: half price, free meals, and guests who come to expect them. |
 | Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
 
 Everything else in this table is back in the game. Not built: upgrading a piece already
@@ -197,8 +210,8 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Built**: groups arriving together (section 1).
 - **To add**: stay length and order size driven by mood (dessert, second drink),
   favourite dishes (needs a second dish), reviews (needs a design).
-- **Discounts and comps**: half price is built (section 1). To add: a free meal, and
-  guests who come to expect a discount.
+- **Discounts and comps** (built, section 1): half price, a free meal, and guests who
+  come to expect a deal.
 
 ## 4. Building (Sims layer)
 
