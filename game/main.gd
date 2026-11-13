@@ -197,6 +197,7 @@ func _apply_demo(demo: String) -> void:
 		bin.count = Station.BIN_HOLDS
 		bin.refresh()
 		player.position = Grid.center(Vector2i(2, 4))
+		player.set_held("rubbish_bag")
 		for a in arrivals:
 			a.time = 0.5
 	elif demo == "lineup":  # every townsperson and every face, close up
