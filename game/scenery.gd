@@ -764,6 +764,7 @@ static func _street(root: Node3D, w: int, x1: float, lights: Array[OmniLight3D])
 	_bench(root, Vector3(X0 + 2.0, 0, kerb))
 	_street_bin(root, Vector3(X0 + 0.6, 0, kerb))
 	_bike(root, Vector3(X0 + 4.0, 0, kerb))
+	_street_dressing(root, x1)
 
 
 ## A soft-cornered block centred on `at`.
@@ -854,6 +855,126 @@ static func _lamp_post(root: Node3D, at: Vector3, lights: Array[OmniLight3D]) ->
 	lights.append(light)
 
 
+## Sheet 12, second pass: a raised stone kerb with drain grates, a zebra crossing,
+## a coral pillar box, a teal hydrant, flowers round the tree and a toy car parked
+## on the far lane. Everything stands on the kerb row or the road, well clear of
+## the queue line along the shop wall.
+static func _street_dressing(root: Node3D, x1: float) -> void:
+	var x := X0
+	var i := 0
+	while x < x1 - 0.01:
+		var wd := minf(1.0, x1 - x)
+		_rb(root, Vector3(x + wd / 2, -0.04, PAVE_Z - 0.03), Vector3(wd - 0.02, 0.16, 0.22), "#e3dcd0" if i % 2 else "#d6cec2", 0.03)
+		if i % 4 == 2:
+			_rb(root, Vector3(x + wd / 2, -0.075, PAVE_Z + 0.22), Vector3(0.5, 0.02, 0.26), "#4d4843", 0.01)
+			for k in 4:
+				Build.box(root, Vector3(x + wd / 2 - 0.15 + k * 0.1, -0.066, PAVE_Z + 0.22), Vector3(0.035, 0.008, 0.2), "#77706a")
+		x += 1.0
+		i += 1
+	# A zebra crossing between two road dashes, near the lamp.
+	var zx := x1 - 2.85
+	for k in 5:
+		Build.box(root, Vector3(zx, -0.085, PAVE_Z + 0.45 + k * 0.48), Vector3(0.95, 0.012, 0.26), "#f6efe2")
+	_pillar_box(root, Vector3(x1 - 3.65, 0, PAVE_Z - 0.4))
+	_hydrant(root, Vector3(X0 + 4.95, 0, PAVE_Z - 0.35))
+	# Flowers in the tree's grass square.
+	var tree := Vector3(x1 - 0.65, 0, PAVE_Z - 0.5)
+	for k in 6:
+		var a := TAU * k / 6.0 + 0.3
+		var at := tree + Vector3(cos(a) * 0.3, 0.23, sin(a) * 0.3)
+		Build.ball(root, at, 0.05, [Build.CORAL, Build.PAPER, "#ffd27a"][k % 3])
+	_toy_car(root, Vector3(X0 + 2.6, -0.08, Z1 - 0.85))
+
+
+## A coral pillar box: a fat drum with a dark band, a domed cap and a mail slot.
+static func _pillar_box(root: Node3D, at: Vector3) -> void:
+	Build.lathe(root, at, [[0.0, 0.0], [0.24, 0.0], [0.25, 0.04], [0.2, 0.08], [0.2, 0.86], [0.24, 0.9], [0.24, 0.98], [0.2, 1.06], [0.12, 1.12], [0.0, 1.14]], Build.CORAL)
+	Build.lathe(root, at, [[0.19, 0.84], [0.215, 0.84], [0.215, 0.9], [0.19, 0.9]], "#4a372c")
+	var face := Node3D.new()
+	face.position = at
+	face.rotation.y = -PI / 4   # the slot faces the camera
+	root.add_child(face)
+	_rb(face, Vector3(0, 0.72, 0.2), Vector3(0.22, 0.045, 0.04), "#3a2c22", 0.015)
+	_rb(face, Vector3(0, 0.52, 0.195), Vector3(0.14, 0.1, 0.02), Build.PAPER, 0.01)
+
+
+## A stubby teal hydrant with brass caps on its side outlets.
+static func _hydrant(root: Node3D, at: Vector3) -> void:
+	Build.lathe(root, at, [[0.0, 0.0], [0.17, 0.0], [0.17, 0.06], [0.12, 0.08], [0.11, 0.42], [0.14, 0.45], [0.14, 0.5], [0.08, 0.6], [0.0, 0.62]], Build.CABINET)
+	Build.ball(root, at + Vector3(0, 0.63, 0), 0.045, BRASS, 0.0, Build.R_WOOD)
+	for side: float in [-1.0, 1.0]:
+		Build.cyl(root, at + Vector3(side * 0.11, 0.3, 0), 0.055, 0.08, BRASS).rotation.z = -side * PI / 2
+
+
+## A chunky toy car (sheet 12's playset feel): a cream body with a teal cabin,
+## dark windows, wooden wheels with dark tyres like the bike, and lamps.
+static func _toy_car(root: Node3D, at: Vector3) -> void:
+	var car := Node3D.new()
+	car.position = at
+	root.add_child(car)
+	_rb(car, Vector3(0, 0.36, 0), Vector3(1.9, 0.38, 0.9), Build.CORAL, 0.12)
+	_rb(car, Vector3(-0.15, 0.7, 0), Vector3(1.05, 0.38, 0.8), Build.PAPER, 0.12)
+	for sz: float in [-1.0, 1.0]:
+		_rb(car, Vector3(-0.15, 0.72, sz * 0.395), Vector3(0.84, 0.22, 0.02), "#2f3a3e", 0.04)
+		for sx: float in [-0.6, 0.6]:
+			var wheel := Node3D.new()
+			wheel.position = Vector3(sx, 0.2, sz * 0.43)
+			wheel.rotation.x = PI / 2
+			car.add_child(wheel)
+			Build.lathe(wheel, Vector3.ZERO, [[0.0, -0.06], [0.13, -0.06], [0.13, 0.06], [0.0, 0.06]], "#dba865", 0.0, Build.R_WOOD)
+			Build.lathe(wheel, Vector3.ZERO, [[0.12, -0.07], [0.18, -0.07], [0.2, 0.0], [0.18, 0.07], [0.12, 0.07], [0.12, -0.07]], "#4a372c")
+		Build.ball(car, Vector3(0.94, 0.42, sz * 0.28), 0.07, "#fff1c4", 0.6)
+		Build.ball(car, Vector3(-0.94, 0.42, sz * 0.28), 0.06, Build.CORAL_DARK)
+	_rb(car, Vector3(0.97, 0.24, 0), Vector3(0.08, 0.08, 0.84), "#9aa3a6", 0.03, Build.R_WOOD)
+	_rb(car, Vector3(-0.97, 0.24, 0), Vector3(0.08, 0.08, 0.84), "#9aa3a6", 0.03, Build.R_WOOD)
+
+
+## Seaside: what stands on the boardwalk by the rail, and a rowing boat and a buoy
+## on the water. All on the rail side, clear of the queue line.
+static func _pier_dressing(root: Node3D, x1: float) -> void:
+	var near := PAVE_Z - 0.6
+	# A stack of fish crates and a lobster pot.
+	_rb(root, Vector3(X0 + 1.1, 0.16, near), Vector3(0.6, 0.32, 0.46), "#a98d6c", 0.03, Build.R_WOOD)
+	_rb(root, Vector3(X0 + 1.05, 0.46, near), Vector3(0.56, 0.28, 0.44), "#c2a684", 0.03, Build.R_WOOD)
+	for k in 3:
+		Build.ball(root, Vector3(X0 + 0.9 + k * 0.15, 0.62, near), 0.07, "#9fc7d6").scale = Vector3(1.6, 0.6, 0.8)
+	var pot := Vector3(X0 + 1.9, 0, near)
+	Build.lathe(root, pot, [[0.0, 0.0], [0.28, 0.0], [0.3, 0.06], [0.3, 0.2], [0.24, 0.34], [0.12, 0.4], [0.0, 0.41]], "#c9a77c", 0.0, Build.R_WOOD)
+	for y: float in [0.1, 0.24]:
+		Build.lathe(root, pot + Vector3(0, y, 0), [[0.28 - y * 0.2, 0.0], [0.315 - y * 0.2, 0.0], [0.315 - y * 0.2, 0.035], [0.28 - y * 0.2, 0.035]], "#3f6f74")
+	Build.lathe(root, pot + Vector3(0, 0.36, 0), [[0.05, 0.0], [0.11, 0.0], [0.11, 0.06], [0.05, 0.06]], "#e8dcc0")
+	# A coil of rope.
+	for k in 3:
+		Build.lathe(root, Vector3(X0 + 4.1, 0.0 + k * 0.06, near + 0.1), [[0.18 - k * 0.04, 0.0], [0.27 - k * 0.04, 0.0], [0.27 - k * 0.04, 0.06], [0.18 - k * 0.04, 0.06]], "#e8dcc0")
+	# A life ring on a post.
+	var post := x1 - 3.2
+	Build.box(root, Vector3(post, 0, near), Vector3(0.12, 1.35, 0.12), Build.WOOD_DARK, 0.0, Build.R_WOOD)
+	var ring := Node3D.new()
+	ring.position = Vector3(post, 1.0, near)
+	ring.rotation.y = -PI / 4   # faces the camera
+	root.add_child(ring)
+	var torus := Build.lathe(ring, Vector3(0, 0, 0.09), [[0.17, -0.05], [0.29, -0.05], [0.29, 0.05], [0.17, 0.05], [0.17, -0.05]], Build.CORAL)
+	torus.rotation.x = PI / 2
+	for k in 4:
+		var band := Node3D.new()
+		band.position = Vector3(0, 0, 0.09)
+		band.rotation.z = TAU * k / 4.0 + PI / 4
+		ring.add_child(band)
+		_rb(band, Vector3(0.23, 0, 0), Vector3(0.14, 0.09, 0.12), Build.PAPER, 0.03)
+	# A rowing boat and a buoy on the sea.
+	var boat := Node3D.new()
+	boat.position = Vector3(X0 + 2.6, -0.1, Z1 - 1.0)
+	root.add_child(boat)
+	var hull := Build._add(boat, Build.lathe_mesh([[0.0, 0.0], [0.3, 0.0], [0.42, 0.16], [0.46, 0.3], [0.38, 0.3], [0.34, 0.18], [0.0, 0.18]], 40), Vector3.ZERO, Color(Build.CORAL), 0.0)
+	hull.scale = Vector3(2.4, 1.0, 1.0)
+	_rb(boat, Vector3(0, 0.24, 0), Vector3(0.12, 0.05, 0.74), Build.WOOD, 0.02, Build.R_WOOD)
+	Build.lathe(boat, Vector3.ZERO, [[0.37, 0.26], [0.47, 0.26], [0.47, 0.32], [0.37, 0.32], [0.37, 0.26]], Build.PAPER).scale = Vector3(2.4 * 0.98, 1.0, 0.98)
+	var buoy := Vector3(x1 - 2.0, -0.1, Z1 - 1.3)
+	Build.lathe(root, buoy, [[0.0, 0.0], [0.26, 0.0], [0.28, 0.12], [0.16, 0.3], [0.1, 0.6], [0.0, 0.66]], Build.CORAL)
+	Build.lathe(root, buoy, [[0.25, 0.1], [0.285, 0.1], [0.27, 0.17], [0.22, 0.2]], Build.PAPER)
+	Build.ball(root, buoy + Vector3(0, 0.68, 0), 0.06, "#ffe2a6", 1.0)
+
+
 ## Seaside: a weathered boardwalk with rope-and-post bollards, and a strip of
 ## turquoise sea with white foam in place of the road.
 static func _pier(root: Node3D, w: int, x1: float) -> void:
@@ -884,3 +1005,4 @@ static func _pier(root: Node3D, w: int, x1: float) -> void:
 				var u := (k + 0.5) / 5.0
 				Build.ball(root, Vector3(x + u * 1.5, 0.5 - sin(u * PI) * 0.14, rail), 0.045, "#e8dcc0").scale = Vector3(4.0, 1, 1)
 		x += 1.5
+	_pier_dressing(root, x1)
