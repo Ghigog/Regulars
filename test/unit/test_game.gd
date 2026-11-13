@@ -77,6 +77,44 @@ func test_half_price_calms_an_impatient_guest_and_costs_half_the_bill():
 	assert_eq(int(game.ledger.today.sales), 6)
 
 
+func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
+	var g: Guest = game.spawn_guest(0)
+	_run(12.0)
+	g.mood.patience = 0.2
+	assert_string_contains(game.prompt_for(g.table), "Half price", "the smaller apology comes first")
+	game.use_station(g.table)
+	assert_eq(game.prompt_for(g.table), "", "half price calmed them for now")
+	g.mood.patience = 0.1
+	assert_string_contains(game.prompt_for(g.table), "Free meal")
+	game.use_station(g.table)
+	assert_true(g.mood.comped)
+	assert_eq(game.prompt_for(g.table), "", "only once")
+	assert_true(g.mood.thoughts.has("On the house? That's really kind"))
+	_cook_burger()
+	game.use_station(g.table)
+	_run(Guest.EAT_TIME + 0.5)
+	assert_eq(int(game.ledger.today.sales), 0)
+
+
+func test_a_disgusted_guest_can_be_offered_a_free_meal_straight_away():
+	var g: Guest = game.spawn_guest(0)
+	_run(12.0)
+	g.mood.disgust = 0.5
+	assert_string_contains(game.prompt_for(g.table), "Free meal")
+
+
+func test_a_guest_who_expects_a_deal_is_let_down_by_full_price():
+	game.town.people[0].deals = Town.EXPECT_AT
+	var g: Guest = game.spawn_guest(0)
+	assert_true(g.mood.thoughts.has("They usually knock something off"))
+	_run(12.0)
+	_cook_burger()
+	game.use_station(g.table)
+	_run(Guest.EAT_TIME + 0.5)
+	assert_true(g.mood.thoughts.has("Full price this time? Hm"))
+	assert_eq(int(game.town.people[0].deals), Town.EXPECT_AT - 1)
+
+
 func test_flyers_cost_money_once_a_night_and_are_used_up_next_day():
 	assert_false(game.buy_flyers(), "not during service")
 	game.arrivals.clear()

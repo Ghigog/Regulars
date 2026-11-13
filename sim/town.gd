@@ -16,6 +16,16 @@ const REGULAR_TIP := 1.25
 const GRUDGE_DAYS := 2      # full days a guest stays away after walking out
 const FLYER_PRICE := 15
 const FLYER_BOOST := 0.25
+## Kindness. Half price and free meals win goodwill, and friends hear about free ones.
+## Guests given deals often start to expect them: a full-price visit then lets them down.
+const KIND_HALF := 0.2        # affinity for half price
+const KIND_COMP := 0.4        # affinity for a free meal
+const KIND_COMP_SHARE := 0.5  # share of a free meal's goodwill each friend gets
+const DEALS_HALF := 1         # how much a half price adds to `deals`
+const DEALS_COMP := 2         # how much a free meal adds
+const EXPECT_AT := 3          # deals at which someone expects one
+const EXPECTED_KINDNESS := 0.5  # an expected deal earns only this share of the goodwill
+const LETDOWN_JOY := 0.15     # joy lost paying full price when they expected a deal
 
 var people: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
@@ -26,7 +36,7 @@ func _init(seed_value := 1) -> void:
 	for i in NAMES.size():
 		people.append({
 			"name": NAMES[i], "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
-			"streak": 0, "away_until": 0, "sore": false, "grudges": 0, "gone": false,
+			"streak": 0, "away_until": 0, "sore": false, "grudges": 0, "gone": false, "deals": 0,
 			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
 		})
 	# A ring of friendships plus a few long-distance ones, so gossip travels.
@@ -176,6 +186,8 @@ func greeting(i: int) -> Dictionary:
 		return {"patience": 0.75, "joy": -0.1, "thought": "Last time was a disaster. One more chance"}
 	if is_regular(i):
 		return {"patience": 1.0, "joy": 0.1, "thought": "My favourite place"}
+	if expects_deal(i):
+		return {"patience": 1.0, "joy": 0.0, "thought": "They usually knock something off"}
 	return {"patience": 1.0, "joy": 0.0, "thought": ""}
 
 
@@ -224,8 +236,32 @@ func record_disgust(i: int, level: int) -> String:
 	return "%s is telling friends how dirty it was." % people[i].name
 
 
-func record_kindness(i: int, amount := 0.2) -> void:
+## A deal for guest `i`: "half" price or a free meal ("comp"). They like the place more
+## (less if they had come to expect it), friends hear about a free meal, and every deal
+## makes them a little more likely to expect the next one.
+func record_kindness(i: int, kind := "half") -> void:
+	var comp := kind == "comp"
+	var amount := KIND_COMP if comp else KIND_HALF
+	if expects_deal(i):
+		amount *= EXPECTED_KINDNESS
 	_nudge(i, amount)
+	if comp:
+		for f: int in people[i].friends:
+			_nudge(f, amount * KIND_COMP_SHARE)
+	people[i].deals += DEALS_COMP if comp else DEALS_HALF
+
+
+## Whether guest `i` has had enough deals to expect one.
+func expects_deal(i: int) -> bool:
+	return int(people[i].deals) >= EXPECT_AT
+
+
+## Guest `i` paid full price. If they expected a deal they are let down: returns the
+## joy they lose (0 if not). Each full-price visit wears the habit down by one.
+func paid_full_price(i: int) -> float:
+	var letdown := LETDOWN_JOY if expects_deal(i) else 0.0
+	people[i].deals = maxi(0, int(people[i].deals) - 1)
+	return letdown
 
 
 ## One line of gossip for the end-of-day report.

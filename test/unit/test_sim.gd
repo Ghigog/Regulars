@@ -95,6 +95,51 @@ func test_half_price_is_offered_once_and_halves_the_bill():
 	assert_eq(GuestMood.new().bill_for(12), 12)
 
 
+func test_free_meal_only_for_the_very_unhappy_and_costs_the_whole_bill():
+	var m := GuestMood.new()
+	m.patience = 0.4
+	assert_false(m.very_unhappy())
+	assert_false(m.offer_comp(), "not for a guest who is merely impatient")
+	m.patience = GuestMood.COMP_BELOW - 0.05
+	assert_true(m.offer_comp())
+	assert_false(m.offer_comp(), "only once per visit")
+	assert_gt(m.patience, 0.75, "calms them more than half price")
+	assert_eq(m.bill_for(12), 0)
+	var d := GuestMood.new()
+	d.disgust = 0.5
+	assert_true(d.very_unhappy(), "disgust counts as very unhappy")
+	assert_true(d.offer_comp())
+	assert_lt(d.disgust_level(), 2, "a free meal takes the edge off")
+
+
+func test_a_free_meal_wins_more_goodwill_than_half_price_and_reaches_friends():
+	var t := Town.new()
+	t.record_kindness(0, "half")
+	t.record_kindness(2, "comp")
+	assert_gt(float(t.people[2].affinity), float(t.people[0].affinity))
+	assert_gt(float(t.people[3].affinity), 0.0, "friends hear about a free meal")
+	assert_eq(float(t.people[13].affinity), 0.0, "but not about half price")
+
+
+func test_guests_given_deals_come_to_expect_them():
+	var t := Town.new()
+	for n in Town.EXPECT_AT - 1:
+		t.record_kindness(4, "half")
+	assert_false(t.expects_deal(4))
+	t.record_kindness(4, "half")
+	assert_true(t.expects_deal(4))
+	assert_string_contains(t.greeting(4).thought, "knock something off")
+	var before := float(t.people[4].affinity)
+	t.record_kindness(4, "half")
+	assert_almost_eq(float(t.people[4].affinity) - before, Town.KIND_HALF * Town.EXPECTED_KINDNESS, 0.001,
+			"an expected deal earns less goodwill")
+	assert_eq(t.paid_full_price(4), Town.LETDOWN_JOY, "full price lets them down")
+	assert_eq(t.paid_full_price(4), Town.LETDOWN_JOY, "until the habit wears off")
+	assert_false(t.expects_deal(4))
+	assert_eq(t.paid_full_price(4), 0.0)
+	assert_eq(Town.new().paid_full_price(0), 0.0, "no letdown for someone never given a deal")
+
+
 func test_tip_never_negative():
 	var m := GuestMood.new()
 	m.see_gross(1.0, 1.0, "Ew")

@@ -219,6 +219,11 @@ func _apply_demo(demo: String) -> void:
 			a.time = 0.2
 		get_tree().create_timer(8.0).timeout.connect(_demo_kind.bind(false))
 		get_tree().create_timer(9.5).timeout.connect(_demo_kind.bind(true))
+	elif demo == "comp":  # a fed-up guest who expects deals, then the free meal; shoot at about 9 and 10.5
+		for a in arrivals:
+			a.time = 0.2
+		get_tree().create_timer(8.0).timeout.connect(_demo_comp.bind(false))
+		get_tree().create_timer(9.5).timeout.connect(_demo_comp.bind(true))
 	elif demo == "inspect":  # a seated guest with a few thoughts and their card open; shoot at 10
 		for a in arrivals:
 			a.time = 0.2
@@ -350,6 +355,23 @@ func _demo_kind(offer: bool) -> void:
 			g.mood.patience = 0.3
 			player.position = Grid.center(g.table.cell + Vector2i(0, 1))
 			player.look(Vector2i(0, -1))
+			return
+
+
+func _demo_comp(offer: bool) -> void:
+	for g in guests:
+		if g.state == "waiting":
+			if offer:
+				use_station(g.table)
+				return
+			town.people[g.idx].deals = Town.EXPECT_AT
+			g.mood.offer_discount()
+			g.mood.patience = 0.15
+			g.mood.disgust = 0.5
+			g.mood.think("Nobody has cleared that table")
+			player.position = Grid.center(g.table.cell + Vector2i(0, 1))
+			player.look(Vector2i(0, -1))
+			hud.show_guest(g)
 			return
 
 
@@ -1693,15 +1715,31 @@ func serve(g: Guest, quality: float) -> void:
 func offer_discount(g: Guest) -> void:
 	if not g.mood.offer_discount():
 		return
-	town.record_kindness(g.idx)
+	town.record_kindness(g.idx, "half")
 	hud.say("Half price for %s. Word gets around." % g.info.name)
 	burst(g.position + Vector3(0, 1.5, 0), "stars", 0.3)
 	g._heart_time = 1.5
 	sfx("coin")
 
 
+## The bigger kindness: the meal is free, for a guest who is very unhappy. Their
+## friends hear about it.
+func offer_comp(g: Guest) -> void:
+	if not g.mood.offer_comp():
+		return
+	town.record_kindness(g.idx, "comp")
+	hud.say("%s eats free tonight. Their friends will hear of it." % g.info.name)
+	burst(g.position + Vector3(0, 1.5, 0), "stars")
+	g._heart_time = 2.5
+	sfx("perfect")
+
+
 func finish_meal(g: Guest) -> void:
 	var bill := g.mood.bill_for(BILL)
+	if bill == BILL:   # someone used to deals is let down by full price
+		var letdown := town.paid_full_price(g.idx)
+		if letdown > 0.0:
+			g.mood.delight(-letdown, "Full price this time? Hm")
 	var tip := g.mood.tip_for(bill, town.tip_bonus(g.idx))
 	var was_sore: bool = g.info.sore
 	var was_regular := town.is_regular(g.idx)
@@ -1858,13 +1896,17 @@ func use_station(st: Station, dry_run := false) -> String:
 				act = "Half price for %s" % g.info.name
 				if not dry_run:
 					offer_discount(g)
+			elif held == "" and g != null and not g.mood.comped and g.mood.very_unhappy():
+				act = "Free meal for %s" % g.info.name   # after half price, or for disgust
+				if not dry_run:
+					offer_comp(g)
 	if act != "" and not dry_run:
 		player.punch()
 		st.used()
 		if act == "Wash":
 			sfx("wash")
 			burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
-		elif not (act.begins_with("Serve") or act.begins_with("Half")):
+		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free")):
 			sfx("pickup" if player.held != "" else "putdown")
 	return act
 
