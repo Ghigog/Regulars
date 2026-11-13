@@ -349,16 +349,8 @@ Not built yet; this is the agreed direction for future sessions.
   a table for four, for now.
 - **To fix:** names drawn over each other in the queue at the door, and members of a
   group walking through one another.
-- **Townspeople with a local language model** (idea, not agreed to build). Proposed
-  split: the simulation decides everything that matters (likes and dislikes, meters,
-  which dish is ordered, how long they wait), so the game stays fair, tunable and
-  testable; a small local model only puts that state into words: thoughts, gossip,
-  reactions to the dishes the player named, the critic's written review, lines in the
-  town book. It must never hold up play: text is written in batches during the build
-  phase and cached, every line has a written fallback so the game works fully without
-  a model, and it is an option (phones may not manage a 1 to 2 GB model). Suggested
-  first try: the critic's review and reactions to dish names, to see whether it earns
-  its place.
+- **No language model for townspeople** (dropped): a small local model is too heavy for
+  phones. Thoughts, gossip and reviews stay written lines chosen by the simulation.
 - **Banked:** the size of the lot is for the metagame (between runs); staff waits
   until after co-op; the name ("Regulars" is a working title) and the "Town Diner"
   subtitle are still open.
