@@ -1,7 +1,9 @@
 # Regulars: audio style guide
 
-The sound counterpart to `docs/STYLE_GUIDE.md`. Nothing here is in the game yet: the build
-has one placeholder `music` loop and synthesised effects from `tools/make_sfx.py`.
+The sound counterpart to `docs/STYLE_GUIDE.md`. In the game now: three real tracks in
+`assets/music` (Daytime, Nighttime, Closed), switched by phase with a cross-fade (`MUSIC`
+and `play_music` in `game/main.gd`), and synthesised effects from `tools/make_sfx.py`.
+`Intro.mp3` is in the folder but not used yet.
 
 ## The idea
 
@@ -136,7 +138,7 @@ Instrumental collection of very short jazz stingers separated by silence, C majo
 
 ## To build in the game
 
-- Replace the placeholder `music` loop with track 1.
-- Layer fading by `day_progress()` and queue length; track switching by phase
-  (service, summary and build, closed).
+- Built: track switching by phase (service, build, closed).
+- Layer fading by `day_progress()` and queue length.
+- A use for `Intro.mp3` (title screen, still undecided).
 - Per-theme music and ambience alongside `REGULARS_THEME`.

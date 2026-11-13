@@ -153,7 +153,7 @@ focused. The logic and tests still exist.
 | Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
 
 Everything else in this table is back in the game. Not built: upgrading a piece already
-placed; floors and ceilings.
+placed. (Floors, walls and doors are built; ceilings are not planned.)
 
 ## 3. Guests (RollerCoaster Tycoon layer)
 
