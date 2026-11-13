@@ -942,6 +942,8 @@ func update_status() -> void:
 
 
 func _process(delta: float) -> void:
+	if _options_card and _options_frame:
+		_options_frame.queue_redraw()   # follows the card as it pops in
 	if not calendar:
 		return
 	dangle.step(calendar.knot(), delta)
@@ -1164,6 +1166,12 @@ var _options_card: Control
 var _options_body: VBoxContainer
 var _options_tab := "audio"
 var _options_tabs := {}
+var _options_tab_row: HBoxContainer
+var _options_done: Button
+var _options_keys: Label         # what the keys do, for keys and pad
+var _options_frame: Control       # the highlight round the chosen row (keys and pad)
+var _options_rows: Array = []     # what up and down move between, top to bottom
+var _options_sel := 0
 
 
 func load_options() -> void:
@@ -1187,12 +1195,43 @@ func apply_options() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventKey and event.pressed and not event.echo):
+	if not (event is InputEventKey and event.pressed):
 		return
 	var key: int = event.physical_keycode
-	if key == KEY_O or (key == KEY_ESCAPE and _options_card != null):
+	if _options_card != null:
+		if options_key(key, event.echo):
+			get_viewport().set_input_as_handled()
+	elif key == KEY_O and not event.echo:
 		toggle_options()
 		get_viewport().set_input_as_handled()
+
+
+func options_open() -> bool:
+	return _options_card != null
+
+
+## One key press while the options screen is open: up and down pick a row, left
+## and right turn a slider or switch tabs, E/Space/Enter presses, Esc or O
+## closes. The controller sends these keys too (d-pad, A, B, Start). Held arrows
+## repeat; nothing else does. Returns whether the key was used.
+func options_key(key: int, echo := false) -> bool:
+	if key in [KEY_UP, KEY_W]:
+		_options_pick(_options_sel - 1)
+	elif key in [KEY_DOWN, KEY_S]:
+		_options_pick(_options_sel + 1)
+	elif key in [KEY_LEFT, KEY_A]:
+		_options_turn(-1)
+	elif key in [KEY_RIGHT, KEY_D]:
+		_options_turn(1)
+	elif echo:
+		return false
+	elif key in [KEY_E, KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]:
+		_options_press()
+	elif key in [KEY_ESCAPE, KEY_O]:
+		toggle_options()
+	else:
+		return false
+	return true
 
 
 ## Opens or closes the options screen. The game is paused while it is open.
@@ -1200,10 +1239,12 @@ func toggle_options() -> void:
 	if _options_card != null:
 		_options_card.queue_free()
 		_options_card = null
+		_options_rows.clear()
 		save_options()
 		get_tree().paused = false
 		return
 	get_tree().paused = true
+	_options_sel = 0
 	_options_card = Control.new()
 	_options_card.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(_options_card)
@@ -1221,22 +1262,32 @@ func toggle_options() -> void:
 	box.add_theme_constant_override("separation", 14)
 	card.add_child(box)
 	_ribbon(box, "OPTIONS", CORAL)
-	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 10)
-	box.add_child(tabs)
+	_options_tab_row = HBoxContainer.new()
+	_options_tab_row.add_theme_constant_override("separation", 10)
+	box.add_child(_options_tab_row)
 	_options_tabs = {
-		"audio": _button(tabs, "Audio", _show_options_tab.bind("audio")),
-		"graphics": _button(tabs, "Graphics", _show_options_tab.bind("graphics")),
+		"audio": _button(_options_tab_row, "Audio", _show_options_tab.bind("audio")),
+		"graphics": _button(_options_tab_row, "Graphics", _show_options_tab.bind("graphics")),
 	}
 	_options_body = VBoxContainer.new()
 	_options_body.add_theme_constant_override("separation", 12)
 	_options_body.custom_minimum_size = Vector2(0, 96)
 	box.add_child(_options_body)
-	_button(box, "Done" + _key_note("back"), toggle_options)
+	_options_done = _button(box, "Done", toggle_options)
+	_options_keys = _label(box, 15)
+	_options_keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_options_keys.modulate.a = 0.7
+	_options_frame = Control.new()
+	_options_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_options_frame.draw.connect(_draw_options_frame)
+	_options_card.add_child(_options_frame)
 	_show_options_tab(_options_tab)
 	_pop_in(card)
 
 
+## Fills the body for a tab and lists the rows the arrows move between: the
+## tabs, each slider or switch, Done. Also sizes everything for the device in
+## use, so refresh_input calls it when the player switches.
 func _show_options_tab(tab: String) -> void:
 	_options_tab = tab
 	for id: String in _options_tabs:
@@ -1244,13 +1295,30 @@ func _show_options_tab(tab: String) -> void:
 	for c in _options_body.get_children():
 		_options_body.remove_child(c)
 		c.queue_free()
+	_options_rows = [_options_tab_row]
 	if tab == "audio":
-		_volume_row("Sound effects", "sfx")
-		_volume_row("Music", "music")
+		_options_rows.append(_volume_row("Sound effects", "sfx"))
+		_options_rows.append(_volume_row("Music", "music"))
 	else:
-		_button(_options_body, "Tilt-shift (miniature look):  %s" % ("On" if options.tilt_shift else "Off"), _toggle_tilt_shift)
+		_options_rows.append(_button(_options_body,
+			"Tilt-shift (miniature look):  %s" % ("On" if options.tilt_shift else "Off"), _toggle_tilt_shift))
 		var note := _label(_options_body, 15, "Blurs the near and far edges so the town looks like a model.")
 		note.modulate.a = 0.7
+	_options_rows.append(_options_done)
+	_options_done.text = "Done" + _key_note("back")
+	var touch := _mode() == "touch"
+	_options_keys.visible = not touch
+	_options_keys.text = "%s choose and change     %s press     %s close" % [_g("browse"), _g("use"), _g("back")]
+	for row: Control in _options_rows:
+		if row is Button:
+			row.custom_minimum_size.y = 64.0 if touch else 0.0
+		row.mouse_filter = Control.MOUSE_FILTER_PASS if row is Container else row.mouse_filter
+		if not row.has_meta("picks"):   # the mouse moves the frame too
+			row.set_meta("picks", true)
+			row.mouse_entered.connect(func() -> void: _options_pick(_options_rows.find(row)))
+	for b: Button in _options_tabs.values():
+		b.custom_minimum_size.y = 64.0 if touch else 0.0
+	_options_pick(_options_sel)
 
 
 func _toggle_tilt_shift() -> void:
@@ -1259,7 +1327,82 @@ func _toggle_tilt_shift() -> void:
 	_show_options_tab("graphics")
 
 
-func _volume_row(title: String, key: String) -> void:
+func _options_pick(i: int) -> void:
+	i = clampi(i, 0, maxi(_options_rows.size() - 1, 0))
+	if i != _options_sel and _options_card != null:
+		game.sfx("tick")
+	_options_sel = i
+	if _options_frame:
+		_options_frame.queue_redraw()
+
+
+func _options_row() -> Control:
+	return _options_rows[_options_sel] if _options_sel < _options_rows.size() else null
+
+
+## Left or right: the next tab along, or a slider a notch (a tenth) each way.
+func _options_turn(dir: int) -> void:
+	var row := _options_row()
+	if row == _options_tab_row:
+		var ids: Array = _options_tabs.keys()
+		var at := ids.find(_options_tab)
+		_show_options_tab(ids[posmod(at + dir, ids.size())])
+		game.sfx("tab")
+	elif row is HBoxContainer:
+		var slider: HSlider = row.get_meta("slider")
+		slider.value = clampf(snappedf(slider.value + dir * 0.1, 0.05), 0.0, 1.0)
+
+
+func _options_press() -> void:
+	var row := _options_row()
+	if row == _options_tab_row:
+		_options_turn(1)
+	elif row is Button:
+		row.pressed.emit()
+
+
+## Keys and controller only: a heavy ink frame round the chosen row with a
+## coral pointer tab on its left, like a marker clipped to the card. Drawn on
+## top of the card so it follows the pop-in.
+func _draw_options_frame() -> void:
+	var row := _options_row()
+	if row == null or _mode() == "touch":
+		return
+	var r := row.get_global_rect().grow_individual(14, 6, 10, 6)
+	r.position -= _options_frame.get_global_rect().position
+	var ink := StyleBoxFlat.new()
+	ink.draw_center = false
+	ink.border_color = INK
+	ink.set_border_width_all(3)
+	ink.set_corner_radius_all(14)
+	_options_frame.draw_style_box(ink, r)
+	var y := r.get_center().y
+	var x := r.position.x
+	var tip := PackedVector2Array([Vector2(x - 2, y), Vector2(x - 20, y - 12), Vector2(x - 20, y + 12)])
+	_options_frame.draw_colored_polygon(PackedVector2Array([tip[0] + Vector2(0, 3), tip[1] + Vector2(0, 3), tip[2] + Vector2(0, 3)]), SHADOW)
+	_options_frame.draw_colored_polygon(tip, CORAL)
+	_options_frame.draw_polyline(PackedVector2Array([tip[0], tip[1], tip[2], tip[0]]), INK, 2.5, true)
+
+
+## A round cream grabber with an ink ring, big enough for a thumb on touch.
+static func _grabber(diameter: int) -> ImageTexture:
+	var img := Image.create(diameter, diameter, false, Image.FORMAT_RGBA8)
+	var c := diameter / 2.0
+	for y in diameter:
+		for x in diameter:
+			var d := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(c, c))
+			var col := Color(INK)
+			if d < c - 3.5:
+				col = Color(CREAM)
+			elif d < c - 3.0:
+				col = Color(CREAM).lerp(INK, (d - (c - 3.5)) * 2.0)
+			col.a = clampf(c - d, 0.0, 1.0)
+			img.set_pixel(x, y, col)
+	return ImageTexture.create_from_image(img)
+
+
+func _volume_row(title: String, key: String) -> HBoxContainer:
+	var touch := _mode() == "touch"
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	_options_body.add_child(row)
@@ -1271,8 +1414,13 @@ func _volume_row(title: String, key: String) -> void:
 	slider.value = float(options[key])
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	slider.focus_mode = Control.FOCUS_NONE
+	slider.custom_minimum_size.y = 56.0 if touch else 30.0
+	var knob := _grabber(46 if touch else 26)
+	for icon in ["grabber", "grabber_highlight", "grabber_disabled"]:
+		slider.add_theme_icon_override(icon, knob)
+	slider.focus_mode = Control.FOCUS_NONE   # the arrows are read by options_key instead
 	row.add_child(slider)
+	row.set_meta("slider", slider)
 	var value := _label(row, 20, "%d%%" % roundi(slider.value * 100))
 	value.custom_minimum_size = Vector2(56, 0)
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -1282,6 +1430,7 @@ func _volume_row(title: String, key: String) -> void:
 		apply_options()
 		if key == "sfx":
 			game.sfx("coin"))
+	return row
 
 
 func hide_card() -> void:
@@ -1522,6 +1671,8 @@ func refresh_input() -> void:
 		_shop_keys.text = _shop_keys_text()
 	if build_bar:
 		show_build()
+	if _options_card:
+		_show_options_tab(_options_tab)
 
 
 ## The build phase: a paper slip along the bottom says what the keys do. The

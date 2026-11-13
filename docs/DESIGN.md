@@ -77,7 +77,12 @@ many days as you can; three walkouts in one day ends the run.
   away); a small Menu button for options. Taps on the room work as clicks (pick a guest,
   place a piece, drag floors), and a touch on a control never reaches the room. The
   buttons and the controller send the same key presses as the keyboard, so there is one
-  set of rules. Not yet: moving the options sliders with a controller.
+  set of rules. The options screen works from the keys and the pad: up and down (d-pad,
+  arrows or the stick) choose a row (the tabs, each slider, the switch, Done), left and
+  right turn a slider a tenth or switch tabs, A, E or Enter presses, B, Esc or Start
+  closes. The chosen row gets an ink frame with a coral pointer, for keys and pad only.
+  On touch the frame and key line go, buttons and slider grabbers grow to thumb size, and
+  only the Menu button stays over the card. The chef cannot walk while it is open.
 - **Reach marks.** While a piece with a reach is carried (a fern: 2 + tier cells; the bin:
   5), a pale square on the floor shows how far it goes from the spot in front, and every
   seat has a disc: green if the piece would reach it from there, red if not (out of range

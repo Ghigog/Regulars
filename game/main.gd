@@ -233,6 +233,7 @@ func _apply_demo(demo: String) -> void:
 	elif demo == "options" or demo == "options_gfx":  # the options screen, on either tab
 		hud._options_tab = "graphics" if demo == "options_gfx" else "audio"
 		hud.toggle_options()
+		hud.options_key(KEY_DOWN)   # the highlight on the first slider (keys and pad)
 		get_tree().paused = false   # so the screenshot timer still runs
 	elif demo == "closed":
 		best_path = "user://regulars_best_demo.json"
@@ -1908,7 +1909,9 @@ func step(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	var input := Vector2.ZERO
-	if phase == Phase.SERVICE or (phase == Phase.BUILD and not shopping and not hud.typing()):
+	if hud.options_open():
+		pass   # paused anyway; the arrows belong to the options screen
+	elif phase == Phase.SERVICE or (phase == Phase.BUILD and not shopping and not hud.typing()):
 		input = Vector2(
 			float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))
 			- float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),

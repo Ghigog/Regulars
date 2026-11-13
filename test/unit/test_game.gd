@@ -806,3 +806,129 @@ func test_touch_joystick_and_buttons_never_reach_the_room():
 	for b: Array in game.controls.buttons():
 		ids.append(b[0])
 	assert_has(ids, "use", "a Use button during service")
+
+
+# ---------------------------------------------------------------- options screen
+
+func after_each():
+	get_tree().paused = false   # a failed options test must not freeze the rest
+
+
+## A key press as the keyboard (or a controller, through Controls) sends it,
+## delivered at once rather than on the next frame.
+func _key(key: Key, pressed := true) -> void:
+	var e := InputEventKey.new()
+	e.physical_keycode = key
+	e.keycode = key
+	e.pressed = pressed
+	Input.parse_input_event(e)
+	Input.flush_buffered_events()
+
+
+func _tap(key: Key) -> void:
+	_key(key)
+	_key(key, false)
+
+
+func _tap_pad(button: int) -> void:
+	_pad(button, true)
+	Input.flush_buffered_events()
+	_pad(button, false)
+	Input.flush_buffered_events()
+
+
+func test_options_screen_works_from_the_keyboard():
+	var hud = game.hud
+	var saved: Dictionary = hud.options.duplicate()
+	hud.options.sfx = 0.5
+	hud.options.music = 0.5
+	_tap(KEY_O)
+	assert_true(hud.options_open())
+	assert_true(get_tree().paused, "the game waits")
+	assert_eq(hud._options_row(), hud._options_tab_row, "the tabs are chosen first")
+	_tap(KEY_DOWN)
+	_tap(KEY_RIGHT)
+	assert_almost_eq(float(hud.options.sfx), 0.6, 0.001, "right turns the sound effects up")
+	_tap(KEY_DOWN)
+	_tap(KEY_LEFT)
+	_tap(KEY_LEFT)
+	assert_almost_eq(float(hud.options.music), 0.3, 0.001, "left turns the music down")
+	_tap(KEY_DOWN)
+	_tap(KEY_DOWN)
+	assert_eq(hud._options_row(), hud._options_done, "down stops at Done")
+	_tap(KEY_UP)
+	_tap(KEY_UP)
+	_tap(KEY_UP)
+	_tap(KEY_RIGHT)
+	assert_eq(hud._options_tab, "graphics", "right on the tabs switches tab")
+	var tilt: bool = hud.options.tilt_shift
+	_tap(KEY_DOWN)
+	_tap(KEY_E)
+	assert_eq(bool(hud.options.tilt_shift), not tilt, "E presses the switch")
+	_tap(KEY_ENTER)
+	assert_eq(bool(hud.options.tilt_shift), tilt, "so does Enter")
+	hud.options.merge(saved, true)   # leave the player's own settings file as it was
+	_tap(KEY_ESCAPE)
+	assert_false(hud.options_open())
+	assert_false(get_tree().paused)
+
+
+func test_options_screen_works_with_a_controller():
+	var hud = game.hud
+	var saved: Dictionary = hud.options.duplicate()
+	hud.options.sfx = 0.5
+	_tap_pad(JOY_BUTTON_START)
+	assert_true(hud.options_open(), "Start opens the options")
+	assert_eq(game.controls.mode, "pad")
+	assert_true(hud._options_keys.visible, "the key line shows for a pad")
+	assert_string_contains(hud._options_keys.text, "D-pad")
+	_tap_pad(JOY_BUTTON_DPAD_DOWN)
+	_tap_pad(JOY_BUTTON_DPAD_RIGHT)
+	assert_almost_eq(float(hud.options.sfx), 0.6, 0.001, "the d-pad turns a slider")
+	var e := InputEventJoypadMotion.new()   # the stick browses too
+	e.axis = JOY_AXIS_LEFT_X
+	e.axis_value = 1.0
+	game.controls._input(e)
+	game.controls._process(0.01)
+	Input.flush_buffered_events()
+	assert_almost_eq(float(hud.options.sfx), 0.7, 0.001, "a flick of the stick is one notch")
+	e.axis_value = 0.0
+	game.controls._input(e)
+	game.controls._process(0.01)
+	Input.flush_buffered_events()
+	_tap_pad(JOY_BUTTON_DPAD_DOWN)
+	_tap_pad(JOY_BUTTON_DPAD_DOWN)
+	assert_eq(hud._options_row(), hud._options_done)
+	hud.options.merge(saved, true)
+	_tap_pad(JOY_BUTTON_A)
+	assert_false(hud.options_open(), "A on Done closes")
+	_tap_pad(JOY_BUTTON_START)
+	assert_true(hud.options_open())
+	_tap_pad(JOY_BUTTON_B)
+	assert_false(hud.options_open(), "and so does B")
+
+
+func test_arrows_do_not_walk_the_chef_while_options_are_open():
+	_tap(KEY_O)
+	var from: Vector3 = game.player.position
+	_key(KEY_RIGHT)
+	for i in 10:
+		game._process(0.05)
+	_key(KEY_RIGHT, false)
+	assert_almost_eq(game.player.position.distance_to(from), 0.0, 0.001, "the chef stays put")
+	_tap(KEY_ESCAPE)
+	assert_false(game.hud.options_open())
+
+
+func test_options_on_touch_have_big_targets_and_no_highlight():
+	game.controls.set_mode("touch")
+	game.hud.toggle_options()
+	var hud = game.hud
+	assert_false(hud._options_keys.visible, "no key line on touch")
+	assert_gte(hud._options_done.custom_minimum_size.y, 64.0, "Done fits a thumb")
+	var slider: HSlider = hud._options_rows[1].get_meta("slider")
+	assert_gte(slider.get_theme_icon("grabber").get_width(), 44, "so does a slider's grabber")
+	var ids: Array = game.controls.buttons().map(func(b: Array) -> String: return b[0])
+	assert_eq(ids, ["options"], "only the Menu button stays over the card")
+	assert_false(game.controls._stick_shown())
+	hud.toggle_options()
