@@ -32,6 +32,7 @@ const DOOR_REACH := 1.25
 const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
 const FLYERS := {"id": "flyers", "tier": 1}   # sold in the shop's Extras, never placed
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
+const BOOTH_DELIGHT := 0.08   # a booth's benches are cosier than chairs
 const SOUNDS := {  # name -> volume in dB
 	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
 	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0,
@@ -348,6 +349,17 @@ func _demo_build(demo: String) -> void:
 			pick_catalog("floor_planks")
 			_drag = {"from": Vector3(-0.5, 0, -1.5), "remove": false}
 			_demo_hover = Vector3(3.5, 0, 1.5)
+	elif demo == "build_dining" or demo == "build_dining_shop":  # a booth and a table for four, in the room or the shop
+		for spot: Array in [[Vector3(6.5, 0, 1.5), "table4", Vector3i(6, 1, 0)], [Vector3(6.5, 0, 5.5), "booth", Vector3i(6, 5, 0)]]:
+			pick_up(spot[0])
+			sell_hand()
+			pick_catalog(spot[1], 1)
+			place(spot[2])
+			cancel_hand()   # a bought piece stays in hand for the next one
+		if demo == "build_dining_shop":
+			open_shop()
+			hud._set_category("Dining")
+			get_tree().create_timer(0.3).timeout.connect(hud.shop_move.bind(1))
 	elif demo == "build_range":  # a fern carried past the tables: its reach and the seats it touches
 		pick_catalog("plant", 1)
 		_demo_hover = Vector3(6.5, 0, 3.5)
@@ -559,7 +571,7 @@ func add_station(type: String, cell: Vector2i, tier := 1, facing := 0) -> Statio
 	var st := Station.new()
 	add_child(st)
 	st.setup(type, cell, tier, facing)
-	if type == "table":
+	if Station.is_table(type):
 		st.lamp = _add_lamp(st.position)
 	_register(st)
 	return st
@@ -1575,6 +1587,8 @@ func _seat_waiting_guests() -> void:
 func on_seated(g: Guest) -> void:
 	if g.table.tier > 1:
 		g.mood.delight(0.05 * (g.table.tier - 1), "What a lovely table")
+	if g.table.type == "booth":
+		g.mood.delight(BOOTH_DELIGHT, "A booth! How cosy")
 	for other in g.table.seats:
 		if other != g.seat and seat_taken.has(other):
 			var mate: Guest = seat_taken[other]
@@ -1677,7 +1691,7 @@ static func _near(a: Vector2i, b: Vector2i, r: int) -> bool:
 func _collect_gross() -> void:
 	_gross.clear()
 	for st: Station in stations.values():
-		if st.type == "table" and st.dirty > 0:
+		if Station.is_table(st.type) and st.dirty > 0:
 			_gross.append({"cell": st.cell, "kind": "plate", "age": st.dirty_age, "thought": "Nobody has cleared that table"})
 		elif st.type == "bin" and st.overflowing():
 			_gross.append({"cell": st.cell, "kind": "overflow", "age": st.dirty_age, "thought": "The bin is overflowing"})
@@ -1883,7 +1897,7 @@ func use_station(st: Station, dry_run := false) -> String:
 			if not dry_run and act in ["Scrape off", "Throw away"]:
 				st.count += 1
 				st.refresh()
-		"table":
+		"table", "booth", "table4":
 			var g := _waiting_guest_at(st)
 			if held == "burger" and g != null:
 				act = "Serve %s" % g.info.name

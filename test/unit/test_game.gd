@@ -888,3 +888,108 @@ func test_touch_joystick_and_buttons_never_reach_the_room():
 	for b: Array in game.controls.buttons():
 		ids.append(b[0])
 	assert_has(ids, "use", "a Use button during service")
+
+
+func test_booth_and_table_for_four_are_sold_under_dining():
+	var dining: Array = Catalog.search("", "Dining").map(func(bp: Dictionary) -> String: return bp.id)
+	assert_has(dining, "booth")
+	assert_has(dining, "table4")
+	assert_eq(Catalog.price_of("booth"), 60)
+	assert_eq(Catalog.price_of("table4"), 90)
+	var cat := Catalog.new()
+	assert_false(cat.can_buy("table4", 500, 2), "a table for four needs level 3")
+	assert_true(cat.can_buy("table4", 500, 3))
+	assert_true(cat.can_buy("booth", 500, 2))
+	assert_eq(Catalog.search("four").size(), 3, "every tier of the table for four turns up")
+
+
+func test_seats_of_a_booth_turn_and_a_table_for_four_has_one_each_side():
+	var c := Vector2i(5, 5)
+	assert_eq(Station.seats_for("booth", c, 0), [Vector2i(4, 5), Vector2i(6, 5)] as Array[Vector2i])
+	assert_eq(Station.seats_for("booth", c, 1), [Vector2i(5, 4), Vector2i(5, 6)] as Array[Vector2i])
+	for facing in 4:
+		var seats := Station.seats_for("table4", c, facing)
+		assert_eq(seats.size(), 4)
+		for s in [Vector2i(4, 5), Vector2i(6, 5), Vector2i(5, 4), Vector2i(5, 6)]:
+			assert_has(seats, s)
+
+
+## Sells the table at (6, 5) and puts `id` there instead.
+func _swap_front_table(id: String, facing := 0) -> Station:
+	_to_build()
+	game.ledger.money = 500
+	game.ledger.xp = 500
+	assert_true(game.pick_up(Vector3(6.5, 0, 5.5)))
+	assert_true(game.sell_hand())
+	assert_true(game.pick_catalog(id))
+	for i in facing:
+		game.rotate_hand()
+	assert_true(game.place(Vector3i(6, 5, 0)))
+	game.cancel_hand()
+	return game.stations[Vector2i(6, 5)]
+
+
+func test_buying_and_placing_a_table_for_four_reserves_four_seats():
+	_to_build()
+	game.ledger.money = 500
+	game.ledger.xp = 500
+	assert_true(game.pick_catalog("table4"))
+	assert_false(game.can_place(Vector3i(5, 3, 0)), "a seat would sit on the pass")
+	assert_false(game.can_place(Vector3i(8, 2, 0)), "a seat would sit on another table")
+	assert_false(game.can_place(Vector3i(9, 6, 0)), "a seat would be outside")
+	game.cancel_hand()
+	var t := _swap_front_table("table4")
+	assert_eq(t.seats.size(), 4)
+	for s in t.seats:
+		assert_true(game.grid.reserved.has(s))
+	assert_eq(game.max_party(), 4)
+	assert_true(game.grid.reachable(game.DOOR, Vector2i(6, 6)), "every seat can be reached")
+
+
+func test_a_booth_turns_with_its_seats_and_refused_spots_stay_refused():
+	var b := _swap_front_table("booth", 1)
+	assert_eq(b.seats, [Vector2i(6, 4), Vector2i(6, 6)] as Array[Vector2i])
+	assert_false(game.grid.reserved.has(Vector2i(5, 5)))
+	assert_true(game.pick_up(Vector3(6.5, 0, 5.5)))
+	game.rotate_hand()
+	assert_true(game.place(Vector3i(6, 5, 0)))
+	assert_eq(b.seats, [Vector2i(5, 5), Vector2i(7, 5)] as Array[Vector2i])
+	assert_true(game.pick_catalog("booth"))
+	assert_false(game.can_place(Vector3i(9, 4, 0)), "a seat would be on the pavement")
+	game.rotate_hand()
+	assert_false(game.can_place(Vector3i(9, 4, 0)), "turned, a seat lands on the table at (8, 3)'s seat")
+	game.cancel_hand()
+	# A wall may not shut the booth's seats off from the door.
+	game.pick_catalog("wall")
+	for e in Floorplan.cell_edges(Vector2i(7, 5)):
+		if game.can_place(e):
+			game.place(e)
+	assert_true(game.grid.reachable(game.DOOR, Vector2i(7, 5)))
+
+
+func test_a_group_of_four_sits_together_at_the_table_for_four():
+	var t := _swap_front_table("table4")
+	game.start_day()
+	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
+	var four: Array[Guest] = game.spawn_group([0, 1, 2, 3])
+	var pair: Array[Guest] = game.spawn_group([4, 5])
+	_run(16.0)
+	for g in four:
+		assert_eq(g.table, t, "the four share the table for four")
+		assert_has(t.seats, g.seat)
+	assert_ne(pair[0].table, t, "a pair takes a table for two, leaving the big one")
+	assert_eq(pair[0].table, pair[1].table)
+
+
+func test_a_booth_seats_a_pair_and_is_cosy():
+	var b := _swap_front_table("booth")
+	game.start_day()
+	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
+	var pairs: Array[Guest] = []
+	for n in 3:
+		pairs.append_array(game.spawn_group([n * 2, n * 2 + 1]))
+	_run(16.0)
+	var at_booth := pairs.filter(func(g: Guest) -> bool: return g.table == b)
+	assert_eq(at_booth.size(), 2, "three pairs, three tables: one pair gets the booth")
+	var at_table: Guest = pairs.filter(func(g: Guest) -> bool: return g.table != b)[0]
+	assert_almost_eq(at_booth[0].mood.joy - at_table.mood.joy, game.BOOTH_DELIGHT, 0.001, "benches are cosier than chairs")
