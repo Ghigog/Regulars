@@ -427,6 +427,29 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 	return n
 
 
+## A dining chair standing `away` from the cell centre, its back on the far side.
+## Sheet 10: a coral seat and back on dark wooden legs. The back legs run on up as
+## two posts holding a low back panel, so the legs read below the seat and the
+## back stays low enough to show faces (0.9 m).
+static func _chair(n: Node3D, away: Vector2i, col: String) -> void:
+	var c := Node3D.new()
+	c.position = Vector3(away.x, 0, away.y)
+	c.rotation.y = atan2(-float(away.y), float(away.x))
+	n.add_child(c)
+	var legs := WOOD_DARK
+	var rough := R_MATTE if col == CORAL else R_WOOD
+	for lz: float in [-0.22, 0.22]:
+		var front := _add(c, bevel_mesh(Vector3(0.07, 0.38, 0.07), 0.02), Vector3(-0.22, 0.19, lz), Color(legs), 0.0, R_WOOD)
+		front.rotation.x = -signf(lz) * 0.07   # splayed a little at the foot
+		front.rotation.z = -0.07
+		_add(c, bevel_mesh(Vector3(0.075, 0.92, 0.075), 0.025), Vector3(0.22, 0.46, lz), Color(legs), 0.0, R_WOOD)
+		_add(c, bevel_mesh(Vector3(0.44, 0.04, 0.04), 0.015), Vector3(0, 0.13, lz), Color(legs), 0.0, R_WOOD)
+	_add(c, bevel_mesh(Vector3(0.54, 0.05, 0.54), 0.02), Vector3(0, 0.355, 0), Color(legs), 0.0, R_WOOD)
+	_add(c, bevel_mesh(Vector3(0.52, 0.07, 0.52), 0.03), Vector3(-0.01, 0.41, 0), Color(col), 0.0, rough)
+	_add(c, bevel_mesh(Vector3(0.07, 0.3, 0.4), 0.03), Vector3(0.23, 0.72, 0), Color(col), 0.0, rough)
+	_add(c, bevel_mesh(Vector3(0.09, 0.05, 0.52), 0.02), Vector3(0.22, 0.9, 0), Color(legs), 0.0, R_WOOD)
+
+
 static func _shade(col: String, amount := 0.13) -> String:
 	return Color(col).darkened(amount).to_html(false)
 
@@ -447,17 +470,52 @@ static func _counter(n: Node3D, body: String, top: String, doors := true, kick :
 			box(n, Vector3(sx * 0.08, 0.5, 0.48), Vector3(0.035, 0.12, 0.03), "#d9a441", 0.0, R_WOOD)
 
 
-## The till from sheet 1: a cream wedge with a keyboard slope and a display block.
+## A proper cash register (sheet 1, sheet 8): a cream body on a coral cash drawer
+## with a brass pull, a sloped deck of chunky keys with a big coral total key, a
+## dark display pod with a warm amber window and a coral price flag popped up on
+## top, a receipt curling out of the back and a brass crank on the camera side.
+## Reads at 20 px as cream block, dark band, coral drawer.
 static func register(n: Node3D) -> void:
+	var cream := Color("#efe6d4")
 	var till := Node3D.new()
-	till.position = Vector3(0, 0.9, -0.05)
+	till.name = "till"
+	till.position = Vector3(0, 0.9, -0.08)
 	till.rotation.y = PI / 2
 	n.add_child(till)
-	_add(till, bevel_mesh(Vector3(0.56, 0.16, 0.5), 0.05), Vector3(0, 0.08, 0), Color("#efe6d4"), 0.0)
-	_add(till, bevel_mesh(Vector3(0.56, 0.3, 0.22), 0.05), Vector3(0, 0.29, -0.14), Color("#efe6d4"), 0.0)
-	var keys := _add(till, bevel_mesh(Vector3(0.44, 0.03, 0.24), 0.012), Vector3(0, 0.175, 0.1), Color("#bdb5a8"), 0.0)
-	keys.rotation.x = 0.25
-	_add(till, bevel_mesh(Vector3(0.36, 0.12, 0.02), 0.008), Vector3(0, 0.33, -0.03), Color(CABINET), 0.0)
+	# Cash drawer: a cream plinth with a coral front, a brass pull and a coin slot.
+	_add(till, bevel_mesh(Vector3(0.62, 0.15, 0.56), 0.04), Vector3(0, 0.075, 0), cream, 0.0)
+	_add(till, bevel_mesh(Vector3(0.54, 0.11, 0.03), 0.015), Vector3(0, 0.075, 0.28), Color(CORAL), 0.0)
+	ball(till, Vector3(0, 0.075, 0.305), 0.03, "#d9a441", 0.0, R_WOOD)
+	# Body: a tall back block, and a key deck sloping down toward the front.
+	_add(till, bevel_mesh(Vector3(0.6, 0.26, 0.22), 0.045), Vector3(0, 0.27, -0.16), cream, 0.0)
+	var deck := Node3D.new()
+	deck.position = Vector3(0, 0.2, 0.08)
+	deck.rotation.x = 0.38
+	till.add_child(deck)
+	_add(deck, bevel_mesh(Vector3(0.6, 0.12, 0.38), 0.04), Vector3.ZERO, cream, 0.0)
+	_add(deck, bevel_mesh(Vector3(0.5, 0.012, 0.3), 0.005), Vector3(0, 0.062, 0), Color("#d8ccb6"), 0.0)
+	for row in 3:
+		for col in 4:
+			if row == 2 and col == 3:
+				continue  # the total key takes this corner
+			cyl(deck, Vector3(-0.17 + col * 0.105, 0.06, -0.1 + row * 0.095), 0.034, 0.03, "#fbf6ea" if (row + col) % 3 else "#3d4a4f")
+	_add(deck, bevel_mesh(Vector3(0.1, 0.035, 0.17), 0.015), Vector3(0.155, 0.08, 0.05), Color(CORAL), 0.0)
+	# Display pod with a lit amber window, and a coral price flag popped up on top.
+	_add(till, bevel_mesh(Vector3(0.44, 0.15, 0.16), 0.04), Vector3(0, 0.46, -0.15), Color("#2f3a3e"), 0.0)
+	_add(till, bevel_mesh(Vector3(0.32, 0.075, 0.02), 0.01), Vector3(0, 0.465, -0.065), Color("#ffcf73"), 1.1)
+	box(till, Vector3(0, 0.53, -0.17), Vector3(0.025, 0.1, 0.025), "#9aa3a6", 0.0, R_WOOD)
+	_add(till, bevel_mesh(Vector3(0.2, 0.1, 0.03), 0.02), Vector3(0, 0.67, -0.17), Color(CORAL), 0.0)
+	_add(till, bevel_mesh(Vector3(0.11, 0.025, 0.012), 0.008), Vector3(0, 0.67, -0.152), Color(PAPER), 0.0)
+	# A curl of receipt out of the back.
+	var paper := _add(till, bevel_mesh(Vector3(0.16, 0.2, 0.01), 0.004), Vector3(0.14, 0.44, -0.29), Color(PAPER), 0.0)
+	paper.rotation.x = -0.45
+	# A brass crank on the left side, which faces the camera on the pass.
+	var crank := Node3D.new()
+	crank.position = Vector3(-0.31, 0.28, -0.12)
+	till.add_child(crank)
+	cyl(crank, Vector3.ZERO, 0.045, 0.04, "#d9a441", 0.0, R_WOOD).rotation.z = PI / 2
+	box(crank, Vector3(-0.05, -0.12, 0), Vector3(0.03, 0.16, 0.03), "#d9a441", 0.0, R_WOOD)
+	ball(crank, Vector3(-0.07, -0.13, 0), 0.04, WOOD_DARK)
 
 
 ## Furniture visuals centred on a cell, front facing +z. Tier adds a gold trim.
@@ -539,16 +597,12 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			ball(n, Vector3(0.05, 0.62 + size * 1.75, 0.03), size * 0.55, LEAF_2)
 		"table":
 			# Two-seat table (sheet 1): a slab top with a small bevel on a slim pedestal and
-			# disc foot; coral chairs on four pale wooden legs, backs to 0.94 m.
+			# disc foot; coral chairs on dark wooden legs (`_chair`).
 			# Soft-cornered square top on a teal pedestal (the anchor frame).
 			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.25, 0.0], [0.27, 0.02], [0.27, 0.08], [0.25, 0.1], [0.075, 0.1], [0.075, 0.63], [0.0, 0.63]], CABINET, 0.0, R_WOOD)
 			_add(n, bevel_mesh(Vector3(1.12, 0.12, 1.12), 0.035), Vector3(0, 0.68, 0), Color("#ecc88f"), 0.0, R_WOOD)
-			for sx: float in [-1.0, 1.0]:
-				for lx: float in [-0.21, 0.21]:
-					for lz: float in [-0.21, 0.21]:
-						_add(n, bevel_mesh(Vector3(0.075, 0.36, 0.075), 0.02), Vector3(sx + lx, 0.18, lz), Color("#d9a56a"), 0.0, R_WOOD)
-				_add(n, bevel_mesh(Vector3(0.58, 0.1, 0.58), 0.035), Vector3(sx, 0.4, 0), Color(CORAL), 0.0)
-				_add(n, bevel_mesh(Vector3(0.1, 0.56, 0.58), 0.035), Vector3(sx * 1.24, 0.66, 0), Color(CORAL), 0.0)
+			for sx: int in [-1, 1]:
+				_chair(n, Vector2i(sx, 0), CORAL)
 			# A small candle in a glass, as in the sunset frame.
 			cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
 			ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
