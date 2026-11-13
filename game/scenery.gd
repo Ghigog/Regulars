@@ -75,7 +75,6 @@ static func build_room(root: Node3D, plan: Floorplan, door: Vector2i) -> Diction
 		for run: Dictionary in _runs(plan, axis, "low"):
 			_low_run(root, plan, run, openings, entrance)
 	_fixtures(root, plan, lights)
-	_rug(root, plan)
 	return {"lights": lights, "openings": openings}
 
 
@@ -179,7 +178,7 @@ static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Ar
 	for k in range(from, to):
 		var e := _edge(axis, line, k)
 		var c := _lx(axis, k + 0.5)
-		if plan.kind(_room_cell(axis, line, k)) == "planks":
+		if plan.kind(_room_cell(axis, line, k)) != "tile":
 			planks += 1
 		match plan.openings.get(e, ""):
 			"door":
@@ -231,6 +230,28 @@ static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Ar
 		if r[1]:
 			var at: float = _lx(axis, from - float(r0[0]) if side == 0 else to + float(r1[0]))
 			_rb(holder, Vector3(at, (bot + top) / 2, -WALL_T / 2), Vector3(0.03, top - bot, WALL_T), t().cut, 0.012)
+	# Paint and paper on the room face, above the wainscot where there is one.
+	for k in range(from, to):
+		var f: String = plan.finishes.get(_edge(axis, line, k), "")
+		if f == "":
+			continue
+		var y0 := 0.83 if dining and dining_floor(plan.kind(_room_cell(axis, line, k))) else 0.0
+		var u0 := minf(_lx(axis, k), _lx(axis, k + 1))
+		var u1 := maxf(_lx(axis, k), _lx(axis, k + 1))
+		var stops: Array[float] = [u0, u1]
+		for hole: Array in holes:
+			for x: float in [hole[0], hole[1]]:
+				if x > u0 and x < u1:
+					stops.append(x)
+		stops.sort()
+		for i in stops.size() - 1:
+			var mid := (stops[i] + stops[i + 1]) / 2
+			var spans := [[y0, top]]
+			for hole: Array in holes:
+				if mid > hole[0] and mid < hole[1]:
+					spans = [[y0, minf(top, hole[2])], [maxf(y0, hole[3]), top]]
+			for sp: Array in spans:
+				_finish_panel(holder, f, stops[i], stops[i + 1], sp[0], sp[1], 0.006)
 	if dining:
 		_wainscot(holder, plan, axis, line, from, to)
 		for c in windows:
@@ -251,7 +272,7 @@ static func _wainscot(holder: Node3D, plan: Floorplan, axis: int, line: int, fro
 	var k := from
 	while k < to:
 		var j := k
-		while j < to and plan.kind(_room_cell(axis, line, j)) == "planks" and not plan.openings.has(_edge(axis, line, j)):
+		while j < to and dining_floor(plan.kind(_room_cell(axis, line, j))) and not plan.openings.has(_edge(axis, line, j)):
 			j += 1
 		if j == k:
 			k += 1
@@ -302,6 +323,12 @@ static func _low_run(root: Node3D, plan: Floorplan, run: Dictionary, openings: D
 			var x0 := minf(_lx(axis, k0), _lx(axis, k1))
 			_wall(holder, Vector3(x0, 0, -WALL_T / 2), Vector3(absf(k1 - k0), CUT_H, WALL_T), t().cut)
 		k0 = g + 1
+	for k in range(from, to):   # paint and paper on both faces
+		var f: String = plan.finishes.get(_edge(axis, line, k), "")
+		if f != "":
+			var x0 := minf(_lx(axis, k), _lx(axis, k + 1))
+			for z: float in [WALL_T / 2 + 0.004, -WALL_T / 2 - 0.004]:
+				_finish_panel(holder, f, x0, x0 + 1.0, 0.0, CUT_H - 0.13, z)
 	if gaps.has(entrance.y) and axis == 1 and line == entrance.x:
 		_doorway(_turned(root, Vector3(entrance.x, 0, entrance.y + 1)), Vector2i.ZERO, 0)
 
@@ -372,8 +399,13 @@ static func _floors(root: Node3D, plan: Floorplan) -> void:
 	for c: Vector2i in plan.floors:
 		var k := plan.kind(c)
 		# Floors are thick slabs of their own material on the sheet of paper (sheet 1).
-		Build.box(root, Vector3(c.x + 0.5, PAPER_Y, c.y + 0.5), Vector3(1.0, deep, 1.0), t().tile_a if k == "tile" else t().planks[0], 0.0, Build.R_GLOSS if k == "tile" else Build.R_WOOD)
-		if k == "tile":
+		var base: String = {"tile": t().tile_a, "planks": t().planks[0], "parquet": PARQUET[1], "marble": VEIN}[k]
+		Build.box(root, Vector3(c.x + 0.5, PAPER_Y, c.y + 0.5), Vector3(1.0, deep, 1.0), base, 0.0, Build.R_GLOSS if k == "tile" or k == "marble" else Build.R_WOOD)
+		if k == "parquet":
+			_parquet(root, c)
+		elif k == "marble":
+			_marble(root, c)
+		elif k == "tile":
 			var col: String = t().tile_b if posmod(c.x + c.y, 2) else t().tile_a
 			Build.box(root, Vector3(c.x + 0.5, -0.03, c.y + 0.5), Vector3(0.985, 0.03, 0.985), col, 0.0, Build.R_GLOSS)
 		else:
@@ -559,16 +591,82 @@ static func _fixtures(root: Node3D, plan: Floorplan, lights: Array[OmniLight3D])
 		Build.box(paddle, Vector3(0, 0.25, 0), Vector3(0.22, 0.42, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
 
 
-## Woven rug, 1.5 cm thick, under the middle table, while its floor is there.
-static func _rug(root: Node3D, plan: Floorplan) -> void:
-	for c in Floorplan.rect_cells(Vector2i(6, 2), Vector2i(9, 4)):
-		if not plan.has_floor(c):
-			return
-	Build.box(root, Vector3(8.5, 0, 3.5), Vector3(3.1, 0.015, 1.6), "#e9dcc0")
+## A woven rug, 1.5 cm thick, for a 3 by 2 cell footprint: the anchor cell's
+## middle is the origin and the rug runs one row toward +z (see Main.rug_cells).
+static func rug(n: Node3D) -> void:
+	var mid := Vector3(0, 0, 0.5)
+	Build.box(n, mid, Vector3(2.8, 0.015, 1.7), "#e9dcc0")
 	for i in 2:
 		var side := -1.0 if i == 0 else 1.0
-		Build.box(root, Vector3(8.5 + side * 1.2, 0.003, 3.5), Vector3(0.18, 0.015, 1.6), Build.CORAL)
-		Build.box(root, Vector3(8.5 + side * 0.95, 0.003, 3.5), Vector3(0.1, 0.015, 1.6), Build.CABINET)
+		Build.box(n, mid + Vector3(side * 1.12, 0.003, 0), Vector3(0.18, 0.015, 1.7), Build.CORAL)
+		Build.box(n, mid + Vector3(side * 0.87, 0.003, 0), Vector3(0.1, 0.015, 1.7), Build.CABINET)
+		for j in 7:   # fringe
+			Build.box(n, mid + Vector3(side * 1.44, 0, -0.72 + j * 0.24), Vector3(0.08, 0.008, 0.05), "#f6eedd")
+	Build.box(n, mid + Vector3(0, 0.003, 0), Vector3(0.5, 0.015, 0.5), Build.CORAL).rotation.y = PI / 4
+
+
+## Floors a dining room can have: wainscot and windows go on their back walls.
+static func dining_floor(k: String) -> bool:
+	return k != "" and k != "tile"
+
+
+const PARQUET: Array[String] = ["#c99a5b", "#b8854a", "#d6aa6c"]
+const MARBLE := "#dedbd2"
+const MARBLE_B := "#9eb1ad"
+const VEIN := "#7d8a88"
+const SAGE := "#a8c6a0"
+const STRIPE := ["#f7e6d6", "#e9a998"]
+const ROSE := ["#7e3a4c", "#e3b25a"]
+
+
+## Basket-weave parquet: four squares of three slats, turned alternately.
+static func _parquet(root: Node3D, c: Vector2i) -> void:
+	for i in 2:
+		for j in 2:
+			var turn := (i + j) % 2 == 1
+			for s in 3:
+				var off := -0.16 + s * 0.16
+				var at := Vector3(c.x + 0.25 + i * 0.5 + (off if turn else 0.0), -0.03, c.y + 0.25 + j * 0.5 + (0.0 if turn else off))
+				Build.box(root, at, Vector3(0.155 if turn else 0.48, 0.03, 0.48 if turn else 0.155), PARQUET[posmod(s + i * 2 + j + c.x + c.y, 3)], 0.0, Build.R_WOOD)
+
+
+## A polished marble slab a cell across, with two grey veins.
+static func _marble(root: Node3D, c: Vector2i) -> void:
+	Build.box(root, Vector3(c.x + 0.5, -0.03, c.y + 0.5), Vector3(0.985, 0.03, 0.985), MARBLE if posmod(c.x + c.y, 2) == 0 else MARBLE_B, 0.0, Build.R_GLOSS)
+	var h := posmod(c.x * 7 + c.y * 13, 5)
+	for v in 2:
+		var vein := Build.box(root, Vector3(c.x + 0.3 + 0.4 * v, -0.0005, c.y + 0.5), Vector3(0.022, 0.002, 0.7 - 0.1 * v), VEIN, 0.0, Build.R_GLOSS)
+		vein.rotation.y = 0.5 + 0.35 * h - 1.1 * v
+
+
+## Paint or wallpaper on a wall face from local x0 to x1 and y0 to y1, as a thin
+## sheet centred on local z.
+static func _finish_panel(holder: Node3D, f: String, x0: float, x1: float, y0: float, y1: float, z: float) -> void:
+	if x1 - x0 < 0.01 or y1 - y0 < 0.01:
+		return
+	var w := x1 - x0
+	var mid := Vector3((x0 + x1) / 2, y0, z)
+	match f:
+		"paint":
+			Build.box(holder, mid, Vector3(w, y1 - y0, 0.008), SAGE)
+		"paper_stripe":   # broad cream and coral-pink stripes
+			Build.box(holder, mid, Vector3(w, y1 - y0, 0.008), STRIPE[0])
+			var x := ceilf(x0 / 0.25) * 0.25 + 0.0625
+			while x + 0.0625 <= x1 + 0.001:
+				Build.box(holder, Vector3(x, y0, z), Vector3(0.1, y1 - y0, 0.012), STRIPE[1])
+				x += 0.25
+		"paper_rose":   # deep rose with small gold diamonds
+			Build.box(holder, mid, Vector3(w, y1 - y0, 0.008), ROSE[0])
+			var row := 0
+			var y := ceilf((y0 + 0.1) / 0.3) * 0.3
+			while y < y1 - 0.08:
+				var x := ceilf(x0 / 0.3) * 0.3 + (0.15 if row % 2 else 0.0)
+				while x < x1 - 0.06:
+					if x > x0 + 0.06:
+						Build.box(holder, Vector3(x, y - 0.035, z), Vector3(0.07, 0.07, 0.012), ROSE[1]).rotation.z = PI / 4
+					x += 0.3
+				y += 0.3
+				row += 1
 
 
 ## A planter and the menu board outside, on the near side of the door.
@@ -589,10 +687,14 @@ static func _outside(root: Node3D, w: int, h: int) -> void:
 static func tool_preview(n: Node3D, id: String) -> void:
 	var plan := Floorplan.new(Rect2i(-2, -2, 4, 4))
 	match id:
-		"floor_tile", "floor_planks":
-			plan.fill(Rect2i(-1, -1, 2, 2), "tile" if id == "floor_tile" else "planks")
+		"floor_tile", "floor_planks", "floor_parquet", "floor_marble":
+			plan.fill(Rect2i(-1, -1, 2, 2), id.trim_prefix("floor_"))
 			_floors(n, plan)
 			n.position.y = 0.25
+		"paint", "paper_stripe", "paper_rose":   # a short stretch of tall wall
+			_slab(n, -0.75, 0.75, 0.0, 1.4, -WALL_T, 0.0, t().wall)
+			_finish_panel(n, id, -0.75, 0.75, 0.0, 1.4, 0.006)
+			n.position.y = -0.3
 		"wall":
 			_wall(n, Vector3(-0.75, 0, -WALL_T / 2), Vector3(1.5, CUT_H, WALL_T), t().cut)
 			n.position.y = 0.2

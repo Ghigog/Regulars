@@ -7,13 +7,16 @@ extends RefCounted
 ## Edges are Vector3i(x, y, axis) as in Grid: axis 0 is the north edge of cell
 ## (x, y), axis 1 its west edge.
 
-const KINDS: Array[String] = ["tile", "planks"]
+const KINDS: Array[String] = ["tile", "planks", "parquet", "marble"]
+## Wall finishes, by their catalog id; one per wall edge, showing on both faces.
+const FINISHES: Array[String] = ["paint", "paper_stripe", "paper_rose"]
 const OPENINGS: Array[String] = ["door", "arch"]   # plus "entrance", the front door, which is fixed
 
 var lot: Rect2i       # where floor may be laid
 var floors := {}      # Vector2i -> "tile" | "planks"
 var built := {}       # Vector3i edge -> true: walls the player put up between two floors
 var openings := {}    # Vector3i edge -> "door" | "arch" | "entrance"
+var finishes := {}    # Vector3i edge -> a FINISHES id: paint or wallpaper on a wall
 
 
 func _init(lot_: Rect2i) -> void:
@@ -154,6 +157,9 @@ func _tidy(c: Vector2i) -> Dictionary:
 		if openings.has(e) and not is_wall(e):
 			gone[e] = openings[e]
 			openings.erase(e)
+		if finishes.has(e) and not is_wall(e):
+			gone[e] = finishes[e]
+			finishes.erase(e)
 	return gone
 
 
@@ -167,6 +173,25 @@ func can_build(edge: Vector3i) -> bool:
 
 func build(edge: Vector3i) -> void:
 	built[edge] = true
+
+
+## Paint or paper can go on any wall without a way through it, unless it has that finish already.
+func can_finish(edge: Vector3i, f: String) -> bool:
+	return FINISHES.has(f) and is_wall(edge) and not openings.has(edge) and finishes.get(edge, "") != f
+
+
+## Puts a finish on a wall. Returns the one it covers, if any, so it can be refunded.
+func finish(edge: Vector3i, f: String) -> String:
+	var was: String = finishes.get(edge, "")
+	finishes[edge] = f
+	return was
+
+
+## Takes the finish off a wall. Returns it, or "" if there was none.
+func strip(edge: Vector3i) -> String:
+	var was: String = finishes.get(edge, "")
+	finishes.erase(edge)
+	return was
 
 
 ## Takes down a built wall. Returns its opening, if it had one, so it can be refunded.

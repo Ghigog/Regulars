@@ -20,6 +20,7 @@ const GROSS := {
 	"rubbish": [0.05, 1.5, 0.4],
 }
 const BIN_RANGE := 5          # the bin only bothers guests seated this close
+const FINISH_RANGE := 2       # paint and paper cheer guests seated this close
 const AREA := Rect2i(0, 0, W, H)   # the first room
 ## The lot: where floor may be laid. It grows back and to the left only: the
 ## street runs down the right, and the near edge of the floor stays where it is.
@@ -73,6 +74,7 @@ var catalog: Catalog
 ## a piece picked up from the room also has {moving, node, from, from_facing}.
 var hand := {}
 var wall_nodes := {}                   # Vector3i edge -> Node3D, player-built partitions only
+var rugs := {}                         # Vector2i anchor cell -> Node3D (meta "facing"); see rug_cells
 var plan: Floorplan                    # floors, walls, doors and archways
 var _room: Node3D                      # the room as drawn from the plan; rebuilt when it changes
 var _room_lights: Array[OmniLight3D] = []
@@ -333,6 +335,20 @@ func _demo_build(demo: String) -> void:
 			pick_catalog("floor_planks")
 			_drag = {"from": Vector3(-0.5, 0, -1.5), "remove": false}
 			_demo_hover = Vector3(3.5, 0, 1.5)
+	elif demo == "build_finish":   # parquet and marble, striped and rose paper, paint, and the rug moved
+		ledger.money = 2000
+		ledger.xp = 500
+		for step: Array in [["floor_parquet", Vector3(4.5, 0, 0.5), Vector3(9.5, 0, 2.5)],
+				["floor_marble", Vector3(4.5, 0, 4.5), Vector3(7.5, 0, 6.5)],
+				["paper_stripe", Vector3(4, 0, 0), Vector3(7, 0, 0)],
+				["paper_rose", Vector3(7, 0, 0), Vector3(10, 0, 0)],
+				["paint", Vector3(0, 0, 2), Vector3(4, 0, 2)],
+				["paint", Vector3(10, 0, 0), Vector3(10, 0, 4)]]:
+			pick_catalog(step[0])
+			finish_drag(step[1], step[2], false)
+		cancel_hand()
+		pick_up(Vector3(8.5, 0, 4.5))
+		place(Vector3i(6, 1, 0))
 	elif demo == "build_range":  # a fern carried past the tables: its reach and the seats it touches
 		pick_catalog("plant", 1)
 		_demo_hover = Vector3(6.5, 0, 3.5)
@@ -469,6 +485,7 @@ func _build_layout() -> void:
 	]:
 		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
 	Build.register(stations[Vector2i(4, 2)])  # the till lives on the pass and moves with it
+	add_rug(Vector2i(8, 3))   # under the middle table, as in sheet 1
 
 
 ## The first room is an L (sheet 1): a tiled kitchen on the left, set forward of
@@ -896,6 +913,14 @@ func pick_up(p: Vector3) -> bool:
 		n.visible = false
 		hand = {"id": "screen", "tier": int(n.get_meta("tier", 1)), "price": 0, "facing": 0, "moving": true,
 			"node": n, "from": edge, "from_facing": 0}
+	elif rug_at(c) != null:   # a rug is picked up last: whatever stands on it comes first
+		var n := rug_at(c)
+		var anchor: Vector2i = rugs.find_key(n)
+		rugs.erase(anchor)
+		n.visible = false
+		var f := int(n.get_meta("facing", 0))
+		hand = {"id": "rug", "tier": 1, "price": 0, "facing": f, "moving": true,
+			"node": n, "from": Vector3i(anchor.x, anchor.y, 0), "from_facing": f}
 	else:
 		return false
 	sfx("pickup")
@@ -911,6 +936,8 @@ func _put_down(spot: Vector3i, facing: int) -> void:
 		grid.walls[spot] = true
 		wall_nodes[spot] = n
 		_place_on_edge(n, spot)
+	elif hand.id == "rug":
+		_lay_rug(n, Vector2i(spot.x, spot.y), facing)
 	else:
 		(n as Station).place_at(Vector2i(spot.x, spot.y), facing)
 		_register(n)
@@ -977,7 +1004,64 @@ func snap(p: Vector3) -> Vector3i:
 
 ## Pieces that sit on a cell edge rather than in a cell.
 static func on_edge(id: String) -> bool:
-	return id == "screen" or id == "wall" or id == "door" or id == "arch"
+	return id == "screen" or id == "wall" or id == "door" or id == "arch" or Catalog.is_finish(id)
+
+
+## Groups the build tools: "floor" for every floor, "finish" for paint and paper,
+## else the id itself.
+static func tool_kind(id: String) -> String:
+	if floor_kind(id) != "":
+		return "floor"
+	return "finish" if Catalog.is_finish(id) else id
+
+
+## The six cells a rug covers: three across the anchor cell and three more one
+## row on, toward `facing` (0 is +z, 1 is +x, 2 is -z, 3 is -x).
+static func rug_cells(anchor: Vector2i, facing: int) -> Array[Vector2i]:
+	var d: Vector2i = [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)][posmod(facing, 4)]
+	var across := Vector2i(absi(d.y), absi(d.x))
+	var out: Array[Vector2i] = []
+	for j in 2:
+		for i in range(-1, 2):
+			out.append(anchor + across * i + d * j)
+	return out
+
+
+## The rug lying on a cell, or null.
+func rug_at(c: Vector2i) -> Node3D:
+	for a: Vector2i in rugs:
+		if rug_cells(a, int(rugs[a].get_meta("facing", 0))).has(c):
+			return rugs[a]
+	return null
+
+
+func add_rug(anchor: Vector2i, facing := 0) -> Node3D:
+	var n := Node3D.new()
+	add_child(n)
+	Scenery.rug(n)
+	_lay_rug(n, anchor, facing)
+	return n
+
+
+func _lay_rug(n: Node3D, anchor: Vector2i, facing: int) -> void:
+	n.set_meta("facing", facing)
+	n.position = Grid.center(anchor)
+	n.rotation.y = facing * PI / 2
+	rugs[anchor] = n
+
+
+## A rug fits where all six cells have floor, no other rug and no wall between them.
+func can_lay_rug(anchor: Vector2i, facing: int) -> bool:
+	var cells := rug_cells(anchor, facing)
+	for c in cells:
+		if not plan.has_floor(c) or rug_at(c) != null:
+			return false
+		for d in [Vector2i(1, 0), Vector2i(0, 1)]:
+			if cells.has(c + d):
+				var e := Grid.edge_between(c, c + d)
+				if plan.is_wall(e) or wall_nodes.has(e):
+					return false
+	return true
 
 
 ## The floor kind a floor tool lays, or "".
@@ -1006,9 +1090,13 @@ func can_place(spot: Vector3i) -> bool:
 	var reach := _reach()
 	var touch := _touch()
 	var cell := Vector2i(spot.x, spot.y)
-	match hand.id:
-		"floor_tile", "floor_planks":
+	match tool_kind(hand.id):
+		"floor":
 			return plan.can_lay(cell, floor_kind(hand.id))
+		"finish":
+			return plan.can_finish(spot, hand.id)
+		"rug":
+			return can_lay_rug(cell, int(hand.facing))
 		"wall":
 			return plan.can_build(spot) and grid.can_place_wall(spot, LOT, DOOR, reach, touch)
 		"door", "arch":
@@ -1044,6 +1132,8 @@ func place(spot: Vector3i) -> bool:
 		var n := add_wall(cell, spot.z, 0.9 + 0.1 * int(hand.tier))
 		n.set_meta("tier", int(hand.tier))
 		wall_nodes[spot] = n
+	elif hand.id == "rug":
+		add_rug(cell, int(hand.facing))
 	else:
 		add_station(hand.id, cell, int(hand.tier), int(hand.facing))
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
@@ -1067,8 +1157,8 @@ func _build_at(spot: Vector3i) -> bool:
 	if not can_place(spot) or not ledger.spend(int(hand.price)):
 		return false
 	var cell := Vector2i(spot.x, spot.y)
-	match hand.id:
-		"floor_tile", "floor_planks":
+	match tool_kind(hand.id):
+		"floor":
 			var was := plan.kind(cell)
 			if was != "":   # laying over another floor: the old one is taken up and paid back
 				ledger.refund(Catalog.price_of("floor_" + was))
@@ -1076,7 +1166,14 @@ func _build_at(spot: Vector3i) -> bool:
 				ledger.refund(Catalog.price_of(what))
 		"wall":
 			plan.build(spot)
+		"finish":
+			var was := plan.finish(spot, hand.id)
+			if was != "":   # papering over paint: the old finish is paid back
+				ledger.refund(Catalog.price_of(was))
 		"door", "arch":
+			var had := plan.strip(spot)
+			if had != "":
+				ledger.refund(Catalog.price_of(had))
 			plan.openings[spot] = hand.id
 	_sync_grid()
 	return true
@@ -1088,10 +1185,10 @@ func remove_at(spot: Vector3i) -> bool:
 	if phase != Phase.BUILD or hand.is_empty() or not Catalog.is_build_tool(hand.id):
 		return false
 	var cell := Vector2i(spot.x, spot.y)
-	match hand.id:
-		"floor_tile", "floor_planks":
+	match tool_kind(hand.id):
+		"floor":
 			if not plan.has_floor(cell) or cell == ENTRANCE_CELL or stations.has(cell) \
-					or grid.reserved.has(cell) or cell == player.cell():
+					or grid.reserved.has(cell) or cell == player.cell() or rug_at(cell) != null:
 				return false
 			for e in Floorplan.cell_edges(cell):
 				if wall_nodes.has(e):
@@ -1111,6 +1208,9 @@ func remove_at(spot: Vector3i) -> bool:
 			if not plan.built.has(spot):
 				return false
 			ledger.refund(Catalog.price_of("wall"))
+			var paper := plan.strip(spot)
+			if paper != "":
+				ledger.refund(Catalog.price_of(paper))
 			var had := plan.unbuild(spot)
 			if had != "":
 				ledger.refund(Catalog.price_of(had))
@@ -1125,6 +1225,10 @@ func remove_at(spot: Vector3i) -> bool:
 				return false
 			plan.openings.erase(spot)
 			ledger.refund(Catalog.price_of(what))
+		"finish":
+			if not plan.finishes.has(spot):
+				return false
+			ledger.refund(Catalog.price_of(plan.strip(spot)))
 	_sync_grid()
 	return true
 
@@ -1146,7 +1250,7 @@ func drag_spots(from: Vector3, to: Vector3) -> Array[Vector3i]:
 			cells = plan.lay_order(cells, floor_kind(id))
 		for c in cells:
 			out.append(Vector3i(c.x, c.y, 0))
-	elif id == "wall":
+	elif id == "wall" or Catalog.is_finish(id):
 		var a := Vector2i(roundi(from.x), roundi(from.z))
 		var b := Vector2i(roundi(to.x), roundi(to.z))
 		if a == b:
@@ -1189,8 +1293,9 @@ func drag_summary() -> String:
 		return "Remove"
 	var n := spots.size() if floor_kind(hand.id) != "" else spots.filter(can_place).size()
 	var price := int(hand.price)
-	var noun: String = "tile" if floor_kind(hand.id) != "" else ("wall" if hand.id == "wall" else hand.id)
-	return "%s %d %s%s  $%d" % ["Lay" if floor_kind(hand.id) != "" else "Build", n, noun, "s" if n != 1 else "", n * price]
+	var noun: String = "tile" if floor_kind(hand.id) != "" else ("wall" if hand.id == "wall" or Catalog.is_finish(hand.id) else hand.id)
+	var verb := "Lay" if floor_kind(hand.id) != "" else ("Paint" if hand.id == "paint" else ("Paper" if Catalog.is_finish(hand.id) else "Build"))
+	return "%s %d %s%s  $%d" % [verb, n, noun, "s" if n != 1 else "", n * price]
 
 
 ## A point on the floor in front of the chef: the middle of the next cell, or (for
@@ -1222,7 +1327,7 @@ func floor_point(screen: Vector2) -> Vector3:
 func _piece_in_front() -> Vector3:
 	if wall_nodes.has(snap_edge(_front_point(true))):
 		return _front_point(true)
-	if stations.has(Grid.to_cell(_front_point())):
+	if stations.has(Grid.to_cell(_front_point())) or rug_at(Grid.to_cell(_front_point())) != null:
 		return _front_point()
 	return Vector3.INF
 
@@ -1234,9 +1339,11 @@ func build_action() -> String:
 	if not hand.is_empty():
 		if not _drag.is_empty():
 			return drag_summary()
-		match hand.id:
-			"floor_tile", "floor_planks":
+		match tool_kind(hand.id):
+			"floor":
 				return "Lay floor"
+			"finish":
+				return "Paint wall" if hand.id == "paint" else "Paper wall"
 			"wall":
 				return "Build wall"
 			"door":
@@ -1279,6 +1386,8 @@ func _update_ghost() -> void:
 			add_child(_ghost)
 			if hand.id == "screen":
 				_wall_visual(_ghost, 0.9 + 0.1 * int(hand.tier))
+			elif hand.id == "rug":
+				Scenery.rug(_ghost)
 			else:
 				Build.station(_ghost, hand.id, int(hand.tier))
 	var p := _hover_point()
@@ -1328,11 +1437,13 @@ func _update_tool_ghost() -> void:
 		if floor_kind(hand.id) != "":
 			var tile := Build.box(_tool_ghost, Vector3(spot.x + 0.5, 0.02, spot.y + 0.5), Vector3(0.94, 0.03, 0.94), Build.GOOD)
 			tile.material_override = Build.overlay_mat(col, 3)
-		elif hand.id == "wall":
+		elif hand.id == "wall" or Catalog.is_finish(hand.id):
 			var bar := Node3D.new()
 			_tool_ghost.add_child(bar)
 			_place_on_edge(bar, spot)
-			Build.box(bar, Vector3(0, 0, 0), Vector3(1.0, Scenery.CUT_H, Scenery.WALL_T), Build.GOOD).material_override = Build.overlay_mat(col, 3)
+			var tall := Scenery.CUT_H if hand.id == "wall" else 1.2
+			var thick := Scenery.WALL_T + (0.0 if hand.id == "wall" else 0.08)
+			Build.box(bar, Vector3(0, 0, 0), Vector3(1.0, tall, thick), Build.GOOD).material_override = Build.overlay_mat(col, 3)
 		else:
 			var n := Node3D.new()
 			_tool_ghost.add_child(n)
@@ -1585,6 +1696,30 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 			saw_gross = true   # one stove's worth of show, however many are on
 		if st.type == "plant" and _near(g.cell, st.cell, range_of("plant", st.tier)) and grid.has_los(g.cell, st.cell):
 			g.mood.delight(0.015 * st.tier * delta, "That fern is rather nice")
+	# A nice floor or rug under the seat, and the nicest paint or paper in view.
+	var under := Catalog.joy_of("floor_" + plan.kind(g.cell))
+	if under > 0.0:
+		g.mood.delight(under * delta, "What a fine floor")
+	if rug_at(g.cell) != null:
+		g.mood.delight(Catalog.joy_of("rug") * delta, "Such a cosy rug")
+	var paper := best_finish_seen(g.cell)
+	if paper != "":
+		g.mood.delight(Catalog.joy_of(paper) * delta, "Lovely walls in here" if paper == "paint" else "What pretty wallpaper")
+
+
+## The finish with the most joy on a wall within FINISH_RANGE cells of a seat,
+## on a side the seat can see. "" when there is none.
+func best_finish_seen(cell: Vector2i) -> String:
+	var best := ""
+	for e: Vector3i in plan.finishes:
+		var f: String = plan.finishes[e]
+		if best != "" and Catalog.joy_of(f) <= Catalog.joy_of(best):
+			continue
+		for side in Floorplan.sides(e):
+			if plan.has_floor(side) and _near(cell, side, FINISH_RANGE) and grid.has_los(cell, side):
+				best = f
+				break
+	return best
 
 
 ## How far a piece's effect on guests reaches, in cells. 0 for a piece with none.

@@ -9,12 +9,24 @@ const SHELF_DAYS := 2
 const CATEGORIES: Array[String] = ["Kitchen", "Dining", "Decor", "Build"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
-## A "tool" builds the room itself and is priced per tile or per wall.
+## A "tool" builds the room itself and is priced per tile or per wall; a "finish"
+## tool paints or papers walls. "joy" is how much a seated guest's joy rises each
+## second from a floor under them, a finish near them or a rug under them.
 const ITEMS := {
 	"floor_tile": {"name": "Tiled floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "Grows the room  $5 a tile"},
 	"floor_planks": {"name": "Plank floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "Grows the room  $5 a tile"},
+	"floor_parquet": {"name": "Parquet floor", "price": 10, "level": 2, "category": "Build", "tiers": 1, "tool": true,
+		"joy": 0.005, "blurb": "Guests seated on it are happier  $10 a tile"},
+	"floor_marble": {"name": "Marble floor", "price": 20, "level": 3, "category": "Build", "tiers": 1, "tool": true,
+		"joy": 0.01, "blurb": "Guests seated on it are much happier  $20 a tile"},
+	"paint": {"name": "Sage paint", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true, "finish": true,
+		"joy": 0.003, "blurb": "Cheers guests seated near the wall  $5 a length"},
+	"paper_stripe": {"name": "Striped wallpaper", "price": 10, "level": 2, "category": "Build", "tiers": 1, "tool": true, "finish": true,
+		"joy": 0.006, "blurb": "Cheers guests seated near the wall  $10 a length"},
+	"paper_rose": {"name": "Rose wallpaper", "price": 20, "level": 3, "category": "Build", "tiers": 1, "tool": true, "finish": true,
+		"joy": 0.01, "blurb": "Delights guests seated near the wall  $20 a length"},
 	"wall": {"name": "Wall", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "Divides the room  $5 a length"},
 	"door": {"name": "Door", "price": 20, "level": 1, "category": "Build", "tiers": 1, "tool": true,
@@ -27,6 +39,8 @@ const ITEMS := {
 		"blurb": "Extra worktop"},
 	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3,
 		"blurb": "Cheers nearby guests", "up": "Cheers guests further away"},
+	"rug": {"name": "Woven rug", "price": 25, "level": 1, "category": "Decor", "tiers": 1,
+		"joy": 0.005, "blurb": "Cheers guests seated on it"},
 	"table": {"name": "Table for two", "price": 40, "level": 2, "category": "Dining", "tiers": 3,
 		"blurb": "Two more seats", "up": "Two comfier seats"},
 	"stove": {"name": "Stove", "price": 80, "level": 3, "category": "Kitchen", "tiers": 3,
@@ -58,11 +72,21 @@ static func price_of(id: String, tier := 1) -> int:
 	return int(ITEMS[id].price) * TIER_PRICE[tier - 1]
 
 
-## Each tier above the first needs one more level.
 static func is_build_tool(id: String) -> bool:
 	return ITEMS.has(id) and ITEMS[id].get("tool", false)
 
 
+## A tool that paints or papers walls.
+static func is_finish(id: String) -> bool:
+	return ITEMS.has(id) and ITEMS[id].get("finish", false)
+
+
+## Joy per second a seated guest gets from this floor, finish or rug; 0 for none.
+static func joy_of(id: String) -> float:
+	return float(ITEMS[id].get("joy", 0.0)) if ITEMS.has(id) else 0.0
+
+
+## Each tier above the first needs one more level.
 static func level_of(id: String, tier := 1) -> int:
 	return int(ITEMS[id].level) + tier - 1
 

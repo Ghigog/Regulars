@@ -770,16 +770,16 @@ func test_pad_buttons_press_the_matching_keys():
 	game.ledger.money = 100
 	_pad(JOY_BUTTON_Y, true)
 	_pad(JOY_BUTTON_Y, false)
-	await wait_frames(2)
+	await wait_process_frames(2)
 	assert_true(game.shopping, "Y opens the shop")
 	_pad(JOY_BUTTON_B, true)
 	_pad(JOY_BUTTON_B, false)
-	await wait_frames(2)
+	await wait_process_frames(2)
 	assert_false(game.shopping, "B closes it")
 	assert_true(game.pick_catalog("plant"))
 	_pad(JOY_BUTTON_RIGHT_SHOULDER, true)
 	_pad(JOY_BUTTON_RIGHT_SHOULDER, false)
-	await wait_frames(2)
+	await wait_process_frames(2)
 	assert_eq(int(game.hand.facing), 1, "a shoulder button turns the piece")
 
 
@@ -806,3 +806,77 @@ func test_touch_joystick_and_buttons_never_reach_the_room():
 	for b: Array in game.controls.buttons():
 		ids.append(b[0])
 	assert_has(ids, "use", "a Use button during service")
+
+
+func test_rug_lies_flat_and_is_moved_and_sold_like_a_fern():
+	_to_build()
+	game.ledger.money = 100
+	assert_not_null(game.rug_at(Vector2i(8, 4)), "the first rug lies under the middle table")
+	assert_false(game.grid.is_blocked(Vector2i(8, 4)), "anyone can walk over it")
+	assert_true(game.pick_up(Vector3(8.5, 0, 3.5)))
+	assert_eq(game.hand.id, "table", "what stands on a rug is picked up first")
+	game.cancel_hand()
+	assert_true(game.pick_up(Vector3(8.5, 0, 4.5)))
+	assert_eq(game.hand.id, "rug")
+	assert_null(game.rug_at(Vector2i(8, 4)))
+	game.rotate_hand()
+	assert_eq(game.rug_cells(Vector2i(6, 3), 1).size(), 6)
+	assert_true(game.rug_cells(Vector2i(6, 3), 1).has(Vector2i(7, 2)), "turned, it runs toward +x")
+	assert_false(game.can_place(Vector3i(9, 3, 0)), "not half off the floor")
+	assert_true(game.place(Vector3i(6, 3, 0)))
+	assert_eq(game.ledger.money, 100, "moving is free")
+	assert_not_null(game.rug_at(Vector2i(7, 4)))
+	assert_true(game.pick_catalog("rug"))
+	assert_false(game.can_place(Vector3i(7, 3, 0)), "not on top of another rug")
+	assert_true(game.place(Vector3i(6, 0, 0)), "under a table is fine")
+	assert_eq(game.ledger.money, 75)
+	game.cancel_hand()
+	assert_true(game.pick_catalog("floor_planks"))
+	assert_false(game.remove_at(Vector3i(7, 4, 0)), "no lifting the floor out from under a rug")
+	game.cancel_hand()
+	assert_true(game.pick_up(Vector3(5.5, 0, 0.5)))
+	assert_true(game.sell_hand())
+	assert_eq(game.ledger.money, 87, "half back")
+	assert_eq(game.rugs.size(), 1)
+
+
+func test_paint_and_paper_go_on_walls_and_come_off_for_a_refund():
+	_to_build()
+	game.ledger.money = 200
+	game.ledger.xp = 300
+	assert_true(game.pick_catalog("paint"))
+	assert_true(game.on_edge("paint"))
+	assert_eq(game.finish_drag(Vector3(5, 0, 0), Vector3(8, 0, 0), false), 3, "a row along the back wall")
+	assert_eq(game.ledger.money, 185)
+	assert_eq(game.plan.finishes.get(Vector3i(6, 0, 0), ""), "paint")
+	assert_true(game.pick_catalog("paper_rose"))
+	assert_true(game.place(Vector3i(6, 0, 0)))
+	assert_eq(game.ledger.money, 170, "$20 for the paper, $5 back for the paint under it")
+	assert_true(game.remove_at(Vector3i(6, 0, 0)))
+	assert_eq(game.ledger.money, 190)
+	assert_false(game.remove_at(Vector3i(6, 0, 0)), "nothing left to strip")
+	game.cancel_hand()
+	assert_true(game._room.get_child_count() > 0, "the room redraws with its paint")
+
+
+func test_nice_floors_rugs_and_walls_cheer_seated_guests():
+	_to_build()
+	var g: Guest = game.spawn_guest(0)
+	var gain := func(cell: Vector2i) -> float:
+		g.cell = cell
+		g.mood.joy = 0.2
+		game.apply_surroundings(g, 1.0)
+		return g.mood.joy - 0.2
+	var plain: float = gain.call(Vector2i(5, 3))
+	game.plan.floors[Vector2i(5, 3)] = "marble"
+	assert_almost_eq(gain.call(Vector2i(5, 3)) - plain, Catalog.joy_of("floor_marble"), 0.0001)
+	assert_true(g.mood.thoughts.has("What a fine floor"))
+	assert_eq(game.best_finish_seen(Vector2i(5, 1)), "")
+	game.plan.finishes[Vector3i(5, 0, 0)] = "paint"
+	game.plan.finishes[Vector3i(6, 0, 0)] = "paper_stripe"
+	assert_eq(game.best_finish_seen(Vector2i(5, 1)), "paper_stripe", "the nicest in view counts")
+	assert_eq(game.best_finish_seen(Vector2i(5, 4)), "", "too far from the wall")
+	var on_rug: float = gain.call(Vector2i(7, 4))
+	game.pick_up(Vector3(7.5, 0, 4.5))
+	game.sell_hand()
+	assert_almost_eq(on_rug - gain.call(Vector2i(7, 4)), Catalog.joy_of("rug"), 0.0001)
