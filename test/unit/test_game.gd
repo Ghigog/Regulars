@@ -848,6 +848,7 @@ func _pad(button: int, pressed: bool) -> void:
 	e.button_index = button
 	e.pressed = pressed
 	game.controls._input(e)
+	Input.flush_buffered_events()   # deliver the key it sent now, not on some later frame
 
 
 func test_the_last_device_used_sets_the_mode_and_the_hints():
@@ -890,16 +891,13 @@ func test_pad_buttons_press_the_matching_keys():
 	game.ledger.money = 100
 	_pad(JOY_BUTTON_Y, true)
 	_pad(JOY_BUTTON_Y, false)
-	await wait_process_frames(2)
 	assert_true(game.shopping, "Y opens the shop")
 	_pad(JOY_BUTTON_B, true)
 	_pad(JOY_BUTTON_B, false)
-	await wait_process_frames(2)
 	assert_false(game.shopping, "B closes it")
 	assert_true(game.pick_catalog("plant"))
 	_pad(JOY_BUTTON_RIGHT_SHOULDER, true)
 	_pad(JOY_BUTTON_RIGHT_SHOULDER, false)
-	await wait_process_frames(2)
 	assert_eq(int(game.hand.facing), 1, "a shoulder button turns the piece")
 
 
