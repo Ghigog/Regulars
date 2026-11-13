@@ -56,6 +56,12 @@ func spend(amount: int) -> bool:
 	return true
 
 
+## Money back for something sold. It comes off today's spending.
+func refund(amount: int) -> void:
+	money += amount
+	today.spent -= amount
+
+
 ## Closes the books for the day and returns that day's record.
 func end_day() -> Dictionary:
 	var record := today.duplicate()

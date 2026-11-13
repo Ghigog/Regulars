@@ -38,7 +38,11 @@ var arrivals: Array[Dictionary] = []
 var clock := 0.0
 var last_day := {}
 var catalog: Catalog
-var hand := {}                         # the catalog piece being placed: {id, tier, price}
+## The piece being placed: {id, tier, price, facing} for a new one from the catalog;
+## a piece picked up from the room also has {moving, node, from, from_facing}.
+var hand := {}
+var wall_nodes := {}                   # Vector3i edge -> Node3D, player-built partitions only
+const PIECE_NAMES := {"fridge": "Fridge", "sink": "Sink", "bin": "Bin", "plates": "Plate stack", "pass": "Pass counter"}
 var _ghost: Node3D
 var _ghost_key := ""
 var _no_mark: Node3D
@@ -192,6 +196,11 @@ func _demo_build(demo: String) -> void:
 	_demo_hover = Vector3(6.5, 0, 5.5) if demo == "build_no" else Vector3(3.5, 0, 5.5)
 	if demo == "build_find":
 		hud.set_search("fern")
+	elif demo == "build_move":  # a table picked up and turned, ready to sell or put down
+		cancel_hand()
+		pick_up(Vector3(8.5, 0, 3.5))
+		rotate_hand()
+		_demo_hover = Vector3(7.5, 0, 2.5)
 
 
 func _demo_kind(offer: bool) -> void:
@@ -272,7 +281,7 @@ func _build_scenery() -> void:
 
 ## The glow of the mushroom lamp on each table. (No hanging lamps: from this
 ## camera a shade would sit in front of the guests behind it.)
-func _add_lamp(over: Vector3) -> void:
+func _add_lamp(over: Vector3) -> OmniLight3D:
 	var light := OmniLight3D.new()
 	light.position = over + Vector3(0, 1.0, 0)
 	light.light_color = Color("#ffd9a0")
@@ -280,6 +289,7 @@ func _add_lamp(over: Vector3) -> void:
 	light.omni_range = 2.6
 	add_child(light)
 	_sconces.append(light)
+	return light
 
 
 func _build_layout() -> void:
@@ -301,22 +311,34 @@ func add_station(type: String, cell: Vector2i, tier := 1, facing := 0) -> Statio
 	var st := Station.new()
 	add_child(st)
 	st.setup(type, cell, tier, facing)
-	stations[cell] = st
 	if type == "table":
-		_add_lamp(st.position)
-	grid.blocked[cell] = true
-	for s in st.seats:
-		grid.reserved[s] = true
+		st.lamp = _add_lamp(st.position)
+	_register(st)
 	return st
 
 
+func _register(st: Station) -> void:
+	stations[st.cell] = st
+	grid.blocked[st.cell] = true
+	for s in st.seats:
+		grid.reserved[s] = true
+
+
+func _unregister(st: Station) -> void:
+	stations.erase(st.cell)
+	grid.blocked.erase(st.cell)
+	for s in st.seats:
+		grid.reserved.erase(s)
+
+
 ## A low partition (sheet 11): teal panelled base, tan cap, thin coral line.
-func add_wall(cell: Vector2i, axis: int, height := 1.0) -> void:
+func add_wall(cell: Vector2i, axis: int, height := 1.0) -> Node3D:
 	grid.walls[Vector3i(cell.x, cell.y, axis)] = true
 	var n := Node3D.new()
 	_place_on_edge(n, Vector3i(cell.x, cell.y, axis))
 	add_child(n)
 	_wall_visual(n, height)
+	return n
 
 
 static func _place_on_edge(n: Node3D, edge: Vector3i) -> void:
@@ -428,6 +450,8 @@ func day_progress() -> float:
 func start_day() -> void:
 	if phase == Phase.CLOSED:
 		return
+	if hand.get("moving", false):
+		cancel_hand()   # a piece still being carried goes back where it was
 	phase = Phase.SERVICE
 	clock = 0.0
 	hand = {}
@@ -478,23 +502,108 @@ func open_build() -> void:
 func pick_catalog(id: String, tier := 1) -> bool:
 	if phase != Phase.BUILD or not catalog.can_buy(id, ledger.money, ledger.level(), tier):
 		return false
-	hand = {"id": id, "tier": tier, "price": Catalog.price_of(id, tier)}
+	if hand.get("moving", false):
+		cancel_hand()
+	hand = {"id": id, "tier": tier, "price": Catalog.price_of(id, tier), "facing": 0}
 	hud.show_build()
 	return true
 
 
+## Puts down whatever is in hand: a new piece is dropped, a moved one goes back.
 func cancel_hand() -> void:
+	if hand.get("moving", false):
+		_put_down(hand.from, int(hand.from_facing))
 	hand = {}
 	if phase == Phase.BUILD:
 		hud.show_build()
 
 
-## Where the piece in hand would go for a point on the floor: (x, y, axis).
-## Furniture snaps to the cell (axis 0); a partition snaps to the nearest cell edge.
-func snap(p: Vector3) -> Vector3i:
+static func piece_name(bp: Dictionary) -> String:
+	return Catalog.label(bp) if Catalog.ITEMS.has(bp.id) else str(PIECE_NAMES.get(bp.id, bp.id))
+
+
+## Picks up the piece standing at a point on the floor, to move, turn or sell it.
+func pick_up(p: Vector3) -> bool:
+	if phase != Phase.BUILD or not hand.is_empty():
+		return false
 	var c := Grid.to_cell(p)
-	if hand.get("id", "") != "screen":
-		return Vector3i(c.x, c.y, 0)
+	var edge := snap_edge(p)
+	if stations.has(c):
+		var st: Station = stations[c]
+		_unregister(st)
+		st.visible = false
+		hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
+			"node": st, "from": Vector3i(c.x, c.y, 0), "from_facing": st.facing}
+	elif wall_nodes.has(edge):
+		var n: Node3D = wall_nodes[edge]
+		wall_nodes.erase(edge)
+		grid.walls.erase(edge)
+		n.visible = false
+		hand = {"id": "screen", "tier": int(n.get_meta("tier", 1)), "price": 0, "facing": 0, "moving": true,
+			"node": n, "from": edge, "from_facing": 0}
+	else:
+		return false
+	sfx("pickup")
+	hud.show_build()
+	return true
+
+
+## Stands the carried piece on a spot. No checks: callers have made them.
+func _put_down(spot: Vector3i, facing: int) -> void:
+	var n: Node3D = hand.node
+	n.visible = true
+	if hand.id == "screen":
+		grid.walls[spot] = true
+		wall_nodes[spot] = n
+		_place_on_edge(n, spot)
+	else:
+		(n as Station).place_at(Vector2i(spot.x, spot.y), facing)
+		_register(n)
+
+
+## Turns the piece in hand a quarter turn. Partitions turn by where you point.
+func rotate_hand() -> void:
+	if not hand.is_empty() and hand.id != "screen":
+		hand.facing = (int(hand.facing) + 1) % 4
+		sfx("pickup")
+
+
+## What selling the carried piece pays: half its catalog price, or 0 if not for sale.
+func sell_value() -> int:
+	if not hand.get("moving", false) or not Catalog.ITEMS.has(hand.id):
+		return 0
+	return Catalog.price_of(hand.id, int(hand.tier)) / 2
+
+
+## Why the carried piece cannot be sold; empty when it can.
+func sell_block() -> String:
+	if not hand.get("moving", false):
+		return "Nothing picked up"
+	if not Catalog.ITEMS.has(hand.id):
+		return "The %s is not for sale" % piece_name(hand).to_lower()
+	if (hand.id == "stove" or hand.id == "table") and find_station(hand.id) == null:
+		return "Your last %s" % hand.id
+	return ""
+
+
+func sell_hand() -> bool:
+	if phase != Phase.BUILD or sell_block() != "":
+		return false
+	ledger.refund(sell_value())
+	var n: Node3D = hand.node
+	if n is Station and (n as Station).lamp:
+		_sconces.erase((n as Station).lamp)
+		(n as Station).lamp.queue_free()
+	n.queue_free()
+	hand = {}
+	sfx("coin")
+	hud.show_build()
+	return true
+
+
+## The cell edge nearest a point on the floor: (x, y, axis).
+static func snap_edge(p: Vector3) -> Vector3i:
+	var c := Grid.to_cell(p)
 	var fx := p.x - c.x
 	var fz := p.z - c.y
 	if minf(fz, 1.0 - fz) < minf(fx, 1.0 - fx):
@@ -502,11 +611,13 @@ func snap(p: Vector3) -> Vector3i:
 	return Vector3i(c.x + (1 if fx > 0.5 else 0), c.y, 1)
 
 
-func _seats_for(id: String, cell: Vector2i) -> Array[Vector2i]:
-	var seats: Array[Vector2i] = []
-	if id == "table":
-		seats = [cell + Vector2i(-1, 0), cell + Vector2i(1, 0)]
-	return seats
+## Where the piece in hand would go for a point on the floor: (x, y, axis).
+## Furniture snaps to the cell (axis 0); a partition snaps to the nearest cell edge.
+func snap(p: Vector3) -> Vector3i:
+	if hand.get("id", "") == "screen":
+		return snap_edge(p)
+	var c := Grid.to_cell(p)
+	return Vector3i(c.x, c.y, 0)
 
 
 ## Would the piece in hand fit at this spot without cutting anyone off?
@@ -520,21 +631,30 @@ func can_place(spot: Vector3i) -> bool:
 	if hand.id == "screen":
 		return grid.can_place_wall(spot, AREA, DOOR, reach, touch)
 	var cell := Vector2i(spot.x, spot.y)
-	return grid.can_place_block(cell, _seats_for(hand.id, cell), AREA, DOOR, reach, touch)
+	return grid.can_place_block(cell, Station.seats_for(hand.id, cell, int(hand.facing)), AREA, DOOR, reach, touch)
 
 
 ## Builds the piece in hand and pays for it, so cancelling before this is free.
-## The piece stays in hand for another while there is money for it.
+## A new piece stays in hand for another while there is money for it; a moved
+## piece is put down for nothing.
 func place(spot: Vector3i) -> bool:
 	if phase != Phase.BUILD or not can_place(spot):
 		return false
+	var cell := Vector2i(spot.x, spot.y)
+	if hand.get("moving", false):
+		_put_down(spot, int(hand.facing))
+		hand = {}
+		sfx("putdown")
+		hud.show_build()
+		return true
 	if not ledger.spend(int(hand.price)):
 		return false
-	var cell := Vector2i(spot.x, spot.y)
 	if hand.id == "screen":
-		add_wall(cell, spot.z, 0.9 + 0.1 * int(hand.tier))
+		var n := add_wall(cell, spot.z, 0.9 + 0.1 * int(hand.tier))
+		n.set_meta("tier", int(hand.tier))
+		wall_nodes[spot] = n
 	else:
-		add_station(hand.id, cell, int(hand.tier))
+		add_station(hand.id, cell, int(hand.tier), int(hand.facing))
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
 	sfx("putdown")
 	if not catalog.can_buy(hand.id, ledger.money, ledger.level(), int(hand.tier)):
@@ -579,6 +699,7 @@ func _update_ghost() -> void:
 		_place_on_edge(_ghost, spot)
 	else:
 		_ghost.position = Grid.center(Vector2i(spot.x, spot.y))
+		_ghost.rotation.y = int(hand.facing) * PI / 2
 	_ghost.position.y = 0.12 + 0.04 * sin(Time.get_ticks_msec() / 160.0)   # held just off the floor
 	_ghost.visible = ok
 	_no_mark.visible = not ok
@@ -990,8 +1111,10 @@ func _update_cursor() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if phase == Phase.BUILD and event is InputEventMouseButton and event.pressed:
 		get_viewport().gui_release_focus()   # leave the search box
-		if event.button_index == MOUSE_BUTTON_LEFT and not hand.is_empty() and _hover_point() != Vector3.INF:
-			if not place(snap(_hover_point())):
+		if event.button_index == MOUSE_BUTTON_LEFT and _hover_point() != Vector3.INF:
+			if hand.is_empty():
+				pick_up(_hover_point())
+			elif not place(snap(_hover_point())):
 				sfx("fail")
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			cancel_hand()
@@ -1016,6 +1139,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		start_day()
 	elif phase == Phase.BUILD and key == KEY_ESCAPE:
 		cancel_hand()
+	elif phase == Phase.BUILD and key == KEY_R:
+		rotate_hand()
+	elif phase == Phase.BUILD and key == KEY_X:
+		sell_hand()
 	elif phase == Phase.SUMMARY and key == KEY_F:
 		buy_flyers()
 	elif phase == Phase.SUMMARY and key == KEY_T:

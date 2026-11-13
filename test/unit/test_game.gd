@@ -148,6 +148,89 @@ func test_partition_snaps_to_the_nearest_edge_and_hides_a_dirty_table():
 	assert_eq(game.ledger.money, 40)
 
 
+func test_moving_a_piece_is_free_and_cancel_puts_it_back():
+	_to_build()
+	var bin: Station = game.find_station("bin")
+	assert_true(game.pick_up(Vector3(0.5, 0, 5.5)))
+	assert_false(game.stations.has(Vector2i(0, 5)))
+	assert_false(game.grid.blocked.has(Vector2i(0, 5)))
+	assert_false(game.place(Vector3i(1, 0, 0)), "a stove is there")
+	assert_true(game.place(Vector3i(2, 5, 0)))
+	assert_eq(bin.cell, Vector2i(2, 5))
+	assert_eq(game.stations[Vector2i(2, 5)], bin)
+	assert_eq(game.ledger.money, 50)
+	assert_true(game.pick_up(Vector3(2.5, 0, 5.5)))
+	game.cancel_hand()
+	assert_eq(bin.cell, Vector2i(2, 5), "back where it was picked up")
+	assert_true(bin.visible)
+	assert_false(game.pick_up(Vector3(3.5, 0, 5.5)), "nothing there")
+
+
+func test_carried_piece_goes_back_when_the_day_opens():
+	_to_build()
+	var fridge: Station = game.find_station("fridge")
+	assert_true(game.pick_up(Vector3(0.5, 0, 0.5)))
+	game.start_day()
+	assert_eq(game.stations[Vector2i(0, 0)], fridge)
+	assert_true(fridge.visible)
+
+
+func test_turned_table_has_seats_above_and_below():
+	_to_build()
+	var table: Station = game.stations[Vector2i(8, 3)]
+	assert_true(game.pick_up(Vector3(8.5, 0, 3.5)))
+	assert_false(game.grid.reserved.has(Vector2i(7, 3)), "its seats come up with it")
+	game.rotate_hand()
+	assert_true(game.place(Vector3i(8, 3, 0)))
+	assert_eq(table.seats, [Vector2i(8, 2), Vector2i(8, 4)] as Array[Vector2i])
+	assert_true(game.grid.reserved.has(Vector2i(8, 4)))
+	game.start_day()
+	var g: Guest = game.spawn_guest(0)
+	var h: Guest = game.spawn_guest(1)
+	var i: Guest = game.spawn_guest(2)
+	var j: Guest = game.spawn_guest(3)
+	var k: Guest = game.spawn_guest(4)
+	var l: Guest = game.spawn_guest(5)
+	_run(14.0)
+	var cells: Array = [g.cell, h.cell, i.cell, j.cell, k.cell, l.cell]
+	assert_true(cells.has(Vector2i(8, 2)) and cells.has(Vector2i(8, 4)), "guests use the turned seats")
+
+
+func test_selling_refunds_half_but_not_the_last_stove_or_fixtures():
+	_to_build()
+	assert_true(game.pick_up(Vector3(9.5, 0, 0.5)))        # the fern
+	assert_eq(game.sell_value(), 10)
+	assert_true(game.sell_hand())
+	assert_eq(game.ledger.money, 60)
+	assert_false(game.stations.has(Vector2i(9, 0)))
+	assert_true(game.pick_up(Vector3(0.5, 0, 0.5)))        # the fridge
+	assert_false(game.sell_hand(), "fixtures are not for sale")
+	game.cancel_hand()
+	assert_true(game.pick_up(Vector3(1.5, 0, 0.5)))        # one of two stoves
+	assert_true(game.sell_hand())
+	assert_eq(game.ledger.money, 100)
+	assert_true(game.pick_up(Vector3(2.5, 0, 0.5)))
+	assert_eq(game.sell_block(), "Your last stove")
+	assert_false(game.sell_hand())
+	game.cancel_hand()
+	assert_eq(game.find_station("stove").cell, Vector2i(2, 0))
+
+
+func test_partition_can_be_picked_up_moved_and_sold():
+	_to_build()
+	assert_true(game.pick_catalog("screen"))
+	assert_true(game.place(Vector3i(6, 3, 1)))
+	game.cancel_hand()
+	assert_true(game.pick_up(Vector3(6.05, 0, 3.5)))
+	assert_false(game.grid.walls.has(Vector3i(6, 3, 1)))
+	assert_true(game.place(Vector3i(6, 4, 1)))
+	assert_true(game.grid.walls.has(Vector3i(6, 4, 1)))
+	assert_true(game.pick_up(Vector3(6.05, 0, 4.5)))
+	assert_true(game.sell_hand())
+	assert_eq(game.ledger.money, 45)
+	assert_false(game.pick_up(Vector3(3.5, 0, 6.95)), "the front wall is not yours to move")
+
+
 func test_new_table_seats_guests():
 	_to_build()
 	game.ledger.money = 100

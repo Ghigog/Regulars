@@ -11,6 +11,8 @@ const DIAL_SWEEP := 150.0  # degrees either side of straight up
 var type := ""
 var cell := Vector2i.ZERO
 var tier := 1
+var facing := 0       # quarter turns; 0 puts the front toward +z
+var lamp: OmniLight3D # a table's lamp light, owned by the game
 var item := ""        # what is sitting on a counter or stove
 var quality := 1.0    # how well cooked that item is (0..1)
 var cook := 0.0       # seconds the stove's patty has been on the heat
@@ -57,13 +59,10 @@ func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0) -> void:
 	type = type_
 	cell = cell_
 	tier = tier_
-	position = Grid.center(cell)
 	_vis = Node3D.new()
-	_vis.rotation.y = facing * PI / 2
 	add_child(_vis)
 	Build.station(_vis, type, tier)
-	if type == "table":
-		seats = [cell + Vector2i(-1, 0), cell + Vector2i(1, 0)]
+	place_at(cell_, facing)
 	if type == "plates":
 		count = 4
 	if type == "stove":
@@ -182,6 +181,26 @@ func _update_cooking_visuals() -> void:
 
 
 ## Redraws plate stacks and dirty dishes.
+## Where a piece's seats are: either side of a table, turning with it.
+static func seats_for(type_: String, cell_: Vector2i, facing_: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if type_ == "table":
+		var side := Vector2i(1, 0) if facing_ % 2 == 0 else Vector2i(0, 1)
+		out = [cell_ - side, cell_ + side]
+	return out
+
+
+## Stands the piece on a cell, turned `facing_` quarter turns.
+func place_at(cell_: Vector2i, facing_: int) -> void:
+	cell = cell_
+	facing = posmod(facing_, 4)
+	position = Grid.center(cell)
+	_vis.rotation.y = facing * PI / 2
+	seats = seats_for(type, cell, facing)
+	if lamp:
+		lamp.position = position + Vector3(0, 1.0, 0)
+
+
 func refresh() -> void:
 	if _stack:
 		_stack.queue_free()

@@ -42,6 +42,7 @@ var _tabs: Array[Button] = []
 var _cards: HBoxContainer
 var _tip: Label
 var _level_label: Label
+var _sell: Button
 var _toast_tween: Tween
 
 
@@ -706,6 +707,8 @@ func show_build() -> void:
 	_tip = _label(last, 15)
 	_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_tip.modulate.a = 0.8
+	_sell = _button(last, "", game.sell_hand)
+	_sell.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_button(last, "Open for day %d   (Enter)" % game.ledger.day, game.start_day).size_flags_horizontal = Control.SIZE_SHRINK_END
 	_refresh_catalog()
 
@@ -726,7 +729,8 @@ func _refresh_catalog() -> void:
 	for bp in found:
 		var id: String = bp.id
 		var tier: int = bp.tier
-		var held: bool = game.hand.get("id", "") == id and int(game.hand.get("tier", 0)) == tier
+		var held: bool = game.hand.get("id", "") == id and int(game.hand.get("tier", 0)) == tier \
+			and not game.hand.get("moving", false)
 		var locked := l.level() < Catalog.level_of(id, tier)
 		var line := "Level %d" % Catalog.level_of(id, tier) if locked else "$%d" % Catalog.price_of(id, tier)
 		var card := _button(_cards, "%s\n%s" % [Catalog.label(bp), line], game.pick_catalog.bind(id, tier))
@@ -739,10 +743,16 @@ func _refresh_catalog() -> void:
 		card.set_pressed_no_signal(held)   # the piece in hand sits pressed in
 	if found.is_empty():
 		_label(_cards, 16, "Nothing in the catalog matches.").modulate.a = 0.7
+	_sell.visible = game.hand.get("moving", false)
 	if game.hand.is_empty():
-		_tip.text = "Pick something, then click the floor to place it."
+		_tip.text = "Pick from the catalog, or click a piece in the room to move, turn or sell it."
+	elif game.hand.get("moving", false):
+		var why: String = game.sell_block()
+		_sell.disabled = why != ""
+		_sell.text = "Sell for $%d   (X)" % game.sell_value() if why == "" else why
+		_tip.text = "Moving the %s. Click to put it down, R turns it, right-click puts it back." % game.piece_name(game.hand).to_lower()
 	else:
-		_tip.text = "%s: %s  Right-click or Esc puts it back." % [
+		_tip.text = "%s: %s  R turns it. Right-click or Esc drops it." % [
 			Catalog.label(game.hand), Catalog.blurb_of(game.hand.id, int(game.hand.tier))]
 
 

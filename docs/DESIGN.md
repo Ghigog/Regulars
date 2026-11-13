@@ -31,6 +31,13 @@ many days as you can; three walkouts in one day ends the run.
   hand while there is money for another. Partitions snap to the nearest cell edge (no
   rotate key). A spot is refused if it would cut the chef, any seat or any station off
   from the door.
+- **Move, turn, sell.** With nothing in hand, clicking a piece in the room picks it up
+  (it keeps whatever is on it). Click to put it down for free, R to turn it a quarter
+  turn (a turned table seats guests above and below), right-click or Esc to put it
+  back; a piece still carried when the day opens goes back too. Sell (button or X)
+  refunds half the catalog price. Fixtures (fridge, sink, bin, plate stack, pass
+  counters) can be moved but not sold, and the last stove and last table cannot be sold.
+  Player-built partitions move and sell the same way; the front wall does not.
 - **Upgrades are catalog entries.** Stove, fern and table are sold in three tiers; a
   tier costs 1x, 2x, 4x the base price and each tier needs one more level. Counter and
   partition have one tier. There are no free blueprints.
@@ -72,8 +79,7 @@ focused. The logic and tests still exist.
 | Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
 
 Everything else in this table is back in the game. Not built: upgrading a piece already
-placed; moving, selling or rotating
-furniture; floors and ceilings.
+placed; floors and ceilings.
 
 ## 3. Guests (RollerCoaster Tycoon layer)
 
@@ -102,8 +108,10 @@ furniture; floors and ceilings.
 - **Walls, floors, ceilings**: free-form placement. Walls sit on cell edges and block
   sight and movement. Placement is refused if it cuts a seat or the chef off from the door.
 - **Two currencies**: money (earned per day) and XP (10 per meal plus the tip; 100 per level).
-- **To add**: expanding the lot, floor and wall finishes that affect joy, moving and
-  selling furniture, rotating furniture, themes that change the catalog.
+- **Built**: moving, selling and rotating furniture (section 1).
+- **To add**: expanding the lot, floor and wall finishes that affect joy, themes that
+  change the catalog. Known rough edge: the dining-room rugs are scenery and stay put
+  when a table is moved off them.
 
 ## 5. Characters (Sims layer)
 
