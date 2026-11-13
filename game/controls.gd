@@ -180,9 +180,10 @@ func _process(delta: float) -> void:
 		return
 	if erase and (game.hand.is_empty() or not Catalog.is_build_tool(game.hand.id)):
 		erase = false
-	# In the shop the stick browses: a flick steps once, holding it repeats.
+	# In the shop and on the options screen the stick browses: a flick steps
+	# once, holding it repeats.
 	var dir := Vector2i.ZERO
-	if game.shopping and stick().length() > 0.6:
+	if (game.shopping or _options()) and stick().length() > 0.6:
 		var s := stick()
 		dir = Vector2i(signi(roundi(s.x)), 0) if absf(s.x) > absf(s.y) else Vector2i(0, -signi(roundi(s.y)))
 	if dir != _shop_dir:
@@ -208,7 +209,9 @@ func buttons() -> Array:
 	var y := r.size.y - 112.0
 	var hand: Dictionary = game.hand
 	var build: bool = game.phase == game.Phase.BUILD
-	if game.phase == game.Phase.SERVICE or (build and not game.shopping):
+	if _options():   # the card's own buttons are big enough to tap
+		pass
+	elif game.phase == game.Phase.SERVICE or (build and not game.shopping):
 		var word: String = game.hud.last_action if game.hud.last_action != "" else "Use"
 		out.append(["use", word, Vector2(x, y), USE_R])
 		y -= USE_R + BTN_R + 16.0
@@ -236,8 +239,12 @@ func _stick_home() -> Vector2:
 	return Vector2(150.0, _view.get_rect().size.y - 150.0)
 
 
+func _options() -> bool:
+	return game.hud != null and game.hud.options_open()
+
+
 func _stick_shown() -> bool:
-	return mode == "touch" and (game.phase == game.Phase.SERVICE or (game.phase == game.Phase.BUILD and not game.shopping))
+	return mode == "touch" and not _options() and (game.phase == game.Phase.SERVICE or (game.phase == game.Phase.BUILD and not game.shopping))
 
 
 ## What a touch at this point would press: "stick", a button id, or "".
