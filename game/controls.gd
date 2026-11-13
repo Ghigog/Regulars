@@ -180,10 +180,10 @@ func _process(delta: float) -> void:
 		return
 	if erase and (game.hand.is_empty() or not Catalog.is_build_tool(game.hand.id)):
 		erase = false
-	# In the shop and on the options screen the stick browses: a flick steps
+	# In the shop, on the options screen and on the title the stick browses: a flick steps
 	# once, holding it repeats.
 	var dir := Vector2i.ZERO
-	if (game.shopping or _options()) and stick().length() > 0.6:
+	if (game.shopping or _options() or game.hud.title_open()) and stick().length() > 0.6:
 		var s := stick()
 		dir = Vector2i(signi(roundi(s.x)), 0) if absf(s.x) > absf(s.y) else Vector2i(0, -signi(roundi(s.y)))
 	if dir != _shop_dir:
@@ -205,6 +205,8 @@ func _process(delta: float) -> void:
 func buttons() -> Array:
 	var r := _view.get_rect()
 	var out: Array = []
+	if game.hud.title_open():   # the title's own buttons are tapped
+		return out
 	var x := r.size.x - 92.0
 	var y := r.size.y - 112.0
 	var hand: Dictionary = game.hand

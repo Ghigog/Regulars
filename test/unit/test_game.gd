@@ -238,10 +238,13 @@ func test_chef_is_pushed_clear_of_a_piece_put_down_too_close_or_on_top():
 	assert_false(game.grid.is_blocked(game.player.cell()))
 
 
-func test_game_opens_on_the_night_before_day_one():
+func test_game_opens_on_the_title_then_the_night_before_day_one():
 	var fresh = load("res://game/main.tscn").instantiate()
+	fresh.get_script()._title_seen = false   # as on a fresh launch
 	add_child_autofree(fresh)
 	fresh.set_process(false)
+	assert_true(fresh.hud.title_open(), "the title comes first")
+	fresh.play()
 	assert_eq(fresh.phase, fresh.Phase.BUILD)
 	assert_false(fresh.door_open)
 	assert_true(fresh.arrivals.is_empty())
@@ -1229,3 +1232,58 @@ func test_options_on_touch_have_big_targets_and_no_highlight():
 	assert_eq(ids, ["options"], "only the Menu button stays over the card")
 	assert_false(game.controls._stick_shown())
 	hud.toggle_options()
+
+
+# ---------------------------------------------------------------- title screen
+
+func test_title_play_starts_the_first_night_from_the_keyboard():
+	game.open_title()
+	assert_true(game.hud.title_open())
+	assert_eq(game.phase, game.Phase.TITLE)
+	assert_eq(game.music_id, "title", "Intro plays on the title")
+	_run(2.0)
+	assert_eq(game.phase, game.Phase.TITLE, "nothing happens behind the title")
+	_tap(KEY_DOWN)
+	_tap(KEY_UP)
+	assert_eq(game.hud.title.sel, 0, "Play is chosen")
+	_tap(KEY_ENTER)
+	assert_false(game.hud.title_open())
+	assert_eq(game.phase, game.Phase.BUILD, "the night before day 1")
+	assert_false(game.door_open)
+
+
+func test_title_play_with_a_controller():
+	game.open_title()
+	_tap_pad(JOY_BUTTON_A)
+	assert_false(game.hud.title_open(), "A presses Play")
+	assert_eq(game.phase, game.Phase.BUILD)
+
+
+func test_title_settings_opens_the_options_and_comes_back():
+	game.open_title()
+	_tap(KEY_DOWN)
+	_tap(KEY_E)
+	assert_true(game.hud.options_open(), "Settings opens the options")
+	_tap(KEY_DOWN)
+	assert_true(game.hud.title_open())
+	assert_eq(game.hud.title.sel, 1, "the arrows belong to the options meanwhile")
+	_tap(KEY_ESCAPE)
+	assert_false(game.hud.options_open())
+	assert_true(game.hud.title_open(), "back on the title")
+	assert_eq(game.phase, game.Phase.TITLE)
+
+
+func test_title_quit_where_quitting_is_a_thing():
+	game.allow_quit = false
+	game.open_title()
+	var names: Array = game.hud.title.buttons.map(func(b: Button) -> String: return b.text)
+	if not Title.can_quit():
+		assert_false(names.has("Quit"), "no Quit on phones or the web")
+		return
+	assert_eq(names, ["Play", "Settings", "Quit"])
+	_tap(KEY_DOWN)
+	_tap(KEY_DOWN)
+	_tap(KEY_DOWN)
+	assert_eq(game.hud.title.sel, 2, "down stops at Quit")
+	_tap(KEY_SPACE)
+	assert_true(game.quit_asked)

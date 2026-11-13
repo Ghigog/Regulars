@@ -291,11 +291,11 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   - Hired staff (server, dishwasher, host), co-op chefs 2 to 4 (trim colours exist),
     future dishes, floor lamp, awning and photo view.
   - A bundled hand-lettered font (the HUD uses a rounded system font).
-  - The open items: title screen, colour-blind support, the "Town Diner" subtitle.
+  - The open items: the real title screen composition, colour-blind support, the "Town
+    Diner" subtitle.
 - Sound effects are synthesised placeholders (`tools/make_sfx.py`). Later: real foley.
 - Music is real: `Daytime` during service, `Nighttime` on the receipt and in the build
-  phase, `Closed` once at game over, cross-faded. `Intro` is unused until there is a title
-  screen. The old synthesised `assets/sfx/music.wav` is no longer played. Later: music per theme.
+  phase, `Closed` once at game over, cross-faded. `Intro` loops on the title screen. The old synthesised `assets/sfx/music.wav` is no longer played. Later: music per theme.
 
 ## 9. Decisions (13 November 2026)
 
@@ -340,6 +340,11 @@ Not built yet; this is the agreed direction for future sessions.
   player: refactor that first.
 - **Title screen: a placeholder** with Play, Settings and Quit. Accessibility comes
   later; meanwhile new interface should say things by shape as well as colour.
+  *Built* (`game/title.gd`): shown once a launch, before the night before day 1 (starting
+  over after a game over skips it). The peg-doll logo over the room, dimmed; Play,
+  Settings (the options screen) and Quit on a paper card. Keys and pad move an ink frame
+  with a pointer tab (shape, not only colour); touch taps the buttons, which grow. Quit
+  is left off on phones and the web.
 - **Decor works like RollerCoaster Tycoon scenery:** a flat bonus by proximity, not
   joy per second. A guest seated on a rug or a fine floor gets the most, one seated
   beside nice walls or a fern less, and one who can only see them least. (The finishes

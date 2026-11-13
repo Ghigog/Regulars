@@ -1,7 +1,7 @@
 extends Node3D
 ## Regulars vertical slice: an endless run of days. Cook meat, serve guests, get paid.
 
-enum Phase { SERVICE, SUMMARY, CLOSED, BUILD }
+enum Phase { SERVICE, SUMMARY, CLOSED, BUILD, TITLE }
 
 const W := 10            # restaurant interior is 10 x 7 cells
 const H := 7             # columns 10 and 11 are the pavement outside, to the right
@@ -45,7 +45,7 @@ const LOOPING: Array[String] = ["sizzle"]
 const MUSIC_DB := -14.0
 const MUSIC_FADE := 1.2   # seconds to cross-fade between tracks
 ## Track per moment. "Intro" is in assets/music too, waiting for a title screen.
-const MUSIC := {"day": "Daytime", "night": "Nighttime", "closed": "Closed"}
+const MUSIC := {"day": "Daytime", "night": "Nighttime", "closed": "Closed", "title": "Intro"}
 # The camera sits wide to show the whole diorama between days, and moves in on
 # the room and the queue while guests are being served.
 const CAM_OFFSET := Vector3(14, 15, 14)
@@ -98,6 +98,9 @@ var _demo_hover := Vector3.INF
 var inspected: Guest                 # the guest whose card is open, if any
 var flyers_out := false          # bought tonight, spent on tomorrow's crowd
 var first_night := true          # open on the night before day 1, in the build phase (tests and demos skip it)
+static var _title_seen := false  # the title shows once a launch; starting over skips it
+var allow_quit := true           # tests turn this off to check Quit without leaving
+var quit_asked := false
 var shopping := false            # the shop is open over the build phase; the chef stands still
 var door_open := true            # which side of the door card faces the street
 var _door_hang: Node3D
@@ -172,7 +175,10 @@ func _ready() -> void:
 	_build_door_card()
 	_range_marks = Node3D.new()
 	add_child(_range_marks)
-	if first_night and OS.get_environment("REGULARS_DEMO") == "":
+	var demo := OS.get_environment("REGULARS_DEMO")
+	if demo == "title" or (first_night and demo == "" and not _title_seen):
+		open_title()
+	elif first_night and demo == "":
 		_open_first_night()
 	else:
 		start_day()
@@ -862,6 +868,31 @@ func _open_first_night() -> void:
 	play_music("night")
 	hud.show_build()
 	hud.say("The night before day 1. Set the room up, then flip the door card.")
+
+
+## The title screen over the room, before the night before day 1.
+func open_title() -> void:
+	_title_seen = true
+	phase = Phase.TITLE
+	door_open = false
+	_door_turn.rotation.y = PI
+	play_music("title")
+	hud.show_title()
+
+
+## Play on the title screen.
+func play() -> void:
+	if phase != Phase.TITLE:
+		return
+	hud.hide_title()
+	_open_first_night()
+
+
+## Quit on the title screen (not offered on phones or the web).
+func quit_game() -> void:
+	quit_asked = true
+	if allow_quit:
+		get_tree().quit()
 
 
 ## After the receipt: the room is yours to walk round and change, until you flip
