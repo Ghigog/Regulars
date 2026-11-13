@@ -112,7 +112,7 @@ or a later sheet, they win. What changed:
 | Controls | The chef turns to face the way it moves (eight ways), and uses whichever neighbouring station is most in front, preferring one with something to do. | One key moves diagonally across the grid from this camera, so the chef almost never faced a station squarely. |
 | Dial | Shown while a patty cooks; hidden once it burns (flames take over). | The burnt state needs no gauge. |
 | Fridge | Shut, and swings open on use to show the meat. | The "open" state has nothing else to hang on. |
-| Station states | Not built: sink full of suds, overflowing bin. Washing plays the bubble effect. | No gameplay behind them yet. |
+| Station states | Sink: dirty plates lean in the basin; at 3 a lumpy white foam dome rises over the rim with pale teal bubbles above. Bin: a mound of scraps rises with each one; full, a dull green bag (`BAG`) bulges over the rim with scraps on top, three on the floor and looping green wisps. Washing plays the bubble effect. | The sheet's crumpled paper is kept as scraps; the green bag is added so the overflow reads at 60 px against the brown tub. Screenshot: `REGULARS_DEMO=messy`, at about 10 s. |
 | Outer walls | Stand just outside the floor instead of centred on the grid edge. The front cutaway is centred on its edge. | Keeps the back row of stations and the floor whole. |
 | Cutaway | Wall colour with a dark trim cap, including the right-hand wall, which had no wall before. | "Resolved conflicts": dark cap, no coral face. |
 | Kitchen dressing | Wall cabinets on the left wall, jar shelf by the stoves, no range hood. | Nothing may hide a stove or its dial. |

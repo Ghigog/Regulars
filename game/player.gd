@@ -5,7 +5,7 @@ extends Node3D
 const SPEED := 4.4
 const RADIUS := 0.28
 const REACH := 1.3   # how far from a station's centre (or a seated guest) the chef can use it
-const GROSS_ITEMS: Array[String] = ["dirty_plate", "burnt_patty"]
+const GROSS_ITEMS: Array[String] = ["dirty_plate", "burnt_patty", "rubbish_bag"]
 
 var game
 var held := ""

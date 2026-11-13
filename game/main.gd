@@ -17,6 +17,8 @@ const GROSS := {
 	"plate": [0.002, 10.0, 0.06],
 	"burning": [0.01, 5.0, 0.06],
 	"bin": [0.004, 15.0, 0.02],
+	"sink": [0.003, 10.0, 0.04],
+	"overflow": [0.008, 8.0, 0.06],
 	"rubbish": [0.05, 1.5, 0.4],
 }
 const BIN_RANGE := 5          # the bin only bothers guests seated this close
@@ -185,6 +187,18 @@ func _apply_demo(demo: String) -> void:
 		player.set_held("plate")
 		for a in arrivals:
 			a.time = 1.0
+	elif demo == "messy":  # a sink piled with washing-up and an overflowing bin; shoot at about 10
+		var sink := find_station("sink")
+		sink.dirty = 4
+		sink.refresh()
+		find_station("plates").count = 0
+		find_station("plates").refresh()
+		var bin := find_station("bin")
+		bin.count = Station.BIN_HOLDS
+		bin.refresh()
+		player.position = Grid.center(Vector2i(2, 4))
+		for a in arrivals:
+			a.time = 0.5
 	elif demo == "lineup":  # every townsperson and every face, close up
 		arrivals.clear()
 		phase = Phase.SUMMARY
@@ -1260,7 +1274,7 @@ func build_interact() -> void:
 				sfx("fail")
 		"Pick up":
 			pick_up(_piece_in_front())
-		"Open up":
+		"Open up", "Take out rubbish":
 			use_door()
 
 
@@ -1412,6 +1426,8 @@ func at_door() -> bool:
 func door_action() -> String:
 	if not at_door():
 		return ""
+	if player.held == "rubbish_bag":
+		return "Take out rubbish"
 	if phase == Phase.BUILD and hand.is_empty() and not shopping:
 		return "Open up"
 	if phase == Phase.SERVICE and door_open and not arrivals.is_empty() and day_progress() >= CLOSE_EARLY_FROM:
@@ -1425,6 +1441,9 @@ func use_door() -> bool:
 			start_day()
 		"Close early":
 			close_early()
+		"Take out rubbish":
+			player.set_held("")
+			sfx("putdown")
 		_:
 			return false
 	player.punch()
@@ -1659,8 +1678,12 @@ func _collect_gross() -> void:
 	for st: Station in stations.values():
 		if st.type == "table" and st.dirty > 0:
 			_gross.append({"cell": st.cell, "kind": "plate", "age": st.dirty_age, "thought": "Nobody has cleared that table"})
+		elif st.type == "bin" and st.overflowing():
+			_gross.append({"cell": st.cell, "kind": "overflow", "age": st.dirty_age, "thought": "The bin is overflowing"})
 		elif st.type == "bin":
 			_gross.append({"cell": st.cell, "kind": "bin", "key": "bin", "range": BIN_RANGE, "thought": "I can see the bin from my seat"})
+		elif st.type == "sink" and st.messy():
+			_gross.append({"cell": st.cell, "kind": "sink", "age": st.dirty_age, "thought": "Look at that washing-up"})
 		elif st.type == "stove" and st.item == "burnt_patty":
 			_gross.append({"cell": st.cell, "kind": "burning", "age": st.cook - Station.BURN_TIME, "thought": "Something is burning in there"})
 	if player.carrying_something_gross():
@@ -1825,14 +1848,23 @@ func use_station(st: Station, dry_run := false) -> String:
 			if not dry_run:
 				st.refresh()
 		"sink":
+			# Plates soak until they are washed, one at a time, back onto the stack.
 			if held == "dirty_plate":
-				act = "Wash"
+				act = "Put in sink"
 				if not dry_run:
 					player.set_held("")
+					st.dirty += 1
+					st.refresh()
+			elif held == "" and st.dirty > 0:
+				act = "Wash"
+				if not dry_run:
+					st.dirty -= 1
+					st.refresh()
 					var stack := find_station("plates")
 					stack.count += 1
 					stack.refresh()
 		"bin":
+			# Every scrap fills it; full, it overflows until the bag goes out the front.
 			if held == "burger":
 				act = "Scrape off"
 				if not dry_run:
@@ -1841,6 +1873,15 @@ func use_station(st: Station, dry_run := false) -> String:
 				act = "Throw away"
 				if not dry_run:
 					player.set_held("")
+			elif held == "" and st.count > 0:
+				act = "Empty bin"
+				if not dry_run:
+					st.count = 0
+					st.refresh()
+					player.set_held("rubbish_bag")
+			if not dry_run and act in ["Scrape off", "Throw away"]:
+				st.count += 1
+				st.refresh()
 		"table":
 			var g := _waiting_guest_at(st)
 			if held == "burger" and g != null:
@@ -1893,7 +1934,7 @@ func step(delta: float) -> void:
 		spawn_group(a.get("group", [a.get("idx", 0)]))
 	_tick_stoves(delta)
 	for st: Station in stations.values():
-		st.dirty_age = st.dirty_age + delta if st.dirty > 0 else 0.0
+		st.dirty_age = st.dirty_age + delta if st.messy() else 0.0
 	_collect_gross()
 	_seat_waiting_guests()
 	for g in guests.duplicate():
