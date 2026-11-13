@@ -193,6 +193,56 @@ func test_dirty_table_disgusts_guests_unless_a_wall_hides_it():
 	assert_eq(g.mood.disgust, seen, "boxed in: nothing gross in view")
 
 
+func _seat_at(table_cell: Vector2i, left: bool) -> Guest:
+	# Fill tables in order until a guest lands on the wanted seat.
+	var want := table_cell + Vector2i(-1 if left else 1, 0)
+	for i in 6:
+		var g: Guest = game.spawn_guest(i)
+		_run(12.0)
+		if g.cell == want and g.state == "waiting":
+			return g
+	return null
+
+
+func test_bin_bothers_only_nearby_guests_until_a_partition_hides_it():
+	var near := _seat_at(Vector2i(6, 5), true)        # seat (5, 5), five cells from the bin
+	assert_not_null(near)
+	if near == null:
+		return
+	assert_true(near.mood.thoughts.has("I can see the bin from my seat"))
+	var far: Guest = null
+	for g: Guest in game.guests:
+		if g.cell.x > 5:
+			far = g
+	assert_not_null(far)
+	assert_false(far.mood.thoughts.has("I can see the bin from my seat"), "too far away to mind")
+	# Box the bin in on its two open sides.
+	var before: float = near.mood.disgust
+	game.grid.walls[Vector3i(0, 5, 0)] = true
+	game.grid.walls[Vector3i(1, 5, 1)] = true
+	game.grid.walls[Vector3i(0, 6, 0)] = true
+	near.mood.patience = 1.0
+	_run(2.0)
+	assert_eq(near.mood.disgust, before)
+
+
+func test_guests_enjoy_watching_the_stove_unless_it_is_burning():
+	var g := _seat_at(Vector2i(6, 1), false)          # seat (7, 1): the bin is out of range
+	assert_not_null(g)
+	if g == null:
+		return
+	var joy: float = g.mood.joy
+	_use("fridge")
+	_use("stove")
+	_run(2.0)
+	assert_gt(g.mood.joy, joy)
+	assert_true(g.mood.thoughts.has("I can watch the chef at work"))
+	for guest: Guest in game.guests:
+		guest.mood.patience = 1.0
+	_run(Station.BURN_TIME)
+	assert_true(g.mood.thoughts.has("Something is burning in there"))
+
+
 func test_overcooked_meat_is_worth_less():
 	assert_eq(Station.quality_at(Station.COOK_TIME - 0.1), 0.0)
 	assert_eq(Station.quality_at(Station.COOK_TIME + 1.0), 1.0)

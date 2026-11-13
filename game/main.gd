@@ -10,6 +10,7 @@ const SPAWN := Vector2i(9, 8)
 const EXIT := Vector2i(0, 8)
 const BILL := 12
 const SIGHT_RANGE := 7
+const BIN_RANGE := 5          # the bin only bothers guests seated this close
 const AREA := Rect2i(0, 0, W, H)   # where the player may build
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
 const SOUNDS := {  # name -> volume in dB
@@ -654,11 +655,18 @@ func on_seated(g: Guest) -> void:
 
 ## Everything a seated guest can see changes how they feel.
 func apply_surroundings(g: Guest, delta: float) -> void:
+	var saw_gross := false
 	for s in _gross:
 		var c: Vector2i = s.cell
-		if _near(g.cell, c, SIGHT_RANGE) and grid.has_los(g.cell, c):
+		if _near(g.cell, c, int(s.get("range", SIGHT_RANGE))) and grid.has_los(g.cell, c):
 			g.mood.see_gross(s.strength, delta, s.thought)
+			saw_gross = true
 	for st: Station in stations.values():
+		if st.type == "stove" and not saw_gross and st.is_cooking() \
+				and _near(g.cell, st.cell, SIGHT_RANGE) and grid.has_los(g.cell, st.cell):
+			# An open kitchen is a show, as long as nothing nasty is in view.
+			g.mood.delight(0.01 * delta, "I can watch the chef at work")
+			saw_gross = true   # one stove's worth of show, however many are on
 		if st.type == "plant" and _near(g.cell, st.cell, 2 + st.tier) and grid.has_los(g.cell, st.cell):
 			g.mood.delight(0.015 * st.tier * delta, "That fern is rather nice")
 
@@ -672,6 +680,10 @@ func _collect_gross() -> void:
 	for st: Station in stations.values():
 		if st.type == "table" and st.dirty > 0:
 			_gross.append({"cell": st.cell, "strength": 0.03, "thought": "Nobody has cleared that table"})
+		elif st.type == "bin":
+			_gross.append({"cell": st.cell, "strength": 0.01, "range": BIN_RANGE, "thought": "I can see the bin from my seat"})
+		elif st.type == "stove" and st.item == "burnt_patty":
+			_gross.append({"cell": st.cell, "strength": 0.03, "thought": "Something is burning in there"})
 	if player.carrying_something_gross():
 		_gross.append({"cell": player.cell(), "strength": 0.15, "thought": "I just watched the chef carry rubbish past me"})
 
