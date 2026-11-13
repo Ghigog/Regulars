@@ -24,13 +24,16 @@ many days as you can; three walkouts in one day ends the run.
   E offers half price, once per visit: +0.35 patience, a little joy, +0.2 affinity, and
   they pay half the bill (the tip is worked out on the halved bill).
 - **Build phase, between days only.** Receipt, then Enter opens it; Enter again opens the
-  day. A tray along the bottom holds tonight's crate (take one of two; the other is
-  gone), the pieces you own, the shelf and the catalog. Pieces are placed with the mouse:
-  a ghost follows the pointer, left-click places, right-click or Esc cancels. Partitions
-  snap to the nearest cell edge (no rotate key). A spot is refused if it would cut the
-  chef, any seat or any station off from the door. Crate pieces are free; catalog pieces
-  are paid for when placed and gated by level. An owned piece can be shelved for two days
-  and comes back one tier higher. Unplaced pieces keep until later nights.
+  day. A tray along the bottom is the catalog, browsed like the Sims: type in the search
+  box (matches name, category and what a piece does) or pick a category tab (Kitchen,
+  Dining, Decor, Walls). Pick a card, then place with the mouse: a ghost follows the
+  pointer, left-click places and pays, right-click or Esc cancels. The piece stays in
+  hand while there is money for another. Partitions snap to the nearest cell edge (no
+  rotate key). A spot is refused if it would cut the chef, any seat or any station off
+  from the door.
+- **Upgrades are catalog entries.** Stove, fern and table are sold in three tiers; a
+  tier costs 1x, 2x, 4x the base price and each tier needs one more level. Counter and
+  partition have one tier. There are no free blueprints.
 - **Tier effects:** faster stove, stronger fern, a tier 2+ table gives seated guests
   +0.05 joy per tier. Counters and partitions gain nothing but looks.
 - **Flyers.** On the receipt, $15 (F) buys +25% visit chance for everyone tomorrow. One
@@ -47,13 +50,15 @@ focused. The logic and tests still exist.
 
 | System | Where | State |
 | --- | --- | --- |
-| Blueprint catalog, nightly crate, shelf upgrades | `sim/catalog.gd` | **Built**, see section 1. |
+| Blueprint catalog | `sim/catalog.gd` | **Built**, see section 1. |
+| Nightly crate, shelf upgrades | `Catalog.offer`, `shelve`, `collect_ready` | **Parked again by decision** (no blueprints from the sky, at least for now). Was hooked up briefly on this branch; logic and tests kept, nothing in the game calls them. |
 | Walls on cell edges, line of sight, placement pathing | `sim/grid.gd` | **Built**, see section 1. Placement rules are `Grid.can_place_block` and `can_place_wall`. |
 | Word of mouth between friends | `sim/town.gd` | **Built**, see section 1. |
 | Kindness / discounts | `GuestMood.offer_discount`, `Town.record_kindness` | **Built**, see section 1. Full comps (a free meal) are not. |
 | Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
 
-Everything in this table is back in the game. Not built: moving, selling or rotating
+Everything else in this table is back in the game. Not built: upgrading a piece already
+placed; moving, selling or rotating
 furniture; floors and ceilings; the bin as a disgust source now that it can be hidden.
 
 ## 3. Guests (RollerCoaster Tycoon layer)
@@ -74,11 +79,11 @@ furniture; floors and ceilings; the bin as a disgust source now that it can be h
 
 ## 4. Building (Sims layer)
 
-- **Nightly crate**: after each day, pick one of two blueprints. Place it, or shelve it
-  for two days and it returns one tier higher (max tier 3). Tier effects so far: faster
-  stove, stronger fern, nicer table.
-- **Catalog**: buy furniture with money, gated by XP level. Starting list: partition wall
-  $10, counter $15, fern $20, table for two $40 (level 2), stove $80 (level 3).
+- **Nightly crate** (parked by decision): after each day, pick one of two blueprints.
+  Place it, or shelve it for two days and it returns one tier higher (max tier 3).
+- **Catalog** (built): buy furniture with money, gated by XP level. Starting list:
+  partition wall $10, counter $15, fern $20, table for two $40 (level 2), stove $80
+  (level 3). To add: more pieces to make browsing worth it, pictures on the cards.
 - **Walls, floors, ceilings**: free-form placement. Walls sit on cell edges and block
   sight and movement. Placement is refused if it cuts a seat or the chef off from the door.
 - **Two currencies**: money (earned per day) and XP (10 per meal plus the tip; 100 per level).

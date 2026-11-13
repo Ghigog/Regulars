@@ -1,16 +1,25 @@
 class_name Catalog
 extends RefCounted
-## Everything you can build, the nightly crate, and the blueprint shelf.
-## A blueprint is {"id": String, "tier": int}. Shelving one returns it a tier higher.
+## Everything you can buy for the restaurant. A blueprint is {"id": String, "tier": int}.
+## The game sells every tier straight from the catalog. The nightly crate and the shelf
+## (offer, shelve, collect_ready) are parked: tested, but nothing in the game calls them.
 
 const MAX_TIER := 3
 const SHELF_DAYS := 2
+const CATEGORIES: Array[String] = ["Kitchen", "Dining", "Decor", "Walls"]
+const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
+## "tiers" is how many tiers are sold; "up" says what a higher tier does.
 const ITEMS := {
-	"screen": {"name": "Partition wall", "price": 10, "level": 1, "blurb": "Blocks what guests can see."},
-	"counter": {"name": "Counter", "price": 15, "level": 1, "blurb": "Somewhere to put things down."},
-	"plant": {"name": "Potted fern", "price": 20, "level": 1, "blurb": "Nearby guests feel happier."},
-	"table": {"name": "Table for two", "price": 40, "level": 2, "blurb": "Two more seats."},
-	"stove": {"name": "Stove", "price": 80, "level": 3, "blurb": "Cook two things at once."},
+	"screen": {"name": "Partition wall", "price": 10, "level": 1, "category": "Walls", "tiers": 1,
+		"blurb": "Blocks what guests can see."},
+	"counter": {"name": "Counter", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Somewhere to put things down."},
+	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3,
+		"blurb": "Nearby guests feel happier.", "up": "Bigger, and cheers guests further away."},
+	"table": {"name": "Table for two", "price": 40, "level": 2, "category": "Dining", "tiers": 3,
+		"blurb": "Two more seats.", "up": "Two more seats, and guests enjoy sitting here."},
+	"stove": {"name": "Stove", "price": 80, "level": 3, "category": "Kitchen", "tiers": 3,
+		"blurb": "Cook two things at once.", "up": "Cooks faster. Watch it closely."},
 }
 
 var shelf: Array[Dictionary] = []
@@ -23,7 +32,7 @@ func _init(seed_value := 1) -> void:
 
 static func label(bp: Dictionary) -> String:
 	var tier: int = bp.tier
-	return str(ITEMS[bp.id].name) + " " + "+".repeat(tier - 1)
+	return str(ITEMS[bp.id].name) + (" " + "+".repeat(tier - 1) if tier > 1 else "")
 
 
 ## Two different blueprints to choose between tonight.
@@ -34,8 +43,45 @@ func offer() -> Array[Dictionary]:
 	return [{"id": ids[a], "tier": 1}, {"id": ids[b], "tier": 1}]
 
 
-func can_buy(id: String, money: int, level: int) -> bool:
-	return money >= int(ITEMS[id].price) and level >= int(ITEMS[id].level)
+static func price_of(id: String, tier := 1) -> int:
+	return int(ITEMS[id].price) * TIER_PRICE[tier - 1]
+
+
+## Each tier above the first needs one more level.
+static func level_of(id: String, tier := 1) -> int:
+	return int(ITEMS[id].level) + tier - 1
+
+
+static func blurb_of(id: String, tier := 1) -> String:
+	return ITEMS[id].up if tier > 1 else ITEMS[id].blurb
+
+
+func can_buy(id: String, money: int, level: int, tier := 1) -> bool:
+	return tier >= 1 and tier <= int(ITEMS[id].tiers) and money >= price_of(id, tier) and level >= level_of(id, tier)
+
+
+## Everything for sale that matches, cheapest first. `query` is matched against the
+## name, the category and what the piece does; an empty query or category matches all.
+static func search(query := "", category := "") -> Array[Dictionary]:
+	var found: Array[Dictionary] = []
+	var words := query.strip_edges().to_lower().split(" ", false)
+	for id: String in ITEMS:
+		var item: Dictionary = ITEMS[id]
+		if category != "" and item.category != category:
+			continue
+		for tier in range(1, int(item.tiers) + 1):
+			var bp := {"id": id, "tier": tier}
+			var text := ("%s %s %s" % [label(bp), item.category, blurb_of(id, tier)]).to_lower()
+			var hit := true
+			for w in words:
+				hit = hit and text.contains(w)
+			if hit:
+				found.append(bp)
+	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var pa := price_of(a.id, a.tier)
+		var pb := price_of(b.id, b.tier)
+		return pa < pb if pa != pb else label(a) < label(b))
+	return found
 
 
 func can_shelve(bp: Dictionary) -> bool:

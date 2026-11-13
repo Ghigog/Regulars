@@ -296,6 +296,32 @@ func test_catalog_is_gated_by_money_and_level():
 	assert_true(c.can_buy("stove", 80, 3))
 
 
+func test_higher_tiers_cost_more_and_need_more_levels():
+	var c := Catalog.new(1)
+	assert_eq(Catalog.price_of("stove", 2), 160)
+	assert_eq(Catalog.price_of("plant", 3), 80)
+	assert_eq(Catalog.level_of("table", 3), 4)
+	assert_true(c.can_buy("plant", 40, 2, 2))
+	assert_false(c.can_buy("plant", 40, 1, 2), "tier 2 needs level 2")
+	assert_false(c.can_buy("plant", 39, 2, 2))
+	assert_false(c.can_buy("counter", 999, 9, 2), "counters have one tier")
+	assert_false(c.can_buy("stove", 9999, 9, 4))
+
+
+func test_catalog_search_by_word_and_category():
+	assert_eq(Catalog.search().size(), 11, "two single-tier pieces and three with three tiers")
+	var ferns := Catalog.search("FERN")
+	assert_eq(ferns.size(), 3)
+	assert_eq(int(ferns[0].tier), 1, "cheapest first")
+	var kitchen := Catalog.search("", "Kitchen")
+	assert_eq(kitchen.size(), 4)
+	assert_eq(kitchen[0].id, "counter")
+	assert_eq(Catalog.search("seats").size(), 3, "matches what a piece does")
+	assert_eq(Catalog.search("stove ++").size(), 1)
+	assert_eq(Catalog.search("fern", "Kitchen").size(), 0)
+	assert_eq(Catalog.search("walls")[0].id, "screen", "matches the category name")
+
+
 func test_shelved_blueprint_returns_upgraded_after_two_days():
 	var c := Catalog.new()
 	c.shelve({"id": "plant", "tier": 1}, 2)

@@ -95,38 +95,31 @@ func _to_build() -> void:
 	game.open_build()
 
 
-func test_crate_blueprint_is_taken_and_placed_for_free():
+func test_upgraded_piece_is_bought_from_the_catalog():
 	_to_build()
-	assert_eq(game.phase, game.Phase.BUILD)
-	assert_eq(game.crate.size(), 2)
-	game.take_crate(1)
-	assert_eq(game.crate.size(), 0, "the other blueprint is gone")
-	assert_eq(game.inventory.size(), 1)
-	var id: String = game.hand.id
-	var spot := Vector3i(2, 4, 0 if id != "screen" else 1)
-	assert_true(game.place(spot))
-	assert_eq(game.ledger.money, 50, "crate pieces cost nothing")
-	assert_eq(game.inventory.size(), 0)
-	assert_true(game.hand.is_empty())
-	if id == "screen":
-		assert_true(game.grid.walls.has(spot))
-	else:
-		assert_eq(game.stations[Vector2i(2, 4)].type, id)
+	game.ledger.money = 100
+	assert_false(game.pick_catalog("plant", 2), "tier 2 needs level 2")
+	game.ledger.xp = 100
+	assert_true(game.pick_catalog("plant", 2))
+	assert_true(game.place(Vector3i(2, 4, 0)))
+	assert_eq(game.stations[Vector2i(2, 4)].tier, 2)
+	assert_eq(game.ledger.money, 60)
+	assert_eq(int(game.hand.tier), 2, "still in hand while there is money for another")
+	assert_true(game.place(Vector3i(3, 4, 0)))
+	assert_true(game.hand.is_empty(), "$20 left will not buy a third")
 
 
-func test_shelved_crate_blueprint_comes_back_a_tier_higher():
+func test_catalog_tray_filters_as_you_search():
 	_to_build()
-	game.take_crate(0)
-	var id: String = game.inventory[0].id
-	assert_true(game.shelve_owned(0))
-	assert_eq(game.inventory.size(), 0)
-	for night in 2:
-		game.start_day()
-		game.arrivals.clear()
-		_run(0.2)
-	assert_eq(game.inventory.size(), 1)
-	assert_eq(game.inventory[0].id, id)
-	assert_eq(int(game.inventory[0].tier), 2)
+	assert_eq(game.hud._cards.get_child_count(), 11)
+	game.hud.set_search("fern")
+	assert_eq(game.hud._cards.get_child_count(), 3)
+	game.hud._set_category("Kitchen")
+	assert_eq(game.hud._cards.get_child_count(), 1, "only the nothing-matches line")
+	game.hud.set_search("")
+	assert_eq(game.hud._cards.get_child_count(), 4)
+	game.start_day()
+	assert_null(game.hud.build_bar)
 
 
 func test_catalog_piece_is_paid_for_when_placed_and_gated_by_level():

@@ -30,6 +30,13 @@ var _shown_money := -1
 var _shown_strikes := 0
 var _town_open := false
 var build_bar: Control
+var _search := ""
+var _category := ""
+var _search_box: LineEdit
+var _tabs: Array[Button] = []
+var _cards: HBoxContainer
+var _tip: Label
+var _level_label: Label
 var _toast_tween: Tween
 
 
@@ -351,6 +358,16 @@ func _theme() -> Theme:
 	t.set_stylebox("disabled", "Button", _stamp_button(Color("#c9b9a3")))
 	t.set_color("font_disabled_color", "Button", CREAM)
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+	var field := _flat(CREAM, 8, 8)
+	field.border_color = INK
+	field.set_border_width_all(2)
+	t.set_stylebox("normal", "LineEdit", field)
+	t.set_stylebox("focus", "LineEdit", StyleBoxEmpty.new())
+	t.set_color("font_color", "LineEdit", INK)
+	t.set_color("caret_color", "LineEdit", INK)
+	t.set_color("font_placeholder_color", "LineEdit", Color(INK, 0.45))
+	t.set_color("font_pressed_color", "Button", CREAM)
+	t.set_color("font_hover_pressed_color", "Button", CREAM)
 	t.set_color("font_color", "Button", CREAM)
 	t.set_color("font_hover_color", "Button", CREAM)
 	t.set_font_size("font_size", "Button", 20)
@@ -529,28 +546,28 @@ func hide_build() -> void:
 	hint.visible = true
 
 
-func _bar_row(box: VBoxContainer, title: String) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	box.add_child(row)
-	var l := _label(row, 13, title)
-	l.custom_minimum_size = Vector2(118, 0)
-	l.modulate.a = 0.7
-	return row
+func set_search(text: String) -> void:
+	_search = text
+	if _search_box and _search_box.text != text:
+		_search_box.text = text
+	_refresh_catalog()
 
 
-func _bar_button(row: Container, text: String, action: Callable, tip := "") -> Button:
-	var b := _button(row, text, action)
-	b.add_theme_font_size_override("font_size", 15)
-	b.tooltip_text = tip
-	return b
+func _set_category(cat: String) -> void:
+	_category = cat
+	_refresh_catalog()
 
 
-## The build phase: a wooden tray along the bottom with tonight's crate, the
-## blueprints waiting to be placed and the catalog. Redrawn whenever anything changes.
+## The build phase: a wooden tray along the bottom holding the catalog. Search it,
+## browse by category, pick a card, then click the floor. Built once per night;
+## later calls only redraw the cards.
 func show_build() -> void:
-	hide_build()
+	if build_bar:
+		_refresh_catalog()
+		return
 	hint.visible = false
+	_search = ""
+	_category = ""
 	var holder := MarginContainer.new()
 	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
 	holder.add_theme_constant_override("margin_bottom", 14)
@@ -563,49 +580,88 @@ func show_build() -> void:
 	wood.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	holder.add_child(wood)
 	var paper := Sheet.new("paper", 16, 10)
+	paper.custom_minimum_size = Vector2(900, 0)
 	wood.add_child(paper)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	paper.add_child(box)
-	var cat: Catalog = game.catalog
-	var l: Ledger = game.ledger
-	if not game.crate.is_empty():
-		var row := _bar_row(box, "TONIGHT'S CRATE\npick one")
-		for i in game.crate.size():
-			_bar_button(row, Catalog.label(game.crate[i]), game.take_crate.bind(i), Catalog.ITEMS[game.crate[i].id].blurb)
-	if not game.inventory.is_empty():
-		var row := _bar_row(box, "YOURS TO PLACE")
-		for i in game.inventory.size():
-			var bp: Dictionary = game.inventory[i]
-			var held: bool = int(game.hand.get("owned", -1)) == i
-			_bar_button(row, ("> %s <" if held else "%s") % Catalog.label(bp), game.pick_owned.bind(i), Catalog.ITEMS[bp.id].blurb)
-			if cat.can_shelve(bp):
-				_bar_button(row, "Shelve it", game.shelve_owned.bind(i),
-					"Comes back in %d days, one tier better." % Catalog.SHELF_DAYS).size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	if not cat.shelf.is_empty():
-		var names: Array[String] = []
-		for sbp in cat.shelf:
-			names.append("%s (day %d)" % [Catalog.label(sbp), sbp.ready_day])
-		var row := _bar_row(box, "ON THE SHELF")
-		_label(row, 15, ", ".join(names))
-	var shop := _bar_row(box, "CATALOG\nlevel %d" % l.level())
-	for id: String in Catalog.ITEMS:
-		var item: Dictionary = Catalog.ITEMS[id]
-		var locked: bool = l.level() < int(item.level)
-		var held: bool = game.hand.get("id", "") == id and int(game.hand.get("owned", -1)) < 0
-		var text := "%s  (level %d)" % [item.name, item.level] if locked else "%s  $%d" % [item.name, item.price]
-		var b := _bar_button(shop, ("> %s <" if held else "%s") % text, game.pick_catalog.bind(id), item.blurb)
-		b.disabled = not cat.can_buy(id, l.money, l.level())
+
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 8)
+	box.add_child(top)
+	_label(top, 20, "CATALOG")
+	_search_box = LineEdit.new()
+	_search_box.placeholder_text = "Search..."
+	_search_box.custom_minimum_size = Vector2(190, 0)
+	_search_box.add_theme_font_size_override("font_size", 16)
+	_search_box.text_changed.connect(set_search)
+	_search_box.text_submitted.connect(func(_t: String) -> void: _search_box.release_focus())
+	top.add_child(_search_box)
+	_tabs.clear()
+	for cat: String in [""] + Catalog.CATEGORIES:
+		var tab := _button(top, "All" if cat == "" else cat, _set_category.bind(cat))
+		tab.add_theme_font_size_override("font_size", 15)
+		tab.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		tab.toggle_mode = true
+		tab.set_meta("cat", cat)
+		_tabs.append(tab)
+	_level_label = _label(top, 15)
+	_level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_level_label.modulate.a = 0.75
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 86)
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	_cards = HBoxContainer.new()
+	_cards.add_theme_constant_override("separation", 8)
+	scroll.add_child(_cards)
+
 	var last := HBoxContainer.new()
 	last.add_theme_constant_override("separation", 14)
 	box.add_child(last)
-	var tip := "Pick something to place."
-	if not game.hand.is_empty():
-		tip = "Click the floor to place it. Right-click or Esc puts it back."
-	var tl := _label(last, 15, tip)
-	tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tl.modulate.a = 0.8
-	_button(last, "Open for day %d   (Enter)" % l.day, game.start_day).size_flags_horizontal = Control.SIZE_SHRINK_END
+	_tip = _label(last, 15)
+	_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tip.modulate.a = 0.8
+	_button(last, "Open for day %d   (Enter)" % game.ledger.day, game.start_day).size_flags_horizontal = Control.SIZE_SHRINK_END
+	_refresh_catalog()
+
+
+func _refresh_catalog() -> void:
+	if build_bar == null:
+		return
+	var cat: Catalog = game.catalog
+	var l: Ledger = game.ledger
+	var into := float(l.xp % Ledger.XP_PER_LEVEL) / Ledger.XP_PER_LEVEL
+	_level_label.text = "Level %d   (%d%% to the next)" % [l.level(), roundi(into * 100)]
+	for tab in _tabs:
+		tab.set_pressed_no_signal(tab.get_meta("cat") == _category)
+	for c in _cards.get_children():
+		_cards.remove_child(c)
+		c.queue_free()
+	var found := Catalog.search(_search, _category)
+	for bp in found:
+		var id: String = bp.id
+		var tier: int = bp.tier
+		var held: bool = game.hand.get("id", "") == id and int(game.hand.get("tier", 0)) == tier
+		var locked := l.level() < Catalog.level_of(id, tier)
+		var line := "Level %d" % Catalog.level_of(id, tier) if locked else "$%d" % Catalog.price_of(id, tier)
+		var card := _button(_cards, "%s\n%s" % [Catalog.label(bp), line], game.pick_catalog.bind(id, tier))
+		card.add_theme_font_size_override("font_size", 15)
+		card.custom_minimum_size = Vector2(150, 70)
+		card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		card.tooltip_text = Catalog.blurb_of(id, tier)
+		card.disabled = not cat.can_buy(id, l.money, l.level(), tier)
+		card.toggle_mode = true
+		card.set_pressed_no_signal(held)   # the piece in hand sits pressed in
+	if found.is_empty():
+		_label(_cards, 16, "Nothing in the catalog matches.").modulate.a = 0.7
+	if game.hand.is_empty():
+		_tip.text = "Pick something, then click the floor to place it."
+	else:
+		_tip.text = "%s: %s  Right-click or Esc puts it back." % [
+			Catalog.label(game.hand), Catalog.blurb_of(game.hand.id, int(game.hand.tier))]
 
 
 func toggle_town() -> void:

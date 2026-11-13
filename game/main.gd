@@ -37,9 +37,7 @@ var arrivals: Array[Dictionary] = []
 var clock := 0.0
 var last_day := {}
 var catalog: Catalog
-var crate: Array[Dictionary] = []      # tonight's two blueprints; empty once one is taken
-var inventory: Array[Dictionary] = []  # blueprints owned but not yet placed
-var hand := {}                         # what is being placed: {id, tier, price, owned}
+var hand := {}                         # the catalog piece being placed: {id, tier, price}
 var _ghost: Node3D
 var _ghost_key := ""
 var _no_mark: Node3D
@@ -155,27 +153,27 @@ func _apply_demo(demo: String) -> void:
 				if i % 2 == 0:
 					town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
 			get_tree().create_timer(1.5).timeout.connect(hud.show_town)
-	elif demo == "build" or demo == "build_no":  # a furnished room and a piece in hand
+	elif demo.begins_with("build"):  # build, build_no (refused spot), build_find (a search)
 		ledger.record_sale(BILL, 5)
 		ledger.money = 300
 		ledger.xp = 250
 		arrivals.clear()
-		get_tree().create_timer(1.0).timeout.connect(_demo_build.bind(demo == "build_no"))
+		get_tree().create_timer(1.0).timeout.connect(_demo_build.bind(demo))
 	elif demo == "flyers":
 		ledger.record_sale(BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.5).timeout.connect(buy_flyers)
 
 
-func _demo_build(refused: bool) -> void:
+func _demo_build(demo: String) -> void:
 	open_build()
-	take_crate(0)
-	cancel_hand()
 	for step: Array in [["counter", 2, 4, 0], ["screen", 8, 5, 0], ["screen", 9, 5, 0], ["table", 8, 6, 0], ["plant", 9, 2, 0]]:
 		pick_catalog(step[0])
 		place(Vector3i(step[1], step[2], step[3]))
-	pick_catalog("stove")
-	_demo_hover = Vector3(6.5, 0, 5.5) if refused else Vector3(3.5, 0, 5.5)
+	pick_catalog("stove", 2)
+	_demo_hover = Vector3(6.5, 0, 5.5) if demo == "build_no" else Vector3(3.5, 0, 5.5)
+	if demo == "build_find":
+		hud.set_search("fern")
 
 
 func _demo_kind(offer: bool) -> void:
@@ -441,37 +439,11 @@ func open_build() -> void:
 	hud.show_build()
 
 
-## Takes one of tonight's two blueprints. The other is gone.
-func take_crate(i: int) -> void:
-	if phase != Phase.BUILD or i >= crate.size():
-		return
-	inventory.append(crate[i])
-	crate.clear()
-	pick_owned(inventory.size() - 1)
-
-
-func pick_owned(i: int) -> void:
-	if phase == Phase.BUILD and i < inventory.size():
-		hand = {"id": inventory[i].id, "tier": inventory[i].tier, "price": 0, "owned": i}
-		hud.show_build()
-
-
-func pick_catalog(id: String) -> bool:
-	if phase != Phase.BUILD or not catalog.can_buy(id, ledger.money, ledger.level()):
+## Picks a piece from the catalog to place. Nothing is paid until it is placed.
+func pick_catalog(id: String, tier := 1) -> bool:
+	if phase != Phase.BUILD or not catalog.can_buy(id, ledger.money, ledger.level(), tier):
 		return false
-	hand = {"id": id, "tier": 1, "price": int(Catalog.ITEMS[id].price), "owned": -1}
-	hud.show_build()
-	return true
-
-
-## Puts an owned blueprint away to come back a tier higher.
-func shelve_owned(i: int) -> bool:
-	if phase != Phase.BUILD or i >= inventory.size() or not catalog.can_shelve(inventory[i]):
-		return false
-	catalog.shelve(inventory[i], ledger.day)
-	inventory.remove_at(i)
-	hand = {}
-	sfx("putdown")
+	hand = {"id": id, "tier": tier, "price": Catalog.price_of(id, tier)}
 	hud.show_build()
 	return true
 
@@ -516,11 +488,12 @@ func can_place(spot: Vector3i) -> bool:
 	return grid.can_place_block(cell, _seats_for(hand.id, cell), AREA, DOOR, reach, touch)
 
 
-## Builds the piece in hand. Catalog pieces are paid for here, so cancelling is free.
+## Builds the piece in hand and pays for it, so cancelling before this is free.
+## The piece stays in hand for another while there is money for it.
 func place(spot: Vector3i) -> bool:
 	if phase != Phase.BUILD or not can_place(spot):
 		return false
-	if int(hand.price) > 0 and not ledger.spend(int(hand.price)):
+	if not ledger.spend(int(hand.price)):
 		return false
 	var cell := Vector2i(spot.x, spot.y)
 	if hand.id == "screen":
@@ -529,10 +502,7 @@ func place(spot: Vector3i) -> bool:
 		add_station(hand.id, cell, int(hand.tier))
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
 	sfx("putdown")
-	if int(hand.owned) >= 0:
-		inventory.remove_at(int(hand.owned))
-		hand = {}
-	elif not catalog.can_buy(hand.id, ledger.money, ledger.level()):
+	if not catalog.can_buy(hand.id, ledger.money, ledger.level(), int(hand.tier)):
 		hand = {}
 	hud.show_build()
 	return true
@@ -593,8 +563,6 @@ func buy_flyers() -> bool:
 func _end_day() -> void:
 	phase = Phase.SUMMARY
 	last_day = ledger.end_day()
-	crate = catalog.offer()
-	inventory.append_array(catalog.collect_ready(ledger.day))
 	hud.show_summary(last_day)
 	sfx("coin")
 
@@ -965,6 +933,7 @@ func _update_cursor() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if phase == Phase.BUILD and event is InputEventMouseButton and event.pressed:
+		get_viewport().gui_release_focus()   # leave the search box
 		if event.button_index == MOUSE_BUTTON_LEFT and not hand.is_empty() and _hover_point() != Vector3.INF:
 			if not place(snap(_hover_point())):
 				sfx("fail")
