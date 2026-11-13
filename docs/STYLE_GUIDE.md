@@ -67,6 +67,22 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 - Icons and effect frames are polygon artwork in `game/icons.gd`, shared by the world and
   the HUD. Effects are four frames, flat colour, hard edges, no alpha.
 
+**Anchor pass (12 Nov 2026).** The midday style frame (`01_style_frame_midday.jpg`) is the
+anchor for the environment and sheet 2 for the character; where they disagree with a rule
+or a later sheet, they win. What changed:
+- Every box is a rounded box with smooth normals (4.5 cm radius, was a 3 cm flat chamfer).
+- Palette moved to the anchor: deep teal `#1f6470` cabinets and tiles against cream, coral
+  `#f07a63`, warmer oak planks, greige backdrop `#d9cfc1`, grey paving.
+- Walls are 30 cm thick soft cream slabs with no dark trim cap. The knee-high cutaway is
+  coral with a cream cap. This overrides "Resolved conflicts: dark cap, no coral face".
+- The pass is the anchor's teal counter with a coral foot (was a coral block). Tables are
+  soft-cornered square tops on teal pedestals (were round); chairs are rounded coral.
+- Pegs follow the turnaround: turned wooden foot, darker hem with a yellow stripe, capped
+  sleeves, cream mittens with cuffs, a head 12% larger, a tiny coral nose, a soft paint sheen.
+- Lighting: stronger key, lower ambient, heavier contact shading, less glow.
+- Still short of the anchor: no range hood, no cash register, street dressing is unchanged,
+  chairs have no wooden legs showing, and nothing is modelled in Blender.
+
 **Departures**
 
 | Topic | What the game does | Why |

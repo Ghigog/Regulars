@@ -6,7 +6,10 @@ extends Node3D
 ## face extras, outfit colour and pattern.
 
 const HEAD_R := 0.27
-const HEAD_Y := 0.8
+const HEAD_Y := 0.84
+const HEAD_SCALE := 1.12   # the sheet-2 head is nearly half the figure
+const R_PAINT := 0.55      # painted wood: a soft toy sheen
+const MITT := "#f6efe2"
 const INK := "#3a2c22"
 const BLUSH := "#ee8a78"
 const SKINS: Array[String] = ["#f6dcc6", "#f0c39c", "#dba276", "#a8693f", "#6f4428"]
@@ -68,10 +71,20 @@ func _build(look: Dictionary, is_chef: bool, player: int) -> void:
 	var pattern: String = look.get("pattern", "plain")
 	if pattern == "dungarees":
 		top = OUTFITS.cream if look.outfit != "cream" else OUTFITS.slate
-	# Barrel body on a rounded base; the bottom 15 cm is a shade darker.
-	Build.lathe(self, Vector3.ZERO, [[0.0, 0.0], [0.13, 0.0], [0.19, 0.04], [0.225, 0.14]], Color(outfit).darkened(0.13).to_html(false))
-	Build.lathe(self, Vector3.ZERO, [[0.225, 0.14], [0.23, 0.26], [0.215, 0.36]], outfit)
-	Build.lathe(self, Vector3.ZERO, [[0.215, 0.36], [0.19, 0.5], [0.15, 0.57], [0.08, 0.6], [0.0, 0.6]], top)
+	# Turned wooden peg foot, then the painted barrel: a darker hem, a yellow
+	# stripe, the outfit, and the top colour over the shoulders (sheet 2).
+	Build.lathe(self, Vector3.ZERO, [[0.0, 0.0], [0.135, 0.0], [0.15, 0.015], [0.15, 0.1], [0.0, 0.1]], "#e2b987", 0.0, Build.R_WOOD)
+	Build.lathe(self, Vector3.ZERO, [[0.0, 0.07], [0.15, 0.07], [0.2, 0.085], [0.228, 0.12], [0.235, 0.17]], Color(outfit).darkened(0.16).to_html(false), 0.0, R_PAINT)
+	Build.lathe(self, Vector3.ZERO, [[0.235, 0.17], [0.24, 0.28], [0.225, 0.38]], outfit, 0.0, R_PAINT)
+	Build.lathe(self, Vector3.ZERO, [[0.225, 0.38], [0.2, 0.5], [0.16, 0.57], [0.08, 0.6], [0.0, 0.6]], top, 0.0, R_PAINT)
+	if not is_chef:
+		_band(0.165, 0.03, 0.238, "#f2c14e")
+	# Short capped sleeves sit on the shoulders like the turnaround's.
+	var sleeve := Color(top).lightened(0.22).to_html(false) if not is_chef else Build.CHEF_WHITE
+	for sx: float in [-1.0, 1.0]:
+		var cap := Build.ball(self, Vector3(sx * 0.2, 0.46, 0.0), 0.095, sleeve, 0.0, R_PAINT)
+		cap.scale = Vector3(0.95, 0.8, 1.0)
+		cap.rotation.z = -sx * 0.45
 	var trim: String = PLAYER_TRIM[player % 4] if is_chef else OUTFITS.cream
 	if is_chef:
 		_band(0.15, 0.05, 0.228, trim)                       # jacket hem
@@ -96,12 +109,14 @@ func _build(look: Dictionary, is_chef: bool, player: int) -> void:
 	for side: float in [-1.0, 1.0]:
 		var hand := Node3D.new()
 		add_child(hand)
-		var mitt := Build.ball(hand, Vector3.ZERO, 0.075, skin)
-		mitt.scale = Vector3(0.85, 1.0, 1.0)
-		Build.ball(hand, Vector3(-side * 0.05, 0.03, 0.03), 0.032, skin)  # thumb
+		var mitt := Build.ball(hand, Vector3.ZERO, 0.095, MITT, 0.0, R_PAINT)
+		mitt.scale = Vector3(0.82, 1.08, 0.95)
+		Build.ball(hand, Vector3(-side * 0.058, 0.028, 0.03), 0.038, MITT, 0.0, R_PAINT)  # thumb
+		Build.lathe(hand, Vector3(0, 0.055, 0), [[0.05, 0.0], [0.062, 0.01], [0.062, 0.04], [0.05, 0.05]], "#e9dfcf")  # cuff
 		hand.position = _hand_rest(side)
 		_hands.append(hand)
 	_head = Build.ball(self, Vector3(0, HEAD_Y, 0), HEAD_R, skin)
+	_head.scale = Vector3.ONE * HEAD_SCALE
 	_features = Node3D.new()
 	_head.add_child(_features)
 	var hair_col: String = HAIR_COLS[look.get("hair_col", "brown")]
@@ -243,18 +258,19 @@ func set_face(kind: String) -> void:
 	var f := _features
 	var ink := "#1f1512" if skin == SKINS[4] else INK
 	var tint: Array = TINTS.get(kind, ["#ffffff", 0.0])
-	_head.material_override = Build.mat(Color(skin).lerp(Color(tint[0]), tint[1]))
+	_head.material_override = Build.mat(Color(skin).lerp(Color(tint[0]), tint[1]), 0.0, R_PAINT)
 	var ex := 0.088
 	var ey := -0.012
 	# Blush cheeks never go away.
 	for sx: float in [-1.0, 1.0]:
 		var cheek := 0.062 if kind == "delighted" else 0.052
 		Build.ball(f, _on_head(sx * 0.15, -0.085, -cheek + 0.007), cheek, BLUSH)
+	Build.ball(f, _on_head(0, -0.05, -0.012), 0.02, "#e8806c")
 	var eye := func(sx: float, style: String) -> void:
 		var c := Vector2(sx * ex, ey)
 		match style:
 			"dot":
-				Build.ball(f, _on_head(c.x, c.y, -0.014), 0.036, ink)
+				Build.ball(f, _on_head(c.x, c.y, -0.016), 0.04, ink)
 			"arc":
 				_stroke(f, [c + Vector2(-0.034, -0.012), c + Vector2(0, 0.014), c + Vector2(0.034, -0.012)], 0.014, ink)
 			"squeeze":

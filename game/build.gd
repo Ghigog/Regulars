@@ -3,22 +3,22 @@ extends RefCounted
 ## Makes every visual in the game out of primitive meshes, in the toy-diorama style.
 
 ## Palette roles (style guide, sheet 7). Brief values, nudged toward the sampled ones.
-const BACKDROP := "#f0dfc4"
-const WALL := "#f6eee0"
-const WALL_LOW := "#e3d8c6"     # the 15 cm darker band at the foot of walls
-const TILE_TEAL := "#99c3b5"
-const TILE_CREAM := "#f2ead4"
-const FLOOR_WOOD := "#d3a468"
-const FLOOR_WOOD_2 := "#c9985c"
-const CORAL := "#ee7560"
-const CORAL_DARK := "#d9604d"
-const CABINET := "#30676c"
-const CABINET_LOW := "#2a5a5f"
-const WORKTOP := "#e6c391"
-const WOOD := "#a8703f"
+const BACKDROP := "#d9cfc1"
+const WALL := "#f6eedd"
+const WALL_LOW := "#eadfcb"     # the 15 cm darker band at the foot of walls
+const TILE_TEAL := "#236a74"
+const TILE_CREAM := "#f1e8cc"
+const FLOOR_WOOD := "#bd7d49"
+const FLOOR_WOOD_2 := "#b47443"
+const CORAL := "#f07a63"
+const CORAL_DARK := "#dc6450"
+const CABINET := "#1f6470"
+const CABINET_LOW := "#1a5560"
+const WORKTOP := "#ecc083"
+const WOOD := "#b07a48"
 const WOOD_DARK := "#7a5235"
-const STEEL := "#a3abad"
-const STEEL_DARK := "#4a4f52"
+const STEEL := "#6f8d92"
+const STEEL_DARK := "#3d4a4f"
 const GOOD := "#6fcf97"
 const WARN := "#ffd452"
 const DANGER := "#e83d36"
@@ -27,10 +27,10 @@ const CHEF_WHITE := "#fefefe"
 const PAPER := "#fff6e6"
 const LEAF := "#5fa873"
 const LEAF_2 := "#74bb86"
-const PAVING := "#cfc6ba"
+const PAVING := "#bdb7b6"
 const ROAD := "#8f8a84"
 
-const BEVEL := 0.03
+const BEVEL := 0.045
 const R_MATTE := 0.9   # walls, fabric, skin, plastic
 const R_WOOD := 0.6    # wood and metal
 const R_GLOSS := 0.4   # tile and food
@@ -83,35 +83,69 @@ static func _poly(st: SurfaceTool, pts: Array, n: Vector3) -> void:
 
 ## A box with every edge chamfered by `b` (the 3 cm toy bevel). Cached by size.
 static func bevel_mesh(size: Vector3, b := BEVEL) -> ArrayMesh:
-	b = minf(b, minf(size.x, minf(size.y, size.z)) * 0.34)
+	# A rounded box with smooth normals: a sphere of radius `b` pulled apart to the
+	# eight corners. Reads as soft moulded clay rather than a chamfered block.
+	b = minf(b, minf(size.x, minf(size.y, size.z)) * 0.45)
 	var key := "box|%s|%s" % [size, b]
 	if _meshes.has(key):
 		return _meshes[key]
-	var h := size / 2.0
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var ring := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]
-	var vx := func(sx: float, sy: float, sz: float) -> Vector3: return Vector3(sx * h.x, sy * (h.y - b), sz * (h.z - b))
-	var vy := func(sx: float, sy: float, sz: float) -> Vector3: return Vector3(sx * (h.x - b), sy * h.y, sz * (h.z - b))
-	var vz := func(sx: float, sy: float, sz: float) -> Vector3: return Vector3(sx * (h.x - b), sy * (h.y - b), sz * h.z)
-	for s: float in [-1.0, 1.0]:
-		_poly(st, ring.map(func(r: Vector2) -> Vector3: return vx.call(s, r.x, r.y)), Vector3(s, 0, 0))
-		_poly(st, ring.map(func(r: Vector2) -> Vector3: return vy.call(r.x, s, r.y)), Vector3(0, s, 0))
-		_poly(st, ring.map(func(r: Vector2) -> Vector3: return vz.call(r.x, r.y, s)), Vector3(0, 0, s))
-	for r: Vector2 in ring:
-		_poly(st, [vy.call(-1, r.x, r.y), vy.call(1, r.x, r.y), vz.call(1, r.x, r.y), vz.call(-1, r.x, r.y)], Vector3(0, r.x, r.y))
-		_poly(st, [vx.call(r.x, -1, r.y), vx.call(r.x, 1, r.y), vz.call(r.x, 1, r.y), vz.call(r.x, -1, r.y)], Vector3(r.x, 0, r.y))
-		_poly(st, [vx.call(r.x, r.y, -1), vx.call(r.x, r.y, 1), vy.call(r.x, r.y, 1), vy.call(r.x, r.y, -1)], Vector3(r.x, r.y, 0))
-		for s: float in [-1.0, 1.0]:
-			_poly(st, [vx.call(s, r.x, r.y), vy.call(s, r.x, r.y), vz.call(s, r.x, r.y)], Vector3(s, r.x, r.y))
-	var m := st.commit()
+	var seg := 4 if b >= 0.025 else 2
+	var inner := size / 2.0 - Vector3(b, b, b)
+	var rings := 2 * (seg + 1)
+	var cols := 4 * (seg + 1)
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var idx := PackedInt32Array()
+	var sxs := [1.0, -1.0, -1.0, 1.0]
+	var szs := [1.0, 1.0, -1.0, -1.0]
+	for ri in rings:
+		var top := ri <= seg
+		var theta := PI / 2.0 * (ri if top else ri - 1) / seg
+		for ci in cols:
+			var q := ci / (seg + 1)
+			var phi := PI / 2.0 * (q + float(ci % (seg + 1)) / seg)
+			var d := Vector3(sin(theta) * cos(phi), cos(theta), sin(theta) * sin(phi))
+			verts.append(Vector3(sxs[q] * inner.x, (1.0 if top else -1.0) * inner.y, szs[q] * inner.z) + d * b)
+			norms.append(d)
+	var tris: Array = []
+	for ri in rings - 1:
+		for ci in cols:
+			var c2 := (ci + 1) % cols
+			var p := ri * cols
+			var n := (ri + 1) * cols
+			tris.append([p + ci, p + c2, n + c2])
+			tris.append([p + ci, n + c2, n + ci])
+	var step := seg + 1
+	var last := (rings - 1) * cols
+	tris.append([0, step, step * 2])
+	tris.append([0, step * 2, step * 3])
+	tris.append([last, last + step, last + step * 2])
+	tris.append([last, last + step * 2, last + step * 3])
+	for tri: Array in tris:
+		var va := verts[tri[0]]
+		var vb := verts[tri[1]]
+		var vc := verts[tri[2]]
+		var cr := (vb - va).cross(vc - va)
+		if cr.length_squared() < 1e-12:
+			continue
+		if cr.dot(norms[tri[0]] + norms[tri[1]] + norms[tri[2]]) > 0.0:
+			idx.append_array([tri[0], tri[2], tri[1]])
+		else:
+			idx.append_array(tri)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+	arrays[Mesh.ARRAY_INDEX] = idx
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_meshes[key] = m
 	return m
 
 
 ## A shape turned on a lathe. `profile` is [radius, height] pairs from the bottom
 ## up the outside. Sharp turns in the profile stay as crisp edges.
-static func lathe_mesh(profile: Array, segs := 24) -> ArrayMesh:
+static func lathe_mesh(profile: Array, segs := 40) -> ArrayMesh:
 	var key := "lathe|%s|%d" % [profile, segs]
 	if _meshes.has(key):
 		return _meshes[key]
@@ -243,8 +277,8 @@ static func ball(parent: Node3D, pos: Vector3, r: float, col: String, emit := 0.
 		var m := SphereMesh.new()
 		m.radius = r
 		m.height = r * 2
-		m.radial_segments = 24
-		m.rings = 12
+		m.radial_segments = 40
+		m.rings = 20
 		_meshes[key] = m
 	return _add(parent, _meshes[key], pos, Color(col), emit, rough)
 
@@ -377,8 +411,8 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 		"counter":
 			_counter(n, CABINET, WORKTOP)
 		"pass":
-			# Coral block, teal base strip, slot dividers on the tan top.
-			_counter(n, CORAL, WORKTOP, false, CABINET)
+			# The anchor frame's long teal counter: coral foot, slot dividers on the tan top.
+			_counter(n, CABINET, WORKTOP, false, CORAL)
 			for sz: float in [-0.5, 0.5]:
 				box(n, Vector3(0, 0.895, sz), Vector3(0.9, 0.035, 0.06), WOOD, 0.0, R_WOOD)
 		"plates":
@@ -407,14 +441,15 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			ball(n, Vector3(0.05, 0.62 + size * 1.75, 0.03), size * 0.55, LEAF_2)
 		"table":
 			# Round two-seat table. Chair backs stop at 0.62 m so heads stay visible.
-			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.26, 0.0], [0.28, 0.02], [0.26, 0.05], [0.09, 0.09], [0.07, 0.5], [0.0, 0.5]], "#4a3a2e", 0.0, R_WOOD)
-			lathe(n, Vector3(0, 0.5, 0), [[0.0, 0.0], [0.6, 0.0], [0.63, 0.03], [0.63, 0.05], [0.6, 0.08], [0.0, 0.08]], "#efd6aa", 0.0, R_WOOD)
+			# Soft-cornered square top on a teal pedestal (the anchor frame).
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.24, 0.0], [0.27, 0.025], [0.26, 0.06], [0.1, 0.1], [0.075, 0.5], [0.0, 0.5]], CABINET, 0.0, R_WOOD)
+			_add(n, bevel_mesh(Vector3(1.16, 0.1, 1.16), 0.05), Vector3(0, 0.55, 0), Color("#ecc88f"), 0.0, R_WOOD)
 			for sx: float in [-1.0, 1.0]:
 				for lx: float in [-0.17, 0.17]:
 					for lz: float in [-0.17, 0.17]:
 						box(n, Vector3(sx + lx, 0, lz), Vector3(0.06, 0.15, 0.06), WOOD, 0.0, R_WOOD)
-				box(n, Vector3(sx, 0.13, 0), Vector3(0.46, 0.07, 0.46), CORAL)
-				box(n, Vector3(sx * 1.2, 0.18, 0), Vector3(0.07, 0.44, 0.46), CORAL_DARK)
+				_add(n, bevel_mesh(Vector3(0.5, 0.1, 0.5), 0.045), Vector3(sx, 0.19, 0), Color(CORAL), 0.0)
+				_add(n, bevel_mesh(Vector3(0.1, 0.46, 0.5), 0.045), Vector3(sx * 1.21, 0.4, 0), Color(CORAL), 0.0)
 			# Mushroom table lamp, 0.24 m.
 			box(n, Vector3(0, 0.58, 0), Vector3(0.12, 0.05, 0.12), CABINET)
 			cyl(n, Vector3(0, 0.62, 0), 0.025, 0.1, PAPER)

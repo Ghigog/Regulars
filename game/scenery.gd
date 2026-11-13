@@ -4,19 +4,19 @@ extends RefCounted
 ## lights (style guide, sheets 10 and 11). No gameplay lives here.
 
 const WALL_H := 2.4
-const WALL_T := 0.24
+const WALL_T := 0.3
 const CUT_H := 0.55
 const KITCHEN_W := 4
 ## A theme is a re-skin of the same kit (sheet 16): grid, stations, heights and
 ## bevels never change; walls, windows, floors, wall art and the slab edge do.
 const THEMES := {
 	"diner": {
-		"backdrop": "#f0dfc4", "wall": "#f6eee0", "wall_low": "#e3d8c6",
-		"tile_a": "#99c3b5", "tile_b": "#f2ead4", "planks": ["#d3a468", "#c9985c", "#dab078"],
+		"backdrop": "#d9cfc1", "wall": "#f6eedd", "wall_low": "#eadfcb", "cut": "#f07a63",
+		"tile_a": "#236a74", "tile_b": "#f1e8cc", "planks": ["#bd7d49", "#b47443", "#c4864f"],
 		"lawn": "#b9c990", "hedge": "#5fa873", "slab": "#4a3a2e",
 	},
 	"seaside": {
-		"backdrop": "#e4ebe0", "wall": "#f3f5ee", "wall_low": "#dde5dc",
+		"backdrop": "#e4ebe0", "wall": "#f3f5ee", "wall_low": "#dde5dc", "cut": "#bfe0d2",
 		"tile_a": "#a8dccb", "tile_b": "#f4efe0", "planks": ["#b9b1a4", "#aaa295", "#c6bfb2"],
 		"lawn": "#ead9b0", "hedge": "#8fb98a", "slab": "#4a3a2e",
 	},
@@ -48,9 +48,9 @@ static func build(root: Node3D, w: int, h: int, door: Vector2i) -> Array[OmniLig
 	_wall(root, Vector3(-WALL_T, 0, -WALL_T), Vector3(w + WALL_T * 2, WALL_H, WALL_T))
 	_wall(root, Vector3(-WALL_T, 0, 0), Vector3(WALL_T, WALL_H, h + WALL_T / 2))
 	# Walls that face the camera drop to a knee-high cutaway. No transparency.
-	_wall(root, Vector3(0, 0, h - WALL_T / 2), Vector3(door.x, CUT_H, WALL_T))
-	_wall(root, Vector3(door.x + 1, 0, h - WALL_T / 2), Vector3(w - door.x - 1 + WALL_T, CUT_H, WALL_T))
-	_wall(root, Vector3(w, 0, 0), Vector3(WALL_T, CUT_H, h - WALL_T / 2))
+	_wall(root, Vector3(0, 0, h - WALL_T / 2), Vector3(door.x, CUT_H, WALL_T), t().cut)
+	_wall(root, Vector3(door.x + 1, 0, h - WALL_T / 2), Vector3(w - door.x - 1 + WALL_T, CUT_H, WALL_T), t().cut)
+	_wall(root, Vector3(w, 0, 0), Vector3(WALL_T, CUT_H, h - WALL_T / 2), t().cut)
 	_doorway(root, door, h)
 	_dining_wall(root, w, lights)
 	_kitchen_wall(root, h, lights)
@@ -79,12 +79,15 @@ static func _floors(root: Node3D, w: int, h: int) -> void:
 	Build.box(root, Vector3(KITCHEN_W, -0.004, h / 2.0), Vector3(0.1, 0.012, h), Build.WOOD, 0.0, Build.R_WOOD)
 
 
-## A wall block from its low corner: darker foot, body, dark trim cap.
-static func _wall(root: Node3D, from: Vector3, size: Vector3) -> void:
+## A wall block from its low corner: one thick, soft-edged cream slab (the
+## anchor frame). `face` paints a knee-high cutaway wall and gives it a cream cap.
+static func _wall(root: Node3D, from: Vector3, size: Vector3, face := "") -> void:
 	var c := from + Vector3(size.x / 2, 0, size.z / 2)
-	Build.box(root, c, Vector3(size.x, 0.17, size.z), t().wall_low)
-	Build.box(root, c + Vector3(0, 0.15, 0), Vector3(size.x, size.y - 0.23, size.z), t().wall)
-	Build.box(root, c + Vector3(0, size.y - 0.1, 0), Vector3(size.x + 0.05, 0.1, size.z + 0.05), Build.TRIM)
+	if face == "":
+		Build._add(root, Build.bevel_mesh(size + Vector3(0, 0.2, 0), 0.07), c + Vector3(0, size.y / 2 - 0.1, 0), Color(t().wall), 0.0)
+		return
+	Build._add(root, Build.bevel_mesh(Vector3(size.x, size.y - 0.02, size.z), 0.05), c + Vector3(0, size.y / 2 - 0.11, 0), Color(face), 0.0)
+	Build._add(root, Build.bevel_mesh(Vector3(size.x + 0.04, 0.14, size.z + 0.04), 0.06), c + Vector3(0, size.y - 0.07, 0), Color(t().wall), 0.0)
 
 
 static func _doorway(root: Node3D, door: Vector2i, h: int) -> void:

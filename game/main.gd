@@ -258,17 +258,18 @@ func _build_scenery() -> void:
 	env.background_color = Color(Scenery.t().backdrop)
 	# Shadows are never black: the ambient fill carries the warm plum of #5a423a.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#f4dcd2")
-	env.ambient_light_energy = 0.62
+	env.ambient_light_color = Color("#eadcd4")
+	env.ambient_light_energy = 0.5
 	env.ssao_enabled = true
-	env.ssao_radius = 0.9
-	env.ssao_intensity = 1.3
-	env.ssao_power = 1.2
+	env.ssao_radius = 1.4
+	env.ssao_intensity = 2.4
+	env.ssao_power = 1.6
+	env.ssao_detail = 0.6
 	env.glow_enabled = true
-	env.glow_intensity = 0.3
+	env.glow_intensity = 0.15
 	env.glow_bloom = 0.03
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.02
+	env.adjustment_saturation = 1.08
 	_env = env
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 	var we := WorldEnvironment.new()
@@ -276,10 +277,10 @@ func _build_scenery() -> void:
 	add_child(we)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-52, -30, 0)
-	sun.light_energy = 0.62
+	sun.light_energy = 0.9
 	sun.shadow_enabled = true
-	sun.shadow_opacity = 0.8
-	sun.shadow_blur = 2.5
+	sun.shadow_opacity = 0.72
+	sun.shadow_blur = 3.0
 	sun.light_angular_distance = 5.0  # wide, soft penumbra
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 60.0
@@ -444,8 +445,8 @@ func _update_daylight() -> void:
 	_sun.light_color = Color("#fff6ea").lerp(Color("#ffd6ac"), t)
 	_sun.rotation_degrees = Vector3(lerpf(-52, -34, t), lerpf(-30, -62, t), 0)
 	_env.background_color = Color(Scenery.t().backdrop).lerp(Color("#d9c9cc"), t)
-	_env.ambient_light_color = Color("#f4dcd2").lerp(Color("#ead6d6"), t)
-	_sun.light_energy = lerpf(0.62, 0.5, t)
+	_env.ambient_light_color = Color("#eadcd4").lerp(Color("#ead6d6"), t)
+	_sun.light_energy = lerpf(0.9, 0.7, t)
 	for l in _sconces:  # practical lights come up as the sun goes down
 		l.light_energy = float(l.get_meta("full", 0.45)) * lerpf(0.35, 1.0, t)
 
