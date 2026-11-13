@@ -905,6 +905,8 @@ func update_status() -> void:
 	_update_guest()
 	var l: Ledger = game.ledger
 	var P = game.Phase
+	if title != null:
+		return   # nothing of the day shows until Play
 	if game.phase != _shown_phase:
 		var first := _shown_phase == -1
 		_shown_phase = game.phase
@@ -1137,7 +1139,7 @@ func _stamp(slot: Punch, delay: float) -> void:
 ## Shows "[E] COOK" over a point on screen, or hides it when `text` is empty.
 func show_prompt(at: Vector2, text: String) -> void:
 	last_action = text
-	prompt.visible = text != ""
+	prompt.visible = text != "" and title == null
 	if text != "":
 		prompt_label.text = text.to_upper()
 		prompt.reset_size()
@@ -1207,9 +1209,44 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _options_card != null:
 		if options_key(key, event.echo):
 			get_viewport().set_input_as_handled()
+	elif title != null and title.key(key, event.echo):
+		get_viewport().set_input_as_handled()
 	elif key == KEY_O and not event.echo:
 		toggle_options()
 		get_viewport().set_input_as_handled()
+
+
+# ---------------------------------------------------------------- title screen
+
+var title: Title
+var _behind_title: Array[Control] = []
+
+
+func title_open() -> bool:
+	return title != null
+
+
+## Covers the room with the title, hiding the rest of the interface until Play.
+## The options screen opens over it (it is added to root after).
+func show_title() -> void:
+	_behind_title.clear()
+	for c in root.get_children():
+		if c is Control and c.visible:
+			c.visible = false
+			_behind_title.append(c)
+	title = Title.new()
+	title.setup(self)
+	root.add_child(title)
+
+
+func hide_title() -> void:
+	if title == null:
+		return
+	title.queue_free()
+	title = null
+	for c in _behind_title:
+		c.visible = true
+	_behind_title.clear()
 
 
 func options_open() -> bool:
@@ -1376,18 +1413,23 @@ func _draw_options_frame() -> void:
 		return
 	var r := row.get_global_rect().grow_individual(14, 6, 10, 6)
 	r.position -= _options_frame.get_global_rect().position
+	pick_frame(_options_frame, r)
+
+
+## The keys-and-pad highlight: an ink frame with a coral pointer tab on its left.
+static func pick_frame(ci: CanvasItem, r: Rect2) -> void:
 	var ink := StyleBoxFlat.new()
 	ink.draw_center = false
 	ink.border_color = INK
 	ink.set_border_width_all(3)
 	ink.set_corner_radius_all(14)
-	_options_frame.draw_style_box(ink, r)
+	ci.draw_style_box(ink, r)
 	var y := r.get_center().y
 	var x := r.position.x
 	var tip := PackedVector2Array([Vector2(x - 2, y), Vector2(x - 20, y - 12), Vector2(x - 20, y + 12)])
-	_options_frame.draw_colored_polygon(PackedVector2Array([tip[0] + Vector2(0, 3), tip[1] + Vector2(0, 3), tip[2] + Vector2(0, 3)]), SHADOW)
-	_options_frame.draw_colored_polygon(tip, CORAL)
-	_options_frame.draw_polyline(PackedVector2Array([tip[0], tip[1], tip[2], tip[0]]), INK, 2.5, true)
+	ci.draw_colored_polygon(PackedVector2Array([tip[0] + Vector2(0, 3), tip[1] + Vector2(0, 3), tip[2] + Vector2(0, 3)]), SHADOW)
+	ci.draw_colored_polygon(tip, CORAL)
+	ci.draw_polyline(PackedVector2Array([tip[0], tip[1], tip[2], tip[0]]), INK, 2.5, true)
 
 
 ## A round cream grabber with an ink ring, big enough for a thumb on touch.
@@ -1679,6 +1721,8 @@ func refresh_input() -> void:
 		show_build()
 	if _options_card:
 		_show_options_tab(_options_tab)
+	if title:
+		title.refresh()
 
 
 ## The build phase: a paper slip along the bottom says what the keys do. The

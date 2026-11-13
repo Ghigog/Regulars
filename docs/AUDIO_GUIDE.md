@@ -3,7 +3,7 @@
 The sound counterpart to `docs/STYLE_GUIDE.md`. In the game now: three real tracks in
 `assets/music` (Daytime, Nighttime, Closed), switched by phase with a cross-fade (`MUSIC`
 and `play_music` in `game/main.gd`), and synthesised effects from `tools/make_sfx.py`.
-`Intro.mp3` is in the folder but not used yet.
+`Intro.mp3` loops on the title screen.
 
 ## The idea
 
@@ -138,7 +138,6 @@ Instrumental collection of very short jazz stingers separated by silence, C majo
 
 ## To build in the game
 
-- Built: track switching by phase (service, build, closed).
+- Built: track switching by phase (title, service, build, closed).
 - Layer fading by `day_progress()` and queue length.
-- A use for `Intro.mp3` (title screen, still undecided).
 - Per-theme music and ambience alongside `REGULARS_THEME`.

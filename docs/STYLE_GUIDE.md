@@ -49,7 +49,8 @@ Implementers should follow these, not the individual drawings.
 - **Name:** "Regulars" for now.
 
 **Open, to be decided later**
-1. **Title screen.** The artist promised a composition but only delivered logos.
+1. **Title screen.** The artist promised a composition but only delivered logos. A placeholder
+   is in the game (see "As built"); the composition is still open.
 2. **Colour-blind support.** Player identity, anger (red) and disgust (green) rely on colour.
    Adding a number on each chef or a shape on each mood is suggested but undecided.
 3. **Subtitle.** "Town Diner" appears on the logos and may become a per-theme subtitle.
@@ -110,6 +111,7 @@ or a later sheet, they win. What changed:
 | Thoughts | Bubbles show one icon (burger, Zzz, green cloud, heart). The written thoughts are still recorded in `sim/` but no longer shown. | Sheet 13. |
 | Popups | "+$12" stays as ink text beside the coin. "ready!", "burnt!" and "walked out" became stars, flames and the anger mark. | Amounts matter; the rest reads without words. |
 | Felix and Nell | Looks invented from the kit (auburn side-sweep and cream collar; top-knot and periwinkle dungarees). | Never drawn. |
+| Logo (title screen) | A placeholder drawn in code (`game/title.gd`) after the bottom-left peg-doll logo on sheet 15: gold and orange letters with an ink outline, four peg heads on them (chef, two buns, red cap), a teal slab on a wooden rim with a chequered dome behind, a burger at the foot. No "Town Diner" banner. | The subtitle is undecided. A drawn logo should replace it. |
 | Stove | Steel body, one large burner with the frying pan always on it. | One cooking slot per stove; a pan over four small burners looked wrong. Steel keeps it distinct from the teal counters. |
 | Patty looks | "Nearly there" and "dry" are looks only. The game still has three item kinds (raw, cooked, burnt) and the same timings. | No gameplay change. |
 | Controls | The chef turns to face the way it moves (eight ways), and uses whichever neighbouring station is most in front, preferring one with something to do. | One key moves diagonally across the grid from this camera, so the chef almost never faced a station squarely. |
