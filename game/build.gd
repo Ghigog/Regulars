@@ -30,7 +30,7 @@ const LEAF_2 := "#74bb86"
 const PAVING := "#bdb7b6"
 const ROAD := "#8f8a84"
 
-const BEVEL := 0.045
+const BEVEL := 0.07   # the large soft bevel is a big part of the look (sheet 1)
 const R_MATTE := 0.9   # walls, fabric, skin, plastic
 const R_WOOD := 0.6    # wood and metal
 const R_GLOSS := 0.4   # tile and food
@@ -39,20 +39,35 @@ static var _mats := {}
 static var _meshes := {}
 
 
-static func mat(col: Color, emit := 0.0, rough := R_MATTE) -> StandardMaterial3D:
-	var key := "%s|%s|%s" % [col.to_html(), emit, rough]
+const CEL := preload("res://game/shaders/cel.gdshader")
+const INK_LINE := preload("res://game/shaders/ink.gdshader")
+
+
+## `ink` adds the thin outline; leave it off for ground sheets and glows.
+static func mat(col: Color, emit := 0.0, rough := R_MATTE, ink := true) -> Material:
+	var key := "%s|%s|%s|%s" % [col.to_html(), emit, rough, ink]
 	if _mats.has(key):
 		return _mats[key]
-	var m := StandardMaterial3D.new()
-	m.albedo_color = col
-	m.roughness = rough
-	m.metallic_specular = 0.35
-	if col.a < 1.0:
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	if emit > 0.0:
-		m.emission_enabled = true
-		m.emission = col
-		m.emission_energy_multiplier = emit
+	if col.a < 1.0:  # glass and the like stay on the standard material
+		var g := StandardMaterial3D.new()
+		g.albedo_color = col
+		g.roughness = rough
+		g.metallic_specular = 0.35
+		g.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_mats[key] = g
+		return g
+	var m := ShaderMaterial.new()
+	m.shader = CEL
+	m.set_shader_parameter("albedo", col)
+	m.set_shader_parameter("emit", emit)
+	m.set_shader_parameter("rough", rough)
+	if rough == R_WOOD and col.h > 0.02 and col.h < 0.16 and col.s > 0.08:
+		m.set_shader_parameter("grain", 1.0)  # warm and wood-rough: give it a grain
+	if ink and emit <= 0.0:
+		var line := ShaderMaterial.new()
+		line.shader = INK_LINE
+		line.set_shader_parameter("albedo", col)
+		m.next_pass = line
 	_mats[key] = m
 	return m
 
@@ -89,7 +104,7 @@ static func bevel_mesh(size: Vector3, b := BEVEL) -> ArrayMesh:
 	var key := "box|%s|%s" % [size, b]
 	if _meshes.has(key):
 		return _meshes[key]
-	var seg := 4 if b >= 0.025 else 2
+	var seg := 6 if b >= 0.06 else (4 if b >= 0.025 else 2)
 	var inner := size / 2.0 - Vector3(b, b, b)
 	var rings := 2 * (seg + 1)
 	var cols := 4 * (seg + 1)
@@ -145,10 +160,39 @@ static func bevel_mesh(size: Vector3, b := BEVEL) -> ArrayMesh:
 
 ## A shape turned on a lathe. `profile` is [radius, height] pairs from the bottom
 ## up the outside. Sharp turns in the profile stay as crisp edges.
+## Turns the gentle bends of a lathe profile into curves, so a turned shape has
+## a round silhouette instead of a string of straight sides. Sharp corners (more
+## than about 40 degrees) are kept as they are.
+static func _round_profile(profile: Array, steps := 5) -> Array:
+	var pts: Array[Vector2] = []
+	for p: Array in profile:
+		pts.append(Vector2(p[0], p[1]))
+	var n := pts.size()
+	if n < 3:
+		return profile
+	var soft: Array[bool] = []  # is the bend at point i gentle?
+	for i in n:
+		soft.append(i > 0 and i < n - 1 \
+				and (pts[i] - pts[i - 1]).normalized().dot((pts[i + 1] - pts[i]).normalized()) >= 0.75)
+	var out: Array = [[pts[0].x, pts[0].y]]
+	for i in n - 1:
+		var a := pts[i]
+		var b := pts[i + 1]
+		if soft[i] or soft[i + 1]:
+			var before: Vector2 = pts[i - 1] if soft[i] else a - (b - a)
+			var after: Vector2 = pts[i + 2] if soft[i + 1] else b + (b - a)
+			for k in range(1, steps):
+				var q := a.cubic_interpolate(b, before, after, float(k) / steps)
+				out.append([maxf(q.x, 0.0), q.y])
+		out.append([b.x, b.y])
+	return out
+
+
 static func lathe_mesh(profile: Array, segs := 40) -> ArrayMesh:
 	var key := "lathe|%s|%d" % [profile, segs]
 	if _meshes.has(key):
 		return _meshes[key]
+	profile = _round_profile(profile)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var group := 0
@@ -367,11 +411,24 @@ static func _tint(col: String, amount := 0.08) -> String:
 static func _counter(n: Node3D, body: String, top: String, doors := true, kick := "") -> void:
 	box(n, Vector3.ZERO, Vector3(0.9, 0.15, 0.9), _shade(body) if kick == "" else kick)
 	box(n, Vector3(0, 0.12, 0), Vector3(0.94, 0.7, 0.94), body)
-	box(n, Vector3(0, 0.82, 0), Vector3(1.0, 0.08, 1.0), top, 0.0, R_WOOD)
+	box(n, Vector3(0, 0.77, 0), Vector3(1.0, 0.13, 1.0), top, 0.0, R_WOOD)  # a thick slab of worktop
 	if doors:
 		for sx: float in [-1.0, 1.0]:
 			box(n, Vector3(sx * 0.225, 0.2, 0.462), Vector3(0.4, 0.54, 0.03), _tint(body, 0.07))
 			box(n, Vector3(sx * 0.08, 0.5, 0.48), Vector3(0.035, 0.12, 0.03), "#d9a441", 0.0, R_WOOD)
+
+
+## The till from sheet 1: a cream wedge with a keyboard slope and a display block.
+static func register(n: Node3D) -> void:
+	var till := Node3D.new()
+	till.position = Vector3(0, 0.9, -0.05)
+	till.rotation.y = PI / 2
+	n.add_child(till)
+	_add(till, bevel_mesh(Vector3(0.56, 0.16, 0.5), 0.05), Vector3(0, 0.08, 0), Color("#efe6d4"), 0.0)
+	_add(till, bevel_mesh(Vector3(0.56, 0.3, 0.22), 0.05), Vector3(0, 0.29, -0.14), Color("#efe6d4"), 0.0)
+	var keys := _add(till, bevel_mesh(Vector3(0.44, 0.03, 0.24), 0.012), Vector3(0, 0.175, 0.1), Color("#bdb5a8"), 0.0)
+	keys.rotation.x = 0.25
+	_add(till, bevel_mesh(Vector3(0.36, 0.12, 0.02), 0.008), Vector3(0, 0.33, -0.03), Color(CABINET), 0.0)
 
 
 ## Furniture visuals centred on a cell, front facing +z. Tier adds a gold trim.
@@ -440,20 +497,21 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 				frond.scale = Vector3(1, 0.7, 1)
 			ball(n, Vector3(0.05, 0.62 + size * 1.75, 0.03), size * 0.55, LEAF_2)
 		"table":
-			# Round two-seat table. Chair backs stop at 0.62 m so heads stay visible.
+			# Two-seat table (sheet 1): a slab top with a small bevel on a slim pedestal and
+			# disc foot; coral chairs on four pale wooden legs, backs to 0.94 m.
 			# Soft-cornered square top on a teal pedestal (the anchor frame).
-			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.24, 0.0], [0.27, 0.025], [0.26, 0.06], [0.1, 0.1], [0.075, 0.5], [0.0, 0.5]], CABINET, 0.0, R_WOOD)
-			_add(n, bevel_mesh(Vector3(1.16, 0.1, 1.16), 0.05), Vector3(0, 0.55, 0), Color("#ecc88f"), 0.0, R_WOOD)
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.25, 0.0], [0.27, 0.02], [0.27, 0.08], [0.25, 0.1], [0.075, 0.1], [0.075, 0.63], [0.0, 0.63]], CABINET, 0.0, R_WOOD)
+			_add(n, bevel_mesh(Vector3(1.12, 0.12, 1.12), 0.035), Vector3(0, 0.68, 0), Color("#ecc88f"), 0.0, R_WOOD)
 			for sx: float in [-1.0, 1.0]:
-				for lx: float in [-0.17, 0.17]:
-					for lz: float in [-0.17, 0.17]:
-						box(n, Vector3(sx + lx, 0, lz), Vector3(0.06, 0.15, 0.06), WOOD, 0.0, R_WOOD)
-				_add(n, bevel_mesh(Vector3(0.5, 0.1, 0.5), 0.045), Vector3(sx, 0.19, 0), Color(CORAL), 0.0)
-				_add(n, bevel_mesh(Vector3(0.1, 0.46, 0.5), 0.045), Vector3(sx * 1.21, 0.4, 0), Color(CORAL), 0.0)
+				for lx: float in [-0.21, 0.21]:
+					for lz: float in [-0.21, 0.21]:
+						_add(n, bevel_mesh(Vector3(0.075, 0.36, 0.075), 0.02), Vector3(sx + lx, 0.18, lz), Color("#d9a56a"), 0.0, R_WOOD)
+				_add(n, bevel_mesh(Vector3(0.58, 0.1, 0.58), 0.035), Vector3(sx, 0.4, 0), Color(CORAL), 0.0)
+				_add(n, bevel_mesh(Vector3(0.1, 0.56, 0.58), 0.035), Vector3(sx * 1.24, 0.66, 0), Color(CORAL), 0.0)
 			# Mushroom table lamp, 0.24 m.
-			box(n, Vector3(0, 0.58, 0), Vector3(0.12, 0.05, 0.12), CABINET)
-			cyl(n, Vector3(0, 0.62, 0), 0.025, 0.1, PAPER)
-			lathe(n, Vector3(0, 0.7, 0), [[0.0, 0.0], [0.1, 0.0], [0.11, 0.02], [0.08, 0.08], [0.03, 0.115], [0.0, 0.12]], CORAL, 0.5)
+			box(n, Vector3(0, 0.72, 0), Vector3(0.12, 0.05, 0.12), CABINET)
+			cyl(n, Vector3(0, 0.76, 0), 0.025, 0.1, PAPER)
+			lathe(n, Vector3(0, 0.84, 0), [[0.0, 0.0], [0.1, 0.0], [0.11, 0.02], [0.08, 0.08], [0.03, 0.115], [0.0, 0.12]], CORAL, 0.5)
 	if tier > 1:
 		for i in tier - 1:
 			box(n, Vector3(0, 0.05 + i * 0.1, 0), Vector3(1.02, 0.04, 1.02), WARN, 0.6)

@@ -4,10 +4,10 @@ extends Node3D
 enum Phase { SERVICE, SUMMARY, CLOSED, BUILD }
 
 const W := 10            # restaurant interior is 10 x 7 cells
-const H := 7             # rows 7 and 8 are the pavement outside
-const DOOR := Vector2i(5, 7)
-const SPAWN := Vector2i(9, 8)
-const EXIT := Vector2i(0, 8)
+const H := 7             # columns 10 and 11 are the pavement outside, to the right
+const DOOR := Vector2i(W, 4)         # the pavement cell just outside the doorway, on the right-hand wall
+const SPAWN := Vector2i(W + 1, 0)
+const EXIT := Vector2i(W + 1, H - 1)
 const BILL := 12
 const SIGHT_RANGE := 7
 ## Disgust sources: [starting rate per second, seconds to double, top rate]. See
@@ -34,10 +34,16 @@ const MUSIC := {"day": "Daytime", "night": "Nighttime", "closed": "Closed"}
 # The camera sits wide to show the whole diorama between days, and moves in on
 # the room and the queue while guests are being served.
 const CAM_OFFSET := Vector3(14, 15, 14)
-const WIDE_SIZE := 14.5
-const WIDE_FOCUS := Vector3(W / 2.0 + 0.2, 0, H / 2.0 + 1.7)
-const CLOSE_SIZE := 11.5
-const CLOSE_FOCUS := Vector3(W / 2.0 - 0.6, 0, H / 2.0)
+const WIDE_SIZE := 12.2
+# Sun, morning to evening (x to y).
+const SUN_PITCH := Vector2(-50, -36)
+# The sun rule: the light comes from the side the room's long axis points to, so
+# the building's shadows fall back across the middle of the screen.
+const SUN_YAW := 90.0 if W >= H else 0.0
+const SUN_ENERGY := Vector2(0.95, 0.9)
+const WIDE_FOCUS := Vector3(W / 2.0 + 0.9, 0, H / 2.0 + 0.1)  # framed on the room, with paper showing all round
+const CLOSE_SIZE := 10.4
+const CLOSE_FOCUS := Vector3(W / 2.0 + 0.3, 0, H / 2.0 - 0.2)
 
 var grid: Grid
 var town: Town
@@ -80,7 +86,7 @@ var _shot_time := 0.0
 
 func _ready() -> void:
 	var seed_value := int(Time.get_unix_time_from_system())
-	grid = Grid.new(W, H + 2)
+	grid = Grid.new(W + 2, H)   # columns W and W + 1 are the pavement outside
 	town = Town.new(seed_value)
 	ledger = Ledger.new()
 	catalog = Catalog.new(seed_value)
@@ -106,7 +112,11 @@ func _ready() -> void:
 	for turn: float in [PI / 4, -PI / 4]:
 		var arm := Build.box(_no_mark, Vector3(0, 0.02, 0), Vector3(1.2, 0.05, 0.2), Build.DANGER, 0.6)
 		arm.rotation.y = turn
-		var m: StandardMaterial3D = arm.get_active_material(0).duplicate()
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(Build.DANGER)
+		m.emission_enabled = true
+		m.emission = Color(Build.DANGER)
+		m.emission_energy_multiplier = 0.6
 		m.no_depth_test = true          # shows through whatever is already standing there
 		m.render_priority = 5
 		arm.material_override = m
@@ -120,8 +130,8 @@ func _apply_demo(demo: String) -> void:
 	if demo == "cook":
 		find_station("stove").set_item("raw_patty")
 		find_station("stove").cook = -8.2
-		stations[Vector2i(2, 0)].set_item("raw_patty")
-		player.position = Grid.center(Vector2i(1, 1))
+		stations[Vector2i(0, 3)].set_item("raw_patty")
+		player.position = Grid.center(Vector2i(1, 3))
 		player.look(Vector2i(0, -1))
 		player.set_held("plate")
 		for a in arrivals:
@@ -130,23 +140,23 @@ func _apply_demo(demo: String) -> void:
 		arrivals.clear()
 		phase = Phase.SUMMARY
 		cam.size = 6.5
-		cam.position += Vector3(-1.5, 0, 3.4)
+		cam.position += Vector3(3.4, 0, -1.5)
 		var names: Array = Peg.LOOKS.keys()
 		for i in names.size():
 			var p := Peg.guest(names[i])
-			p.position = Vector3(1.0 + (i % 7) * 1.0 + (i / 7) * 0.5, 0, 7.6 + (i / 7) * 1.1 - (i % 7) * 0.25)
+			p.position = Vector3(10.6 + (i / 7) * 1.1 - (i % 7) * 0.25, 0, 7.4 - (i % 7) * 1.0 - (i / 7) * 0.5)
 			p.rotation.y = PI / 4
 			p.pose = ["idle", "carry", "tap", "wave"][i % 4]
 			add_child(p)
 		for i in Peg.FACES.size():
 			var p := Peg.guest(names[i + 3])
 			p.set_face(Peg.FACES[i])
-			p.position = Vector3(1.6 + i * 0.95, 0, 10.2 - i * 0.3)
+			p.position = Vector3(13.2 - i * 0.3, 0, 7.2 - i * 0.95)
 			p.rotation.y = PI / 4
 			add_child(p)
 		for i in 4:
 			var c := Peg.chef(i)
-			c.position = Vector3(6.2 + i, 0, 12.2 - i * 0.6)
+			c.position = Vector3(15.0 - i * 0.6, 0, 3.4 - i)
 			c.rotation.y = PI / 4 + i * PI / 2
 			add_child(c)
 	elif demo == "fx":  # fires every effect in turn; shoot at about 6.5 and 8.4
@@ -258,37 +268,52 @@ func _build_scenery() -> void:
 	env.background_color = Color(Scenery.t().backdrop)
 	# Shadows are never black: the ambient fill carries the warm plum of #5a423a.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#eadcd4")
-	env.ambient_light_energy = 0.5
+	env.ambient_light_color = Color("#ece0dc")
+	env.ambient_light_energy = 0.62  # a high, tinted fill: shadows are soft and never dark
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 1.12
+	env.tonemap_white = 1.7
 	env.ssao_enabled = true
-	env.ssao_radius = 1.4
-	env.ssao_intensity = 2.4
-	env.ssao_power = 1.6
+	env.ssao_radius = 1.6
+	env.ssao_intensity = 1.4
+	env.ssao_power = 1.4
 	env.ssao_detail = 0.6
 	env.glow_enabled = true
 	env.glow_intensity = 0.15
 	env.glow_bloom = 0.03
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.08
+	env.adjustment_saturation = 1.12
 	_env = env
 	get_viewport().msaa_3d = Viewport.MSAA_4X
+	# Grain-free soft shadows and contact shading: the default filters dither.
+	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_ULTRA)
+	RenderingServer.directional_shadow_atlas_set_size(8192, true)
+	RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_HIGH, false, 0.5, 3, 50, 300)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-52, -30, 0)
-	sun.light_energy = 0.9
+	sun.rotation_degrees = Vector3(SUN_PITCH.x, SUN_YAW, 0)
+	sun.light_energy = SUN_ENERGY.x
 	sun.shadow_enabled = true
-	sun.shadow_opacity = 0.72
-	sun.shadow_blur = 3.0
-	sun.light_angular_distance = 5.0  # wide, soft penumbra
+	sun.shadow_opacity = 0.6
+	sun.shadow_blur = 2.2  # an even, soft edge; a wide sun disc dithers instead
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	sun.directional_shadow_max_distance = 60.0
+	sun.directional_shadow_max_distance = 48.0  # just past the far corner of the paper
+	sun.directional_shadow_fade_start = 1.0
+	# Small biases keep each shadow attached to the foot of what casts it. The
+	# defaults (0.1 and 2.0) slide shadows sideways and open a gap under walls.
+	sun.shadow_bias = 0.03
+	sun.shadow_normal_bias = 0.4
 	_sun = sun
 	add_child(sun)
 	cam = Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
 	cam.size = WIDE_SIZE
+	# Tight clip planes: with the default 0.05 to 4000 an orthographic camera gets
+	# no directional shadows at all.
+	cam.near = 1.0
+	cam.far = 80.0
 	add_child(cam)
 	cam.look_at_from_position(WIDE_FOCUS + CAM_OFFSET, WIDE_FOCUS)
 
@@ -301,8 +326,9 @@ func _add_lamp(over: Vector3) -> OmniLight3D:
 	var light := OmniLight3D.new()
 	light.position = over + Vector3(0, 1.0, 0)
 	light.light_color = Color("#ffd9a0")
-	light.light_energy = 0.45
-	light.omni_range = 2.6
+	light.light_energy = 0.8
+	light.set_meta("full", 0.8)
+	light.omni_range = 2.8
 	add_child(light)
 	_sconces.append(light)
 	return light
@@ -310,17 +336,27 @@ func _add_lamp(over: Vector3) -> OmniLight3D:
 
 func _build_layout() -> void:
 	for spot: Array in [
-		["fridge", 0, 0], ["stove", 1, 0], ["stove", 2, 0], ["counter", 3, 0],
-		["plates", 0, 2, 1], ["sink", 0, 3, 1], ["bin", 0, 5, 1],
-		["pass", 4, 0], ["pass", 4, 1], ["pass", 4, 2], ["pass", 4, 3], ["pass", 4, 4],
+		# The cooking line runs down the left wall under the hood, as in sheet 1.
+		# The cell in front of the back doorway stays clear, so the fridge can be reached.
+		["fridge", 0, 2], ["plates", 2, 2], ["sink", 3, 2],
+		["stove", 0, 3, 1], ["stove", 0, 4, 1], ["bin", 0, 5, 1], ["counter", 0, 6, 1],
+		["pass", 4, 2], ["pass", 4, 3], ["pass", 4, 4], ["pass", 4, 5],
 		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], ["plant", 9, 0],
 	]:
 		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
+	Build.register(stations[Vector2i(4, 2)])  # the till lives on the pass and moves with it
 	# The front wall (drawn by Scenery as a knee-high cutaway) has a doorway;
 	# guests cannot see or walk through the rest.
-	for x in W:
-		if x != DOOR.x:
-			grid.walls[Vector3i(x, H, 0)] = true
+	for y in H:
+		if y != DOOR.y:
+			grid.walls[Vector3i(W, y, 1)] = true
+	# The room is an L: the corner behind the kitchen is not part of it.
+	for x in Scenery.KITCHEN_W:
+		grid.walls[Vector3i(x, Scenery.KITCHEN_Z, 0)] = true
+		for y in Scenery.KITCHEN_Z:
+			grid.blocked[Vector2i(x, y)] = true
+	for y in Scenery.KITCHEN_Z:
+		grid.walls[Vector3i(Scenery.KITCHEN_W, y, 1)] = true
 
 
 func add_station(type: String, cell: Vector2i, tier := 1, facing := 0) -> Station:
@@ -442,11 +478,11 @@ func shake(amount := 0.12) -> void:
 ## Morning light drifts to a warm, low evening sun as the day goes on.
 func _update_daylight() -> void:
 	var t := smoothstep(0.35, 1.0, day_progress())
-	_sun.light_color = Color("#fff6ea").lerp(Color("#ffd6ac"), t)
-	_sun.rotation_degrees = Vector3(lerpf(-52, -34, t), lerpf(-30, -62, t), 0)
+	_sun.light_color = Color("#fff3e2").lerp(Color("#ffb27c"), t)  # ends in an orange sunset
+	_sun.rotation_degrees = Vector3(lerpf(SUN_PITCH.x, SUN_PITCH.y, t), SUN_YAW, 0)
 	_env.background_color = Color(Scenery.t().backdrop).lerp(Color("#d9c9cc"), t)
-	_env.ambient_light_color = Color("#eadcd4").lerp(Color("#ead6d6"), t)
-	_sun.light_energy = lerpf(0.9, 0.7, t)
+	_env.ambient_light_color = Color("#ece0dc").lerp(Color("#d9bfd0"), t)  # mauve evening shade
+	_sun.light_energy = lerpf(SUN_ENERGY.x, SUN_ENERGY.y, t)
 	for l in _sconces:  # practical lights come up as the sun goes down
 		l.light_energy = float(l.get_meta("full", 0.45)) * lerpf(0.35, 1.0, t)
 
@@ -825,7 +861,7 @@ func spawn_group(ids: Array) -> Array[Guest]:
 
 func _reflow_queue() -> void:
 	for i in queue.size():
-		queue[i].walk_to(Vector2i(mini(DOOR.x + i, W - 1), H))
+		queue[i].walk_to(Vector2i(W, maxi(DOOR.y - i, 0)))
 
 
 ## A table nobody is sitting at with room for `count`; the smallest that fits.

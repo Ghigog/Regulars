@@ -5,6 +5,7 @@ extends Node3D
 ## mitten hands. The figure faces +z. Variety comes from the kit: skin, hair, hat,
 ## face extras, outfit colour and pattern.
 
+const SCALE := 1.3      # in the world a peg stands 1.5 m: head and shoulders over a counter (sheet 1)
 const HEAD_R := 0.27
 const HEAD_Y := 0.84
 const HEAD_SCALE := 1.12   # the sheet-2 head is nearly half the figure
@@ -50,6 +51,14 @@ var _head: MeshInstance3D
 var _features: Node3D
 var _hands: Array[Node3D] = []
 var _age := 0.0
+
+
+## A holder that brings a peg up to world size. Animate the peg; place the rig.
+static func rigged(peg: Peg) -> Node3D:
+	var rig := Node3D.new()
+	rig.scale = Vector3.ONE * SCALE
+	rig.add_child(peg)
+	return rig
 
 
 static func guest(person_name: String) -> Peg:
@@ -243,7 +252,11 @@ func _toque(trim: String) -> void:
 	var y := HEAD_R - 0.1
 	Build.lathe(_head, Vector3(0, y, 0), [[0.0, 0.0], [0.2, 0.0], [0.21, 0.01], [0.21, 0.19], [0.0, 0.19]], Build.CHEF_WHITE)
 	_band_on(_head, y, 0.213, 0.07, trim)
-	Build.lathe(_head, Vector3(0, y + 0.17, 0), [[0.0, 0.0], [0.19, 0.0], [0.27, 0.05], [0.29, 0.13], [0.25, 0.21], [0.15, 0.255], [0.0, 0.265]], Build.CHEF_WHITE)
+	# The puff: a soft crown with five billowing lobes round it (sheet 5).
+	Build.lathe(_head, Vector3(0, y + 0.17, 0), [[0.0, 0.0], [0.17, 0.0], [0.24, 0.05], [0.26, 0.13], [0.22, 0.21], [0.13, 0.255], [0.0, 0.265]], Build.CHEF_WHITE)
+	for i in 5:
+		var a := TAU * i / 5.0 + 0.3
+		Build.ball(_head, Vector3(cos(a) * 0.16, y + 0.3, sin(a) * 0.16), 0.15, Build.CHEF_WHITE).scale = Vector3(1, 0.9, 1)
 
 
 # ---------------------------------------------------------------- faces

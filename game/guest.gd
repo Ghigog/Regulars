@@ -6,7 +6,7 @@ const SPEED := 2.4
 const QUEUE_PATIENCE := 40.0
 const EAT_TIME := 5.0
 const BAR_WIDTH := 0.6
-const SEAT_HEIGHT := 0.2
+const SEAT_HEIGHT := 0.33
 
 var game
 var idx := 0
@@ -45,17 +45,17 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	position = Grid.center(start)
 	_body = Peg.guest(info.name)
 	_body.rotation.y = -PI / 2
-	add_child(_body)
+	add_child(Peg.rigged(_body))
 	# A chunky patience meter under the thought bubble, facing the camera.
 	_bar = Node3D.new()
-	_bar.position = Vector3(0, 1.58, 0)
+	_bar.position = Vector3(0, 1.58 * Peg.SCALE, 0)
 	_bar.basis = Build.CAM_BASIS
 	add_child(_bar)
 	Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH + 0.07, 0.15), Build.TRIM)
 	Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH, 0.08), "#6b5647", 0.003)
 	_fill = Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH, 0.08), "#ffffff", 0.006)
 	_order = Fx.bubble()
-	_order.position = Vector3(0, 2.0, 0)
+	_order.position = Vector3(0, 2.0 * Peg.SCALE - 0.1, 0)
 	add_child(_order)
 	# A paper name tag.
 	_label = Label3D.new()
@@ -66,7 +66,7 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	_label.pixel_size = 0.006
 	_label.modulate = Color(Build.TRIM)
 	_label.outline_modulate = Color(Build.PAPER)
-	_label.position = Vector3(0, 1.3, 0)
+	_label.position = Vector3(0, 1.3 * Peg.SCALE, 0)
 	_label.text = info.name
 	add_child(_label)
 
@@ -120,7 +120,7 @@ func _set_meal(kind: String, quality: float) -> void:
 	_meal_kind = kind
 	var to_table := (Grid.center(table.cell) - position).normalized()
 	_meal = Build.item(kind, quality)
-	_meal.position = to_table * 0.62 + Vector3(0, 0.58, 0)
+	_meal.position = to_table * 0.62 + Vector3(0, 0.74, 0)
 	add_child(_meal)
 
 

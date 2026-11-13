@@ -37,7 +37,7 @@ many days as you can; three walkouts in one day ends the run.
   back; a piece still carried when the day opens goes back too. Sell (button or X)
   refunds half the catalog price. Fixtures (fridge, sink, bin, plate stack, pass
   counters) can be moved but not sold, and the last stove and last table cannot be sold.
-  Player-built partitions move and sell the same way; the front wall does not.
+  Player-built partitions move and sell the same way; the entrance wall does not.
 - **Upgrades are catalog entries.** Stove, fern and table are sold in three tiers; a
   tier costs 1x, 2x, 4x the base price and each tier needs one more level. Counter and
   partition have one tier. There are no free blueprints.

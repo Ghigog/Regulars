@@ -22,7 +22,7 @@ func setup(game_, start: Vector2i) -> void:
 	game = game_
 	position = Grid.center(start)
 	_body = Peg.chef(0)
-	add_child(_body)
+	add_child(Peg.rigged(_body))
 
 
 func set_held(kind: String, quality := 1.0) -> void:

@@ -215,7 +215,7 @@ func refresh() -> void:
 	elif type == "table":
 		for i in dirty:
 			var d := Build.item("dirty_plate")
-			d.position = Vector3(-0.25 + i * 0.5, 0.58, 0.3)
+			d.position = Vector3(-0.25 + i * 0.5, 0.74, 0.3)
 			_stack.add_child(d)
 
 

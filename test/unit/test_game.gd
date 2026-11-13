@@ -127,8 +127,8 @@ func test_catalog_piece_is_paid_for_when_placed_and_gated_by_level():
 	assert_false(game.pick_catalog("stove"), "level 3 and $80")
 	assert_true(game.pick_catalog("counter"))
 	assert_eq(game.ledger.money, 50, "picking is free")
-	assert_false(game.place(Vector3i(5, 6, 0)), "that would block the doorway")
-	assert_false(game.place(Vector3i(1, 0, 0)), "a stove is already there")
+	assert_false(game.place(Vector3i(9, 4, 0)), "that would block the doorway")
+	assert_false(game.place(Vector3i(0, 2, 0)), "a stove is already there")
 	assert_true(game.place(Vector3i(2, 4, 0)))
 	assert_eq(game.ledger.money, 35)
 	assert_eq(game.stations[Vector2i(2, 4)].type, "counter")
@@ -169,9 +169,9 @@ func test_moving_a_piece_is_free_and_cancel_puts_it_back():
 func test_carried_piece_goes_back_when_the_day_opens():
 	_to_build()
 	var fridge: Station = game.find_station("fridge")
-	assert_true(game.pick_up(Vector3(0.5, 0, 0.5)))
+	assert_true(game.pick_up(Vector3(0.5, 0, 2.5)))
 	game.start_day()
-	assert_eq(game.stations[Vector2i(0, 0)], fridge)
+	assert_eq(game.stations[Vector2i(0, 2)], fridge)
 	assert_true(fridge.visible)
 
 
@@ -202,17 +202,17 @@ func test_selling_refunds_half_but_not_the_last_stove_or_fixtures():
 	assert_true(game.sell_hand())
 	assert_eq(game.ledger.money, 60)
 	assert_false(game.stations.has(Vector2i(9, 0)))
-	assert_true(game.pick_up(Vector3(0.5, 0, 0.5)))        # the fridge
+	assert_true(game.pick_up(Vector3(0.5, 0, 2.5)))        # the fridge
 	assert_false(game.sell_hand(), "fixtures are not for sale")
 	game.cancel_hand()
-	assert_true(game.pick_up(Vector3(1.5, 0, 0.5)))        # one of two stoves
+	assert_true(game.pick_up(Vector3(0.5, 0, 3.5)))        # one of two stoves
 	assert_true(game.sell_hand())
 	assert_eq(game.ledger.money, 100)
-	assert_true(game.pick_up(Vector3(2.5, 0, 0.5)))
+	assert_true(game.pick_up(Vector3(0.5, 0, 4.5)))
 	assert_eq(game.sell_block(), "Your last stove")
 	assert_false(game.sell_hand())
 	game.cancel_hand()
-	assert_eq(game.find_station("stove").cell, Vector2i(2, 0))
+	assert_eq(game.find_station("stove").cell, Vector2i(0, 4))
 
 
 func test_partition_can_be_picked_up_moved_and_sold():
@@ -227,7 +227,7 @@ func test_partition_can_be_picked_up_moved_and_sold():
 	assert_true(game.pick_up(Vector3(6.05, 0, 4.5)))
 	assert_true(game.sell_hand())
 	assert_eq(game.ledger.money, 45)
-	assert_false(game.pick_up(Vector3(3.5, 0, 6.95)), "the front wall is not yours to move")
+	assert_false(game.pick_up(Vector3(9.95, 0, 2.5)), "the entrance wall is not yours to move")
 
 
 func test_new_table_seats_guests():
@@ -484,20 +484,20 @@ func test_chef_can_serve_from_beside_the_guest_without_facing_the_table():
 
 
 func test_chef_aims_at_the_station_most_in_front():
-	# Holding meat at (1, 1): stoves at (1, 0) and, diagonally, (2, 0) can both take it.
+	# Holding meat at (1, 3): stoves at (0, 3) and, diagonally, (0, 4) can both take it.
 	_use("fridge")
-	game.player.position = Grid.center(Vector2i(1, 1))
-	game.player.look(Vector2i(0, -1))
-	assert_eq(game.player.target_cell(), Vector2i(1, 0), "the nearer one")
+	game.player.position = Grid.center(Vector2i(1, 3))
+	game.player.look(Vector2i(-1, 0))
+	assert_eq(game.player.target_cell(), Vector2i(0, 3), "the nearer one")
 	# One key moves diagonally from this camera; the chef still finds the stove.
 	game.player.move(Vector2(0, 1), 0.0)
-	assert_eq(game.player.target_cell(), Vector2i(1, 0))
+	assert_eq(game.player.target_cell(), Vector2i(0, 3))
 	# Nearness, not facing, decides: looking away still reaches it.
-	game.player.look(Vector2i(0, 1))
-	assert_eq(game.player.target_cell(), Vector2i(1, 0))
+	game.player.look(Vector2i(1, 0))
+	assert_eq(game.player.target_cell(), Vector2i(0, 3))
 	# Standing by the far stove's corner picks that one instead.
-	game.player.position = Grid.center(Vector2i(2, 1)) + Vector3(0.2, 0, 0)
-	assert_eq(game.player.target_cell(), Vector2i(2, 0))
+	game.player.position = Grid.center(Vector2i(1, 4)) + Vector3(0, 0, 0.2)
+	assert_eq(game.player.target_cell(), Vector2i(0, 4))
 	# With nothing useful in reach, nothing is targeted.
 	game.player.position = Grid.center(Vector2i(2, 5))
 	assert_false(game.stations.has(game.player.target_cell()))

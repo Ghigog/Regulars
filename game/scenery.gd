@@ -7,24 +7,26 @@ const WALL_H := 2.4
 const WALL_T := 0.3
 const CUT_H := 0.55
 const KITCHEN_W := 4
+const KITCHEN_Z := 2   # the room is an L (sheet 1): the kitchen's back wall stands this many rows forward of the dining room's
+const CAM_RISE := 14.0 / 15.0  # how far back along the ground one metre of height appears from the fixed camera
+static var X0 := 3.0  # the near end of the street as drawn; set in _ground
 ## A theme is a re-skin of the same kit (sheet 16): grid, stations, heights and
-## bevels never change; walls, windows, floors, wall art and the slab edge do.
+## bevels never change; walls, windows, floors and wall art do.
 const THEMES := {
 	"diner": {
 		"backdrop": "#d9cfc1", "wall": "#f6eedd", "wall_low": "#eadfcb", "cut": "#f07a63",
 		"tile_a": "#236a74", "tile_b": "#f1e8cc", "planks": ["#bd7d49", "#b47443", "#c4864f"],
-		"lawn": "#b9c990", "hedge": "#5fa873", "slab": "#4a3a2e",
 	},
 	"seaside": {
 		"backdrop": "#e4ebe0", "wall": "#f3f5ee", "wall_low": "#dde5dc", "cut": "#bfe0d2",
 		"tile_a": "#a8dccb", "tile_b": "#f4efe0", "planks": ["#b9b1a4", "#aaa295", "#c6bfb2"],
-		"lawn": "#ead9b0", "hedge": "#8fb98a", "slab": "#4a3a2e",
 	},
 }
 const SEAFOAM := "#bfe0d2"
 const BRASS := "#d9a441"
-const X0 := -2.6    # the slab everything stands on
 const Z0 := -1.2
+const PAPER_Y := -0.14
+const BASE_M := 0.5   # how far the street runs past the floor on the right: flush with the wall
 const Z1 := 12.5
 const PAVE_Z := 9.9  # where the pavement (or pier) meets the road (or sea)
 
@@ -45,13 +47,16 @@ static func build(root: Node3D, w: int, h: int, door: Vector2i) -> Array[OmniLig
 	_ground(root, w, lights)
 	_floors(root, w, h)
 	# Far walls stand full height, just outside the floor.
-	_wall(root, Vector3(-WALL_T, 0, -WALL_T), Vector3(w + WALL_T * 2, WALL_H, WALL_T))
-	_wall(root, Vector3(-WALL_T, 0, 0), Vector3(WALL_T, WALL_H, h + WALL_T / 2))
-	# Walls that face the camera drop to a knee-high cutaway. No transparency.
-	_wall(root, Vector3(0, 0, h - WALL_T / 2), Vector3(door.x, CUT_H, WALL_T), t().cut)
-	_wall(root, Vector3(door.x + 1, 0, h - WALL_T / 2), Vector3(w - door.x - 1 + WALL_T, CUT_H, WALL_T), t().cut)
-	_wall(root, Vector3(w, 0, 0), Vector3(WALL_T, CUT_H, h - WALL_T / 2), t().cut)
-	_doorway(root, door, h)
+	_wall(root, Vector3(KITCHEN_W - WALL_T, 0, -WALL_T), Vector3(w - KITCHEN_W + WALL_T * 2, WALL_H, WALL_T))  # dining, back
+	_wall(root, Vector3(KITCHEN_W - WALL_T, 0, 0), Vector3(WALL_T, WALL_H, KITCHEN_Z))                        # the jog
+	_wall(root, Vector3(-WALL_T, 0, KITCHEN_Z - WALL_T), Vector3(KITCHEN_W, WALL_H, WALL_T))                  # kitchen, back
+	_wall(root, Vector3(-WALL_T, 0, KITCHEN_Z), Vector3(WALL_T, WALL_H, h - KITCHEN_Z))                       # kitchen, left
+	# The entrance wall, on the right, drops to a knee-high cutaway with the
+	# doorway in it. The near-left side has no wall at all: the floor simply ends
+	# (sheet 1). No transparency.
+	_wall(root, Vector3(w - WALL_T / 2, 0, 0), Vector3(WALL_T, CUT_H, door.y), t().cut)
+	_wall(root, Vector3(w - WALL_T / 2, 0, door.y + 1), Vector3(WALL_T, CUT_H, h - door.y - 1), t().cut)
+	_doorway(_turned(root, Vector3(w, 0, door.y + 1)), Vector2i.ZERO, 0)
 	_dining_wall(root, w, lights)
 	_kitchen_wall(root, h, lights)
 	_dressing(root, w, h)
@@ -60,14 +65,15 @@ static func build(root: Node3D, w: int, h: int, door: Vector2i) -> Array[OmniLig
 
 static func _floors(root: Node3D, w: int, h: int) -> void:
 	for x in KITCHEN_W:
-		for y in h:
+		for y in range(KITCHEN_Z, h):
 			var col: String = t().tile_b if (x + y) % 2 else t().tile_a
 			Build.box(root, Vector3(x + 0.5, -0.03, y + 0.5), Vector3(0.985, 0.03, 0.985), col, 0.0, Build.R_GLOSS)
 	# Dining: oak planks, half a metre wide, with staggered joints.
 	var tones: Array = t().planks
 	for r in h * 2:
-		var cuts: Array[float] = [float(KITCHEN_W)]
-		var x := KITCHEN_W + 0.7 + fmod(r * 0.9, 1.6)
+		var x_from := float(KITCHEN_W)
+		var cuts: Array[float] = [x_from]
+		var x := x_from + 0.7 + fmod(r * 0.9, 1.6)
 		while x < w - 0.3:
 			cuts.append(x)
 			x += 2.0
@@ -76,7 +82,7 @@ static func _floors(root: Node3D, w: int, h: int) -> void:
 			var length := cuts[i + 1] - cuts[i]
 			Build.box(root, Vector3(cuts[i] + length / 2, -0.03, r * 0.5 + 0.25), Vector3(length - 0.012, 0.03, 0.488), tones[(r + i * 2) % 3], 0.0, Build.R_WOOD)
 	# A flat wooden threshold hides the seam between any two floors.
-	Build.box(root, Vector3(KITCHEN_W, -0.004, h / 2.0), Vector3(0.1, 0.012, h), Build.WOOD, 0.0, Build.R_WOOD)
+	Build.box(root, Vector3(KITCHEN_W, -0.004, (KITCHEN_Z + h) / 2.0), Vector3(0.1, 0.012, h - KITCHEN_Z), Build.WOOD, 0.0, Build.R_WOOD)
 
 
 ## A wall block from its low corner: one thick, soft-edged cream slab (the
@@ -84,20 +90,31 @@ static func _floors(root: Node3D, w: int, h: int) -> void:
 static func _wall(root: Node3D, from: Vector3, size: Vector3, face := "") -> void:
 	var c := from + Vector3(size.x / 2, 0, size.z / 2)
 	if face == "":
-		Build._add(root, Build.bevel_mesh(size + Vector3(0, 0.2, 0), 0.07), c + Vector3(0, size.y / 2 - 0.1, 0), Color(t().wall), 0.0)
+		Build._add(root, Build.bevel_mesh(size + Vector3(0, 0.2, 0), 0.13), c + Vector3(0, size.y / 2 - 0.1, 0), Color(t().wall), 0.0)
 		return
-	Build._add(root, Build.bevel_mesh(Vector3(size.x, size.y - 0.02, size.z), 0.05), c + Vector3(0, size.y / 2 - 0.11, 0), Color(face), 0.0)
+	Build._add(root, Build.bevel_mesh(Vector3(size.x, size.y + 0.08, size.z), 0.1), c + Vector3(0, size.y / 2 - 0.16, 0), Color(face), 0.0)
 	Build._add(root, Build.bevel_mesh(Vector3(size.x + 0.04, 0.14, size.z + 0.04), 0.06), c + Vector3(0, size.y - 0.07, 0), Color(t().wall), 0.0)
+
+
+## A holder a quarter turn round, so pieces drawn along the x axis run along z:
+## local (x, z) lands at `at` + (z, -x).
+static func _turned(root: Node3D, at: Vector3) -> Node3D:
+	var n := Node3D.new()
+	n.position = at
+	n.rotation.y = PI / 2
+	root.add_child(n)
+	return n
 
 
 static func _doorway(root: Node3D, door: Vector2i, h: int) -> void:
 	# A coral frame stands full height in the cutaway, with the hanging burger sign.
-	for dx: float in [-0.02, 1.02]:
-		Build.box(root, Vector3(door.x + dx, 0, h), Vector3(0.16, 2.1, 0.3), Build.CORAL)
-	Build.box(root, Vector3(door.x + 0.5, 2.0, h), Vector3(1.36, 0.18, 0.32), Build.CORAL)
+	# Thick and heavily rounded, like a bent loop of clay (sheet 1).
+	for dx: float in [-0.04, 1.04]:
+		_rb(root, Vector3(door.x + dx, 1.05, h), Vector3(0.27, 2.3, 0.34), Build.CORAL, 0.12)
+	_rb(root, Vector3(door.x + 0.5, 2.13, h), Vector3(1.35, 0.27, 0.34), Build.CORAL, 0.12)
 	Build.box(root, Vector3(door.x + 0.5, 0.0, h), Vector3(0.9, 0.012, 0.34), Build.WOOD, 0.0, Build.R_WOOD)
 	Build.box(root, Vector3(door.x + 0.5, 0.0, h + 0.45), Vector3(0.8, 0.02, 0.5), Build.CORAL_DARK)
-	var sign_at := Vector3(door.x + 0.5, 2.22, h)
+	var sign_at := Vector3(door.x + 0.5, 2.3, h)
 	Build.box(root, sign_at, Vector3(0.9, 0.62, 0.1), Build.WOOD, 0.0, Build.R_WOOD)
 	for side: float in [-1.0, 1.0]:
 		var z := sign_at.z + side * 0.06
@@ -171,17 +188,29 @@ static func _dining_wall(root: Node3D, w: int, lights: Array[OmniLight3D]) -> vo
 
 static func _kitchen_wall(root: Node3D, h: int, lights: Array[OmniLight3D]) -> void:
 	# Wall cabinets over the sink side, where they cannot hide a stove or a dial.
-	Build.box(root, Vector3(0.18, 1.5, 3.0), Vector3(0.36, 0.66, 2.9), Build.CABINET)
-	for i in 4:
-		Build.box(root, Vector3(0.365, 1.56, 1.92 + i * 0.72), Vector3(0.03, 0.54, 0.64), Build._tint(Build.CABINET, 0.07))
-		Build.box(root, Vector3(0.385, 1.6, 2.16 + i * 0.72 - (0.48 if i % 2 else 0.0)), Vector3(0.03, 0.12, 0.035), "#d9a441", 0.0, Build.R_WOOD)
+	# Sheet 1: wall cabinets either side of a hood over the two stoves.
+	for run: Array in [[5.5, 2]]:
+		var z0: float = run[0]
+		Build.box(root, Vector3(0.2, 1.45, z0 + 0.72 * run[1] / 2.0 - 0.36), Vector3(0.4, 0.74, 0.72 * run[1] + 0.06), Build.CABINET)
+		for i: int in run[1]:
+			Build.box(root, Vector3(0.405, 1.51, z0 + i * 0.72), Vector3(0.03, 0.62, 0.64), Build._tint(Build.CABINET, 0.07))
+			Build.box(root, Vector3(0.425, 1.56, z0 + i * 0.72 + (0.22 if i % 2 == 0 else -0.22)), Vector3(0.03, 0.14, 0.04), "#d9a441", 0.0, Build.R_WOOD)
+	var hood := "#6f9aa0"
+	_rb(root, Vector3(0.36, 1.5, 4.0), Vector3(0.72, 0.2, 1.9), hood, 0.06, Build.R_WOOD)
+	_rb(root, Vector3(0.27, 1.78, 4.0), Vector3(0.54, 0.42, 1.5), hood, 0.1, Build.R_WOOD)
+	_rb(root, Vector3(0.2, 2.1, 4.0), Vector3(0.4, 0.4, 1.0), hood, 0.08, Build.R_WOOD)
+	# The way through to the back room: a round-topped opening in the back wall.
+	_rb(root, Vector3(1.5, 0.98, KITCHEN_Z), Vector3(0.9, 2.0, 0.05), "#cfc3ae", 0.02)
+	_rb(root, Vector3(1.5, 0.94, KITCHEN_Z + 0.012), Vector3(0.78, 1.88, 0.05), "#b9ad99", 0.02)
+	for i in 6:
+		Build.box(root, Vector3(1.21 + (i % 3) * 0.26 + (0.13 if i >= 3 else 0.0) - 0.07, 0.0, KITCHEN_Z + 0.03), Vector3(0.25, 0.012 + 0.2 * (i / 3), 0.02), t().tile_a if i % 2 else t().tile_b)
 	# A shelf of jars over the worktop.
-	Build.box(root, Vector3(3.2, 1.5, 0.12), Vector3(1.3, 0.06, 0.24), Build.WOOD, 0.0, Build.R_WOOD)
+	Build.box(root, Vector3(3.2, 1.5, KITCHEN_Z + 0.12), Vector3(1.1, 0.06, 0.24), Build.WOOD, 0.0, Build.R_WOOD)
 	var jars := [Build.PAPER, Build.CORAL, Build.TILE_TEAL, Build.WARN]
 	for i in jars.size():
-		Build.cyl(root, Vector3(2.75 + i * 0.3, 1.56, 0.12), 0.09, 0.18 + 0.05 * (i % 2), jars[i], 0.0, Build.R_GLOSS)
-		Build.cyl(root, Vector3(2.75 + i * 0.3, 1.74 + 0.05 * (i % 2), 0.12), 0.07, 0.04, Build.WOOD_DARK)
-	_sconce(root, Vector3(0, 1.75, h - 1.2), Vector3(1, 0, 0), lights)
+		Build.cyl(root, Vector3(2.8 + i * 0.27, 1.56, KITCHEN_Z + 0.12), 0.09, 0.18 + 0.05 * (i % 2), jars[i], 0.0, Build.R_GLOSS)
+		Build.cyl(root, Vector3(2.8 + i * 0.27, 1.74 + 0.05 * (i % 2), KITCHEN_Z + 0.12), 0.07, 0.04, Build.WOOD_DARK)
+	_sconce(root, Vector3(0, 1.75, KITCHEN_Z + 0.5), Vector3(1, 0, 0), lights)
 
 
 static func _dressing(root: Node3D, w: int, h: int) -> void:
@@ -196,11 +225,12 @@ static func _dressing(root: Node3D, w: int, h: int) -> void:
 	Build.lathe(root, cs, [[0.0, 0.0], [0.17, 0.0], [0.18, 0.02], [0.05, 0.07], [0.035, 1.5], [0.06, 1.56], [0.0, 1.6]], Build.WOOD, 0.0, Build.R_WOOD)
 	Build.box(root, cs + Vector3(0, 1.36, 0), Vector3(0.42, 0.04, 0.04), Build.WOOD, 0.0, Build.R_WOOD)
 	Build.lathe(root, cs + Vector3(-0.1, 0.72, 0), [[0.0, 0.0], [0.14, 0.0], [0.16, 0.1], [0.12, 0.56], [0.05, 0.66], [0.0, 0.66]], Peg.OUTFITS.royal)
-	# Planters and the menu board outside, on the kitchen side of the door.
-	for px: float in [0.95, 2.75]:
-		Build.box(root, Vector3(px, 0, h + 0.3), Vector3(1.6, 0.55, 0.34), Build.WOOD, 0.0, Build.R_WOOD)
-		for i in 4:
-			Build.ball(root, Vector3(px - 0.57 + i * 0.38, 0.6, h + 0.3), 0.2, Build.LEAF if i % 2 else Build.LEAF_2)
+	# A planter and the menu board outside, on the near side of the door.
+	root = _turned(root, Vector3(w - h, 0, 9.5))
+	for px: float in [3.2]:
+		Build.box(root, Vector3(px, 0, h + 0.3), Vector3(1.2, 0.55, 0.34), Build.WOOD, 0.0, Build.R_WOOD)
+		for i in 3:
+			Build.ball(root, Vector3(px - 0.38 + i * 0.38, 0.6, h + 0.3), 0.2, Build.LEAF if i % 2 else Build.LEAF_2)
 	for lean: float in [-1.0, 1.0]:
 		var board := Build.box(root, Vector3(4.2, 0, h + 0.34 + lean * 0.09), Vector3(0.5, 0.78, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
 		board.rotation.x = -lean * 0.22
@@ -208,27 +238,36 @@ static func _dressing(root: Node3D, w: int, h: int) -> void:
 		slate.rotation.x = -lean * 0.22
 
 
-## The plot, the street and the thick floating slab (sheet 12). Everything ends
-## cleanly at the slab edge: no fade.
+## The street and the sheet of paper everything rests on. Everything ends
+## cleanly at its own edge: no fade.
 static func _ground(root: Node3D, w: int, lights: Array[OmniLight3D]) -> void:
-	var x1 := w + 2.4
+	# The street rule. The street runs the length of the entrance wall. Its near
+	# end stops flush with the near edge of the floor. Its far end runs on past the
+	# tall wall that heads toward the street, to the point where the street's edge
+	# sits on the line of that wall's top edge as the camera sees it.
+	X0 = w - 7.0
+	var x1 := w + WALL_T + WALL_H * CAM_RISE
 	var cx := (X0 + x1) / 2
 	var span := x1 - X0
-	Build.box(root, Vector3(cx, -0.85, (Z0 + Z1) / 2), Vector3(span, 0.75, Z1 - Z0), t().slab)
-	Build.box(root, Vector3(cx, -0.26, (Z0 + Z1) / 2), Vector3(span + 0.08, 0.16, Z1 - Z0 + 0.08), Build.WOOD_DARK, 0.0, Build.R_WOOD)
-	Build.box(root, Vector3(cx, -0.1, (Z0 + 7.0) / 2), Vector3(span, 0.08, 7.0 - Z0), t().lawn)
-	# Boundaries: a low hedge and a 0.55 m picket fence. Nothing tall.
-	Build._add(root, Build.bevel_mesh(Vector3(0.5, 0.5, 7.4), 0.12), Vector3(x1 - 0.35, 0.23, 3.0), Color(t().hedge), 0.0)
-	Build._add(root, Build.bevel_mesh(Vector3(2.1, 0.5, 0.5), 0.12), Vector3(X0 + 1.15, 0.23, 6.7), Color(t().hedge), 0.0)
-	for i in 9:
-		var fx := w + 0.42 + i * 0.2
-		Build.box(root, Vector3(fx, -0.02, 6.85), Vector3(0.12, 0.57 if i % 4 else 0.62, 0.05), Build.PAPER)
-	for fy: float in [0.14, 0.36]:
-		Build.box(root, Vector3(w + 1.2, fy, 6.82), Vector3(1.8, 0.06, 0.04), Build.PAPER)
+	# No base board: floors and paving are thick slabs of their own material that
+	# rest straight on a sheet of paper, which catches every shadow (sheet 1).
+	var deep := -0.03 - PAPER_Y
+	Build.box(root, Vector3(KITCHEN_W / 2.0, PAPER_Y, (KITCHEN_Z + 7.0) / 2.0), Vector3(KITCHEN_W, deep, 7.0 - KITCHEN_Z), t().tile_a)
+	Build.box(root, Vector3((KITCHEN_W + w) / 2.0, PAPER_Y, 3.5), Vector3(w - KITCHEN_W, deep, 7.0), t().planks[0], 0.0, Build.R_WOOD)
+	var paper := MeshInstance3D.new()
+	var sheet := PlaneMesh.new()
+	sheet.size = Vector2(400, 400)
+	paper.mesh = sheet
+	paper.position = Vector3(cx, PAPER_Y, (Z0 + Z1) / 2)
+	paper.material_override = Build.mat(Color(t().backdrop).darkened(0.07), 0.0, Build.R_MATTE, false)
+	paper.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(paper)
+	# The street is drawn along x and turned to run down the right-hand side.
+	var street := _turned(root, Vector3(w - 7.0, 0, w))
 	if seaside():
-		_pier(root, w, x1)
+		_pier(street, w, x1)
 	else:
-		_street(root, w, x1, lights)
+		_street(street, w, x1, lights)
 
 
 static func _street(root: Node3D, w: int, x1: float, lights: Array[OmniLight3D]) -> void:
@@ -238,52 +277,104 @@ static func _street(root: Node3D, w: int, x1: float, lights: Array[OmniLight3D])
 		for row in 3:
 			var depth := 1.0 if row < 2 else PAVE_Z - 9.0
 			var col := "#d9d1c5" if row == 2 else (Build.PAVING if int(absf(x * 2.0) + row) % 2 else "#c8beb1")
-			Build.box(root, Vector3(x + 0.5, -0.1, 7.0 + row + depth / 2), Vector3(0.985, 0.1, depth - 0.015), col)
+			var wd := minf(1.0, x1 - x)  # the last slab is cut to the street's end
+			Build.box(root, Vector3(x + wd / 2, PAPER_Y, 7.0 + row + depth / 2), Vector3(wd - 0.015, -PAPER_Y, depth - 0.015), col)
 		x += 1.0
 	# A two-lane road with white dashes, cut clean at the slab edge.
-	Build.box(root, Vector3((X0 + x1) / 2, -0.17, (PAVE_Z + Z1) / 2), Vector3(x1 - X0, 0.1, Z1 - PAVE_Z), Build.ROAD)
+	Build.box(root, Vector3((X0 + x1) / 2, PAPER_Y, (PAVE_Z + Z1) / 2), Vector3(x1 - X0, 0.08, Z1 - PAVE_Z), Build.ROAD)
 	x = X0 + 0.7
 	while x < x1 - 1.0:
-		Build.box(root, Vector3(x + 0.5, -0.075, (PAVE_Z + Z1) / 2), Vector3(1.0, 0.012, 0.13), "#f6efe2")
+		Build.box(root, Vector3(x + 0.5, -0.065, (PAVE_Z + Z1) / 2), Vector3(1.0, 0.012, 0.13), "#f6efe2")
 		x += 2.2
 	# Street furniture sits on the kerb side only, never over the queue line.
 	var kerb := PAVE_Z - 0.45
-	_lamp_post(root, Vector3(-0.7, 0, kerb), lights)
-	# A layered-sphere tree in a stone surround.
-	var tree := Vector3(X0 + 0.75, 0, kerb - 0.05)
-	Build.box(root, tree, Vector3(0.8, 0.16, 0.8), "#bdb5a8")
-	Build.cyl(root, tree, 0.09, 1.1, Build.WOOD_DARK, 0.0, Build.R_WOOD)
-	Build.ball(root, tree + Vector3(0, 1.45, 0), 0.6, Build.LEAF)
-	Build.ball(root, tree + Vector3(0.1, 2.05, 0.05), 0.44, Build.LEAF_2)
-	Build.ball(root, tree + Vector3(-0.3, 1.3, 0.25), 0.36, Build.LEAF_2)
-	# A slatted bench, a teal bin and a coral bike.
-	var bench := Vector3(2.4, 0, kerb)
+	# Tall things stand at the far end, where they hide nothing; low ones near.
+	_tree(root, Vector3(x1 - 0.65, 0, kerb - 0.05))
+	_lamp_post(root, Vector3(x1 - 2.4, 0, kerb), lights)
+	_bench(root, Vector3(X0 + 2.0, 0, kerb))
+	_street_bin(root, Vector3(X0 + 0.6, 0, kerb))
+	_bike(root, Vector3(X0 + 4.0, 0, kerb))
+
+
+## A soft-cornered block centred on `at`.
+static func _rb(root: Node3D, at: Vector3, size: Vector3, col: String, bevel := 0.05, rough := Build.R_MATTE) -> MeshInstance3D:
+	return Build._add(root, Build.bevel_mesh(size, bevel), at, Color(col), 0.0, rough)
+
+
+## Sheet 12: a chunky trunk with two branch stubs under a crown of billowing
+## lobes, in a stone surround with a square of grass.
+static func _tree(root: Node3D, at: Vector3) -> void:
+	var bark := "#a8703f"
+	_rb(root, at + Vector3(0, 0.09, 0), Vector3(1.0, 0.18, 1.0), "#bdb5a8", 0.07)
+	_rb(root, at + Vector3(0, 0.16, 0), Vector3(0.74, 0.1, 0.74), "#8fbf6a", 0.04)
+	Build.lathe(root, at + Vector3(0, 0.18, 0), [[0.0, 0.0], [0.3, 0.0], [0.22, 0.14], [0.17, 0.45], [0.16, 0.9], [0.21, 1.2], [0.0, 1.2]], bark, 0.0, Build.R_WOOD)
+	for side: float in [-1.0, 1.0]:
+		var stub := Build.lathe(root, at + Vector3(side * 0.1, 1.0, 0.05 * side), [[0.0, 0.0], [0.1, 0.0], [0.085, 0.5], [0.0, 0.5]], bark, 0.0, Build.R_WOOD)
+		stub.rotation.z = -side * 0.75
+	var crown := at + Vector3(0, 2.0, 0)
+	Build.ball(root, crown, 0.62, "#4f9a63")
+	for i in 6:
+		var a := TAU * i / 6.0
+		Build.ball(root, crown + Vector3(cos(a) * 0.46, -0.2 + 0.14 * (i % 2), sin(a) * 0.46), 0.37, Build.LEAF if i % 2 else Build.LEAF_2)
 	for i in 3:
-		Build.box(root, bench + Vector3(0, 0.36, -0.14 + i * 0.14), Vector3(1.5, 0.045, 0.12), Build.WOOD, 0.0, Build.R_WOOD)
-	for i in 2:
-		Build.box(root, bench + Vector3(0, 0.5 + i * 0.15, 0.3), Vector3(1.5, 0.12, 0.045), Build.WOOD, 0.0, Build.R_WOOD)
-	for sx: float in [-0.6, 0.6]:
-		Build.box(root, bench + Vector3(sx, 0, 0.02), Vector3(0.07, 0.36, 0.4), Build.TRIM)
-		Build.box(root, bench + Vector3(sx, 0.3, 0.3), Vector3(0.07, 0.52, 0.06), Build.TRIM)
-	Build.cyl(root, Vector3(4.2, 0, kerb), 0.22, 0.6, Build.CABINET)
-	Build.cyl(root, Vector3(4.2, 0.6, kerb), 0.25, 0.07, Build._shade(Build.CABINET))
+		var a := TAU * i / 3.0 + 0.5
+		Build.ball(root, crown + Vector3(cos(a) * 0.27, 0.42, sin(a) * 0.27), 0.34, Build.LEAF_2 if i % 2 else Build.LEAF)
+	Build.ball(root, crown + Vector3(0, 0.72, 0), 0.27, Build.LEAF_2)
+
+
+## Sheet 12: thick rounded slats on dark, chunky legs; the back leans away.
+static func _bench(root: Node3D, at: Vector3) -> void:
+	var leg := "#5a3f2e"
+	for i in 4:
+		_rb(root, at + Vector3(0, 0.44, -0.2 + i * 0.15), Vector3(1.6, 0.075, 0.13), Build.WOOD, 0.03, Build.R_WOOD)
+	for i in 3:
+		_rb(root, at + Vector3(0, 0.63 + i * 0.17, 0.37 + i * 0.035), Vector3(1.6, 0.15, 0.065), Build.WOOD, 0.03, Build.R_WOOD).rotation.x = 0.2
+	for sx: float in [-0.62, 0.62]:
+		_rb(root, at + Vector3(sx, 0.2, -0.2), Vector3(0.12, 0.4, 0.13), leg, 0.045)
+		_rb(root, at + Vector3(sx, 0.52, 0.33), Vector3(0.12, 1.04, 0.13), leg, 0.045).rotation.x = 0.2
+		_rb(root, at + Vector3(sx, 0.37, 0.04), Vector3(0.12, 0.09, 0.6), leg, 0.04)
+
+
+## Sheet 12: a teal drum with a thick dark rim.
+static func _street_bin(root: Node3D, at: Vector3) -> void:
+	Build.lathe(root, at, [[0.0, 0.0], [0.23, 0.0], [0.26, 0.04], [0.275, 0.32], [0.26, 0.62], [0.0, 0.62]], Build.CABINET)
+	Build.lathe(root, at, [[0.2, 0.6], [0.29, 0.6], [0.315, 0.66], [0.29, 0.72], [0.2, 0.72], [0.2, 0.6]], "#4a372c")
+	Build.cyl(root, at + Vector3(0, 0.63, 0), 0.2, 0.02, "#173f47")
+
+
+## Sheet 12: a wooden balance bike. Wooden wheels with dark tyres, a chunky coral
+## frame, a wooden saddle and handlebar, a steel fork.
+static func _bike(root: Node3D, at: Vector3) -> void:
+	var wood := "#dba865"
 	var bike := Node3D.new()
-	bike.position = Vector3(w + 1.2, 0, kerb)
+	bike.position = at
+	bike.rotation.y = 0.45
 	root.add_child(bike)
-	for sx: float in [-0.42, 0.42]:
-		var wheel := Build.lathe(bike, Vector3(sx, 0.3, 0), [[0.22, -0.025], [0.3, -0.025], [0.3, 0.025], [0.22, 0.025], [0.22, -0.025]], Build.TRIM)
+	for sx: float in [-0.45, 0.45]:
+		var wheel := Node3D.new()
+		wheel.position = Vector3(sx, 0.3, 0)
 		wheel.rotation.x = PI / 2
-	Build.box(bike, Vector3(0, 0.36, 0), Vector3(0.6, 0.06, 0.05), Build.CORAL)
-	Build.box(bike, Vector3(-0.12, 0.38, 0), Vector3(0.06, 0.36, 0.05), Build.CORAL).rotation.z = 0.3
-	Build.box(bike, Vector3(0.32, 0.36, 0), Vector3(0.06, 0.5, 0.05), Build.CORAL).rotation.z = -0.3
-	Build.box(bike, Vector3(-0.2, 0.72, 0), Vector3(0.26, 0.06, 0.12), Build.TRIM)
-	Build.box(bike, Vector3(0.24, 0.84, 0), Vector3(0.06, 0.06, 0.4), Build.TRIM)
+		bike.add_child(wheel)
+		Build.lathe(wheel, Vector3.ZERO, [[0.0, -0.035], [0.22, -0.035], [0.22, 0.035], [0.0, 0.035]], wood, 0.0, Build.R_WOOD)
+		Build.lathe(wheel, Vector3.ZERO, [[0.21, -0.05], [0.28, -0.05], [0.3, 0.0], [0.28, 0.05], [0.21, 0.05], [0.21, -0.05]], "#4a372c")
+		Build.lathe(wheel, Vector3.ZERO, [[0.0, -0.06], [0.05, -0.06], [0.05, 0.06], [0.0, 0.06]], Build.CORAL)
+	_rb(bike, Vector3(-0.05, 0.47, 0), Vector3(0.8, 0.14, 0.1), Build.CORAL, 0.05).rotation.z = 0.28
+	_rb(bike, Vector3(-0.32, 0.52, 0), Vector3(0.1, 0.36, 0.1), Build.CORAL, 0.04)
+	_rb(bike, Vector3(-0.32, 0.74, 0), Vector3(0.32, 0.1, 0.18), wood, 0.045, Build.R_WOOD)
+	_rb(bike, Vector3(0.38, 0.58, 0), Vector3(0.08, 0.68, 0.08), "#9aa3a6", 0.035, Build.R_WOOD).rotation.z = 0.25
+	_rb(bike, Vector3(0.3, 0.93, 0), Vector3(0.09, 0.09, 0.5), wood, 0.04, Build.R_WOOD)
+	for sz: float in [-0.25, 0.25]:
+		Build.ball(bike, Vector3(0.3, 0.93, sz), 0.065, Build.CORAL)
 
 
+## Sheet 12: a stepped foot, a slim column and a four-sided lantern that widens
+## upward under a peaked cap with a finial.
 static func _lamp_post(root: Node3D, at: Vector3, lights: Array[OmniLight3D]) -> void:
-	Build.lathe(root, at, [[0.0, 0.0], [0.16, 0.0], [0.18, 0.03], [0.08, 0.2], [0.055, 0.3], [0.055, 2.3], [0.12, 2.36], [0.0, 2.36]], "#3a3f44", 0.0, Build.R_WOOD)
-	Build.box(root, at + Vector3(0, 2.36, 0), Vector3(0.26, 0.3, 0.26), "#ffe9bd", 1.6)
-	Build.lathe(root, at + Vector3(0, 2.64, 0), [[0.0, 0.0], [0.22, 0.0], [0.24, 0.02], [0.06, 0.14], [0.0, 0.16]], "#3a3f44", 0.0, Build.R_WOOD)
+	var iron := "#4a372c"
+	Build.lathe(root, at, [[0.0, 0.0], [0.2, 0.0], [0.22, 0.05], [0.2, 0.1], [0.13, 0.14], [0.12, 0.3], [0.14, 0.36], [0.075, 0.46], [0.06, 0.6], [0.06, 2.0], [0.11, 2.05], [0.11, 2.12], [0.0, 2.12]], iron, 0.0, Build.R_WOOD)
+	Build._add(root, Build.lathe_mesh([[0.0, 0.0], [0.12, 0.0], [0.19, 0.34], [0.0, 0.34]], 4), at + Vector3(0, 2.12, 0), Color("#ffe2a6"), 1.4).rotation.y = PI / 4
+	Build._add(root, Build.lathe_mesh([[0.0, 0.0], [0.26, 0.0], [0.26, 0.05], [0.08, 0.17], [0.0, 0.17]], 4), at + Vector3(0, 2.46, 0), Color(iron), 0.0, Build.R_WOOD).rotation.y = PI / 4
+	Build.ball(root, at + Vector3(0, 2.67, 0), 0.055, iron)
 	var light := OmniLight3D.new()
 	light.position = at + Vector3(0, 2.3, 0)
 	light.light_color = Color("#ffd9a0")
@@ -300,10 +391,11 @@ static func _pier(root: Node3D, w: int, x1: float) -> void:
 	var i := 0
 	var x := X0
 	while x < x1 - 0.01:
-		Build.box(root, Vector3(x + 0.25, -0.1, (7.0 + PAVE_Z) / 2), Vector3(0.485, 0.1, PAVE_Z - 7.0), tones[i % 3], 0.0, Build.R_WOOD)
+		var wd := minf(0.5, x1 - x)
+		Build.box(root, Vector3(x + wd / 2, PAPER_Y, (7.0 + PAVE_Z) / 2), Vector3(wd - 0.015, -PAPER_Y, PAVE_Z - 7.0), tones[i % 3], 0.0, Build.R_WOOD)
 		x += 0.5
 		i += 1
-	Build.box(root, Vector3((X0 + x1) / 2, -0.17, (PAVE_Z + Z1) / 2), Vector3(x1 - X0, 0.1, Z1 - PAVE_Z), "#4fc3c8", 0.0, 0.25)
+	Build.box(root, Vector3((X0 + x1) / 2, PAPER_Y, (PAVE_Z + Z1) / 2), Vector3(x1 - X0, 0.08, Z1 - PAVE_Z), "#4fc3c8", 0.0, 0.25)
 	x = X0 + 0.3
 	i = 0
 	while x < x1:
