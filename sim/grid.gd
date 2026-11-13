@@ -6,13 +6,17 @@ extends RefCounted
 const DIRS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
 
 var size: Vector2i
+var origin := Vector2i.ZERO   # the lowest cell; the grid may reach into negative cells
 var blocked := {}   # Vector2i -> true: furniture, nobody can stand here
 var reserved := {}  # Vector2i -> true: seats and doorways, walkable but not buildable
 var walls := {}     # Vector3i(x, y, axis) -> true; axis 0 = north edge of the cell, 1 = west edge
+var doors := {}     # Vector3i edge -> true: people walk through, but nobody sees through
+var outside := {}   # Vector2i -> true: bare ground with no floor, nobody can stand here
 
 
-func _init(w: int, h: int) -> void:
+func _init(w: int, h: int, from := Vector2i.ZERO) -> void:
 	size = Vector2i(w, h)
+	origin = from
 
 
 static func to_cell(p: Vector3) -> Vector2i:
@@ -30,15 +34,21 @@ static func edge_between(a: Vector2i, b: Vector2i) -> Vector3i:
 
 
 func in_bounds(c: Vector2i) -> bool:
-	return c.x >= 0 and c.y >= 0 and c.x < size.x and c.y < size.y
+	return c.x >= origin.x and c.y >= origin.y and c.x < origin.x + size.x and c.y < origin.y + size.y
 
 
 func is_blocked(c: Vector2i) -> bool:
-	return not in_bounds(c) or blocked.has(c)
+	return not in_bounds(c) or blocked.has(c) or outside.has(c)
 
 
 func edge_open(a: Vector2i, b: Vector2i) -> bool:
 	return not walls.has(edge_between(a, b))
+
+
+## Open to the eye: no wall and no door.
+func sight_open(a: Vector2i, b: Vector2i) -> bool:
+	var e := edge_between(a, b)
+	return not walls.has(e) and not doors.has(e)
 
 
 func can_step(a: Vector2i, b: Vector2i) -> bool:
@@ -86,13 +96,13 @@ func has_los(a: Vector2i, b: Vector2i) -> bool:
 		if cur == prev:
 			continue
 		if cur.x == prev.x or cur.y == prev.y:
-			if not edge_open(prev, cur):
+			if not sight_open(prev, cur):
 				return false
 		else:
 			var m1 := Vector2i(cur.x, prev.y)
 			var m2 := Vector2i(prev.x, cur.y)
-			var r1 := edge_open(prev, m1) and edge_open(m1, cur)
-			var r2 := edge_open(prev, m2) and edge_open(m2, cur)
+			var r1 := sight_open(prev, m1) and sight_open(m1, cur)
+			var r2 := sight_open(prev, m2) and sight_open(m2, cur)
 			if not (r1 or r2):
 				return false
 		prev = cur
@@ -136,10 +146,10 @@ func layout_ok(door: Vector2i, must_reach: Array[Vector2i], must_touch: Array[Ve
 ## Can furniture go on `c` (with `seats` beside it) inside `area` without cutting anyone off?
 func can_place_block(c: Vector2i, seats: Array[Vector2i], area: Rect2i, door: Vector2i,
 		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
-	if not area.has_point(c) or blocked.has(c) or reserved.has(c):
+	if not area.has_point(c) or blocked.has(c) or reserved.has(c) or outside.has(c):
 		return false
 	for s in seats:
-		if not area.has_point(s) or blocked.has(s) or reserved.has(s):
+		if not area.has_point(s) or blocked.has(s) or reserved.has(s) or outside.has(s):
 			return false
 	blocked[c] = true
 	var ok := layout_ok(door, must_reach + seats, must_touch + ([c] as Array[Vector2i]))
@@ -152,7 +162,7 @@ func can_place_wall(edge: Vector3i, area: Rect2i, door: Vector2i,
 		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
 	var a := Vector2i(edge.x, edge.y)
 	var b := a + (Vector2i(0, -1) if edge.z == 0 else Vector2i(-1, 0))
-	if walls.has(edge) or not area.has_point(a) or not area.has_point(b):
+	if walls.has(edge) or not area.has_point(a) or not area.has_point(b) or outside.has(a) or outside.has(b):
 		return false
 	walls[edge] = true
 	var ok := layout_ok(door, must_reach, must_touch)

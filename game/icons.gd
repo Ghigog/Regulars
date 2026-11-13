@@ -74,6 +74,11 @@ static func icon(id: String) -> Array:
 			o.append([ell(0, 0.26, 0.8, 0.62, 0, 180), "#e6a542"])
 		"food":
 			o = _moved(icon("burger"), Vector2.ZERO, 1.0)
+		"warning":  # a gold road-sign triangle with an ink rim and a bold "!"
+			o.append([PackedVector2Array([Vector2(0, 1.0), Vector2(-1.05, -0.82), Vector2(1.05, -0.82)]), INK])
+			o.append([PackedVector2Array([Vector2(0, 0.74), Vector2(-0.8, -0.66), Vector2(0.8, -0.66)]), GOLD])
+			o.append([rect(0, 0.06, 0.2, 0.62), INK])
+			o.append([ell(0, -0.44, 0.12), INK])
 		"zzz":
 			for i in 3:
 				o.append([ell(-0.62 + i * 0.36, -0.55, 0.14), INK])

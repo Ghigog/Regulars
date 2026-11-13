@@ -6,11 +6,22 @@ extends RefCounted
 
 const MAX_TIER := 3
 const SHELF_DAYS := 2
-const CATEGORIES: Array[String] = ["Kitchen", "Dining", "Decor", "Walls"]
+const CATEGORIES: Array[String] = ["Kitchen", "Dining", "Decor", "Build"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
+## A "tool" builds the room itself and is priced per tile or per wall.
 const ITEMS := {
-	"screen": {"name": "Partition wall", "price": 10, "level": 1, "category": "Walls", "tiers": 1,
+	"floor_tile": {"name": "Tiled floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"blurb": "Grows the room  $5 a tile"},
+	"floor_planks": {"name": "Plank floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"blurb": "Grows the room  $5 a tile"},
+	"wall": {"name": "Wall", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"blurb": "Divides the room  $5 a length"},
+	"door": {"name": "Door", "price": 20, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"blurb": "A way through that hides the view"},
+	"arch": {"name": "Archway", "price": 15, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"blurb": "An open way through"},
+	"screen": {"name": "Partition wall", "price": 10, "level": 1, "category": "Build", "tiers": 1,
 		"blurb": "Blocks guests' view"},
 	"counter": {"name": "Counter", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Extra worktop"},
@@ -48,6 +59,10 @@ static func price_of(id: String, tier := 1) -> int:
 
 
 ## Each tier above the first needs one more level.
+static func is_build_tool(id: String) -> bool:
+	return ITEMS.has(id) and ITEMS[id].get("tool", false)
+
+
 static func level_of(id: String, tier := 1) -> int:
 	return int(ITEMS[id].level) + tier - 1
 

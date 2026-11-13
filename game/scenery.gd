@@ -1,7 +1,8 @@
 class_name Scenery
 extends RefCounted
-## The room itself: floors, walls, the knee-high cutaway, windows, wall art and
-## lights (style guide, sheets 10 and 11). No gameplay lives here.
+## The room itself, drawn from a Floorplan: floors, walls, the knee-high cutaway,
+## windows, doors, wall art and lights (style guide, sheets 10 and 11); and the
+## street outside. No gameplay lives here.
 
 const WALL_H := 2.4
 const WALL_T := 0.3
@@ -46,69 +47,368 @@ static func seaside() -> bool:
 	return theme_id == "seaside"
 
 
-## Builds the room and returns its practical lights so the day can dim them.
-static func build(root: Node3D, w: int, h: int, door: Vector2i) -> Array[OmniLight3D]:
+## The street, the paper and what stands outside. Built once; returns the street lights.
+static func build_ground(root: Node3D, w: int, h: int) -> Array[OmniLight3D]:
 	var lights: Array[OmniLight3D] = []
 	_ground(root, w, lights)
-	_floors(root, w, h)
-	# Tall walls: each run is a union of overlapping slabs, so corners and the
-	# pieces round an opening join without a seam. Crisp 2.5 cm edges, flat tops.
-	var top := WALL_H
-	var bot := -0.2
-	var xa := KITCHEN_W - WALL_T
-	var xb := w + WALL_T / 2
-	if seaside():  # portholes sit on a solid wall
-		_slab(root, xa, xb, bot, top, -WALL_T, 0, t().wall)
-	else:  # two real window openings (sheet 1)
-		_slab(root, xa, xb, bot, WIN_Y0 + 0.05, -WALL_T, 0, t().wall)
-		_slab(root, xa, xb, WIN_Y1 - 0.05, top, -WALL_T, 0, t().wall)
-		var edges: Array[float] = [xa]
-		for c: float in [KITCHEN_W + 1.55, w - 1.55]:
-			edges.append_array([c - WIN_W / 2, c + WIN_W / 2])
-		edges.append(xb)
-		for i in range(0, edges.size(), 2):
-			_slab(root, edges[i], edges[i + 1], WIN_Y0 - 0.05, WIN_Y1 + 0.05, -WALL_T, 0, t().wall)
-	_slab(root, xa, KITCHEN_W, bot, top, -WALL_T, KITCHEN_Z, t().wall)                  # the jog
-	_slab(root, -WALL_T, 0, bot, top, KITCHEN_Z - WALL_T, h, t().wall)                  # kitchen, left
-	# Kitchen, back: a round-topped way through to the back room.
-	var zk := float(KITCHEN_Z)
-	_slab(root, -WALL_T, DOOR_X - DOOR_R, bot, top, zk - WALL_T, zk, t().wall)
-	_slab(root, DOOR_X + DOOR_R, KITCHEN_W, bot, top, zk - WALL_T, zk, t().wall)
-	_slab(root, DOOR_X - DOOR_R - 0.1, DOOR_X + DOOR_R + 0.1, 2.15, top, zk - WALL_T, zk, t().wall)
-	_arch_header(root, DOOR_X, DOOR_R, 1.55, 2.2, zk - WALL_T + 0.004, zk - 0.004)
-	for i in 4:  # the back room's floor, seen through the opening
-		Build.box(root, Vector3(DOOR_X - 0.25 + (i % 2) * 0.5, -0.03, zk - WALL_T - 0.25 - (i / 2) * 0.5), Vector3(0.49, 0.03, 0.49), t().tile_b if (i + i / 2) % 2 else t().tile_a, 0.0, Build.R_GLOSS)
-	Build.box(root, Vector3(DOOR_X, PAPER_Y, zk - WALL_T - 0.5), Vector3(1.0, -0.03 - PAPER_Y, 1.0), t().tile_a)
-	# Where a tall wall is cut short, the cut face is painted (sheet 11).
-	_rb(root, Vector3(xb, (bot + top) / 2, -WALL_T / 2), Vector3(0.03, top - bot, WALL_T), t().cut, 0.012)
-	_rb(root, Vector3(-WALL_T / 2, (bot + top) / 2, h), Vector3(WALL_T, top - bot, 0.03), t().cut, 0.012)
-	# The entrance wall, on the right, drops to a knee-high cutaway with the
-	# doorway in it. The near-left side has no wall at all: the floor simply ends
-	# (sheet 1). No transparency.
-	_wall(root, Vector3(w - WALL_T / 2, 0, -0.05), Vector3(WALL_T, CUT_H, door.y + 0.05), t().cut)
-	_wall(root, Vector3(w - WALL_T / 2, 0, door.y + 1), Vector3(WALL_T, CUT_H, h - door.y - 1), t().cut)
-	_doorway(_turned(root, Vector3(w, 0, door.y + 1)), Vector2i.ZERO, 0)
-	_dining_wall(root, w, lights)
-	_kitchen_wall(root, h, lights)
-	_dressing(root, w, h)
+	_outside(root, w, h)
 	return lights
 
 
-static func _floors(root: Node3D, w: int, h: int) -> void:
-	for x in KITCHEN_W:
-		for y in range(KITCHEN_Z, h):
-			var col: String = t().tile_b if (x + y) % 2 else t().tile_a
-			Build.box(root, Vector3(x + 0.5, -0.03, y + 0.5), Vector3(0.985, 0.03, 0.985), col, 0.0, Build.R_GLOSS)
-	# Dining: long boards running front to back, one staggered joint each (sheet 1).
+## The room, drawn from the floorplan: floors, walls, windows, doors and the
+## dressing on the walls. Rebuilt whenever the plan changes. Returns
+## {"lights": Array[OmniLight3D], "openings": {edge: info}}, where each info can be
+## redrawn with dress_opening to grey it out.
+##
+## Which walls stand tall follows sheet 1 and the fixed camera: a wall with the
+## room in front and bare ground behind is a full-height back wall. Walls between
+## two floors, and those on the street side, are cut down to knee height so
+## nothing hides behind them. On the near side the floor simply ends.
+static func build_room(root: Node3D, plan: Floorplan, door: Vector2i) -> Dictionary:
+	var lights: Array[OmniLight3D] = []
+	var openings := {}
+	_floors(root, plan)
+	var entrance := Vector3i(door.x, door.y, 1)
+	for axis in 2:
+		for run: Dictionary in _runs(plan, axis, "tall"):
+			_tall_run(root, plan, run, lights, openings)
+		for run: Dictionary in _runs(plan, axis, "low"):
+			_low_run(root, plan, run, openings, entrance)
+	_fixtures(root, plan, lights)
+	_rug(root, plan)
+	return {"lights": lights, "openings": openings}
+
+
+## How a wall edge is drawn: "tall", "low" or "" (not drawn).
+static func wall_look(plan: Floorplan, e: Vector3i) -> String:
+	if not plan.is_wall(e):
+		return ""
+	var s := Floorplan.sides(e)
+	var front := plan.has_floor(s[0])
+	var back := plan.has_floor(s[1])
+	if front and not back:
+		return "tall"
+	if front and back:
+		return "low"
+	return "low" if e.z == 1 else ""
+
+
+## Straight runs of one look along each grid line, as
+## {axis, line, from, to}: edges from..to-1 along the line.
+static func _runs(plan: Floorplan, axis: int, look: String) -> Array[Dictionary]:
+	var by_line := {}
+	for e in plan.walls():
+		if e.z == axis and wall_look(plan, e) == look:
+			var line := e.y if axis == 0 else e.x
+			if not by_line.has(line):
+				by_line[line] = []
+			by_line[line].append(e.x if axis == 0 else e.y)
+	var out: Array[Dictionary] = []
+	for line: int in by_line:
+		var at: Array = by_line[line]
+		at.sort()
+		var start: int = at[0]
+		for i in at.size():
+			if i == at.size() - 1 or at[i + 1] != at[i] + 1:
+				out.append({"axis": axis, "line": line, "from": start, "to": at[i] + 1})
+				if i < at.size() - 1:
+					start = at[i + 1]
+	return out
+
+
+static func _edge(axis: int, line: int, k: int) -> Vector3i:
+	return Vector3i(k, line, 0) if axis == 0 else Vector3i(line, k, 1)
+
+
+## The cell on the room side of edge k of a run.
+static func _room_cell(axis: int, line: int, k: int) -> Vector2i:
+	return Vector2i(k, line) if axis == 0 else Vector2i(line, k)
+
+
+## How far a tall run reaches past its end at lattice position k (before the
+## first edge when `start`): into the corner where another tall wall meets it,
+## half way into a knee-high one, and not at all where the room goes on round a
+## corner. Returns [reach, cut]: `cut` when the end shows its painted cut face.
+static func _end_reach(plan: Floorplan, axis: int, line: int, k: int, start: bool) -> Array:
+	var beyond := _room_cell(axis, line, k - 1 if start else k)
+	if plan.has_floor(beyond):
+		return [0.0, false]
+	var looks: Array[String] = []
+	for e in [_edge(1 - axis, k, line - 1), _edge(1 - axis, k, line)]:
+		looks.append(wall_look(plan, e))
+	if looks.has("tall"):
+		return [WALL_T, false]
+	if looks.has("low"):
+		return [WALL_T / 2, true]
+	return [0.0, true]
+
+
+## A holder for a run: local x runs along the wall, the room is toward +z and the
+## wall's line is local z = 0. Returns [holder, sign]: local x = sign * world k.
+static func _run_holder(root: Node3D, axis: int, line: int) -> Node3D:
+	if axis == 0:
+		var n := Node3D.new()
+		n.position = Vector3(0, 0, line)
+		root.add_child(n)
+		return n
+	return _turned(root, Vector3(line, 0, 0))
+
+
+## Local x of world position k along a run (axis 1 runs are mirrored).
+static func _lx(axis: int, k: float) -> float:
+	return k if axis == 0 else -k
+
+
+static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Array[OmniLight3D], openings: Dictionary) -> void:
+	var axis: int = run.axis
+	var line: int = run.line
+	var from: int = run.from
+	var to: int = run.to
+	var holder := _run_holder(root, axis, line)
+	var r0 := _end_reach(plan, axis, line, from, true)
+	var r1 := _end_reach(plan, axis, line, to, false)
+	# Local extent: a < b whichever way the run is mirrored.
+	var ends := [_lx(axis, from - float(r0[0])), _lx(axis, to + float(r1[0]))]
+	var a: float = minf(ends[0], ends[1])
+	var b: float = maxf(ends[0], ends[1])
+	var top := WALL_H
+	var bot := -0.2
+	# Holes: doors and archways on their edges, then windows where there is room.
+	var holes: Array = []   # [x0, x1, y0, y1]
+	var planks := 0
+	for k in range(from, to):
+		var e := _edge(axis, line, k)
+		var c := _lx(axis, k + 0.5)
+		if plan.kind(_room_cell(axis, line, k)) == "planks":
+			planks += 1
+		match plan.openings.get(e, ""):
+			"door":
+				holes.append([c - 0.45, c + 0.45, bot, 2.0])
+				openings[e] = {"holder": _opening_holder(holder, c), "kind": "door", "tall": true}
+			"arch":
+				holes.append([c - DOOR_R, c + DOOR_R, bot, 2.15])
+				_arch_header(holder, c, DOOR_R, 1.55, 2.2, -WALL_T + 0.004, -0.004)
+				openings[e] = {"holder": _opening_holder(holder, c), "kind": "arch", "tall": true}
+	var dining := planks * 2 > to - from
+	var windows: Array[float] = []
+	var length := to - from
+	if dining and length >= 3:
+		var n := int((length + 0.2) / 3.0)
+		for i in n:
+			var c := _lx(axis, from + length * (i + 0.5) / n)
+			var clear := true
+			for hole: Array in holes:
+				if c + WIN_W / 2 + 0.1 > hole[0] and c - WIN_W / 2 - 0.1 < hole[1]:
+					clear = false
+			if clear:
+				windows.append(c)
+				if not seaside():
+					holes.append([c - WIN_W / 2, c + WIN_W / 2, WIN_Y0, WIN_Y1])
+	# The wall itself: one slab per stretch between hole edges, overlapping a
+	# little so the joins never show.
+	var cuts: Array[float] = [a, b]
+	for hole: Array in holes:
+		cuts.append_array([clampf(hole[0], a, b), clampf(hole[1], a, b)])
+	cuts.sort()
+	for i in cuts.size() - 1:
+		var u := cuts[i]
+		var v := cuts[i + 1]
+		if v - u < 0.001:
+			continue
+		var over: Array = []
+		for hole: Array in holes:
+			if (u + v) / 2 > hole[0] and (u + v) / 2 < hole[1]:
+				over = hole
+		if over.is_empty():
+			_slab(holder, maxf(a, u - 0.05), minf(b, v + 0.05), bot, top, -WALL_T, 0, t().wall)
+		else:
+			if over[2] > bot:
+				_slab(holder, u, v, bot, over[2], -WALL_T, 0, t().wall)
+			_slab(holder, u, v, over[3], top, -WALL_T, 0, t().wall)
+	# Where a tall wall is cut short, the cut face is painted (sheet 11).
+	for side in 2:
+		var r: Array = r0 if side == 0 else r1
+		if r[1]:
+			var at: float = _lx(axis, from - float(r0[0]) if side == 0 else to + float(r1[0]))
+			_rb(holder, Vector3(at, (bot + top) / 2, -WALL_T / 2), Vector3(0.03, top - bot, WALL_T), t().cut, 0.012)
+	if dining:
+		_wainscot(holder, plan, axis, line, from, to)
+		for c in windows:
+			_window(holder, c)
+		# Sconces near each end of a back wall, where nothing is in the way.
+		for k: float in ([from + 0.5, to - 0.45] if length >= 3 and axis == 0 else []):
+			var x := _lx(axis, k)
+			var clear := true
+			for hole: Array in holes:
+				if x + 0.15 > hole[0] and x - 0.15 < hole[1]:
+					clear = false
+			if clear:
+				_sconce(holder, Vector3(x, 1.75, 0), Vector3(0, 0, 1), lights)
+
+
+## Painted lower wall along the dining stretches of a tall run, broken at openings.
+static func _wainscot(holder: Node3D, plan: Floorplan, axis: int, line: int, from: int, to: int) -> void:
+	var k := from
+	while k < to:
+		var j := k
+		while j < to and plan.kind(_room_cell(axis, line, j)) == "planks" and not plan.openings.has(_edge(axis, line, j)):
+			j += 1
+		if j == k:
+			k += 1
+			continue
+		var x0 := _lx(axis, k)
+		var x1 := _lx(axis, j)
+		var mid := (x0 + x1) / 2
+		var span := absf(x1 - x0)
+		if seaside():   # painted clapboard: seafoam and white boards
+			for i in 7:
+				Build.box(holder, Vector3(mid, 0.16 + i * 0.3, 0.015), Vector3(span, 0.3, 0.04), SEAFOAM if i % 2 == 0 else "#f6f8f1")
+		else:   # teal wainscoting with a wooden rail
+			Build.box(holder, Vector3(mid, 0, 0.02), Vector3(span, 0.82, 0.05), Build.CABINET)
+			Build.box(holder, Vector3(mid, 0.8, 0.03), Vector3(span, 0.06, 0.09), Build.WOOD, 0.0, Build.R_WOOD)
+		k = j
+
+
+## A knee-high run: painted face, cream cap, gaps for doors, archways and the entrance.
+static func _low_run(root: Node3D, plan: Floorplan, run: Dictionary, openings: Dictionary, entrance: Vector3i) -> void:
+	var axis: int = run.axis
+	var line: int = run.line
+	var from: int = run.from
+	var to: int = run.to
+	var holder := _run_holder(root, axis, line)
+	var reach := []
+	for side in 2:
+		var k: int = from if side == 0 else to
+		var any := false
+		for e in [_edge(1 - axis, k, line - 1), _edge(1 - axis, k, line)]:
+			any = any or wall_look(plan, e) != ""
+		reach.append(WALL_T / 2 if any else 0.0)
+	var gaps: Array = []
+	for k in range(from, to):
+		var e := _edge(axis, line, k)
+		if e == entrance:
+			gaps.append(k)
+			continue
+		var what: String = plan.openings.get(e, "")
+		if what != "":
+			gaps.append(k)
+			openings[e] = {"holder": _opening_holder(holder, _lx(axis, k + 0.5)), "kind": what, "tall": false}
+	var k0 := from - float(reach[0])
+	var stops: Array = gaps.duplicate()
+	stops.append(to)
+	for g: int in stops:
+		var k1: float = g if g != to else to + float(reach[1])
+		if k1 - k0 > 0.01:
+			var x0 := minf(_lx(axis, k0), _lx(axis, k1))
+			_wall(holder, Vector3(x0, 0, -WALL_T / 2), Vector3(absf(k1 - k0), CUT_H, WALL_T), t().cut)
+		k0 = g + 1
+	if gaps.has(entrance.y) and axis == 1 and line == entrance.x:
+		_doorway(_turned(root, Vector3(entrance.x, 0, entrance.y + 1)), Vector2i.ZERO, 0)
+
+
+## The node a door or archway's own pieces hang from, at the middle of its gap.
+static func _opening_holder(holder: Node3D, x: float) -> Node3D:
+	var n := Node3D.new()
+	n.position = Vector3(x, 0, 0)
+	holder.add_child(n)
+	return n
+
+
+## Draws (or redraws) a door or archway's frame, leaf and threshold. One that
+## nobody can get through is greyed out under a little warning sign.
+static func dress_opening(info: Dictionary, ok: bool) -> void:
+	var n: Node3D = info.holder
+	for c in n.get_children():
+		n.remove_child(c)
+		c.queue_free()
+	var grey := "#b9b1ab"
+	var frame: String = Build.CORAL if ok else grey
+	var leaf: String = Build.CABINET if ok else "#a39b95"
+	var tall: bool = info.tall
+	var z := -WALL_T / 2 if tall else 0.0
+	Build.box(n, Vector3(0, 0.0, z), Vector3(0.88, 0.012, WALL_T), Build.WOOD if ok else grey, 0.0, Build.R_WOOD)
+	if info.kind == "door":
+		if tall:   # a coral frame round the opening and a teal door standing ajar
+			for sx: float in [-0.45, 0.45]:
+				_rb(n, Vector3(sx, 1.0, z), Vector3(0.12, 2.06, WALL_T + 0.08), frame, 0.04)
+			_rb(n, Vector3(0, 2.03, z), Vector3(1.02, 0.12, WALL_T + 0.08), frame, 0.04)
+			var hinge := Node3D.new()
+			hinge.position = Vector3(-0.4, 0, 0.0)
+			hinge.rotation.y = -0.9
+			n.add_child(hinge)
+			_rb(hinge, Vector3(0.4, 0.98, 0.03), Vector3(0.8, 1.9, 0.06), leaf, 0.02)
+			_rb(hinge, Vector3(0.4, 1.35, 0.065), Vector3(0.5, 0.6, 0.02), Build._tint(leaf, 0.07), 0.01)
+			Build.ball(hinge, Vector3(0.7, 0.95, 0.09), 0.04, BRASS if ok else grey)
+		else:   # cafe doors on low posts
+			for sx: float in [-0.5, 0.5]:
+				_rb(n, Vector3(sx, (CUT_H + 0.3) / 2, 0), Vector3(0.12, CUT_H + 0.3, WALL_T + 0.04), frame, 0.04)
+				var hinge := Node3D.new()
+				hinge.position = Vector3(sx * 0.88, 0, 0)
+				hinge.rotation.y = 0.35 * signf(sx)
+				n.add_child(hinge)
+				_rb(hinge, Vector3(-sx * 0.42, 0.5, 0), Vector3(0.4, 0.5, 0.05), leaf, 0.02)
+	else:
+		if tall:   # a rounded coral rim inside the arch
+			for sx: float in [-DOOR_R - 0.04, DOOR_R + 0.04]:
+				_rb(n, Vector3(sx, 0.78, z), Vector3(0.08, 1.56, WALL_T + 0.06), frame, 0.03)
+		else:   # two cream posts with round caps
+			for sx: float in [-0.5, 0.5]:
+				_rb(n, Vector3(sx, (CUT_H + 0.18) / 2, 0), Vector3(0.14, CUT_H + 0.18, WALL_T + 0.04), t().wall if ok else grey, 0.05)
+				Build.ball(n, Vector3(sx, CUT_H + 0.22, 0), 0.09, frame)
+	if not ok:
+		var sign := Fx.card(Icons.icon("warning"), 0.26)
+		sign.position = Vector3(0, (2.45 if tall else 1.9), z + 0.2)
+		n.add_child(sign)
+		if n.is_inside_tree():   # face the camera whichever way the wall runs
+			sign.basis = n.global_basis.inverse() * sign.basis
+		var bob := sign.create_tween().set_loops()
+		bob.tween_property(sign, "position:y", sign.position.y + 0.08, 0.6).set_trans(Tween.TRANS_SINE)
+		bob.tween_property(sign, "position:y", sign.position.y, 0.6).set_trans(Tween.TRANS_SINE)
+
+
+static func _floors(root: Node3D, plan: Floorplan) -> void:
+	var deep := -0.03 - PAPER_Y
+	var columns := {}   # x -> sorted list of plank cells' y, for the boards
+	for c: Vector2i in plan.floors:
+		var k := plan.kind(c)
+		# Floors are thick slabs of their own material on the sheet of paper (sheet 1).
+		Build.box(root, Vector3(c.x + 0.5, PAPER_Y, c.y + 0.5), Vector3(1.0, deep, 1.0), t().tile_a if k == "tile" else t().planks[0], 0.0, Build.R_GLOSS if k == "tile" else Build.R_WOOD)
+		if k == "tile":
+			var col: String = t().tile_b if posmod(c.x + c.y, 2) else t().tile_a
+			Build.box(root, Vector3(c.x + 0.5, -0.03, c.y + 0.5), Vector3(0.985, 0.03, 0.985), col, 0.0, Build.R_GLOSS)
+		else:
+			if not columns.has(c.x):
+				columns[c.x] = []
+			columns[c.x].append(c.y)
+	# Long boards running front to back, one staggered joint each (sheet 1).
 	var tones: Array = t().planks
-	for i in (w - KITCHEN_W) * 2:
-		var joint := 2.2 + fmod(i * 1.7, 3.0)
-		for part: Array in [[0.0, joint], [joint, float(h)]]:
-			var length: float = part[1] - part[0]
-			var board := Build.box(root, Vector3(KITCHEN_W + i * 0.5 + 0.25, -0.03, part[0] + length / 2), Vector3(length - 0.02, 0.03, 0.48), tones[(i + (1 if part[0] > 0.0 else 0)) % 3], 0.0, Build.R_WOOD)
-			board.rotation.y = PI / 2
+	for x: int in columns:
+		var ys: Array = columns[x]
+		ys.sort()
+		var start: int = ys[0]
+		for i in ys.size():
+			if i < ys.size() - 1 and ys[i + 1] == ys[i] + 1:
+				continue
+			var end: int = ys[i] + 1
+			for half in 2:
+				var g := (x - 4) * 2 + half
+				var joint := start + 2.2 + fposmod(g * 1.7, 3.0)
+				var parts: Array = [[float(start), joint], [joint, float(end)]] if joint < end - 0.3 else [[float(start), float(end)]]
+				for p: Array in parts:
+					var length: float = p[1] - p[0]
+					var board := Build.box(root, Vector3(x + half * 0.5 + 0.25, -0.03, p[0] + length / 2), Vector3(length - 0.02, 0.03, 0.48), tones[posmod(g + (1 if p[0] > start else 0), 3)], 0.0, Build.R_WOOD)
+					board.rotation.y = PI / 2
+			if i < ys.size() - 1:
+				start = ys[i + 1]
 	# A flat wooden threshold hides the seam between any two floors.
-	Build.box(root, Vector3(KITCHEN_W, -0.004, (KITCHEN_Z + h) / 2.0), Vector3(0.1, 0.012, h - KITCHEN_Z), Build.WOOD, 0.0, Build.R_WOOD)
+	for c: Vector2i in plan.floors:
+		for e: Vector3i in [Vector3i(c.x, c.y, 0), Vector3i(c.x, c.y, 1)]:
+			var s := Floorplan.sides(e)
+			if plan.has_floor(s[1]) and plan.kind(s[1]) != plan.kind(c) and not plan.is_wall(e):
+				if e.z == 0:
+					Build.box(root, Vector3(c.x + 0.5, -0.004, c.y), Vector3(1.0, 0.012, 0.1), Build.WOOD, 0.0, Build.R_WOOD)
+				else:
+					Build.box(root, Vector3(c.x, -0.004, c.y + 0.5), Vector3(0.1, 0.012, 1.0), Build.WOOD, 0.0, Build.R_WOOD)
 
 
 ## A wall block from its low corner: one thick, soft-edged cream slab (the
@@ -204,14 +504,48 @@ static func _window(root: Node3D, x: float) -> void:
 		_rb(root, Vector3(x + sx, mid_y, zc), Vector3(0.14, WIN_Y1 - WIN_Y0 + 0.14, WALL_T + 0.1), Build.CORAL, 0.05)
 
 
-static func _dining_wall(root: Node3D, w: int, lights: Array[OmniLight3D]) -> void:
-	var span := float(w - KITCHEN_W)
-	var mid := KITCHEN_W + span / 2
-	if seaside():
-		# Painted clapboard: seafoam and white boards the length of the wall.
-		for i in 7:
-			Build.box(root, Vector3(mid, 0.16 + i * 0.3, 0.015), Vector3(span, 0.3, 0.04), SEAFOAM if i % 2 == 0 else "#f6f8f1")
-		# A life ring and a wooden paddle.
+## True when every one of these edges is still a plain tall wall: the fixed
+## dressing on the first room's walls stays only while its wall does.
+static func _plain_tall(plan: Floorplan, edges: Array) -> bool:
+	for e: Vector3i in edges:
+		if wall_look(plan, e) != "tall" or plan.openings.has(e):
+			return false
+	return true
+
+
+## The first room's fixtures: the hood, cabinets and jar shelf in the kitchen
+## (sheet 1) and, by the sea, a life ring and a paddle on the dining wall.
+static func _fixtures(root: Node3D, plan: Floorplan, lights: Array[OmniLight3D]) -> void:
+	if _plain_tall(plan, [Vector3i(0, 3, 1), Vector3i(0, 4, 1)]):
+		# A sloped hood over the two stoves.
+		var hood := "#7fa3a8"
+		var canopy := Build._add(root, Build.lathe_mesh([[0.0, 0.0], [1.36, 0.0], [1.36, 0.1], [0.62, 0.52], [0.0, 0.52]], 4), Vector3(0.37, 1.5, 4.0), Color(hood), 0.0, Build.R_WOOD)
+		canopy.rotation.y = PI / 4
+		var hold := Node3D.new()  # squash the square canopy to a 0.74 m deep, 1.9 m long one
+		root.add_child(hold)
+		canopy.reparent(hold)
+		hold.scale = Vector3(0.39, 1, 1)
+		hold.position.x = 0.37 - 0.37 * 0.39
+		_rb(root, Vector3(0.22, 2.2, 4.0), Vector3(0.44, 0.44, 0.7), hood, 0.04, Build.R_WOOD)
+	if _plain_tall(plan, [Vector3i(0, 5, 1), Vector3i(0, 6, 1)]):
+		# A run of tall wall cabinets, where they cannot hide a stove or a dial.
+		var z0 := 5.08
+		Build._add(root, Build.bevel_mesh(Vector3(0.42, 0.92, 1.9), 0.04), Vector3(0.21, 1.86, z0 + 0.93), Color(Build.CABINET), 0.0)
+		for i in 3:
+			Build._add(root, Build.bevel_mesh(Vector3(0.03, 0.8, 0.56), 0.012), Vector3(0.43, 1.86, z0 + 0.33 + i * 0.62), Color(Build._tint(Build.CABINET, 0.07)), 0.0)
+			Build._add(root, Build.bevel_mesh(Vector3(0.03, 0.16, 0.04), 0.012), Vector3(0.455, 1.6, z0 + 0.33 + i * 0.62 + (0.2 if i % 2 == 0 else -0.2)), Color("#d9a441"), 0.0, Build.R_WOOD)
+	var kz := float(KITCHEN_Z)
+	if _plain_tall(plan, [Vector3i(2, KITCHEN_Z, 0), Vector3i(3, KITCHEN_Z, 0)]):
+		# A shelf of jars over the worktop.
+		Build.box(root, Vector3(3.2, 1.5, kz + 0.12), Vector3(1.1, 0.06, 0.24), Build.WOOD, 0.0, Build.R_WOOD)
+		var jars := [Build.PAPER, Build.CORAL, Build.TILE_TEAL, Build.WARN]
+		for i in jars.size():
+			Build.cyl(root, Vector3(2.8 + i * 0.27, 1.56, kz + 0.12), 0.09, 0.18 + 0.05 * (i % 2), jars[i], 0.0, Build.R_GLOSS)
+			Build.cyl(root, Vector3(2.8 + i * 0.27, 1.74 + 0.05 * (i % 2), kz + 0.12), 0.07, 0.04, Build.WOOD_DARK)
+	if _plain_tall(plan, [Vector3i(0, KITCHEN_Z, 1)]):
+		_sconce(root, Vector3(0, 2.0, kz + 0.5), Vector3(1, 0, 0), lights)
+	if seaside() and _plain_tall(plan, [Vector3i(6, 0, 0), Vector3i(7, 0, 0)]):
+		var mid := 7.0
 		var ring := Build.lathe(root, Vector3(mid - 0.35, 1.5, 0.03), [[0.2, 0.0], [0.36, 0.0], [0.38, 0.04], [0.36, 0.09], [0.2, 0.09], [0.18, 0.04], [0.2, 0.0]], "#fbf7ee")
 		ring.rotation.x = PI / 2
 		for i in 4:
@@ -223,51 +557,22 @@ static func _dining_wall(root: Node3D, w: int, lights: Array[OmniLight3D]) -> vo
 		root.add_child(paddle)
 		Build.box(paddle, Vector3(0, -0.5, 0), Vector3(0.06, 0.8, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
 		Build.box(paddle, Vector3(0, 0.25, 0), Vector3(0.22, 0.42, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
-	else:
-		# Teal wainscoting with a wooden rail.
-		Build.box(root, Vector3(mid, 0, 0.02), Vector3(span, 0.82, 0.05), Build.CABINET)
-		Build.box(root, Vector3(mid, 0.8, 0.03), Vector3(span, 0.06, 0.09), Build.WOOD, 0.0, Build.R_WOOD)
-	_window(root, KITCHEN_W + 1.55)
-	_window(root, w - 1.55)
-	_sconce(root, Vector3(KITCHEN_W + 0.5, 1.75, 0), Vector3(0, 0, 1), lights)
-	_sconce(root, Vector3(w - 0.45, 1.75, 0), Vector3(0, 0, 1), lights)
 
 
-static func _kitchen_wall(root: Node3D, h: int, lights: Array[OmniLight3D]) -> void:
-	# Wall cabinets over the sink side, where they cannot hide a stove or a dial.
-	# Sheet 1: a sloped hood over the two stoves and a run of tall wall cabinets.
-	var hood := "#7fa3a8"
-	var canopy := Build._add(root, Build.lathe_mesh([[0.0, 0.0], [1.36, 0.0], [1.36, 0.1], [0.62, 0.52], [0.0, 0.52]], 4), Vector3(0.37, 1.5, 4.0), Color(hood), 0.0, Build.R_WOOD)
-	canopy.rotation.y = PI / 4
-	canopy.scale = Vector3(1, 1, 1)
-	var hold := Node3D.new()  # squash the square canopy to a 0.74 m deep, 1.9 m long one
-	root.add_child(hold)
-	canopy.reparent(hold)
-	hold.scale = Vector3(0.39, 1, 1)
-	hold.position.x = 0.37 - 0.37 * 0.39
-	_rb(root, Vector3(0.22, 2.2, 4.0), Vector3(0.44, 0.44, 0.7), hood, 0.04, Build.R_WOOD)
-	var z0 := 5.08
-	Build._add(root, Build.bevel_mesh(Vector3(0.42, 0.92, 1.9), 0.04), Vector3(0.21, 1.86, z0 + 0.93), Color(Build.CABINET), 0.0)
-	for i in 3:
-		Build._add(root, Build.bevel_mesh(Vector3(0.03, 0.8, 0.56), 0.012), Vector3(0.43, 1.86, z0 + 0.33 + i * 0.62), Color(Build._tint(Build.CABINET, 0.07)), 0.0)
-		Build._add(root, Build.bevel_mesh(Vector3(0.03, 0.16, 0.04), 0.012), Vector3(0.455, 1.6, z0 + 0.33 + i * 0.62 + (0.2 if i % 2 == 0 else -0.2)), Color("#d9a441"), 0.0, Build.R_WOOD)
-	# A shelf of jars over the worktop.
-	Build.box(root, Vector3(3.2, 1.5, KITCHEN_Z + 0.12), Vector3(1.1, 0.06, 0.24), Build.WOOD, 0.0, Build.R_WOOD)
-	var jars := [Build.PAPER, Build.CORAL, Build.TILE_TEAL, Build.WARN]
-	for i in jars.size():
-		Build.cyl(root, Vector3(2.8 + i * 0.27, 1.56, KITCHEN_Z + 0.12), 0.09, 0.18 + 0.05 * (i % 2), jars[i], 0.0, Build.R_GLOSS)
-		Build.cyl(root, Vector3(2.8 + i * 0.27, 1.74 + 0.05 * (i % 2), KITCHEN_Z + 0.12), 0.07, 0.04, Build.WOOD_DARK)
-	_sconce(root, Vector3(0, 2.0, KITCHEN_Z + 0.5), Vector3(1, 0, 0), lights)
-
-
-static func _dressing(root: Node3D, w: int, h: int) -> void:
-	# Woven rug, 1.5 cm thick, under the middle table.
+## Woven rug, 1.5 cm thick, under the middle table, while its floor is there.
+static func _rug(root: Node3D, plan: Floorplan) -> void:
+	for c in Floorplan.rect_cells(Vector2i(6, 2), Vector2i(9, 4)):
+		if not plan.has_floor(c):
+			return
 	Build.box(root, Vector3(8.5, 0, 3.5), Vector3(3.1, 0.015, 1.6), "#e9dcc0")
 	for i in 2:
 		var side := -1.0 if i == 0 else 1.0
 		Build.box(root, Vector3(8.5 + side * 1.2, 0.003, 3.5), Vector3(0.18, 0.015, 1.6), Build.CORAL)
 		Build.box(root, Vector3(8.5 + side * 0.95, 0.003, 3.5), Vector3(0.1, 0.015, 1.6), Build.CABINET)
-	# A planter and the menu board outside, on the near side of the door.
+
+
+## A planter and the menu board outside, on the near side of the door.
+static func _outside(root: Node3D, w: int, h: int) -> void:
 	root = _turned(root, Vector3(w - h, 0, 9.5))
 	for px: float in [3.2]:
 		Build.box(root, Vector3(px, 0, h + 0.3), Vector3(1.2, 0.55, 0.34), Build.WOOD, 0.0, Build.R_WOOD)
@@ -278,6 +583,26 @@ static func _dressing(root: Node3D, w: int, h: int) -> void:
 		board.rotation.x = -lean * 0.22
 		var slate := Build.box(root, Vector3(4.2, 0.14, h + 0.34 + lean * 0.115), Vector3(0.4, 0.5, 0.03), "#3f4a45")
 		slate.rotation.x = -lean * 0.22
+
+
+## Little models of the build tools for the shop.
+static func tool_preview(n: Node3D, id: String) -> void:
+	var plan := Floorplan.new(Rect2i(-2, -2, 4, 4))
+	match id:
+		"floor_tile", "floor_planks":
+			plan.fill(Rect2i(-1, -1, 2, 2), "tile" if id == "floor_tile" else "planks")
+			_floors(n, plan)
+			n.position.y = 0.25
+		"wall":
+			_wall(n, Vector3(-0.75, 0, -WALL_T / 2), Vector3(1.5, CUT_H, WALL_T), t().cut)
+			n.position.y = 0.2
+		_:
+			_wall(n, Vector3(-1.0, 0, -WALL_T / 2), Vector3(0.5, CUT_H, WALL_T), t().cut)
+			_wall(n, Vector3(0.5, 0, -WALL_T / 2), Vector3(0.5, CUT_H, WALL_T), t().cut)
+			var o := Node3D.new()
+			n.add_child(o)
+			dress_opening({"holder": o, "kind": id, "tall": false}, true)
+			n.position.y = 0.1
 
 
 ## The street and the sheet of paper everything rests on. Everything ends
@@ -293,9 +618,6 @@ static func _ground(root: Node3D, w: int, lights: Array[OmniLight3D]) -> void:
 	var span := x1 - X0
 	# No base board: floors and paving are thick slabs of their own material that
 	# rest straight on a sheet of paper, which catches every shadow (sheet 1).
-	var deep := -0.03 - PAPER_Y
-	Build.box(root, Vector3(KITCHEN_W / 2.0, PAPER_Y, (KITCHEN_Z + 7.0) / 2.0), Vector3(KITCHEN_W, deep, 7.0 - KITCHEN_Z), t().tile_a)
-	Build.box(root, Vector3((KITCHEN_W + w) / 2.0, PAPER_Y, 3.5), Vector3(w - KITCHEN_W, deep, 7.0), t().planks[0], 0.0, Build.R_WOOD)
 	var paper := MeshInstance3D.new()
 	var sheet := PlaneMesh.new()
 	sheet.size = Vector2(400, 400)

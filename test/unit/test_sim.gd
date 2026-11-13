@@ -382,7 +382,7 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 11, "two single-tier pieces and three with three tiers")
+	assert_eq(Catalog.search().size(), 16, "two single-tier pieces, three with three tiers and five build tools")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 3)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
@@ -392,7 +392,9 @@ func test_catalog_search_by_word_and_category():
 	assert_eq(Catalog.search("seats").size(), 3, "matches what a piece does")
 	assert_eq(Catalog.search("stove ++").size(), 1)
 	assert_eq(Catalog.search("fern", "Kitchen").size(), 0)
-	assert_eq(Catalog.search("walls")[0].id, "screen", "matches the category name")
+	assert_eq(Catalog.search("partition")[0].id, "screen")
+	assert_eq(Catalog.search("", "Build").size(), 6, "floors, wall, door, archway and the partition")
+	assert_eq(Catalog.search("build", "Dining").size(), 0, "matches the category name")
 
 
 func test_shelved_blueprint_returns_upgraded_after_two_days():
@@ -463,3 +465,67 @@ func test_disgusted_guests_tell_friends_and_revolted_ones_never_return():
 		assert_false(t.roll_guests(day).has(0), "never comes back")
 	assert_eq(t.status_word(0, 1), "Never coming back")
 
+
+
+# ---------------------------------------------------------------- floorplan
+
+func _plan() -> Floorplan:
+	var p := Floorplan.new(Rect2i(-3, -3, 10, 10))
+	p.fill(Rect2i(0, 0, 2, 2), "planks")
+	return p
+
+
+func test_outer_walls_follow_the_edge_of_the_floor():
+	var p := _plan()
+	assert_eq(p.walls().size(), 8, "a 2 x 2 floor has 8 lengths of wall round it")
+	assert_false(p.is_wall(Vector3i(1, 0, 1)), "none inside")
+	assert_true(p.is_wall(Vector3i(0, 0, 0)))
+	var gone := p.lay(Vector2i(2, 0), "tile")
+	assert_true(gone.is_empty())
+	assert_false(p.is_wall(Vector3i(2, 0, 1)), "the wall between old and new floor comes down")
+	assert_true(p.is_wall(Vector3i(3, 0, 1)), "and goes up round the new edge")
+
+
+func test_floor_must_touch_the_room_and_stay_on_the_lot():
+	var p := _plan()
+	assert_false(p.can_lay(Vector2i(4, 4), "tile"), "not floating on its own")
+	assert_true(p.can_lay(Vector2i(2, 1), "tile"))
+	assert_false(p.can_lay(Vector2i(0, 0), "planks"), "already planks")
+	assert_true(p.can_lay(Vector2i(0, 0), "tile"), "but can be re-laid as tile")
+	assert_false(p.can_lay(Vector2i(-4, 0), "tile"), "off the lot")
+	var order := p.lay_order(Floorplan.rect_cells(Vector2i(5, 0), Vector2i(2, 0)), "tile")
+	assert_eq(order, [Vector2i(2, 0), Vector2i(3, 0), Vector2i(4, 0), Vector2i(5, 0)] as Array[Vector2i],
+		"a dragged strip is laid outward from the room")
+
+
+func test_built_walls_and_openings():
+	var p := _plan()
+	assert_true(p.can_build(Vector3i(1, 0, 1)), "between two floors")
+	assert_false(p.can_build(Vector3i(0, 0, 0)), "not on the outline")
+	p.build(Vector3i(1, 0, 1))
+	assert_true(p.is_wall(Vector3i(1, 0, 1)))
+	assert_true(p.can_open(Vector3i(1, 0, 1), "door"))
+	assert_true(p.can_open(Vector3i(0, 0, 0), "arch"), "an outer wall can take one, for floor laid later")
+	assert_false(p.can_open(Vector3i(1, 1, 1), "door"), "no wall there")
+	p.openings[Vector3i(0, 0, 0)] = "arch"
+	assert_false(p.opening_has_floor(Vector3i(0, 0, 0)), "bare ground behind it")
+	p.openings[Vector3i(1, 0, 1)] = "arch"
+	assert_true(p.opening_has_floor(Vector3i(1, 0, 1)))
+	assert_eq(p.unbuild(Vector3i(1, 0, 1)), "arch", "taking the wall down takes its archway")
+	p.openings[Vector3i(1, 0, 0)] = "door"
+	assert_eq(p.lay(Vector2i(1, -1), "planks"), {Vector3i(1, 0, 0): "door"}, "a door in an outer wall goes when floor is laid past it")
+	p.build(Vector3i(1, 0, 1))
+	p.lift(Vector2i(0, 0))
+	assert_false(p.built.has(Vector3i(1, 0, 1)), "a built wall goes with the floor beside it")
+	assert_eq(Floorplan.line(Vector2i(0, 2), Vector2i(3, 2)), [Vector3i(0, 2, 0), Vector3i(1, 2, 0), Vector3i(2, 2, 0)] as Array[Vector3i])
+	assert_eq(Floorplan.line(Vector2i(1, 3), Vector2i(1, 1)), [Vector3i(1, 1, 1), Vector3i(1, 2, 1)] as Array[Vector3i])
+
+
+func test_doors_let_people_through_but_not_their_gaze():
+	var g := Grid.new(3, 1, Vector2i(-1, 0))
+	assert_true(g.in_bounds(Vector2i(-1, 0)), "a grid can start below zero")
+	g.doors[Vector3i(0, 0, 1)] = true
+	assert_true(g.reachable(Vector2i(-1, 0), Vector2i(1, 0)))
+	assert_false(g.has_los(Vector2i(-1, 0), Vector2i(1, 0)))
+	g.outside[Vector2i(0, 0)] = true
+	assert_false(g.reachable(Vector2i(-1, 0), Vector2i(1, 0)), "nobody walks on bare ground")
