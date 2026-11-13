@@ -167,7 +167,10 @@ placed; floors and ceilings.
     future dishes, the four-seat table and booth, floor lamp, awning and photo view.
   - A bundled hand-lettered font (the HUD uses a rounded system font).
   - The open items: title screen, colour-blind support, the "Town Diner" subtitle.
-- Sounds are synthesised placeholders (`tools/make_sfx.py`). Later: real foley, music per theme.
+- Sound effects are synthesised placeholders (`tools/make_sfx.py`). Later: real foley.
+- Music is real: `Daytime` during service, `Nighttime` on the receipt and in the build
+  phase, `Closed` once at game over, cross-faded. `Intro` is unused until there is a title
+  screen. The old synthesised `assets/sfx/music.wav` is no longer played. Later: music per theme.
 
 ## 9. Open questions
 

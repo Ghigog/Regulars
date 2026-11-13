@@ -382,6 +382,24 @@ func test_prompt_names_the_action_without_doing_it():
 	assert_eq(game.prompt_for(game.find_station("stove")), "Cook")
 
 
+func test_music_follows_day_night_and_closing():
+	assert_eq(game.music_id, "day")
+	assert_true(game._music.playing)
+	assert_true((game._music.stream as AudioStreamMP3).loop)
+	game.arrivals.clear()
+	_run(0.2)
+	assert_eq(game.music_id, "night")
+	game.open_build()
+	assert_eq(game.music_id, "night", "the build phase keeps the night track")
+	game.start_day()
+	assert_eq(game.music_id, "day")
+	for i in Ledger.MAX_STRIKES:
+		game.ledger.record_walkout()
+	_run(0.2)
+	assert_eq(game.music_id, "closed")
+	assert_false((game._music.stream as AudioStreamMP3).loop, "the closing track plays once")
+
+
 func test_days_are_endless_and_get_harder():
 	game.arrivals.clear()
 	_run(1.0)

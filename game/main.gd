@@ -15,9 +15,13 @@ const AREA := Rect2i(0, 0, W, H)   # where the player may build
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
 const SOUNDS := {  # name -> volume in dB
 	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
-	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0, "music": -15.0,
+	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0,
 }
-const LOOPING: Array[String] = ["sizzle", "music"]
+const LOOPING: Array[String] = ["sizzle"]
+const MUSIC_DB := -14.0
+const MUSIC_FADE := 1.2   # seconds to cross-fade between tracks
+## Track per moment. "Intro" is in assets/music too, waiting for a title screen.
+const MUSIC := {"day": "Daytime", "night": "Nighttime", "closed": "Closed"}
 # The camera sits wide to show the whole diorama between days, and moves in on
 # the room and the queue while guests are being served.
 const CAM_OFFSET := Vector3(14, 15, 14)
@@ -56,6 +60,8 @@ var cam: Camera3D
 var _cursor: Node3D
 var _gross: Array[Dictionary] = []
 var _sfx := {}
+var music_id := ""               # which MUSIC track is playing
+var _music: AudioStreamPlayer
 var _sun: DirectionalLight3D
 var _sconces: Array[OmniLight3D] = []
 var _env: Environment
@@ -378,8 +384,30 @@ func _load_sounds() -> void:
 		p.stream = stream
 		add_child(p)
 		_sfx[id] = p
-	if _sfx.has("music"):
-		_sfx.music.play()
+
+
+## Cross-fades to a track from MUSIC. "closed" plays once; the others loop.
+func play_music(id: String) -> void:
+	if id == music_id:
+		return
+	music_id = id
+	if _music:
+		var old := _music
+		var out := old.create_tween()
+		out.tween_property(old, "volume_db", -50.0, MUSIC_FADE)
+		out.tween_callback(old.queue_free)
+		_music = null
+	var path := "res://assets/music/%s.mp3" % MUSIC.get(id, "")
+	if not ResourceLoader.exists(path):
+		return
+	var stream: AudioStreamMP3 = load(path).duplicate()
+	stream.loop = id != "closed"
+	_music = AudioStreamPlayer.new()
+	_music.stream = stream
+	_music.volume_db = -50.0
+	add_child(_music)
+	_music.play()
+	_music.create_tween().tween_property(_music, "volume_db", MUSIC_DB, MUSIC_FADE)
 
 
 ## Plays a sound with a little random pitch so repeats do not sound identical.
@@ -465,6 +493,7 @@ func start_day() -> void:
 	for i in coming.size():
 		var t := 2.0 + (i + town.rng.randf() * 0.6) * (day_length() - 2.0) / coming.size()
 		arrivals.append({"time": t, "idx": coming[i]})
+	play_music("day")
 	hud.show_banner("Day %d" % ledger.day)
 	hud.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
 	sfx("day")
@@ -718,6 +747,7 @@ func buy_flyers() -> bool:
 
 func _end_day() -> void:
 	phase = Phase.SUMMARY
+	play_music("night")
 	inspect(null)
 	last_day = ledger.end_day()
 	hud.show_summary(last_day)
@@ -725,6 +755,7 @@ func _end_day() -> void:
 
 
 func _close_down() -> void:
+	play_music("closed")
 	phase = Phase.CLOSED
 	var days := ledger.day
 	var earned := ledger.lifetime_earnings()
