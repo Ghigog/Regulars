@@ -28,6 +28,8 @@ const PAPER := "#fff6e6"
 const LEAF := "#5fa873"
 const LEAF_2 := "#74bb86"
 const PAVING := "#bdb7b6"
+const BAG := "#4f6b4a"    # bin bags: a dull green that still reads against the brown bin
+const SUDS := "#f4fbfb"
 const ROAD := "#8f8a84"
 
 const BEVEL := 0.05   # soft, but small enough that slabs still read as slabs (sheet 1)
@@ -413,6 +415,11 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 			ball(n, Vector3(-0.03, 0.02, 0.02), 0.022, "#7a4a2b", 0.0, R_GLOSS)
 			for c: Vector3 in [Vector3(0.1, 0.03, 0.06), Vector3(-0.09, 0.03, -0.08), Vector3(0.02, 0.03, -0.13)]:
 				box(n, c, Vector3(0.035, 0.02, 0.03), "#e0a850").rotation.y = c.x * 20.0
+		"rubbish_bag":  # a fat knotted sack, for carrying out the front
+			ball(n, Vector3(0, 0.17, 0), 0.19, BAG).scale = Vector3(1, 0.95, 0.9)
+			ball(n, Vector3(0, 0.38, 0), 0.06, BAG)
+			for a: float in [-0.6, 0.6]:
+				ball(n, Vector3(sin(a) * 0.07, 0.45, 0), 0.04, BAG).scale = Vector3(0.7, 1.4, 0.7)
 		"burger", "burger_bitten":
 			_plate(n)
 			_puck(n, 0.018, 0.14, 0.055, "#e6a542")                       # bottom bun
@@ -425,6 +432,47 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 				for c: Vector3 in [Vector3(0.17, 0.03, -0.06), Vector3(-0.15, 0.03, 0.1)]:
 					box(n, c, Vector3(0.03, 0.02, 0.03), "#e0a850")
 	return n
+
+
+## The washing-up in a sink: dirty plates leaning in the basin and, once it has
+## piled up, a heap of suds that rises over the rim (readable from across the room).
+static func sink_load(n: Node3D, plates: int, piled: bool) -> void:
+	for i in mini(plates, 4):
+		var p := item("dirty_plate")
+		p.position = Vector3(-0.18 + i * 0.12, 0.93 + 0.01 * i, 0.06)
+		p.rotation = Vector3(0.0, 0.0, -1.15)
+		n.add_child(p)
+	if not piled:
+		return
+	# A foam dome over the whole basin, lumpy, with a few bubbles floating off.
+	for b: Array in [[-0.2, 0.0, 0.15], [0.0, 0.05, 0.19], [0.2, -0.02, 0.16], [-0.1, 0.15, 0.14], [0.13, 0.16, 0.13],
+			[0.03, -0.14, 0.15], [-0.05, 0.0, 0.17]]:
+		ball(n, Vector3(b[0], 1.0 + b[2] * 0.4, 0.04 + b[1]), b[2], SUDS, 0.0, R_GLOSS).scale = Vector3(1, 0.85, 1)
+	for b: Array in [[-0.14, 1.32, 0.07], [0.1, 1.4, 0.06], [0.0, 1.52, 0.045]]:
+		ball(n, Vector3(b[0], b[1], 0.04), b[2], "#9fd3de", 0.0, R_GLOSS)
+
+
+## What is in a bin: a mound of scraps that rises with each one thrown away, then,
+## full, a bulging bag over the rim, rubbish spilt on the floor in front.
+static func bin_load(n: Node3D, fill: int, holds: int) -> void:
+	if fill <= 0:
+		return
+	if fill < holds:
+		var h := 0.6 + 0.03 * fill
+		ball(n, Vector3(0, h - 0.1, 0), 0.2, BAG).scale = Vector3(1, 0.6, 1)
+		for i in fill:
+			var a := TAU * i / 3.0 + 0.5
+			box(n, Vector3(cos(a) * 0.1, h, sin(a) * 0.1), Vector3(0.1, 0.05, 0.08), [PAPER, "#c98a4a", "#e9c46a"][i % 3]).rotation.y = a
+		return
+	ball(n, Vector3(0, 0.74, 0), 0.34, BAG).scale = Vector3(1, 0.72, 1)
+	ball(n, Vector3(0.02, 0.97, 0.02), 0.07, BAG)
+	# Scraps on top and down the front (+z faces the room in the default layout, but
+	# a bin is round enough for that not to matter much), and two on the floor.
+	for s: Array in [[0.18, 0.9, 0.16, PAPER, 0.4], [-0.2, 0.86, 0.12, "#e9c46a", 1.1], [-0.05, 0.88, -0.22, "#c98a4a", 2.0],
+			[0.32, 0.62, 0.3, PAPER, 0.8], [-0.3, 0.6, 0.32, "#e9c46a", -0.5]]:
+		box(n, Vector3(s[0], s[1], s[2]), Vector3(0.13, 0.05, 0.09), s[3]).rotation = Vector3(0.4, s[4], 0.3)
+	for s: Array in [[0.48, 0.42, PAPER], [-0.1, 0.55, "#c98a4a"], [0.3, 0.6, "#e9c46a"]]:
+		box(n, Vector3(s[0], 0.03, s[1]), Vector3(0.14, 0.05, 0.1), s[2]).rotation.y = s[0] * 4.0
 
 
 static func _shade(col: String, amount := 0.13) -> String:

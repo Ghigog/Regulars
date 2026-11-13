@@ -5,7 +5,7 @@ extends Node3D
 const SPEED := 4.4
 const RADIUS := 0.28
 const REACH := 1.3   # how far from a station's centre (or a seated guest) the chef can use it
-const GROSS_ITEMS: Array[String] = ["dirty_plate", "burnt_patty"]
+const GROSS_ITEMS: Array[String] = ["dirty_plate", "burnt_patty", "rubbish_bag"]
 
 var game
 var held := ""
@@ -14,6 +14,7 @@ var facing := Vector2i(0, 1)      # nearest grid direction to `aim`
 var aim := Vector3(0, 0, 1)       # the way the chef is really looking (any of 8 ways)
 var _velocity := Vector3.ZERO
 var _held_node: Node3D
+var _held_size := 1.0   # the carried item's size in the world; it pops in from 0.4
 var _body: Peg
 var _stride := 0.0
 
@@ -36,8 +37,8 @@ func set_held(kind: String, quality := 1.0) -> void:
 		_held_node = Build.item(kind, quality)
 		_held_node.position = Vector3(0, 0.42, 0.34)
 		_body.add_child(_held_node)
-		_held_node.scale = Vector3.ONE * 0.4
-		_held_node.create_tween().tween_property(_held_node, "scale", Vector3.ONE, 0.18) \
+		_held_size = 0.4
+		_held_node.create_tween().tween_property(self, "_held_size", 1.0, 0.18) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -178,5 +179,5 @@ func move(input: Vector2, delta: float) -> void:
 	# Lean into a run, and tip whatever is carried so its top faces the camera.
 	_body.rotation.x = lerpf(_body.rotation.x, 0.3 * pace, 1.0 - exp(-10.0 * delta))
 	if _held_node:
-		_held_node.global_basis = Basis(Vector3(1, 0, -1).normalized(), deg_to_rad(25.0)).scaled(_held_node.scale)
+		_held_node.global_basis = Basis(Vector3(1, 0, -1).normalized(), deg_to_rad(25.0)).scaled(Vector3.ONE * _held_size)
 	_body.rotation.y = lerp_angle(_body.rotation.y, atan2(aim.x, aim.z), 1.0 - exp(-18.0 * delta))

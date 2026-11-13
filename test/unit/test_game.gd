@@ -371,7 +371,89 @@ func test_washing_a_dirty_plate_returns_it_to_the_stack():
 	assert_eq(game.player.held, "dirty_plate")
 	_use("sink")
 	assert_eq(game.player.held, "")
+	assert_eq(game.find_station("sink").dirty, 1, "it soaks until washed")
+	assert_eq(game.find_station("plates").count, 4)
+	_use("sink")
+	assert_eq(game.find_station("sink").dirty, 0)
 	assert_eq(game.find_station("plates").count, 5)
+	assert_eq(game.use_station(game.find_station("sink"), true), "", "nothing left to wash")
+
+
+func test_bin_fills_overflows_and_is_emptied_out_the_front():
+	var bin: Station = game.find_station("bin")
+	for i in Station.BIN_HOLDS:
+		assert_false(bin.overflowing())
+		game.player.set_held("burnt_patty")
+		game.use_station(bin)
+	assert_eq(bin.count, Station.BIN_HOLDS)
+	assert_true(bin.overflowing())
+	game.player.set_held("burger")
+	assert_eq(game.use_station(bin), "Scrape off", "a full bin still takes scraps")
+	assert_eq(bin.count, Station.BIN_HOLDS + 1)
+	game.player.set_held("")
+	assert_eq(game.use_station(bin), "Empty bin")
+	assert_eq(bin.count, 0)
+	assert_eq(game.player.held, "rubbish_bag")
+	assert_true(game.player.carrying_something_gross())
+	assert_eq(game.door_action(), "", "the bag goes out of the front door")
+	game.player.position = game.DOORWAY
+	assert_eq(game.door_action(), "Take out rubbish")
+	assert_true(game.use_door())
+	assert_eq(game.player.held, "")
+	assert_true(game.door_open, "taking the rubbish out leaves the door as it was")
+
+
+func _gross_kinds() -> Array:
+	game._collect_gross()
+	return game._gross.map(func(s): return s.kind)
+
+
+func test_a_piled_sink_and_an_overflowing_bin_are_gross():
+	var sink: Station = game.find_station("sink")
+	var bin: Station = game.find_station("bin")
+	sink.dirty = Station.SINK_PILED - 1
+	bin.count = Station.BIN_HOLDS - 1
+	var kinds := _gross_kinds()
+	assert_false(kinds.has("sink"), "a plate or two soaking is fine")
+	assert_false(kinds.has("overflow"))
+	assert_true(kinds.has("bin"), "the bin is still a bin")
+	sink.dirty = Station.SINK_PILED
+	bin.count = Station.BIN_HOLDS
+	kinds = _gross_kinds()
+	assert_true(kinds.has("sink"))
+	assert_true(kinds.has("overflow"))
+	assert_false(kinds.has("bin"), "overflowing replaces the plain bin")
+	_run(3.0)
+	assert_almost_eq(sink.dirty_age, 3.0, 0.15, "the mess ages from when it piled up")
+	assert_almost_eq(bin.dirty_age, 3.0, 0.15)
+	sink.dirty = 0
+	_run(0.1)
+	assert_eq(sink.dirty_age, 0.0)
+
+
+func test_overflowing_bin_disgusts_guests_across_the_room_unless_a_wall_hides_it():
+	var g := _seat_at(Vector2i(6, 1), false)          # seat (7, 1): out of the plain bin's range
+	assert_not_null(g)
+	if g == null:
+		return
+	g.mood.patience = 1.0
+	_run(4.0)
+	var before: float = g.mood.disgust
+	assert_false(g.mood.thoughts.has("The bin is overflowing"))
+	var bin: Station = game.find_station("bin")
+	bin.count = Station.BIN_HOLDS
+	bin.dirty_age = 30.0
+	g.mood.patience = 1.0
+	_run(2.0)
+	assert_true(g.mood.thoughts.has("The bin is overflowing"))
+	var seen: float = g.mood.disgust
+	assert_gt(seen, before)
+	game.grid.walls[Vector3i(0, 5, 0)] = true
+	game.grid.walls[Vector3i(1, 5, 1)] = true
+	game.grid.walls[Vector3i(0, 6, 0)] = true
+	g.mood.patience = 1.0
+	_run(2.0)
+	assert_eq(g.mood.disgust, seen, "walled off: out of sight")
 
 
 func test_ignored_guest_walks_out_and_counts_as_a_strike():

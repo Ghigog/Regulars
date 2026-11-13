@@ -12,7 +12,12 @@ An endless run. Each day guests arrive, you cook meat, serve it, and get paid. S
 many days as you can; three walkouts in one day ends the run.
 
 - Direct control of one chef (WASD, E/Space).
-- One dish: a burger. Fridge > stove > plate > table. Dirty plates go to the sink.
+- One dish: a burger. Fridge > stove > plate > table. Dirty plates go into the sink and
+  soak there until washed, one press each, back onto the stack.
+- **A dirty kitchen.** Three or more plates soaking pile up in suds. Every patty thrown
+  away or burger scraped off goes in the bin; at four it overflows (it still takes more).
+  "Empty bin" hands the chef a bag, which goes out of the front door ("Take out rubbish");
+  carried, it counts as rubbish. Both are disgust sources (table below).
 - Meat has doneness. A radial dial over the stove has a green "perfect" window; pull it late
   and it is dry (worse tips), leave it and it burns. The patty changes look as it goes.
 - Guests are named townsfolk with patience, disgust, joy and savour. These set the tip.
@@ -111,6 +116,8 @@ many days as you can; three walkouts in one day ends the run.
   | Used plate on a table | 0.002 | 10 s | 0.06 | when the plate was left |
   | Burning food on a stove | 0.01 | 5 s | 0.06 | when it burnt |
   | The bin (within 5 cells) | 0.004 | 15 s | 0.02 | when this guest first saw it |
+  | Overflowing bin (any distance) | 0.008 | 8 s | 0.06 | when it overflowed (replaces the line above) |
+  | Sink piled with 3+ plates | 0.003 | 10 s | 0.04 | when it piled up |
   | Chef carrying rubbish | 0.05 | 1.5 s | 0.4 | when this guest first saw it |
 
   Below 0.005 a second a guest has not noticed: no thought, and it does not spoil the
@@ -166,8 +173,8 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Thoughts**: short lines triggered by what they experience ("I just watched the chef
   carry rubbish past me"). The click-to-inspect guest card is built (section 1); it shows
   the last six thoughts, not the full history.
-- **Sightlines**: built (section 1). To add: a dirty kitchen (sink full, bin overflowing)
-  as its own source, so "clean" means more than "nothing burning".
+- **Sightlines**: built (section 1), including a dirty kitchen (piled sink, overflowing
+  bin). To add: night cleaning; the sink and bin stay as they are overnight, like tables.
 - **Word of mouth**: each guest has an affinity (-1..1) that sets their chance to visit.
   A visit moves it; 40% of the change spreads to their friends.
 - **Built**: regulars with a visit streak, grudges (section 1).
@@ -241,7 +248,6 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
     works; swap pieces in where a sculpted model would beat the generated one (hair, hats,
     the fridge, the tree are the best candidates).
   - A theme picker in the game (themes are an environment variable for now).
-  - Station states with no gameplay behind them yet: sink full of suds, overflowing bin.
   - Hired staff (server, dishwasher, host), co-op chefs 2 to 4 (trim colours exist),
     future dishes, the four-seat table and booth, floor lamp, awning and photo view.
   - A bundled hand-lettered font (the HUD uses a rounded system font).

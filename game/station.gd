@@ -7,6 +7,8 @@ const PERFECT_END := 7.5   # juicy until here, then it dries out
 const BURN_TIME := 12.0
 const NEARLY_TIME := 2.4   # the raw patty starts to colour
 const DIAL_SWEEP := 150.0  # degrees either side of straight up
+const SINK_PILED := 3      # this many plates soaking and the washing-up shows (and bothers guests)
+const BIN_HOLDS := 4       # scraps a bin takes before it overflows
 
 var type := ""
 var cell := Vector2i.ZERO
@@ -16,9 +18,9 @@ var lamp: OmniLight3D # a table's lamp light, owned by the game
 var item := ""        # what is sitting on a counter or stove
 var quality := 1.0    # how well cooked that item is (0..1)
 var cook := 0.0       # seconds the stove's patty has been on the heat
-var count := 0        # clean plates in a plate stack
-var dirty := 0        # dirty plates left on a table
-var dirty_age := 0.0  # seconds those plates have been sitting there
+var count := 0        # clean plates in a plate stack; scraps in a bin
+var dirty := 0        # dirty plates left on a table, or soaking in a sink
+var dirty_age := 0.0  # seconds this piece has been messy (see `messy`)
 var seats: Array[Vector2i] = []
 var _item_node: Node3D
 var _stack: Node3D
@@ -203,6 +205,22 @@ func place_at(cell_: Vector2i, facing_: int) -> void:
 		lamp.position = position + Vector3(0, 1.0, 0)
 
 
+## A table with plates on it, a sink piled with washing-up, an overflowing bin.
+func messy() -> bool:
+	match type:
+		"table":
+			return dirty > 0
+		"sink":
+			return dirty >= SINK_PILED
+		"bin":
+			return overflowing()
+	return false
+
+
+func overflowing() -> bool:
+	return type == "bin" and count >= BIN_HOLDS
+
+
 func refresh() -> void:
 	if _stack:
 		_stack.queue_free()
@@ -218,6 +236,16 @@ func refresh() -> void:
 			var d := Build.item("dirty_plate")
 			d.position = Vector3(-0.25 + i * 0.5, 0.74, 0.3)
 			_stack.add_child(d)
+	elif type == "sink":
+		Build.sink_load(_stack, dirty, dirty >= SINK_PILED)
+	elif type == "bin":
+		Build.bin_load(_stack, count, BIN_HOLDS)
+		if overflowing() and not _fx.has("wisps"):
+			_fx.wisps = Fx.play(self, "wisps", Vector3(0, 1.25, 0), 0.32, true)
+			_fx.wisps.fps = 3.0
+		elif not overflowing() and _fx.has("wisps"):
+			_fx.wisps.queue_free()
+			_fx.erase("wisps")
 
 
 ## A little show when the chef uses the station: the fridge door swings open.
