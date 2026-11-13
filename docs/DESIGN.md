@@ -45,11 +45,28 @@ many days as you can; three walkouts in one day ends the run.
   +0.05 joy per tier. Counters and partitions gain nothing but looks.
 - **Guest card.** Click a guest during service to see their standing, visit number, the
   four meters and their last six thoughts. It follows them live and closes when they go.
-- **Sightlines.** Disgust sources a guest must be able to see: an uncleared table and
-  burning food on a stove (0.03 a second, 7 cells), the chef carrying rubbish (0.15),
-  and the bin (0.01, 5 cells; in the starting room that reaches the two seats nearest
-  the kitchen). A partition hides any of them. A guest who can see a working stove and
-  nothing nasty gains joy (0.01 a second).
+- **Sightlines.** A guest is disgusted only by what they can see; a partition hides it.
+  Every source follows one rule (`GuestMood.gross_rate`): it starts small, doubles on a
+  fixed beat and tops out. Rates per second, in `GROSS` in `game/main.gd`:
+
+  | Source | Starts | Doubles every | Tops out | Ages from |
+  | --- | --- | --- | --- | --- |
+  | Used plate on a table | 0.002 | 10 s | 0.06 | when the plate was left |
+  | Burning food on a stove | 0.01 | 5 s | 0.06 | when it burnt |
+  | The bin (within 5 cells) | 0.004 | 15 s | 0.02 | when this guest first saw it |
+  | Chef carrying rubbish | 0.05 | 1.5 s | 0.4 | when this guest first saw it |
+
+  Below 0.005 a second a guest has not noticed: no thought, and it does not spoil the
+  view. A guest who can see a working stove and nothing they have noticed gains joy
+  (0.01 a second).
+- **Groups.** Guests arrive in groups of friends, never with strangers. The biggest
+  group is the most seats any one table has (2 today). A group queues together, takes
+  a whole empty table (the smallest that fits) and shares it with nobody, so a lone
+  guest has a table to themselves. If one of a group runs out of patience, those still
+  waiting leave with them and it counts as one walkout; each of them holds a grudge.
+- **Reaching stations.** E uses the nearest station within 1.3 m that has something to
+  do, with a small preference for the one the chef faces and for serving over putting
+  down. A table also counts as near when one of its seated guests is.
 - **Regulars.** Three good visits in a row (satisfaction above 0.3) make someone a
   regular: they arrive with +0.1 joy and tip 25% more. A poor visit resets the streak.
   The town book shows "Regular, N in a row".
@@ -93,8 +110,9 @@ placed; floors and ceilings.
 - **Word of mouth**: each guest has an affinity (-1..1) that sets their chance to visit.
   A visit moves it; 40% of the change spreads to their friends.
 - **Built**: regulars with a visit streak, grudges (section 1).
-- **To add**: stay length and order size driven by mood (dessert, second drink), groups
-  arriving together, favourite dishes (needs a second dish), reviews (needs a design).
+- **Built**: groups arriving together (section 1).
+- **To add**: stay length and order size driven by mood (dessert, second drink),
+  favourite dishes (needs a second dish), reviews (needs a design).
 - **Discounts and comps**: half price is built (section 1). To add: a free meal, and
   guests who come to expect a discount.
 

@@ -10,6 +10,15 @@ const SPAWN := Vector2i(9, 8)
 const EXIT := Vector2i(0, 8)
 const BILL := 12
 const SIGHT_RANGE := 7
+## Disgust sources: [starting rate per second, seconds to double, top rate]. See
+## GuestMood.gross_rate. A plate and burning food age from when they appeared; the bin
+## and carried rubbish age from when each guest first had them in view.
+const GROSS := {
+	"plate": [0.002, 10.0, 0.06],
+	"burning": [0.01, 5.0, 0.06],
+	"bin": [0.004, 15.0, 0.02],
+	"rubbish": [0.05, 1.5, 0.4],
+}
 const BIN_RANGE := 5          # the bin only bothers guests seated this close
 const AREA := Rect2i(0, 0, W, H)   # where the player may build
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
@@ -487,12 +496,13 @@ func start_day() -> void:
 	hud.hide_build()
 	town.new_day()
 	var coming := town.roll_guests(ledger.day, Town.FLYER_BOOST if flyers_out else 0.0)
+	var groups := town.make_groups(coming, max_party())
 	var flyered := flyers_out
 	flyers_out = false
 	arrivals.clear()
-	for i in coming.size():
-		var t := 2.0 + (i + town.rng.randf() * 0.6) * (day_length() - 2.0) / coming.size()
-		arrivals.append({"time": t, "idx": coming[i]})
+	for i in groups.size():
+		var t := 2.0 + (i + town.rng.randf() * 0.6) * (day_length() - 2.0) / groups.size()
+		arrivals.append({"time": t, "group": groups[i]})
 	play_music("day")
 	hud.show_banner("Day %d" % ledger.day)
 	hud.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
@@ -784,14 +794,32 @@ func restart() -> void:
 
 # ---------------------------------------------------------------- guests
 
+## The most guests one table can seat, which is also the biggest group that comes.
+func max_party() -> int:
+	var most := 1
+	for st: Station in stations.values():
+		most = maxi(most, st.seats.size())
+	return most
+
+
+## A lone guest: a group of one.
 func spawn_guest(idx: int) -> Guest:
-	var g := Guest.new()
-	add_child(g)
-	g.setup(self, idx, SPAWN)
-	guests.append(g)
-	queue.append(g)
+	return spawn_group([idx])[0]
+
+
+## Guests who arrive together, queue together and share a table with nobody else.
+func spawn_group(ids: Array) -> Array[Guest]:
+	var party: Array[Guest] = []
+	for idx: int in ids:
+		var g := Guest.new()
+		add_child(g)
+		g.setup(self, idx, SPAWN)
+		g.party = party
+		party.append(g)
+		guests.append(g)
+		queue.append(g)
 	_reflow_queue()
-	return g
+	return party
 
 
 func _reflow_queue() -> void:
@@ -799,32 +827,39 @@ func _reflow_queue() -> void:
 		queue[i].walk_to(Vector2i(mini(DOOR.x + i, W - 1), H))
 
 
-func _free_seat_for(g: Guest) -> Array:
-	var fallback: Array = []
+## A table nobody is sitting at with room for `count`; the smallest that fits.
+func _free_table_for(count: int) -> Station:
+	var best: Station = null
 	for st: Station in stations.values():
+		if st.seats.size() < count or (best != null and st.seats.size() >= best.seats.size()):
+			continue
+		var empty := true
 		for s in st.seats:
-			if seat_taken.has(s):
-				continue
-			if fallback.is_empty():
-				fallback = [st, s]
-			for other in st.seats:
-				if seat_taken.has(other) and town.are_friends(g.idx, seat_taken[other].idx):
-					return [st, s]
-	return fallback
+			empty = empty and not seat_taken.has(s)
+		if empty:
+			best = st
+	return best
 
 
+## Seats the group at the head of the queue once a whole table is free for them.
+## Groups never share a table, and nobody jumps the queue.
 func _seat_waiting_guests() -> void:
 	while not queue.is_empty():
-		var g := queue[0]
-		var found := _free_seat_for(g)
-		if found.is_empty():
+		var party: Array[Guest] = []
+		for m: Guest in queue[0].party:
+			if queue.has(m):
+				party.append(m)
+		var table := _free_table_for(party.size())
+		if table == null:
 			return
-		queue.pop_front()
-		g.table = found[0]
-		g.seat = found[1]
-		seat_taken[g.seat] = g
-		g.state = "to_seat"
-		g.walk_to(g.seat)
+		for i in party.size():
+			var g := party[i]
+			queue.erase(g)
+			g.table = table
+			g.seat = table.seats[i]
+			seat_taken[g.seat] = g
+			g.state = "to_seat"
+			g.walk_to(g.seat)
 		sfx("bell")
 		_reflow_queue()
 
@@ -846,8 +881,14 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 	for s in _gross:
 		var c: Vector2i = s.cell
 		if _near(g.cell, c, int(s.get("range", SIGHT_RANGE))) and grid.has_los(g.cell, c):
-			g.mood.see_gross(s.strength, delta, s.thought)
-			saw_gross = true
+			var age: float = s.get("age", -1.0)
+			if age < 0.0:   # no age of its own: count how long this guest has looked at it
+				age = g.seen.get(s.key, 0.0)
+				g.seen[s.key] = age + delta
+			var curve: Array = GROSS[s.kind]
+			var rate := GuestMood.gross_rate(curve[0], age, curve[1], curve[2])
+			g.mood.see_gross(rate, delta, s.thought)
+			saw_gross = saw_gross or rate >= GuestMood.NOTICE
 	for st: Station in stations.values():
 		if st.type == "stove" and not saw_gross and st.is_cooking() \
 				and _near(g.cell, st.cell, SIGHT_RANGE) and grid.has_los(g.cell, st.cell):
@@ -866,13 +907,13 @@ func _collect_gross() -> void:
 	_gross.clear()
 	for st: Station in stations.values():
 		if st.type == "table" and st.dirty > 0:
-			_gross.append({"cell": st.cell, "strength": 0.03, "thought": "Nobody has cleared that table"})
+			_gross.append({"cell": st.cell, "kind": "plate", "age": st.dirty_age, "thought": "Nobody has cleared that table"})
 		elif st.type == "bin":
-			_gross.append({"cell": st.cell, "strength": 0.01, "range": BIN_RANGE, "thought": "I can see the bin from my seat"})
+			_gross.append({"cell": st.cell, "kind": "bin", "key": "bin", "range": BIN_RANGE, "thought": "I can see the bin from my seat"})
 		elif st.type == "stove" and st.item == "burnt_patty":
-			_gross.append({"cell": st.cell, "strength": 0.03, "thought": "Something is burning in there"})
+			_gross.append({"cell": st.cell, "kind": "burning", "age": st.cook - Station.BURN_TIME, "thought": "Something is burning in there"})
 	if player.carrying_something_gross():
-		_gross.append({"cell": player.cell(), "strength": 0.15, "thought": "I just watched the chef carry rubbish past me"})
+		_gross.append({"cell": player.cell(), "kind": "rubbish", "key": "rubbish", "thought": "I just watched the chef carry rubbish past me"})
 
 
 func _waiting_guest_at(table: Station) -> Guest:
@@ -932,17 +973,27 @@ func finish_meal(g: Guest) -> void:
 	_leave(g)
 
 
+## One guest runs out of patience and the rest of their group who are still
+## waiting go with them. That is one walkout on the card, however many leave.
 func walk_out(g: Guest) -> void:
-	g.mood.think("I'm never coming back")
-	g.stormed = true
+	var going: Array[Guest] = []
+	for m: Guest in (g.party if not g.party.is_empty() else [g]):
+		if is_instance_valid(m) and (m == g or m.state == "queue" or m.state == "to_seat" or m.state == "waiting"):
+			going.append(m)
 	ledger.record_walkout()
-	var talk := town.gossip_line(g.idx, town.record_walkout(g.idx, ledger.day))
-	hud.say(("%s walked out! " % g.info.name) + talk)
-	var mark := Fx.play(g, "anger", Vector3(0, 1.75, 0), 0.3, true)
-	mark.fps = 6.0
+	var names: Array[String] = []
+	var talk := ""
+	for m in going:
+		m.mood.think("I'm never coming back")
+		m.stormed = true
+		talk = town.gossip_line(m.idx, town.record_walkout(m.idx, ledger.day))
+		names.append(m.info.name)
+		var mark := Fx.play(m, "anger", Vector3(0, 1.75, 0), 0.3, true)
+		mark.fps = 6.0
+		_leave(m)
+	hud.say(("%s walked out! " % " and ".join(names)) + (talk if going.size() == 1 else ""))
 	sfx("fail")
 	shake()
-	_leave(g)
 
 
 func _leave(g: Guest) -> void:
@@ -1084,8 +1135,11 @@ func step(delta: float) -> void:
 		return
 	clock += delta
 	while not arrivals.is_empty() and float(arrivals[0].time) <= clock:
-		spawn_guest(arrivals.pop_front().idx)
+		var a: Dictionary = arrivals.pop_front()
+		spawn_group(a.get("group", [a.get("idx", 0)]))
 	_tick_stoves(delta)
+	for st: Station in stations.values():
+		st.dirty_age = st.dirty_age + delta if st.dirty > 0 else 0.0
 	_collect_gross()
 	_seat_waiting_guests()
 	for g in guests.duplicate():

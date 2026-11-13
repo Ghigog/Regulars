@@ -18,6 +18,7 @@ var quality := 1.0    # how well cooked that item is (0..1)
 var cook := 0.0       # seconds the stove's patty has been on the heat
 var count := 0        # clean plates in a plate stack
 var dirty := 0        # dirty plates left on a table
+var dirty_age := 0.0  # seconds those plates have been sitting there
 var seats: Array[Vector2i] = []
 var _item_node: Node3D
 var _stack: Node3D

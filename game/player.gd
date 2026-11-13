@@ -4,6 +4,7 @@ extends Node3D
 
 const SPEED := 4.4
 const RADIUS := 0.28
+const REACH := 1.3   # how far from a station's centre (or a seated guest) the chef can use it
 const GROSS_ITEMS: Array[String] = ["dirty_plate", "burnt_patty"]
 
 var game
@@ -55,28 +56,38 @@ func cell() -> Vector2i:
 	return Grid.to_cell(position)
 
 
-## The cell the chef would use right now. One key moves diagonally across the
-## grid from this camera, so the chef rarely looks square at anything: of the
-## stations beside the chef, pick the one most in front, and prefer one that has
-## something to do.
+## The cell the chef would use right now, chosen by nearness: any station within
+## REACH that has something to do, the closest winning, with a small nudge toward
+## the one the chef faces. A table also counts as near when one of its seated
+## guests is, so walking up to the guest is enough to serve them. With nothing
+## useful in reach, the cell straight ahead.
 func target_cell() -> Vector2i:
 	var here := cell()
 	var best := here + facing
 	var best_score := -INF
-	for d in Grid.DIRS:
-		var n: Vector2i = here + d
-		if not game.stations.has(n):
-			continue
-		var to := Grid.center(n) - position
-		to.y = 0.0
-		var score := to.normalized().dot(aim)
-		if score < 0.2:
-			continue
-		if game.prompt_for(game.stations[n]) != "":
-			score += 0.6
-		if score > best_score:
-			best_score = score
-			best = n
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			var n := here + Vector2i(dx, dy)
+			if not game.stations.has(n):
+				continue
+			if absi(dx) + absi(dy) == 1 and not game.grid.edge_open(here, n):
+				continue   # a partition is in the way
+			var st: Station = game.stations[n]
+			var to := Grid.center(n) - position
+			to.y = 0.0
+			var dist := to.length()
+			for s in st.seats:
+				if game.seat_taken.has(s):
+					dist = minf(dist, (Grid.center(s) - position).length())
+			var action: String = game.prompt_for(st)
+			if dist > REACH or action == "":
+				continue
+			var score := -dist + 0.4 * to.normalized().dot(aim)
+			if action.begins_with("Serve"):
+				score += 0.5   # a waiting guest beats a counter to put the plate on
+			if score > best_score:
+				best_score = score
+				best = n
 	return best
 
 

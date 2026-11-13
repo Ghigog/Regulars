@@ -25,9 +25,19 @@ func wait(delta: float, seconds_to_snap: float) -> void:
 	patience = maxf(0.0, patience - delta / seconds_to_snap)
 
 
+const NOTICE := 0.005   # disgust per second below which a guest has not really noticed
+
+## How fast something nasty disgusts, per second. Every source follows one rule: it
+## starts at `base`, doubles every `doubling` seconds of `age`, and tops out at `cap`.
+## So a fresh plate is nothing and an old one is foul; rubbish goes from bad to awful fast.
+static func gross_rate(base: float, age: float, doubling: float, cap: float) -> float:
+	return minf(cap, base * pow(2.0, maxf(0.0, age) / doubling))
+
+
 func see_gross(strength: float, delta: float, thought: String) -> void:
 	disgust = minf(1.0, disgust + strength * delta)
-	think(thought)
+	if strength >= NOTICE:
+		think(thought)
 
 
 func delight(amount: float, thought := "") -> void:

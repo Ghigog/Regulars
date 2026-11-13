@@ -185,14 +185,13 @@ func test_turned_table_has_seats_above_and_below():
 	assert_eq(table.seats, [Vector2i(8, 2), Vector2i(8, 4)] as Array[Vector2i])
 	assert_true(game.grid.reserved.has(Vector2i(8, 4)))
 	game.start_day()
-	var g: Guest = game.spawn_guest(0)
-	var h: Guest = game.spawn_guest(1)
-	var i: Guest = game.spawn_guest(2)
-	var j: Guest = game.spawn_guest(3)
-	var k: Guest = game.spawn_guest(4)
-	var l: Guest = game.spawn_guest(5)
+	var cells: Array = []
+	var all: Array[Guest] = []
+	for n in 3:
+		all.append_array(game.spawn_group([n * 2, n * 2 + 1]))
 	_run(14.0)
-	var cells: Array = [g.cell, h.cell, i.cell, j.cell, k.cell, l.cell]
+	for g in all:
+		cells.append(g.cell)
 	assert_true(cells.has(Vector2i(8, 2)) and cells.has(Vector2i(8, 4)), "guests use the turned seats")
 
 
@@ -261,14 +260,21 @@ func test_ignored_guest_walks_out_and_counts_as_a_strike():
 
 
 func test_dirty_table_disgusts_guests_unless_a_wall_hides_it():
+	game.stations.erase(Vector2i(0, 5))   # no bin, so only the plate is in question
 	var g: Guest = game.spawn_guest(2)
 	_run(12.0)
 	assert_eq(g.state, "waiting")
 	var other: Station = game.stations[Vector2i(6, 5)] if g.table.cell != Vector2i(6, 5) else game.stations[Vector2i(6, 1)]
 	other.dirty = 1
 	_run(2.0)
+	var fresh: float = g.mood.disgust
+	assert_lt(fresh, 0.01, "a plate just finished hardly registers")
+	assert_false(g.mood.thoughts.has("Nobody has cleared that table"))
+	other.dirty_age = 40.0
+	_run(2.0)
 	var seen: float = g.mood.disgust
-	assert_gt(seen, 0.0)
+	assert_gt(seen - fresh, fresh * 8.0, "one left sitting is far worse")
+	assert_true(g.mood.thoughts.has("Nobody has cleared that table"))
 	for c: Vector2i in [g.cell, g.cell + Vector2i(1, 0), g.cell + Vector2i(0, 1)]:
 		game.grid.walls[Vector3i(c.x, c.y, 0)] = true
 		game.grid.walls[Vector3i(c.x, c.y, 1)] = true
@@ -277,13 +283,14 @@ func test_dirty_table_disgusts_guests_unless_a_wall_hides_it():
 
 
 func _seat_at(table_cell: Vector2i, left: bool) -> Guest:
-	# Fill tables in order until a guest lands on the wanted seat.
+	# Fill tables with pairs until a guest lands on the wanted seat.
 	var want := table_cell + Vector2i(-1 if left else 1, 0)
-	for i in 6:
-		var g: Guest = game.spawn_guest(i)
+	for i in 3:
+		var pair: Array[Guest] = game.spawn_group([i * 2, i * 2 + 1])
 		_run(12.0)
-		if g.cell == want and g.state == "waiting":
-			return g
+		for g in pair:
+			if g.cell == want and g.state == "waiting":
+				return g
 	return null
 
 
@@ -292,6 +299,8 @@ func test_bin_bothers_only_nearby_guests_until_a_partition_hides_it():
 	assert_not_null(near)
 	if near == null:
 		return
+	near.mood.patience = 1.0
+	_run(8.0)   # it takes a little while in view before it bothers them
 	assert_true(near.mood.thoughts.has("I can see the bin from my seat"))
 	var far: Guest = null
 	for g: Guest in game.guests:
@@ -408,7 +417,10 @@ func test_days_are_endless_and_get_harder():
 	var patience_day_2: float = game.table_patience()
 	game.start_day()
 	assert_eq(game.phase, game.Phase.SERVICE)
-	assert_gte(game.arrivals.size(), 5)
+	var expected := 0
+	for a: Dictionary in game.arrivals:
+		expected += (a.group as Array).size()
+	assert_gte(expected, 5)
 	game.ledger.day = 9
 	assert_lt(game.table_patience(), patience_day_2)
 
@@ -435,14 +447,57 @@ func test_patty_passes_through_five_looks():
 	assert_eq(Build.look_for("cooked_patty", Station.quality_at(Station.PERFECT_END + 2.0)), "dry")
 
 
+func test_a_group_takes_a_whole_table_and_singles_do_not_share():
+	var pair: Array[Guest] = game.spawn_group([0, 1])
+	var solo_a: Guest = game.spawn_guest(5)
+	var solo_b: Guest = game.spawn_guest(9)
+	var late: Guest = game.spawn_guest(11)
+	_run(14.0)
+	assert_eq(pair[0].table, pair[1].table, "the pair sits together")
+	assert_ne(solo_a.table, solo_b.table, "two singles do not share")
+	assert_ne(solo_a.table, pair[0].table)
+	assert_eq(late.state, "queue", "three tables, three groups: the fourth waits outside")
+	assert_eq(game.max_party(), 2)
+
+
+func test_a_group_walking_out_is_one_strike():
+	var pair: Array[Guest] = game.spawn_group([0, 1])
+	_run(12.0)
+	pair[0].mood.patience = 0.0
+	_run(0.2)
+	assert_eq(game.ledger.strikes(), 1)
+	assert_true(pair[0].stormed and pair[1].stormed, "they leave together")
+	assert_true(game.town.people[1].sore, "and both hold the grudge")
+
+
+func test_chef_can_serve_from_beside_the_guest_without_facing_the_table():
+	var g: Guest = game.spawn_guest(0)
+	_run(12.0)
+	_cook_burger()
+	# Diagonally off the table, right next to the seated guest, looking away.
+	game.player.position = Grid.center(g.seat + Vector2i(0, 1)) + Vector3(0, 0, -0.1)
+	game.player.look(Vector2i(0, 1))
+	assert_eq(game.player.target_cell(), g.table.cell)
+	# Across the room it is out of reach.
+	game.player.position = Grid.center(Vector2i(2, 5))
+	assert_false(game.stations.has(game.player.target_cell()) and game.player.target_cell() == g.table.cell)
+
+
 func test_chef_aims_at_the_station_most_in_front():
-	# Standing at (1, 1) with a stove behind-left and the fridge two cells away.
+	# Holding meat at (1, 1): stoves at (1, 0) and, diagonally, (2, 0) can both take it.
+	_use("fridge")
 	game.player.position = Grid.center(Vector2i(1, 1))
 	game.player.look(Vector2i(0, -1))
-	assert_eq(game.player.target_cell(), Vector2i(1, 0))
+	assert_eq(game.player.target_cell(), Vector2i(1, 0), "the nearer one")
 	# One key moves diagonally from this camera; the chef still finds the stove.
 	game.player.move(Vector2(0, 1), 0.0)
 	assert_eq(game.player.target_cell(), Vector2i(1, 0))
-	# Looking away from every station, nothing is picked up by accident.
+	# Nearness, not facing, decides: looking away still reaches it.
 	game.player.look(Vector2i(0, 1))
+	assert_eq(game.player.target_cell(), Vector2i(1, 0))
+	# Standing by the far stove's corner picks that one instead.
+	game.player.position = Grid.center(Vector2i(2, 1)) + Vector3(0.2, 0, 0)
+	assert_eq(game.player.target_cell(), Vector2i(2, 0))
+	# With nothing useful in reach, nothing is targeted.
+	game.player.position = Grid.center(Vector2i(2, 5))
 	assert_false(game.stations.has(game.player.target_cell()))

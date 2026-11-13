@@ -74,6 +74,26 @@ func roll_guests(day: int, boost := 0.0) -> Array[int]:
 	return coming
 
 
+## Splits today's guests into groups of friends, at most `max_size` each. Nobody is
+## grouped with a stranger, so someone whose friends are not coming arrives alone.
+func make_groups(coming: Array[int], max_size: int) -> Array[Array]:
+	var left := coming.duplicate()
+	var groups: Array[Array] = []
+	while not left.is_empty():
+		var first: int = left.pop_front()
+		var group: Array[int] = [first]
+		# Most people would rather bring company than eat alone.
+		var want := max_size if rng.randf() < 0.7 else rng.randi_range(1, max_size)
+		for f: int in people[first].friends:
+			if group.size() >= want:
+				break
+			if left.has(f):
+				left.erase(f)
+				group.append(f)
+		groups.append(group)
+	return groups
+
+
 func _nudge(i: int, amount: float) -> void:
 	var affinity: float = people[i].affinity
 	people[i].affinity = clampf(affinity + amount, -1.0, 1.0)

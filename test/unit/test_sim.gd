@@ -63,6 +63,19 @@ func test_disgust_lowers_satisfaction_and_tip():
 	assert_eq(grossed.latest_thought(), "Ew")
 
 
+func test_disgust_starts_small_and_doubles_up_to_a_cap():
+	assert_almost_eq(GuestMood.gross_rate(0.002, 0.0, 10.0, 0.06), 0.002, 0.0001)
+	assert_almost_eq(GuestMood.gross_rate(0.002, 10.0, 10.0, 0.06), 0.004, 0.0001)
+	assert_almost_eq(GuestMood.gross_rate(0.002, 30.0, 10.0, 0.06), 0.016, 0.0001)
+	assert_eq(GuestMood.gross_rate(0.002, 300.0, 10.0, 0.06), 0.06, "capped")
+	var m := GuestMood.new()
+	m.see_gross(0.002, 1.0, "Ew")
+	assert_eq(m.latest_thought(), "", "too faint to notice yet")
+	assert_gt(m.disgust, 0.0)
+	m.see_gross(0.01, 1.0, "Ew")
+	assert_eq(m.latest_thought(), "Ew")
+
+
 func test_thoughts_are_not_repeated():
 	var m := GuestMood.new()
 	assert_true(m.think("Hm"))
@@ -232,6 +245,22 @@ func test_a_good_visit_forgives_and_a_second_walkout_lasts_longer():
 	t.record_walkout(4, 10)
 	assert_true(t.holds_grudge(4, 14), "four days away the second time")
 	assert_false(t.holds_grudge(4, 15))
+
+
+func test_groups_are_friends_and_fit_the_biggest_table():
+	for seed_value in range(1, 11):
+		var t := Town.new(seed_value)
+		var coming := t.roll_guests(6)
+		for max_size in [1, 2, 4]:
+			var seen := {}
+			for group: Array in t.make_groups(coming, max_size):
+				assert_between(group.size(), 1, max_size)
+				for who: int in group:
+					assert_false(seen.has(who), "nobody is in two groups")
+					seen[who] = true
+					if who != group[0]:
+						assert_true(t.are_friends(group[0], who), "no strangers at the table")
+			assert_eq(seen.size(), coming.size(), "everyone who is coming is in a group")
 
 
 func test_bad_visit_lowers_visit_chance():
