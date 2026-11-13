@@ -311,21 +311,28 @@ Not built yet; this is the agreed direction for future sessions.
   stations to stock and writes their own menu from what they can make (only
   cheeseburgers, say), and guests order from it. Every restaurant type has mains, a
   sides system and a drinks system: the diner is burgers, fries and soda; the seaside
-  is fish, vegetables and white wine. Proposed, not yet agreed: ingredient order only
-  sets how a dish looks stacked, never refuses it; at most one prep step per
-  ingredient; townspeople like and dislike ingredients, so variety pays. Still to
-  answer: ingredient costs (per serving or restocked nightly), when the menu is set
-  (nightly?), who names dishes, and whether menu size has a cap. This replaces the
-  hard-coded burger flow (fridge, stove, plates).
+  is fish, vegetables and white wine. This replaces the hard-coded burger flow
+  (fridge, stove, plates). Agreed details:
+  - *Ingredients are restocked each night* and cost money. The build phase shows a
+    note with what tomorrow's restock will cost, so the player can plan, or take a
+    dish off the menu for a night to save on it.
+  - *The menu is set each night.* The player may change the menu or the ingredients
+    they stock, or just carry on with what they had.
+  - *The player names each dish*, and guests order it by that name ("Stupid Burger").
+  - *No limit on menu size* for now (a dish that is one slice of cheese is allowed).
+  - *Ingredient order only sets how a dish looks stacked*; it never refuses one.
+  - *At most one prep step per ingredient*, and some need none (used as they are).
+  - *Each townsperson likes and dislikes ingredients*, so a varied menu pays off.
 - **Mood drives pay and stay.** Happy guests pay more and stay longer: secure income,
   but the table turns over slower, so a fast-food player may keep guests a little
   less comfortable on purpose.
 - **The critic.** One critic per run, always the same townsperson in that run and
-  unknown to the player unless they work it out. They come every fifth day (Friday;
-  to confirm: days, not levels), are served like anyone, and rate service time,
+  unknown to the player unless they work it out. They come every fifth day (each day
+  is a working day, so day 5 is Friday; there are no weekends), are served like anyone, and rate service time,
   cleanliness, food quality and variety, then give stars out of 5. The review confirms
   or contradicts the rumours going round, and resets townspeople's opinions on what it
-  rated: someone put off by dirt forgets it if the critic found the place clean. A good
+  rated (cleanliness, speed, quality, variety), and only that: someone put off by dirt
+  forgets it if the critic found the place clean. A good
   review brings more guests (which can backfire on a kitchen that is not ready); a bad
   one keeps them away.
 - **Co-op: local, same screen first;** online later. Controller input today goes into
@@ -333,6 +340,25 @@ Not built yet; this is the agreed direction for future sessions.
   player: refactor that first.
 - **Title screen: a placeholder** with Play, Settings and Quit. Accessibility comes
   later; meanwhile new interface should say things by shape as well as colour.
+- **Decor works like RollerCoaster Tycoon scenery:** a flat bonus by proximity, not
+  joy per second. A guest seated on a rug or a fine floor gets the most, one seated
+  beside nice walls or a fern less, and one who can only see them least. (The finishes
+  merged on 13 November still add joy per second; to change.)
+- **Free meals** (built): the proposed numbers are accepted.
+- **Selling the last table for two** stays refused even when the room has a booth or
+  a table for four, for now.
+- **To fix:** names drawn over each other in the queue at the door, and members of a
+  group walking through one another.
+- **Townspeople with a local language model** (idea, not agreed to build). Proposed
+  split: the simulation decides everything that matters (likes and dislikes, meters,
+  which dish is ordered, how long they wait), so the game stays fair, tunable and
+  testable; a small local model only puts that state into words: thoughts, gossip,
+  reactions to the dishes the player named, the critic's written review, lines in the
+  town book. It must never hold up play: text is written in batches during the build
+  phase and cached, every line has a written fallback so the game works fully without
+  a model, and it is an option (phones may not manage a 1 to 2 GB model). Suggested
+  first try: the critic's review and reactions to dish names, to see whether it earns
+  its place.
 - **Banked:** the size of the lot is for the metagame (between runs); staff waits
   until after co-op; the name ("Regulars" is a working title) and the "Town Diner"
   subtitle are still open.
