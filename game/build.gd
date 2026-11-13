@@ -30,10 +30,11 @@ const LEAF_2 := "#74bb86"
 const PAVING := "#bdb7b6"
 const ROAD := "#8f8a84"
 
-const BEVEL := 0.07   # the large soft bevel is a big part of the look (sheet 1)
+const BEVEL := 0.05   # soft, but small enough that slabs still read as slabs (sheet 1)
 const R_MATTE := 0.9   # walls, fabric, skin, plastic
 const R_WOOD := 0.6    # wood and metal
 const R_GLOSS := 0.4   # tile and food
+const PAN := Vector3(-0.22, 0, -0.17)  # the stove's working burner, from the cell centre
 
 static var _mats := {}
 static var _meshes := {}
@@ -455,23 +456,35 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			_add(door, bevel_mesh(Vector3(0.84, 0.98, 0.07), 0.03), Vector3(0.42, 0.57, 0.035), Color("#fbf6ea"), 0.0)
 			box(door, Vector3(0.72, 0.62, 0.07), Vector3(0.05, 0.3, 0.04), STEEL, 0.0, R_WOOD)
 		"stove":
+			# Sheet 8: a steel-teal range with a raised back, four burners, a row of
+			# knobs and an oven door with a window and a bar handle.
 			_counter(n, STEEL, STEEL_DARK, false)
-			var ring := lathe(n, Vector3(0, 0.9, 0), [[0.15, 0.0], [0.17, 0.012], [0.21, 0.012], [0.23, 0.0]], STEEL_DARK)
+			_add(n, bevel_mesh(Vector3(0.96, 0.2, 0.1), 0.03), Vector3(0, 0.99, -0.44), Color(STEEL), 0.0)
+			for bx: float in [-0.22, 0.22]:
+				for bz: float in [-0.17, 0.22]:
+					if bx < 0.0 and bz < 0.0:
+						continue  # the working burner, below
+					lathe(n, Vector3(bx, 0.9, bz), [[0.0, 0.0], [0.13, 0.0], [0.14, 0.012], [0.0, 0.012]], "#2b2f31", 0.0, R_WOOD)
+			var ring := lathe(n, Vector3(PAN.x, 0.9, PAN.z), [[0.1, 0.0], [0.115, 0.012], [0.15, 0.012], [0.165, 0.0]], STEEL_DARK)
 			ring.name = "ring"
-			# The frying pan lives on the burner; the patty sits in it.
-			lathe(n, Vector3(0, 0.905, 0), [[0.0, 0.0], [0.2, 0.0], [0.25, 0.045], [0.235, 0.045], [0.19, 0.022], [0.0, 0.022]], "#34383b", 0.0, R_WOOD)
-			box(n, Vector3(0.36, 0.925, 0.0), Vector3(0.28, 0.035, 0.06), WOOD_DARK)
-			box(n, Vector3(0, 0.2, 0.455), Vector3(0.66, 0.4, 0.05), STEEL_DARK)
-			box(n, Vector3(0, 0.52, 0.485), Vector3(0.5, 0.035, 0.03), "#d7dcdc", 0.0, R_WOOD)
-			for i in 3:
-				ball(n, Vector3(-0.25 + i * 0.25, 0.72, 0.47), 0.05, CORAL)
+			# The frying pan lives on the back burner; the patty sits in it.
+			lathe(n, Vector3(PAN.x, 0.905, PAN.z), [[0.0, 0.0], [0.15, 0.0], [0.19, 0.04], [0.177, 0.04], [0.143, 0.02], [0.0, 0.02]], "#34383b", 0.0, R_WOOD)
+			box(n, Vector3(PAN.x + 0.3, 0.92, PAN.z), Vector3(0.26, 0.035, 0.055), WOOD_DARK)
+			_add(n, bevel_mesh(Vector3(0.72, 0.44, 0.05), 0.03), Vector3(0, 0.4, 0.46), Color(STEEL_DARK), 0.0)
+			_add(n, bevel_mesh(Vector3(0.46, 0.2, 0.03), 0.02), Vector3(0, 0.4, 0.485), Color("#2b2f31"), 0.0, R_GLOSS)
+			_add(n, bevel_mesh(Vector3(0.6, 0.045, 0.045), 0.02), Vector3(0, 0.66, 0.52), Color("#c9d0d1"), 0.0, R_WOOD)
+			for hx: float in [-0.26, 0.26]:
+				box(n, Vector3(hx, 0.64, 0.48), Vector3(0.04, 0.04, 0.05), "#c9d0d1", 0.0, R_WOOD)
+			for i in 4:
+				ball(n, Vector3(-0.3 + i * 0.2, 0.79, 0.475), 0.04, "#2b2f31")
 		"counter":
 			_counter(n, CABINET, WORKTOP)
 		"pass":
-			# The anchor frame's long teal counter: coral foot, slot dividers on the tan top.
-			_counter(n, CABINET, WORKTOP, false, CORAL)
-			for sz: float in [-0.5, 0.5]:
-				box(n, Vector3(0, 0.895, sz), Vector3(0.9, 0.035, 0.06), WOOD, 0.0, R_WOOD)
+			# The frame's long teal counter. Each piece runs a little past its cell,
+			# so a row of them is one unbroken body under one unbroken worktop.
+			box(n, Vector3.ZERO, Vector3(0.9, 0.15, 1.04), CORAL)
+			_add(n, bevel_mesh(Vector3(0.94, 0.7, 1.08), 0.03), Vector3(0, 0.47, 0), Color(CABINET), 0.0)
+			_add(n, bevel_mesh(Vector3(1.0, 0.13, 1.1), 0.03), Vector3(0, 0.835, 0), Color(WORKTOP), 0.0, R_WOOD)
 		"plates":
 			_counter(n, CABINET, WORKTOP)
 			lathe(n, Vector3(0, 0.9, 0), [[0.0, 0.0], [0.25, 0.0], [0.26, 0.008], [0.25, 0.016], [0.0, 0.016]], CORAL)
@@ -482,10 +495,10 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			cyl(n, Vector3(0, 0.9, -0.36), 0.035, 0.26, "#c9d0d1", 0.0, R_WOOD)
 			box(n, Vector3(0, 1.12, -0.25), Vector3(0.06, 0.05, 0.26), "#c9d0d1", 0.0, R_WOOD)
 		"bin":
-			box(n, Vector3.ZERO, Vector3(0.6, 0.12, 0.6), _shade(WOOD))
-			box(n, Vector3(0, 0.1, 0), Vector3(0.64, 0.56, 0.64), WOOD, 0.0, R_WOOD)
-			box(n, Vector3(0, 0.64, 0), Vector3(0.7, 0.08, 0.7), STEEL, 0.0, R_WOOD)
-			box(n, Vector3(0, 0.7, 0), Vector3(0.52, 0.025, 0.52), TRIM)
+			# Sheet 8: a dark brown tub, wider at the top, with a steel rim.
+			_add(n, lathe_mesh([[0.0, 0.0], [0.34, 0.0], [0.43, 0.62], [0.0, 0.62]], 4), Vector3.ZERO, Color("#5a4034"), 0.0).rotation.y = PI / 4
+			_add(n, lathe_mesh([[0.36, 0.6], [0.47, 0.6], [0.47, 0.7], [0.36, 0.7], [0.36, 0.6]], 4), Vector3.ZERO, Color("#9aa3a6"), 0.0, R_WOOD).rotation.y = PI / 4
+			box(n, Vector3(0, 0.63, 0), Vector3(0.5, 0.02, 0.5), TRIM)
 		"plant":
 			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.18, 0.0], [0.2, 0.02], [0.27, 0.36], [0.3, 0.38], [0.3, 0.44], [0.26, 0.46], [0.0, 0.46]], CORAL)
 			lathe(n, Vector3(0, 0.2, 0), [[0.228, 0.0], [0.24, 0.006], [0.256, 0.08], [0.246, 0.086]], PAPER)
@@ -508,10 +521,9 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 						_add(n, bevel_mesh(Vector3(0.075, 0.36, 0.075), 0.02), Vector3(sx + lx, 0.18, lz), Color("#d9a56a"), 0.0, R_WOOD)
 				_add(n, bevel_mesh(Vector3(0.58, 0.1, 0.58), 0.035), Vector3(sx, 0.4, 0), Color(CORAL), 0.0)
 				_add(n, bevel_mesh(Vector3(0.1, 0.56, 0.58), 0.035), Vector3(sx * 1.24, 0.66, 0), Color(CORAL), 0.0)
-			# Mushroom table lamp, 0.24 m.
-			box(n, Vector3(0, 0.72, 0), Vector3(0.12, 0.05, 0.12), CABINET)
-			cyl(n, Vector3(0, 0.76, 0), 0.025, 0.1, PAPER)
-			lathe(n, Vector3(0, 0.84, 0), [[0.0, 0.0], [0.1, 0.0], [0.11, 0.02], [0.08, 0.08], [0.03, 0.115], [0.0, 0.12]], CORAL, 0.5)
+			# A small candle in a glass, as in the sunset frame.
+			cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
+			ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
 	if tier > 1:
 		for i in tier - 1:
 			box(n, Vector3(0, 0.05 + i * 0.1, 0), Vector3(1.02, 0.04, 1.02), WARN, 0.6)

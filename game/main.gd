@@ -35,11 +35,12 @@ const MUSIC := {"day": "Daytime", "night": "Nighttime", "closed": "Closed"}
 # the room and the queue while guests are being served.
 const CAM_OFFSET := Vector3(14, 15, 14)
 const WIDE_SIZE := 12.2
-# Sun, morning to evening (x to y).
-const SUN_PITCH := Vector2(-50, -36)
-# The sun rule: the light comes from the side the room's long axis points to, so
-# the building's shadows fall back across the middle of the screen.
-const SUN_YAW := 90.0 if W >= H else 0.0
+# The sun rises on the right of the screen and sets on the left, whatever the
+# room's shape.
+const SUN_LEAN := 24.0   # degrees the sun's arc leans toward the camera
+# Tilt-shift: only a band across the middle of the picture is sharp, which makes
+# the scene read as a small model photographed up close.
+const TILT_SHIFT := true
 const SUN_ENERGY := Vector2(0.95, 0.9)
 const WIDE_FOCUS := Vector3(W / 2.0 + 0.9, 0, H / 2.0 + 0.1)  # framed on the room, with paper showing all round
 const CLOSE_SIZE := 10.4
@@ -282,7 +283,7 @@ func _build_scenery() -> void:
 	env.glow_intensity = 0.15
 	env.glow_bloom = 0.03
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.12
+	env.adjustment_saturation = 1.05
 	_env = env
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 	# Grain-free soft shadows and contact shading: the default filters dither.
@@ -293,7 +294,6 @@ func _build_scenery() -> void:
 	we.environment = env
 	add_child(we)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(SUN_PITCH.x, SUN_YAW, 0)
 	sun.light_energy = SUN_ENERGY.x
 	sun.shadow_enabled = true
 	sun.shadow_opacity = 0.6
@@ -314,6 +314,17 @@ func _build_scenery() -> void:
 	# no directional shadows at all.
 	cam.near = 1.0
 	cam.far = 80.0
+	if TILT_SHIFT:
+		var lens := CameraAttributesPractical.new()
+		var focus := CAM_OFFSET.length()  # the camera always sits this far from what it frames
+		lens.dof_blur_far_enabled = true
+		lens.dof_blur_far_distance = focus + 2.2
+		lens.dof_blur_far_transition = 5.0
+		lens.dof_blur_near_enabled = true
+		lens.dof_blur_near_distance = focus - 3.2  # the door and the queue stay readable
+		lens.dof_blur_near_transition = 5.0
+		lens.dof_blur_amount = 0.07
+		cam.attributes = lens
 	add_child(cam)
 	cam.look_at_from_position(WIDE_FOCUS + CAM_OFFSET, WIDE_FOCUS)
 
@@ -479,7 +490,15 @@ func shake(amount := 0.12) -> void:
 func _update_daylight() -> void:
 	var t := smoothstep(0.35, 1.0, day_progress())
 	_sun.light_color = Color("#fff3e2").lerp(Color("#ffb27c"), t)  # ends in an orange sunset
-	_sun.rotation_degrees = Vector3(lerpf(SUN_PITCH.x, SUN_PITCH.y, t), SUN_YAW, 0)
+	var p := day_progress()
+	# East is the right of the screen and west is the left, so shadows run across
+	# the picture: leftward in the morning, rightward by evening. The arc leans a
+	# little toward the camera so the faces we see are lit at midday.
+	var arc := deg_to_rad(lerpf(24.0, 156.0, p))
+	var east := Vector3(1, 0, -1).normalized()
+	var over := Vector3(0, 1, 0).rotated(east, deg_to_rad(SUN_LEAN))
+	var from := east * cos(arc) + over * sin(arc)
+	_sun.basis = Basis.looking_at(-from)
 	_env.background_color = Color(Scenery.t().backdrop).lerp(Color("#d9c9cc"), t)
 	_env.ambient_light_color = Color("#ece0dc").lerp(Color("#d9bfd0"), t)  # mauve evening shade
 	_sun.light_energy = lerpf(SUN_ENERGY.x, SUN_ENERGY.y, t)

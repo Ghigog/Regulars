@@ -82,7 +82,7 @@ func _show_item(kind: String) -> void:
 		var on_heat := type == "stove" and kind.ends_with("patty")
 		_shown_look = patty_look(cook) if on_heat else Build.look_for(kind, quality)
 		_item_node = Build.item(kind, quality, _shown_look)
-		_item_node.position = Vector3(0, 0.935 if type == "stove" else 0.9, 0)
+		_item_node.position = Vector3(Build.PAN.x, 0.93, Build.PAN.z) if type == "stove" else Vector3(0, 0.9, 0)
 		add_child(_item_node)
 		_item_node.scale = Vector3.ONE * 0.4
 		_item_node.create_tween().tween_property(_item_node, "scale", Vector3.ONE, 0.18) \

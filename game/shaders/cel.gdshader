@@ -5,6 +5,9 @@ uniform vec3 albedo : source_color = vec3(1.0);
 uniform float emit = 0.0;
 uniform float rough = 0.9;
 uniform float grain = 0.0;
+uniform float vignette = 0.0;
+uniform vec2 vignette_centre = vec2(0.0);
+varying vec3 world_pos;
 varying vec3 local_pos;
 varying vec3 local_nrm;
 
@@ -21,6 +24,7 @@ float vnoise(vec2 p) {
 
 void vertex() {
 	local_pos = VERTEX;
+	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	local_nrm = NORMAL;
 }
 
@@ -32,6 +36,9 @@ void fragment() {
 		vec2 uv = a.y > 0.6 ? local_pos.xz : (a.x > a.z ? local_pos.zy : local_pos.xy);
 		float g = vnoise(vec2(uv.x * 1.6, uv.y * 46.0)) * 0.6 + vnoise(vec2(uv.x * 4.0, uv.y * 110.0)) * 0.4;
 		col *= 1.0 - grain * 0.11 * smoothstep(0.35, 0.8, g);
+	}
+	if (vignette > 0.0) {
+		col *= 1.0 - vignette * smoothstep(7.0, 20.0, length(world_pos.xz - vignette_centre));
 	}
 	ALBEDO = col;
 	ROUGHNESS = rough;
