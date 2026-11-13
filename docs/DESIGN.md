@@ -23,14 +23,32 @@ many days as you can; three walkouts in one day ends the run.
 - **Half price.** With empty hands at the table of a guest whose patience is under half,
   E offers half price, once per visit: +0.35 patience, a little joy, +0.2 affinity, and
   they pay half the bill (the tip is worked out on the halved bill).
-- **Build phase, between days only.** Receipt, then Enter opens it; Enter again opens the
-  day. A tray along the bottom is the catalog, browsed like the Sims: type in the search
-  box (matches name, category and what a piece does) or pick a category tab (Kitchen,
-  Dining, Decor, Walls). Pick a card, then place with the mouse: a ghost follows the
-  pointer, left-click places and pays, right-click or Esc cancels. The piece stays in
-  hand while there is money for another. Partitions snap to the nearest cell edge (no
-  rotate key). A spot is refused if it would cut the chef, any seat or any station off
-  from the door.
+- **Night 0.** The game opens in the build phase, on the night before day 1, with the door
+  card on CLOSED and the starting $50 to spend. Tests and `REGULARS_DEMO` shots skip it
+  (`first_night` in `game/main.gd`).
+- **Build phase, between days only, played from the keyboard.** Receipt, then Enter. The
+  chef walks the room (WASD or arrows). E picks up the piece in front (a partition on the
+  edge ahead first, else the next cell) and puts it down again in front; R turns it, X
+  sells it, Esc puts it back. Tab opens the shop: a tray along the bottom holds one row of
+  every piece in the category. The row slides so the selected piece is always in the
+  middle, much bigger than the small ones either side (about five show each way), on a
+  soft white disc, lifted, tipped and spinning slowly, with its price underneath and its
+  name and a few words on what it does on the line below. Left and right browse (wrapping), up and down change
+  category (Kitchen, Dining, Decor, Walls, Extras, centred under the row; there is no
+  "All"), E buys, F or / types in the search box at the bottom left. A search looks
+  through every category, and picking a category ends it. A bought piece goes into the chef's hands
+  and is paid for when it is put down; it stays in hand for another while there is money.
+  The mouse still works on the shop's cards, tabs and Buy button, but not on the room.
+- **Reach marks.** While a piece with a reach is carried (a fern: 2 + tier cells; the bin:
+  5), a pale square on the floor shows how far it goes from the spot in front, and every
+  seat has a disc: green if the piece would reach it from there, red if not (out of range
+  or behind a partition). Green means "reached", so for the bin green is the bad news.
+  Stoves (seen from 7 cells) are not marked.
+- **The door card.** An OPEN / CLOSED card hangs on a string in the doorway. In the build
+  phase, E at the doorway flips it to OPEN and starts the day (there is no button). From
+  halfway through the day (`CLOSE_EARLY_FROM`), E at the doorway flips it to CLOSED: no
+  more arrivals, and guests already here (queue included) are served as usual. The halfway
+  rule stops a day being skipped outright; it is a guess and easy to change.
 - **Move, turn, sell.** With nothing in hand, clicking a piece in the room picks it up
   (it keeps whatever is on it). Click to put it down for free, R to turn it a quarter
   turn (a turned table seats guests above and below), right-click or Esc to put it
@@ -74,7 +92,7 @@ many days as you can; three walkouts in one day ends the run.
   counts them down), then returns sore: 0.75 patience, -0.1 joy. A good visit forgives
   (+0.1 affinity on top of the usual). Each further walkout adds two more days away.
   Guests holding a grudge are not used to top up a thin crowd.
-- **Flyers.** In the build tray, $15 (F) buys +25% visit chance for everyone tomorrow. One
+- **Flyers.** In the shop's Extras tab, $15 buys +25% visit chance for everyone tomorrow. One
   batch a night. 
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
 

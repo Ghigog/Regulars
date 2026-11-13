@@ -48,6 +48,12 @@ func punch() -> void:
 		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
+## Arms out while a piece of furniture is being carried in the build phase.
+func carry(on: bool) -> void:
+	if held == "":
+		_body.pose = "carry" if on else "idle"
+
+
 func carrying_something_gross() -> bool:
 	return GROSS_ITEMS.has(held)
 
@@ -112,8 +118,34 @@ func _can_stand(from: Vector3, to: Vector3) -> bool:
 	return true
 
 
+## True when the chef overlaps something solid: a piece put down right beside
+## them, or on top of them. From there every step would be refused.
+func stuck() -> bool:
+	return not _can_stand(position, position)
+
+
+## Where a stuck chef should go: the middle of their own cell if it is clear
+## (that is always a legal spot), or else of the nearest clear cell.
+func _way_out() -> Vector3:
+	var here := cell()
+	var best := here
+	var best_d := INF
+	for dx in range(-3, 4):
+		for dy in range(-3, 4):
+			var c := here + Vector2i(dx, dy)
+			var d := (Grid.center(c) - position).length()
+			if d < best_d and not game.grid.is_blocked(c):
+				best_d = d
+				best = c
+	return Grid.center(best)
+
+
 ## Moves by a screen-space input vector (x = right, y = up on screen).
 func move(input: Vector2, delta: float) -> void:
+	if stuck():   # slide out, through whatever is in the way, before anything else
+		_velocity = Vector3.ZERO
+		position = position.move_toward(_way_out(), SPEED * 1.2 * delta)
+		return
 	# The camera looks from +x/+z, so screen-up is (-1, -1) and screen-right is (1, -1).
 	var dir := Vector3.ZERO
 	if input != Vector2.ZERO:

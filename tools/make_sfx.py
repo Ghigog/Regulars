@@ -264,4 +264,27 @@ noise(b, 0, 0.03, 0.8, 0.35, decay=120)
 noise(b, 0.05, 0.12, 0.2, 0.6, decay=30)
 save("stamp", b, 0.7)
 
+b = buf(0.4)   # slide: a wooden tray pushed along a counter
+noise(b, 0, 0.32, 0.5, 0.35, decay=7)
+tone(b, 0.0, 180, 0.3, 0.3, WOOD, decay=10, bend=0.8)
+tone(b, 0.27, 120, 0.12, 0.7, SOFT, decay=30, bend=-1.0)
+save("slide", b, 0.5)
+
+b = buf(0.12)  # tick: one card flicked along the tray
+tone(b, 0, 620, 0.06, 0.8, WOOD, decay=60)
+noise(b, 0, 0.02, 0.5, 0.8, decay=200)
+save("tick", b, 0.45)
+
+b = buf(0.22)  # tab: a paper divider flipped over
+noise(b, 0, 0.06, 0.7, 0.75, decay=60)
+tone(b, 0.05, 360, 0.12, 0.6, WOOD, decay=30, bend=0.5)
+save("tab", b, 0.5)
+
+b = buf(0.7)   # flip: the door card spun on its string and knocking the frame
+noise(b, 0, 0.16, 0.5, 0.7, decay=14)
+for i, t in enumerate([0.2, 0.34, 0.44]):
+    tone(b, t, 300 - 30 * i, 0.1, 0.9 - 0.3 * i, WOOD, decay=36)
+    noise(b, t, 0.02, 0.4 - 0.1 * i, 0.5, decay=150)
+save("flip", b, 0.6)
+
 print("wrote", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

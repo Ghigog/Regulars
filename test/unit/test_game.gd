@@ -6,6 +6,7 @@ var game
 
 func before_each():
 	game = load("res://game/main.tscn").instantiate()
+	game.first_night = false   # straight into day 1
 	add_child_autofree(game)
 	game.set_process(false)
 	game.best_path = "user://regulars_best_test.json"
@@ -81,7 +82,7 @@ func test_flyers_cost_money_once_a_night_and_are_used_up_next_day():
 	game.arrivals.clear()
 	_run(0.2)
 	assert_eq(game.phase, game.Phase.SUMMARY)
-	assert_false(game.buy_flyers(), "not on the receipt: they are in the build tray")
+	assert_false(game.buy_flyers(), "not on the receipt: they are in the shop")
 	game.open_build()
 	assert_true(game.buy_flyers())
 	assert_eq(game.ledger.money, 50 - Town.FLYER_PRICE)
@@ -111,17 +112,137 @@ func test_upgraded_piece_is_bought_from_the_catalog():
 	assert_true(game.hand.is_empty(), "$20 left will not buy a third")
 
 
-func test_catalog_tray_filters_as_you_search():
+func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	_to_build()
-	assert_eq(game.hud._cards.get_child_count(), 11)
-	game.hud.set_search("fern")
-	assert_eq(game.hud._cards.get_child_count(), 3)
-	game.hud._set_category("Kitchen")
-	assert_eq(game.hud._cards.get_child_count(), 1, "only the nothing-matches line")
-	game.hud.set_search("")
+	game.open_shop()
+	assert_true(game.shopping)
+	assert_eq(game.hud._category, "Kitchen", "there is no All tab")
 	assert_eq(game.hud._cards.get_child_count(), 4)
+	game.hud.set_search("fern")
+	assert_eq(game.hud._cards.get_child_count(), 3, "a search looks through every category")
+	game.hud.set_search("zzz")
+	assert_eq(game.hud._cards.get_child_count(), 1, "only the nothing-matches line")
+	game.hud._set_category("Kitchen")
+	assert_eq(game.hud._search, "", "picking a category ends the search")
+	assert_eq(game.hud._cards.get_child_count(), 4)
+	game.hud.shop_move(-1)
+	assert_eq(game.hud._shop_index, 3, "left from the first wraps to the last")
+	game.hud.shop_category(1)
+	assert_eq(game.hud._category, "Dining")
+	game.close_shop()
+	assert_null(game.hud._shop)
 	game.start_day()
 	assert_null(game.hud.build_bar)
+
+
+func test_buying_in_the_shop_puts_the_piece_in_hand_and_shuts_it():
+	_to_build()
+	game.open_shop()
+	assert_false(game.buy({"id": "stove", "tier": 1}), "level 3 and $80")
+	assert_true(game.shopping)
+	assert_true(game.buy({"id": "counter", "tier": 1}))
+	assert_false(game.shopping)
+	assert_eq(game.hand.id, "counter")
+	game.open_shop()
+	assert_true(game.buy(game.FLYERS))
+	assert_true(game.flyers_out)
+	assert_true(game.shopping, "flyers are not carried, so the shop stays open")
+
+
+func test_furniture_is_carried_and_put_down_in_front_of_the_chef():
+	_to_build()
+	game.player.position = Grid.center(Vector2i(8, 2))
+	game.player.look(Vector2i(0, 1))            # facing the table at (8, 3)
+	assert_eq(game.build_action(), "Pick up")
+	game.build_interact()
+	assert_eq(game.hand.id, "table")
+	assert_eq(game.build_action(), "Put down")
+	game.build_interact()
+	assert_true(game.hand.is_empty())
+	assert_true(game.stations.has(Vector2i(8, 3)))
+	game.player.look(Vector2i(0, -1))
+	assert_eq(game.build_action(), "", "nothing in front and not at the door")
+
+
+func test_a_carried_fern_shows_which_seats_it_would_reach():
+	_to_build()
+	assert_eq(game.range_of("plant", 2), 4)
+	assert_eq(game.range_of("table"), 0)
+	var seat: Vector2i = game.stations[Vector2i(8, 3)].seats[0]
+	assert_true(game.seats_reached(Vector2i(8, 2), 3)[seat])
+	assert_false(game.seats_reached(seat - Vector2i(4, 0), 3)[seat], "four cells is out of reach")
+	assert_true(game.pick_catalog("plant"))
+	game._update_range()
+	assert_gt(game._range_marks.get_child_count(), 1, "the wash and a disc for every seat")
+	game.cancel_hand()
+	game._update_range()
+	assert_eq(game._range_key, "")
+
+
+func test_chef_is_pushed_clear_of_a_piece_put_down_too_close_or_on_top():
+	_to_build()
+	game.player.position = Vector3(2.5, 0, 3.9)          # hard against the edge of (2, 4)
+	game.player.look(Vector2i(0, 1))
+	assert_true(game.pick_catalog("counter"))
+	game.build_interact()
+	assert_true(game.stations.has(Vector2i(2, 4)))
+	assert_true(game.player.stuck(), "overlapping the new counter")
+	for i in 30:
+		game.player.move(Vector2.ZERO, 0.016)
+	assert_false(game.player.stuck())
+	assert_eq(game.player.cell(), Vector2i(2, 3), "nudged back into the same cell")
+	game.cancel_hand()
+	game.add_station("counter", Vector2i(2, 3))          # dropped right on top of the chef
+	assert_true(game.player.stuck())
+	for i in 60:
+		game.player.move(Vector2.ZERO, 0.016)
+	assert_false(game.player.stuck())
+	assert_false(game.grid.is_blocked(game.player.cell()))
+
+
+func test_game_opens_on_the_night_before_day_one():
+	var fresh = load("res://game/main.tscn").instantiate()
+	add_child_autofree(fresh)
+	fresh.set_process(false)
+	assert_eq(fresh.phase, fresh.Phase.BUILD)
+	assert_false(fresh.door_open)
+	assert_true(fresh.arrivals.is_empty())
+	assert_true(fresh.pick_catalog("counter"), "the room can be changed before anyone comes")
+	fresh.cancel_hand()
+	fresh.player.position = Grid.center(Vector2i(9, 4))
+	fresh.build_interact()
+	assert_eq(fresh.phase, fresh.Phase.SERVICE)
+	assert_eq(fresh.ledger.day, 1)
+	assert_false(fresh.arrivals.is_empty())
+
+
+func test_flipping_the_door_card_opens_the_day():
+	_to_build()
+	assert_false(game.door_open, "the card says closed overnight")
+	game.player.position = Grid.center(Vector2i(2, 3))
+	assert_false(game.use_door(), "too far from the doorway")
+	game.player.position = Grid.center(Vector2i(9, 4))
+	game.player.look(Vector2i(1, 0))
+	assert_eq(game.build_action(), "Open up")
+	game.build_interact()
+	assert_eq(game.phase, game.Phase.SERVICE)
+	assert_true(game.door_open)
+
+
+func test_closing_early_turns_new_guests_away_but_keeps_those_inside():
+	game.spawn_guest(0)
+	game.player.position = Grid.center(Vector2i(9, 4))
+	assert_eq(game.door_action(), "", "too early in the day")
+	game.clock = game.day_length() * 0.6
+	assert_false(game.arrivals.is_empty())
+	assert_eq(game.door_action(), "Close early")
+	assert_true(game.use_door())
+	assert_true(game.arrivals.is_empty())
+	assert_false(game.door_open)
+	assert_eq(game.guests.size(), 1)
+	_run(0.2)
+	assert_eq(game.phase, game.Phase.SERVICE, "the day runs on until the last guest leaves")
+	assert_eq(game.door_action(), "", "already closed")
 
 
 func test_catalog_piece_is_paid_for_when_placed_and_gated_by_level():

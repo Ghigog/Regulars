@@ -11,15 +11,15 @@ const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
 const ITEMS := {
 	"screen": {"name": "Partition wall", "price": 10, "level": 1, "category": "Walls", "tiers": 1,
-		"blurb": "Blocks what guests can see."},
+		"blurb": "Blocks guests' view"},
 	"counter": {"name": "Counter", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
-		"blurb": "Somewhere to put things down."},
+		"blurb": "Extra worktop"},
 	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3,
-		"blurb": "Nearby guests feel happier.", "up": "Bigger, and cheers guests further away."},
+		"blurb": "Cheers nearby guests", "up": "Cheers guests further away"},
 	"table": {"name": "Table for two", "price": 40, "level": 2, "category": "Dining", "tiers": 3,
-		"blurb": "Two more seats.", "up": "Two more seats, and guests enjoy sitting here."},
+		"blurb": "Two more seats", "up": "Two comfier seats"},
 	"stove": {"name": "Stove", "price": 80, "level": 3, "category": "Kitchen", "tiers": 3,
-		"blurb": "Cook two things at once.", "up": "Cooks faster. Watch it closely."},
+		"blurb": "Cook two things at once", "up": "Cooks faster  burns faster"},
 }
 
 var shelf: Array[Dictionary] = []

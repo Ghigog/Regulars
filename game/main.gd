@@ -21,12 +21,17 @@ const GROSS := {
 }
 const BIN_RANGE := 5          # the bin only bothers guests seated this close
 const AREA := Rect2i(0, 0, W, H)   # where the player may build
+const DOORWAY := Vector3(W, 0, DOOR.y + 0.5)   # the middle of the doorway, on the floor
+const DOOR_REACH := 1.25
+const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
+const FLYERS := {"id": "flyers", "tier": 1}   # sold in the shop's Extras, never placed
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
 const SOUNDS := {  # name -> volume in dB
 	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
 	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0,
 	"roll": -8.0, "lift": -10.0, "rattle": -9.0, "page": -7.0, "thump": -6.0, "rip": -6.0,
 	"flutter": -10.0, "rustle": -9.0, "rope": -8.0, "stamp": -4.0,
+	"slide": -8.0, "tick": -9.0, "tab": -8.0, "flip": -5.0,
 }
 const LOOPING: Array[String] = ["sizzle"]
 const MUSIC_DB := -14.0
@@ -71,6 +76,13 @@ var _no_mark: Node3D
 var _demo_hover := Vector3.INF
 var inspected: Guest                 # the guest whose card is open, if any
 var flyers_out := false          # bought tonight, spent on tomorrow's crowd
+var first_night := true          # open on the night before day 1, in the build phase (tests and demos skip it)
+var shopping := false            # the shop is open over the build phase; the chef stands still
+var door_open := true            # which side of the door card faces the street
+var _door_hang: Node3D
+var _range_marks: Node3D          # floor marks for the reach of the piece being carried
+var _range_key := ""
+var _door_turn: Node3D
 var best_path := "user://regulars_best.json"
 var player: Player
 var hud: Hud
@@ -125,7 +137,13 @@ func _ready() -> void:
 		m.render_priority = 5
 		arm.material_override = m
 	_shot_path = OS.get_environment("REGULARS_SHOT")
-	start_day()
+	_build_door_card()
+	_range_marks = Node3D.new()
+	add_child(_range_marks)
+	if first_night and OS.get_environment("REGULARS_DEMO") == "":
+		_open_first_night()
+	else:
+		start_day()
 	_apply_demo(OS.get_environment("REGULARS_DEMO"))
 
 
@@ -208,7 +226,7 @@ func _apply_demo(demo: String) -> void:
 				if i % 2 == 0:
 					town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
 			get_tree().create_timer(1.5).timeout.connect(hud.show_town)
-	elif demo.begins_with("build"):  # build, build_no (refused spot), build_find (a search)
+	elif demo.begins_with("build") or demo == "door":  # build (the shop), build_find (a search), build_no (refused spot), build_move, door
 		ledger.record_sale(BILL, 5)
 		ledger.money = 300
 		ledger.xp = 250
@@ -218,7 +236,17 @@ func _apply_demo(demo: String) -> void:
 		ledger.record_sale(BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(3.0).timeout.connect(open_build)
-		get_tree().create_timer(5.0).timeout.connect(start_day)
+		get_tree().create_timer(5.0).timeout.connect(func() -> void:
+			player.position = Grid.center(Vector2i(W - 1, DOOR.y))
+			use_door())
+	elif demo == "close":  # the door card flipped to CLOSED late in the day; shoot at about 3
+		for a in arrivals:
+			a.time = 400.0
+		spawn_guest(0)
+		clock = day_length() * 0.6
+		player.position = Grid.center(Vector2i(W - 1, DOOR.y))
+		player.look(Vector2i(1, 0))
+		get_tree().create_timer(2.0).timeout.connect(use_door)
 	elif demo == "walkout":  # one walkout stamped on the card
 		for a in arrivals:
 			a.time = 30.0
@@ -228,7 +256,9 @@ func _apply_demo(demo: String) -> void:
 		arrivals.clear()
 		get_tree().create_timer(1.5).timeout.connect(func() -> void:
 			open_build()
-			buy_flyers())
+			open_shop()
+			hud._set_category("Extras")
+			buy(FLYERS))
 
 
 func _demo_build(demo: String) -> void:
@@ -236,15 +266,26 @@ func _demo_build(demo: String) -> void:
 	for step: Array in [["counter", 2, 4, 0], ["screen", 8, 5, 0], ["screen", 9, 5, 0], ["table", 8, 6, 0], ["plant", 9, 2, 0]]:
 		pick_catalog(step[0])
 		place(Vector3i(step[1], step[2], step[3]))
-	pick_catalog("stove", 2)
-	_demo_hover = Vector3(6.5, 0, 5.5) if demo == "build_no" else Vector3(3.5, 0, 5.5)
-	if demo == "build_find":
-		hud.set_search("fern")
+	cancel_hand()
+	if demo == "door":  # at the doorway, about to flip the card
+		player.position = Grid.center(Vector2i(W - 1, DOOR.y))
+		player.look(Vector2i(1, 0))
+	elif demo == "build" or demo == "build_find":  # the shop, three items along
+		open_shop()
+		if demo == "build_find":
+			hud.set_search("o")
+		for i in 3:
+			get_tree().create_timer(0.3 + 0.25 * i).timeout.connect(hud.shop_move.bind(1))
 	elif demo == "build_move":  # a table picked up and turned, ready to sell or put down
-		cancel_hand()
 		pick_up(Vector3(8.5, 0, 3.5))
 		rotate_hand()
 		_demo_hover = Vector3(7.5, 0, 2.5)
+	elif demo == "build_range":  # a fern carried past the tables: its reach and the seats it touches
+		pick_catalog("plant", 1)
+		_demo_hover = Vector3(6.5, 0, 3.5)
+	else:   # a stove from the shop, held over a good spot or (build_no) a refused one
+		pick_catalog("stove", 2)
+		_demo_hover = Vector3(6.5, 0, 5.5) if demo == "build_no" else Vector3(3.5, 0, 5.5)
 
 
 func _demo_kind(offer: bool) -> void:
@@ -509,9 +550,9 @@ func set_volumes(sfx_level: float, music_level: float) -> void:
 
 
 ## Plays a sound with a little random pitch so repeats do not sound identical.
-func sfx(id: String, vary := 0.06) -> void:
+func sfx(id: String, vary := 0.06, pitch := 1.0) -> void:
 	if _sfx.has(id):
-		_sfx[id].pitch_scale = randf_range(1.0 - vary, 1.0 + vary)
+		_sfx[id].pitch_scale = pitch * randf_range(1.0 - vary, 1.0 + vary)
 		_sfx[id].play()
 
 
@@ -597,6 +638,8 @@ func start_day() -> void:
 	phase = Phase.SERVICE
 	clock = 0.0
 	hand = {}
+	shopping = false
+	set_door(true)
 	hud.hide_card()
 	hud.hide_build()
 	town.new_day()
@@ -633,13 +676,70 @@ func guest_at(screen: Vector2, within := 60.0) -> Guest:
 
 # ---------------------------------------------------------------- building
 
-## After the receipt: the room is yours to change until you open for the day.
+## Night 0: the game opens with the door card on CLOSED and the room to set up.
+## Nothing has been played yet, so there is no receipt; day 1 starts at the door.
+func _open_first_night() -> void:
+	phase = Phase.BUILD
+	door_open = false
+	_door_turn.rotation.y = PI
+	play_music("night")
+	hud.show_build()
+	hud.say("The night before day 1. Set the room up, then flip the door card.")
+
+
+## After the receipt: the room is yours to walk round and change, until you flip
+## the door card to open for the day.
 func open_build() -> void:
 	if phase != Phase.SUMMARY:
 		return
 	phase = Phase.BUILD
 	hud.hide_card()
 	hud.show_build()
+
+
+## What the shop lists for a search and a category tab: the catalog, and the flyers
+## under Extras.
+static func shop_items(query := "", category := "") -> Array[Dictionary]:
+	var found: Array[Dictionary] = []
+	if category != "Extras":
+		found = Catalog.search(query, category)
+	if category == "" or category == "Extras":
+		var hit := true
+		for w in query.strip_edges().to_lower().split(" ", false):
+			hit = hit and "flyers extras more guests tomorrow".contains(w)
+		if hit:
+			found.append(FLYERS)
+	return found
+
+
+func open_shop() -> void:
+	if phase != Phase.BUILD or shopping:
+		return
+	shopping = true
+	sfx("slide")
+	hud.show_shop()
+
+
+func close_shop() -> void:
+	if not shopping:
+		return
+	shopping = false
+	sfx("slide", 0.0, 0.8)
+	hud.hide_shop()
+
+
+## Buys what the shop is showing. Flyers are paid for at once; a piece goes into
+## the chef's hands and the shop shuts, so it can be carried to its place.
+func buy(bp: Dictionary) -> bool:
+	if bp.id == FLYERS.id:
+		if buy_flyers():
+			return true
+	elif pick_catalog(bp.id, int(bp.tier)):
+		sfx("pickup")
+		close_shop()
+		return true
+	sfx("fail")
+	return false
 
 
 ## Picks a piece from the catalog to place. Nothing is paid until it is placed.
@@ -807,16 +907,53 @@ func place(spot: Vector3i) -> bool:
 	return true
 
 
+## A point on the floor in front of the chef: the middle of the next cell, or (for
+## partitions) just inside the edge of the cell the chef stands in.
+func _front_point(edge := false) -> Vector3:
+	return Grid.center(player.cell()) + Vector3(player.facing.x, 0, player.facing.y) * (0.45 if edge else 1.0)
+
+
+## Where the piece in hand is held: over the spot in front of the chef.
 func _hover_point() -> Vector3:
 	if _demo_hover != Vector3.INF:
 		return _demo_hover
-	var m := get_viewport().get_mouse_position()
-	var o := cam.project_ray_origin(m)
-	var d := cam.project_ray_normal(m)
-	return o - d * (o.y / d.y) if absf(d.y) > 0.001 else Vector3.INF
+	return _front_point(hand.get("id", "") == "screen")
 
 
-## The piece in hand follows the mouse; a cross marks spots where it cannot go.
+## A point on the piece the chef could pick up: the partition on the edge ahead,
+## or else whatever stands in the next cell. Vector3.INF when there is nothing.
+func _piece_in_front() -> Vector3:
+	if wall_nodes.has(snap_edge(_front_point(true))):
+		return _front_point(true)
+	if stations.has(Grid.to_cell(_front_point())):
+		return _front_point()
+	return Vector3.INF
+
+
+## What E would do in the build phase: "Put down", "Pick up", "Open up" or nothing.
+func build_action() -> String:
+	if phase != Phase.BUILD or shopping:
+		return ""
+	if not hand.is_empty():
+		return "Put down"
+	if _piece_in_front() != Vector3.INF:
+		return "Pick up"
+	return door_action()
+
+
+func build_interact() -> void:
+	match build_action():
+		"Put down":
+			if not place(snap(_hover_point())):
+				sfx("fail")
+		"Pick up":
+			pick_up(_piece_in_front())
+		"Open up":
+			use_door()
+
+
+## The piece in hand is held over the spot in front of the chef; a cross marks
+## spots where it cannot go.
 func _update_ghost() -> void:
 	var key := "%s:%s" % [hand.get("id", ""), hand.get("tier", 0)] if phase == Phase.BUILD and not hand.is_empty() else ""
 	if key != _ghost_key:
@@ -850,7 +987,7 @@ func _update_ghost() -> void:
 	_no_mark.position = Vector3(_ghost.position.x, 0, _ghost.position.z)
 
 
-## Flyers: bought from the build tray at night for a bigger crowd tomorrow. One batch a night.
+## Flyers: bought from the shop's Extras at night for a bigger crowd tomorrow. One batch a night.
 func buy_flyers() -> bool:
 	if phase != Phase.BUILD or flyers_out or not ledger.spend(Town.FLYER_PRICE):
 		return false
@@ -860,7 +997,96 @@ func buy_flyers() -> bool:
 	return true
 
 
+# ---------------------------------------------------------------- the door card
+
+## The OPEN / CLOSED card on a string in the doorway. It hangs from a nail under
+## the lintel, facing the street, and spins on its string to show the other side.
+func _build_door_card() -> void:
+	_door_hang = Node3D.new()
+	_door_hang.position = DOORWAY + Vector3(0.3, 2.03, 0)
+	_door_hang.rotation.y = PI / 2   # local +z looks out at the street
+	add_child(_door_hang)
+	Build.ball(_door_hang, Vector3.ZERO, 0.035, Build.TRIM)
+	_door_turn = Node3D.new()
+	_door_hang.add_child(_door_turn)
+	for side: float in [-1.0, 1.0]:
+		var string := Build.box(_door_turn, Vector3.ZERO, Vector3(0.018, 0.33, 0.018), Build.TRIM)
+		string.position = Vector3.ZERO
+		string.rotation.z = PI - side * 0.74
+		string.position = Vector3(side * 0.11, -0.12, 0)
+	Build.box(_door_turn, Vector3(0, -0.56, 0), Vector3(0.62, 0.34, 0.03), Build.PAPER)
+	for open: bool in [true, false]:
+		var z := 0.014 if open else -0.014
+		Build.box(_door_turn, Vector3(0, -0.53, z), Vector3(0.55, 0.28, 0.012), Build.LEAF if open else Build.CORAL_DARK)
+		var l := Label3D.new()
+		l.text = "OPEN" if open else "CLOSED"
+		l.font = Hud.lettering()
+		l.font_size = 64
+		l.pixel_size = 0.0034 if open else 0.0028
+		l.outline_size = 0
+		l.modulate = Color(Build.PAPER)
+		l.double_sided = false
+		l.position = Vector3(0, -0.4, z * 1.6)
+		l.rotation.y = 0.0 if open else PI
+		_door_turn.add_child(l)
+
+
+## Flips the card, with a spin on its string and a swing from the nail.
+func set_door(open: bool) -> void:
+	if door_open == open:
+		return
+	door_open = open
+	sfx("flip")
+	var tw := _door_turn.create_tween()
+	tw.tween_property(_door_turn, "rotation:y", 0.0 if open else PI, 0.55) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_door_hang.rotation.z = 0.5
+	_door_hang.create_tween().tween_property(_door_hang, "rotation:z", 0.0, 1.4) \
+		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+func at_door() -> bool:
+	var d := player.position - DOORWAY
+	return Vector2(d.x, d.z).length() < DOOR_REACH
+
+
+## What the chef can do with the door card from here: "Open up" at the end of the
+## build phase, "Close early" from the middle of the day on, or nothing.
+func door_action() -> String:
+	if not at_door():
+		return ""
+	if phase == Phase.BUILD and hand.is_empty() and not shopping:
+		return "Open up"
+	if phase == Phase.SERVICE and door_open and not arrivals.is_empty() and day_progress() >= CLOSE_EARLY_FROM:
+		return "Close early"
+	return ""
+
+
+func use_door() -> bool:
+	match door_action():
+		"Open up":
+			start_day()
+		"Close early":
+			close_early()
+		_:
+			return false
+	player.punch()
+	return true
+
+
+## Nobody else comes in today. Guests already here, queue included, stay and are
+## served as usual; the day ends when the last of them has gone.
+func close_early() -> void:
+	if phase != Phase.SERVICE or not door_open:
+		return
+	arrivals.clear()
+	set_door(false)
+	hud.say("Closed. Guests already here can stay.")
+
+
 func _end_day() -> void:
+	set_door(false)
+	shopping = false
 	phase = Phase.SUMMARY
 	play_music("night")
 	inspect(null)
@@ -1000,8 +1226,69 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 			# An open kitchen is a show, as long as nothing nasty is in view.
 			g.mood.delight(0.01 * delta, "I can watch the chef at work")
 			saw_gross = true   # one stove's worth of show, however many are on
-		if st.type == "plant" and _near(g.cell, st.cell, 2 + st.tier) and grid.has_los(g.cell, st.cell):
+		if st.type == "plant" and _near(g.cell, st.cell, range_of("plant", st.tier)) and grid.has_los(g.cell, st.cell):
 			g.mood.delight(0.015 * st.tier * delta, "That fern is rather nice")
+
+
+## How far a piece's effect on guests reaches, in cells. 0 for a piece with none.
+static func range_of(id: String, tier := 1) -> int:
+	if id == "plant":
+		return 2 + tier
+	return BIN_RANGE if id == "bin" else 0
+
+
+## Every seat in the room, and whether a piece reaching `reach` cells would reach
+## it from `cell`. Partitions block it, as they block a guest's view.
+func seats_reached(cell: Vector2i, reach: int) -> Dictionary:
+	var out := {}
+	for st: Station in stations.values():
+		for s in st.seats:
+			out[s] = _near(s, cell, reach) and grid.has_los(s, cell)
+	return out
+
+
+## While a piece with a reach is carried: a pale square on the floor shows how far
+## it goes from the spot in front, and every seat gets a disc, green if the piece
+## would reach it from there and red if it would not.
+func _update_range() -> void:
+	var reach := 0
+	if phase == Phase.BUILD and not hand.is_empty():
+		reach = range_of(hand.id, int(hand.tier))
+	var cell := Grid.to_cell(_hover_point())
+	var key := "%d:%s:%d:%d" % [reach, cell, stations.size(), grid.walls.size()] if reach > 0 else ""
+	if key == _range_key:
+		return
+	_range_key = key
+	for c in _range_marks.get_children():
+		c.queue_free()
+	if key == "":
+		return
+	var area := Rect2i(cell - Vector2i(reach, reach), Vector2i(reach, reach) * 2 + Vector2i.ONE).intersection(AREA)
+	if area.has_area():
+		var wash := MeshInstance3D.new()
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(area.size)
+		wash.mesh = plane
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(1, 1, 1, 0.22)
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		wash.material_override = m
+		wash.position = Vector3(area.position.x + area.size.x / 2.0, 0.03, area.position.y + area.size.y / 2.0)
+		_range_marks.add_child(wash)
+	var seats := seats_reached(cell, reach)
+	for s: Vector2i in seats:
+		var disc := MeshInstance3D.new()
+		var puck := CylinderMesh.new()
+		puck.top_radius = 0.4
+		puck.bottom_radius = 0.4
+		puck.height = 0.02
+		disc.mesh = puck
+		disc.material_override = Build.overlay_mat(Color(Color(Build.GOOD if seats[s] else Build.DANGER), 0.8), 2)
+		disc.position = Grid.center(s) + Vector3(0, 0.05, 0)
+		_range_marks.add_child(disc)
+		disc.scale = Vector3(0.3, 1, 0.3)
+		disc.create_tween().tween_property(disc, "scale", Vector3.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 static func _near(a: Vector2i, b: Vector2i, r: int) -> bool:
@@ -1262,17 +1549,19 @@ func step(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	var input := Vector2.ZERO
-	if phase == Phase.SERVICE:
+	if phase == Phase.SERVICE or (phase == Phase.BUILD and not shopping and not hud.typing()):
 		input = Vector2(
 			float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))
 			- float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),
 			float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP))
 			- float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)))
 	player.move(input, delta)
+	player.carry(not hand.is_empty())
 	step(delta)
 	_update_camera(delta)
 	_update_cursor()
 	_update_ghost()
+	_update_range()
 	_update_daylight()
 	hud.update_status()
 	if _shot_path != "":
@@ -1298,19 +1587,58 @@ func _update_cursor() -> void:
 		var top := 1.72 if st.type == "fridge" else 0.9
 		_cursor.position = st.position + Vector3(0, top, 0)
 		at = cam.unproject_position(st.position + Vector3(0, 2.25 if st.type == "stove" else top + 0.7, 0))
+	if action == "":   # nothing to cook or serve: the build phase and the door card
+		action = build_action() if phase == Phase.BUILD else door_action()
+		var p := DOORWAY + Vector3(0, 2.9, 0)
+		if action == "Put down":
+			p = _hover_point() + Vector3(0, 2.0, 0)
+		elif action == "Pick up":
+			p = _piece_in_front() + Vector3(0, 2.0, 0)
+		at = cam.unproject_position(p)
 	hud.show_prompt(at, action)
+
+
+## Tab is taken here, before the interface can use it to move focus.
+func _input(event: InputEvent) -> void:
+	if phase == Phase.BUILD and event is InputEventKey and event.pressed and not event.echo \
+			and event.physical_keycode == KEY_TAB:
+		if shopping:
+			close_shop()
+		else:
+			open_shop()
+		get_viewport().set_input_as_handled()
+
+
+## One key press while the shop is open. Also called by the search box, which
+## would otherwise keep the arrow keys for itself.
+func shop_key(key: int, typing := false) -> bool:
+	if key == KEY_LEFT or (key == KEY_A and not typing):
+		hud.shop_move(-1)
+	elif key == KEY_RIGHT or (key == KEY_D and not typing):
+		hud.shop_move(1)
+	elif key == KEY_UP or (key == KEY_W and not typing):
+		hud.shop_category(-1)
+	elif key == KEY_DOWN or (key == KEY_S and not typing):
+		hud.shop_category(1)
+	elif key == KEY_ESCAPE:
+		if typing:
+			hud.stop_typing()
+		else:
+			close_shop()
+	elif typing:
+		return false
+	elif key == KEY_E or key == KEY_SPACE or key == KEY_ENTER or key == KEY_KP_ENTER:
+		hud.shop_buy()
+	elif key == KEY_F or key == KEY_SLASH:
+		hud.focus_search()
+	else:
+		return false
+	return true
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if phase == Phase.BUILD and event is InputEventMouseButton and event.pressed:
-		get_viewport().gui_release_focus()   # leave the search box
-		if event.button_index == MOUSE_BUTTON_LEFT and _hover_point() != Vector3.INF:
-			if hand.is_empty():
-				pick_up(_hover_point())
-			elif not place(snap(_hover_point())):
-				sfx("fail")
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			cancel_hand()
+		hud.stop_typing()   # a click on the room leaves the search box
 		return
 	if phase == Phase.SERVICE and event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -1320,24 +1648,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var key: int = event.physical_keycode
 	var confirm := key == KEY_ENTER or key == KEY_KP_ENTER
+	var use := key == KEY_E or key == KEY_SPACE
 	if key == KEY_M:
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
 		return
-	if phase == Phase.SERVICE and (key == KEY_E or key == KEY_SPACE):
-		if stations.has(player.target_cell()):
-			use_station(stations[player.target_cell()])
+	if phase == Phase.SERVICE and use:
+		var st: Station = stations.get(player.target_cell())
+		if st != null and prompt_for(st) != "":
+			use_station(st)
+		elif not use_door() and st != null:
+			use_station(st)
 	elif phase == Phase.SUMMARY and confirm:
 		open_build()
-	elif phase == Phase.BUILD and confirm:
-		start_day()
+	elif phase == Phase.BUILD and shopping:
+		shop_key(key)
+	elif phase == Phase.BUILD and use:
+		build_interact()
 	elif phase == Phase.BUILD and key == KEY_ESCAPE:
 		cancel_hand()
 	elif phase == Phase.BUILD and key == KEY_R:
 		rotate_hand()
 	elif phase == Phase.BUILD and key == KEY_X:
-		sell_hand()
-	elif phase == Phase.BUILD and key == KEY_F:
-		buy_flyers()
+		if not sell_hand():
+			sfx("fail")
 	elif phase == Phase.SUMMARY and key == KEY_T:
 		hud.toggle_town()
 	elif phase == Phase.CLOSED and confirm:

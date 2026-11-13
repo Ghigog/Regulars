@@ -53,11 +53,17 @@ var _search := ""
 var _category := ""
 var _search_box: LineEdit
 var _tabs: Array[Button] = []
-var _cards: HBoxContainer
+var _cards: Control
 var _tip: Label
-var _level_label: Label
-var _sell: Button
-var _flyers: Button
+var _shop: Control             # the shop's sliding tray; null while the shop is shut
+var _info: Label
+var _info_blurb: Label
+var _shop_items: Array[Dictionary] = []
+var _shop_index := 0
+var _items: Array[Control] = []      # one per piece in the row, laid out by _lay_out
+var _views: Array[ModelView] = []
+var _row_pos := 0.0                  # which piece is in the middle; fractional while sliding
+var _row_tween: Tween
 var _toast_tween: Tween
 
 
@@ -419,6 +425,85 @@ class RubberStamp extends Control:
 
 
 ## A piece of paper or wood that holds other controls.
+## A catalog piece as a little picture: its 3D model in a world of its own, seen
+## from the game's camera angle. A `live` one redraws every frame so the model can
+## spin; the rest are drawn once.
+class ModelView extends TextureRect:
+	const LEAN := Vector3(0.7071, 0, -0.7071)   # tipping about this shows the camera more of the top
+	var vp: SubViewport
+	var tilt: Node3D
+	var spin: Node3D
+	var live := false
+
+	func _init(px: int, live_: bool) -> void:
+		live = live_
+		custom_minimum_size = Vector2(px, px)
+		size = Vector2(px, px)
+		expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		stretch_mode = TextureRect.STRETCH_SCALE
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vp = SubViewport.new()
+		vp.size = Vector2i(px, px) * 2
+		vp.transparent_bg = true
+		vp.own_world_3d = true
+		vp.msaa_3d = Viewport.MSAA_4X
+		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if live else SubViewport.UPDATE_ONCE
+		add_child(vp)
+		texture = vp.get_texture()
+		var env := Environment.new()
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		env.ambient_light_color = Color("#ece0dc")
+		env.ambient_light_energy = 0.62
+		env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+		env.tonemap_exposure = 1.12
+		env.tonemap_white = 1.7
+		var cam := Camera3D.new()
+		cam.environment = env
+		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+		cam.size = 2.6
+		cam.near = 1.0
+		cam.far = 60.0
+		var focus := Vector3(0, 0.75, 0)
+		cam.position = focus + Vector3(14, 15, 14)
+		cam.basis = Basis.looking_at(-Vector3(14, 15, 14))
+		vp.add_child(cam)
+		var sun := DirectionalLight3D.new()
+		sun.light_color = Color("#fff3e2")
+		sun.light_energy = 0.95
+		sun.basis = Basis.looking_at(-Vector3(0.55, 1.0, 0.2))
+		vp.add_child(sun)
+		tilt = Node3D.new()
+		vp.add_child(tilt)
+		spin = Node3D.new()
+		tilt.add_child(spin)
+
+	## Call once this view is in the scene tree.
+	func show_piece(game, bp: Dictionary) -> void:
+		for c in spin.get_children():
+			spin.remove_child(c)
+			c.queue_free()
+		var n := Node3D.new()
+		spin.add_child(n)
+		if bp.id == "screen":
+			game._wall_visual(n, 0.9 + 0.1 * int(bp.tier))
+		elif bp.id == "flyers":   # a loose stack of printed sheets
+			n.scale = Vector3.ONE * 1.7
+			for i in 4:
+				Build.box(n, Vector3(0, 0.12 + i * 0.035, 0), Vector3(0.62, 0.03, 0.84), Build.PAPER) \
+					.rotation.y = [0.1, -0.16, 0.06, -0.04][i]
+			Build.box(n, Vector3(0, 0.25, -0.14), Vector3(0.44, 0.014, 0.34), Build.CORAL).rotation.y = -0.04
+			Build.box(n, Vector3(0, 0.25, 0.2), Vector3(0.44, 0.014, 0.1), Build.TILE_TEAL).rotation.y = -0.04
+		else:
+			Build.station(n, bp.id, int(bp.tier))
+		if not live:
+			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+	## 0 is flat on the floor; 1 is lifted and tipped toward the camera, as on show.
+	func lift(t: float) -> void:
+		tilt.basis = Basis(LEAN, 0.2 * t) * Basis(Vector3(0.7071, 0, 0.7071), 0.1 * t)
+		tilt.position.y = lerpf(-0.3, 0.1, t)
+
+
 class Sheet extends MarginContainer:
 	var kind := "paper"
 	var tint := Hud.CORAL
@@ -817,6 +902,8 @@ func update_status() -> void:
 				_board_up(first)
 				_rip_tag()
 			P.BUILD:
+				if first:   # the night before day 1: no walkout card to show yet
+					_board_up(true)
 				_new_tag()
 		if first:
 			_intro()
@@ -829,7 +916,7 @@ func update_status() -> void:
 	if not _turning:
 		clock.night = game.phase != P.SERVICE
 	clock.progress = game.day_progress()
-	hint.visible = l.day <= 1   # the controls reminder is for the first day
+	hint.visible = l.day <= 1 and game.phase == P.SERVICE   # the controls reminder is for the first day
 	if l.money != _shown_money:
 		if _shown_money >= 0 and l.money > _shown_money:
 			money_tag.pivot_offset = money_tag.size * Vector2(0.5, 0.0)
@@ -851,6 +938,12 @@ func _process(delta: float) -> void:
 	if not calendar:
 		return
 	dangle.step(calendar.knot(), delta)
+	for j in _views.size() if _shop else 0:   # the piece in the middle turns ever so slowly
+		var turn: Node3D = _views[j].spin
+		if j == _shop_index:
+			turn.rotate_y(delta * 0.45)
+		else:
+			turn.rotation.y = lerp_angle(turn.rotation.y, 0.0, 1.0 - exp(-6.0 * delta))
 	if _tag_state == "receipt":
 		money_tag.visible = is_instance_valid(_summary_clip)
 		if money_tag.visible:
@@ -1293,15 +1386,22 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	gossip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	gossip.custom_minimum_size = Vector2(380, 0)
 	_button(stack, "Town book   (T)", show_town)
-	_button(stack, "Build, then day %d   (Enter)" % game.ledger.day, game.open_build)
+	_button(stack, "Set up for day %d   (Enter)" % game.ledger.day, game.open_build)
 	if animate:
 		_pop_in(clip)
 
 
+const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Walls", "Extras"]
+const TRAY_DROP := 260.0   # how far below its place the shop tray waits
+
+
 func hide_build() -> void:
-	if build_bar:
-		build_bar.queue_free()
-		build_bar = null
+	for n: Control in [build_bar, _shop]:
+		if n:
+			n.queue_free()
+	_drop_row()
+	build_bar = null
+	_shop = null
 	hint.visible = true
 
 
@@ -1313,128 +1413,355 @@ func set_search(text: String) -> void:
 
 
 func _set_category(cat: String) -> void:
+	if cat != _category and _shop:
+		game.sfx("tab", 0.08)
 	_category = cat
+	_search = ""   # a search looks through every category; picking one ends it
+	if _search_box:
+		_search_box.text = ""
+	_refresh_catalog()
+	_deal_cards()
+
+
+func typing() -> bool:
+	return _shop != null and _search_box.has_focus()
+
+
+func focus_search() -> void:
+	if _shop:
+		_search_box.grab_focus()
+		_search_box.edit()
+
+
+func stop_typing() -> void:
+	if typing():
+		_search_box.release_focus()
+
+
+## The build phase: a paper slip along the bottom says what the keys do. The
+## shop (show_shop) slides up over it. Later calls only redraw.
+func show_build() -> void:
+	if build_bar == null:
+		hint.visible = false
+		var holder := MarginContainer.new()
+		holder.set_anchors_preset(Control.PRESET_FULL_RECT)
+		holder.add_theme_constant_override("margin_bottom", 16)
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(holder)
+		root.move_child(holder, center.get_index())
+		build_bar = holder
+		var slip := Sheet.new("paper", 22, 10)
+		slip.size_flags_vertical = Control.SIZE_SHRINK_END
+		slip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		holder.add_child(slip)
+		_tip = _label(slip, 20)
+		holder.modulate.a = 0.0
+		holder.create_tween().tween_property(holder, "modulate:a", 1.0, 0.3)
+		game.sfx("rustle")
+	build_bar.visible = _shop == null
+	var hand: Dictionary = game.hand
+	if hand.is_empty():
+		_tip.text = "WASD walk      E pick up      Tab shop      Flip the door card to open for day %d" % game.ledger.day
+	elif hand.get("moving", false):
+		var why: String = game.sell_block()
+		_tip.text = "Carrying the %s.      E put down      R turn      %s      Esc put back" % [
+			game.piece_name(hand).to_lower(), "X sell for $%d" % game.sell_value() if why == "" else why]
+	else:
+		_tip.text = "%s, $%d when it is put down.      E put down      R turn      Esc drop" % [
+			Catalog.label(hand), int(hand.price)]
 	_refresh_catalog()
 
 
-## The build phase: a wooden tray along the bottom holding the catalog. Search it,
-## browse by category, pick a card, then click the floor. Built once per night;
-## later calls only redraw the cards.
-func show_build() -> void:
-	if build_bar:
-		_refresh_catalog()
+const SLOT := 88.0                  # the gap between the small pieces along the row
+const GAP := 64.0                   # extra room either side of the piece in the middle
+const BAND := Vector2(1080, 232)    # the row itself
+const ITEM := Vector2(204, 232)     # one piece: its picture with the price underneath
+const SMALL := 0.42                 # how big the pieces either side of the middle are
+
+
+func _drop_row() -> void:
+	if _row_tween:
+		_row_tween.kill()
+	_items.clear()
+	_views.clear()
+
+
+## The shop: a wooden tray along the bottom with one row of pieces that slides
+## left and right. The piece in the middle is the selected one: a little bigger,
+## lifted and tipped on a soft white disc, turning slowly, its price underneath.
+## Category tabs sit under the row, with the search box at the bottom right.
+func show_shop() -> void:
+	if _shop:
 		return
-	hint.visible = false
 	_search = ""
-	_category = ""
-	var holder := MarginContainer.new()
-	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
-	holder.add_theme_constant_override("margin_bottom", 14)
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(holder)
-	build_bar = holder
+	_category = SHOP_TABS[0]
+	_shop_index = 0
+	build_bar.visible = false
+	_shop = Control.new()
+	_shop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_shop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_shop)
+	root.move_child(_shop, center.get_index())
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_shop.add_child(margin)
 	var wood := Sheet.new("wood", 10, 10)
 	wood.mouse_filter = Control.MOUSE_FILTER_STOP
 	wood.size_flags_vertical = Control.SIZE_SHRINK_END
 	wood.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	holder.add_child(wood)
-	var paper := Sheet.new("paper", 16, 10)
-	paper.custom_minimum_size = Vector2(900, 0)
+	margin.add_child(wood)
+	var paper := Sheet.new("paper", 14, 8)
 	wood.add_child(paper)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 4)
 	paper.add_child(box)
 
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 8)
-	box.add_child(top)
-	_label(top, 20, "CATALOG")
+	var band := Control.new()
+	band.custom_minimum_size = BAND
+	band.clip_contents = true
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(band)
+	var felt := Panel.new()   # a kraft mat, so the white disc shows against the paper
+	felt.set_anchors_preset(Control.PRESET_FULL_RECT)
+	felt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	felt.add_theme_stylebox_override("panel", _flat(KRAFT, 12))
+	band.add_child(felt)
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.78, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 1.0), Color(1, 1, 1, 0.97), Color(1, 1, 1, 0.0)])
+	var disc := GradientTexture2D.new()
+	disc.gradient = fade
+	disc.fill = GradientTexture2D.FILL_RADIAL
+	disc.fill_from = Vector2(0.5, 0.5)
+	disc.fill_to = Vector2(1.0, 0.5)
+	disc.width = 256
+	disc.height = 256
+	var glow := TextureRect.new()
+	glow.texture = disc
+	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	glow.size = Vector2(216, 216)
+	glow.position = Vector2(BAND.x / 2.0 - 108, -8)
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.add_child(glow)
+	_cards = Control.new()   # only a holder: _lay_out places the pieces by hand
+	_cards.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.add_child(_cards)
+	for side: int in [-1, 1]:   # keycaps at the ends: there is more to the left and right
+		var key := Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
+		key.position = Vector2(BAND.x / 2.0 + side * (BAND.x / 2.0 - 30) - 20, 70)
+		band.add_child(key)
+		_label(key, 24, "<" if side < 0 else ">")
+	var about := HBoxContainer.new()
+	about.alignment = BoxContainer.ALIGNMENT_CENTER
+	about.add_theme_constant_override("separation", 14)
+	box.add_child(about)
+	_info = _label(about, 21)
+	_info_blurb = _label(about, 18)
+	_info_blurb.modulate.a = 0.7
+
+	# Under the row: search on the left, the categories in the middle, the keys on the right.
+	var strip := HBoxContainer.new()
+	strip.add_theme_constant_override("separation", 8)
+	box.add_child(strip)
 	_search_box = LineEdit.new()
-	_search_box.placeholder_text = "Search..."
-	_search_box.custom_minimum_size = Vector2(190, 0)
+	_search_box.placeholder_text = "Search...  (F)"
+	_search_box.custom_minimum_size = Vector2(210, 0)
 	_search_box.add_theme_font_size_override("font_size", 16)
 	_search_box.text_changed.connect(set_search)
 	_search_box.text_submitted.connect(func(_t: String) -> void: _search_box.release_focus())
-	top.add_child(_search_box)
+	_search_box.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventKey and event.pressed and game.shop_key(event.physical_keycode, true):
+			_search_box.accept_event())
+	strip.add_child(_search_box)
+	var middle := HBoxContainer.new()
+	middle.alignment = BoxContainer.ALIGNMENT_CENTER
+	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	middle.add_theme_constant_override("separation", 8)
+	strip.add_child(middle)
 	_tabs.clear()
-	for cat: String in [""] + Catalog.CATEGORIES:
-		var tab := _button(top, "All" if cat == "" else cat, _set_category.bind(cat))
-		tab.add_theme_font_size_override("font_size", 15)
+	for cat: String in SHOP_TABS:
+		var tab := _button(middle, cat, _set_category.bind(cat))
+		tab.add_theme_font_size_override("font_size", 16)
 		tab.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		tab.toggle_mode = true
 		tab.set_meta("cat", cat)
 		_tabs.append(tab)
-	_level_label = _label(top, 15)
-	_level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_level_label.modulate.a = 0.75
+	var keys := _label(strip, 15, "E buy      Tab close")
+	keys.custom_minimum_size = Vector2(210, 0)   # as wide as the search box, so the tabs sit dead centre
+	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	keys.modulate.a = 0.75
 
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 86)
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	box.add_child(scroll)
-	_cards = HBoxContainer.new()
-	_cards.add_theme_constant_override("separation", 8)
-	scroll.add_child(_cards)
-
-	var last := HBoxContainer.new()
-	last.add_theme_constant_override("separation", 14)
-	box.add_child(last)
-	_tip = _label(last, 15)
-	_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_tip.modulate.a = 0.8
-	_sell = _button(last, "", game.sell_hand)
-	_sell.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_flyers = _button(last, "", game.buy_flyers)
-	_flyers.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_flyers.tooltip_text = "More guests tomorrow."
-	_button(last, "Open for day %d   (Enter)" % game.ledger.day, game.start_day).size_flags_horizontal = Control.SIZE_SHRINK_END
 	_refresh_catalog()
+	_deal_cards()
+	# The tray slides up from under the screen.
+	_shop.position.y = TRAY_DROP
+	_shop.create_tween().tween_property(_shop, "position:y", 0.0, 0.38) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-func _refresh_catalog() -> void:
-	if build_bar == null:
+## Slides the tray away.
+func hide_shop() -> void:
+	if _shop == null:
 		return
-	var cat: Catalog = game.catalog
+	stop_typing()
+	var tray := _shop
+	_shop = null
+	_drop_row()
+	var tw := tray.create_tween()
+	tw.tween_property(tray, "position:y", TRAY_DROP, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_callback(tray.queue_free)
+	if build_bar:
+		build_bar.visible = true
+
+
+## What the shop says about a piece: {name, price, blurb, can, locked}.
+func _shop_info(bp: Dictionary) -> Dictionary:
 	var l: Ledger = game.ledger
-	var into := float(l.xp % Ledger.XP_PER_LEVEL) / Ledger.XP_PER_LEVEL
-	_level_label.text = "Level %d   (%d%% to the next)" % [l.level(), roundi(into * 100)]
+	if bp.id == "flyers":
+		return {"name": "Flyers", "price": "Out" if game.flyers_out else "$%d" % Town.FLYER_PRICE,
+			"blurb": "More guests tomorrow",
+			"can": not game.flyers_out and l.money >= Town.FLYER_PRICE, "locked": false}
+	var id: String = bp.id
+	var tier: int = bp.tier
+	var locked := l.level() < Catalog.level_of(id, tier)
+	return {"name": Catalog.label(bp), "blurb": Catalog.blurb_of(id, tier), "locked": locked,
+		"price": "Level %d" % Catalog.level_of(id, tier) if locked else "$%d" % Catalog.price_of(id, tier),
+		"can": game.catalog.can_buy(id, l.money, l.level(), tier)}
+
+
+## Rebuilds the row for the current search and category, keeping the selection on
+## the same piece where it is still listed.
+func _refresh_catalog() -> void:
+	if _shop == null:
+		return
+	var searching := _search.strip_edges() != ""   # a search looks through every category
 	for tab in _tabs:
-		tab.set_pressed_no_signal(tab.get_meta("cat") == _category)
+		tab.set_pressed_no_signal(tab.get_meta("cat") == _category and not searching)
+	var keep: Dictionary = _shop_items[_shop_index] if _shop_index < _shop_items.size() else {}
+	var turned := _views[_shop_index].spin.rotation.y if _shop_index < _views.size() else -0.6
 	for c in _cards.get_children():
 		_cards.remove_child(c)
 		c.queue_free()
-	var found := Catalog.search(_search, _category)
-	for bp in found:
-		var id: String = bp.id
-		var tier: int = bp.tier
-		var held: bool = game.hand.get("id", "") == id and int(game.hand.get("tier", 0)) == tier \
-			and not game.hand.get("moving", false)
-		var locked := l.level() < Catalog.level_of(id, tier)
-		var line := "Level %d" % Catalog.level_of(id, tier) if locked else "$%d" % Catalog.price_of(id, tier)
-		var card := _button(_cards, "%s\n%s" % [Catalog.label(bp), line], game.pick_catalog.bind(id, tier))
-		card.add_theme_font_size_override("font_size", 15)
-		card.custom_minimum_size = Vector2(150, 70)
-		card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-		card.tooltip_text = Catalog.blurb_of(id, tier)
-		card.disabled = not cat.can_buy(id, l.money, l.level(), tier)
-		card.toggle_mode = true
-		card.set_pressed_no_signal(held)   # the piece in hand sits pressed in
-	if found.is_empty():
-		_label(_cards, 16, "Nothing in the catalog matches.").modulate.a = 0.7
-	_flyers.disabled = game.flyers_out or l.money < Town.FLYER_PRICE
-	_flyers.text = "Flyers are out" if game.flyers_out else "Flyers  $%d   (F)" % Town.FLYER_PRICE
-	_sell.visible = game.hand.get("moving", false)
-	if game.hand.is_empty():
-		_tip.text = "Pick from the catalog, or click a piece in the room to move, turn or sell it."
-	elif game.hand.get("moving", false):
-		var why: String = game.sell_block()
-		_sell.disabled = why != ""
-		_sell.text = "Sell for $%d   (X)" % game.sell_value() if why == "" else why
-		_tip.text = "Moving the %s. Click to put it down, R turns it, right-click puts it back." % game.piece_name(game.hand).to_lower()
+	_drop_row()
+	_shop_items = game.shop_items(_search, "" if searching else _category)
+	for i in _shop_items.size():
+		var bp := _shop_items[i]
+		var info := _shop_info(bp)
+		var item := Control.new()
+		item.size = ITEM
+		item.pivot_offset = Vector2(ITEM.x / 2.0, 122)
+		item.tooltip_text = "%s\n%s" % [info.name, info.blurb]
+		item.gui_input.connect(func(event: InputEvent) -> void:
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				_card_pressed(i))
+		_cards.add_child(item)
+		_items.append(item)
+		var view := ModelView.new(int(ITEM.x), true)
+		view.modulate = Color(1, 1, 1, 0.45) if info.locked else Color.WHITE
+		item.add_child(view)
+		view.show_piece(game, bp)
+		_views.append(view)
+		var price := _label(item, 32, info.price)
+		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		price.position = Vector2(0, 190)
+		price.size = Vector2(ITEM.x, 40)
+		if not info.can:
+			price.add_theme_color_override("font_color", Color(INK, 0.6) if info.locked else Color("#b8473a"))
+	if _shop_items.is_empty():
+		var none := _label(_cards, 20, "Nothing in the shop matches.")
+		none.modulate.a = 0.7
+		none.position = Vector2(BAND.x / 2.0 - 120, 196)
+	var at := _shop_items.find(keep)
+	_select(clampi(_shop_index, 0, maxi(_shop_items.size() - 1, 0)) if at < 0 else at, 0)
+	if at >= 0:
+		_views[at].spin.rotation.y = turned   # the same piece carries on turning from where it was
+
+
+## Places every piece for a row position: `pos` is the index in the middle, and
+## fractional while the row slides. A piece grows, lifts and tips as it comes in.
+func _lay_out(pos: float) -> void:
+	_row_pos = pos
+	for j in _items.size():
+		var away := absf(j - pos)
+		var near := 1.0 - clampf(away, 0.0, 1.0)
+		var item := _items[j]
+		var along := (j - pos) * SLOT + signf(j - pos) * GAP * minf(away, 1.0)
+		item.position.x = BAND.x / 2.0 - ITEM.x / 2.0 + along
+		item.scale = Vector2.ONE * lerpf(SMALL, 1.0, smoothstep(0.0, 1.0, near))
+		item.modulate.a = clampf(5.3 - away, 0.0, 1.0)   # fading out toward the ends of the tray
+		item.z_index = 1 if near > 0.5 else 0
+		_views[j].lift(near)
+
+
+## The pieces drop into the tray one after another, from the middle outward.
+func _deal_cards() -> void:
+	for i in _items.size():
+		var wait := absi(i - _shop_index) * 0.03
+		_items[i].position.y = 90.0
+		_items[i].create_tween().tween_property(_items[i], "position:y", 0.0, 0.3).set_delay(wait) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _card_pressed(i: int) -> void:
+	if i == _shop_index:
+		shop_buy()
 	else:
-		_tip.text = "%s: %s  R turns it. Right-click or Esc drops it." % [
-			Catalog.label(game.hand), Catalog.blurb_of(game.hand.id, int(game.hand.tier))]
+		game.sfx("tick", 0.1)
+		_select(i, signi(i - _shop_index))
+
+
+## Brings piece `i` to the middle of the row. `dir` is the way the selection
+## moved; 0 puts it there at once.
+func _select(i: int, dir: int) -> void:
+	_shop_index = i
+	if _row_tween:
+		_row_tween.kill()
+	if _shop_items.is_empty():
+		_info.text = ""
+		_info_blurb.text = ""
+		return
+	var info := _shop_info(_shop_items[i])
+	_info.text = info.name
+	_info_blurb.text = info.blurb
+	if dir == 0:
+		_lay_out(i)
+	else:
+		_row_tween = _shop.create_tween()
+		_row_tween.tween_method(_lay_out, _row_pos, float(i), 0.34).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Left and right along the tray, wrapping at the ends.
+func shop_move(d: int) -> void:
+	if _shop == null or _shop_items.is_empty():
+		return
+	game.sfx("tick", 0.1)
+	_select(wrapi(_shop_index + d, 0, _shop_items.size()), d)
+
+
+func shop_category(d: int) -> void:
+	if _shop:
+		_set_category(SHOP_TABS[wrapi(SHOP_TABS.find(_category) + d, 0, SHOP_TABS.size())])
+
+
+## Buys the piece in the middle. A refusal shakes it; flyers get a little hop.
+func shop_buy() -> void:
+	if _shop == null or _shop_items.is_empty():
+		game.sfx("fail")
+		return
+	var item := _items[_shop_index]
+	if game.buy(_shop_items[_shop_index]):
+		if _shop:   # still open: it was the flyers, and the row has been redrawn
+			item = _items[_shop_index]
+			var tw := item.create_tween()
+			tw.tween_property(item, "position:y", -22.0, 0.12).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			tw.tween_property(item, "position:y", 0.0, 0.3).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		return
+	var x := item.position.x
+	var no := item.create_tween()
+	for dx: float in [-12.0, 10.0, -6.0, 0.0]:
+		no.tween_property(item, "position:x", x + dx, 0.05)
 
 
 func toggle_town() -> void:
