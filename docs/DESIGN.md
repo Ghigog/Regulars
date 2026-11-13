@@ -251,8 +251,43 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   phase, `Closed` once at game over, cross-faded. `Intro` is unused until there is a title
   screen. The old synthesised `assets/sfx/music.wav` is no longer played. Later: music per theme.
 
-## 9. Open questions
+## 9. Decisions (13 November 2026)
 
-- The name stays "Regulars" for now. Logo direction is decided; see "Decisions and open items" in `docs/STYLE_GUIDE.md`.
-- Should order-taking be a step (walk to the table first), as in PlateUp?
-- Building happens between days only (decided). Live building during service is not planned.
+Not built yet; this is the agreed direction for future sessions.
+
+- **Order-taking is a step.** The chef walks to the table to take the order before
+  cooking. Build it together with the menu below, since the guest orders from the menu.
+- **Recipes, ingredients and a menu the player designs.** Every dish is data: a recipe
+  is a list of ingredients (burger: bun, patty, salad, cheese; salad: lettuce, tomato,
+  onion). Each ingredient comes from a station in the room dedicated to it, so a
+  bigger menu needs a bigger kitchen. Some ingredients can be bought ready-made
+  (prefab salad) as shop upgrades that save prep. The player picks which ingredient
+  stations to stock and writes their own menu from what they can make (only
+  cheeseburgers, say), and guests order from it. Every restaurant type has mains, a
+  sides system and a drinks system: the diner is burgers, fries and soda; the seaside
+  is fish, vegetables and white wine. Proposed, not yet agreed: ingredient order only
+  sets how a dish looks stacked, never refuses it; at most one prep step per
+  ingredient; townspeople like and dislike ingredients, so variety pays. Still to
+  answer: ingredient costs (per serving or restocked nightly), when the menu is set
+  (nightly?), who names dishes, and whether menu size has a cap. This replaces the
+  hard-coded burger flow (fridge, stove, plates).
+- **Mood drives pay and stay.** Happy guests pay more and stay longer: secure income,
+  but the table turns over slower, so a fast-food player may keep guests a little
+  less comfortable on purpose.
+- **The critic.** One critic per run, always the same townsperson in that run and
+  unknown to the player unless they work it out. They come every fifth day (Friday;
+  to confirm: days, not levels), are served like anyone, and rate service time,
+  cleanliness, food quality and variety, then give stars out of 5. The review confirms
+  or contradicts the rumours going round, and resets townspeople's opinions on what it
+  rated: someone put off by dirt forgets it if the critic found the place clean. A good
+  review brings more guests (which can backfire on a kitchen that is not ready); a bad
+  one keeps them away.
+- **Co-op: local, same screen first;** online later. Controller input today goes into
+  the game as shared key presses (`game/controls.gd`), so co-op needs input per
+  player: refactor that first.
+- **Title screen: a placeholder** with Play, Settings and Quit. Accessibility comes
+  later; meanwhile new interface should say things by shape as well as colour.
+- **Banked:** the size of the lot is for the metagame (between runs); staff waits
+  until after co-op; the name ("Regulars" is a working title) and the "Town Diner"
+  subtitle are still open.
+- Building happens between days only. Live building during service is not planned.
