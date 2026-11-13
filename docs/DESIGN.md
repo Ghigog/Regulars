@@ -117,7 +117,7 @@ many days as you can; three walkouts in one day ends the run.
   view. A guest who can see a working stove and nothing they have noticed gains joy
   (0.01 a second).
 - **Groups.** Guests arrive in groups of friends, never with strangers. The biggest
-  group is the most seats any one table has (2 today). A group queues together, takes
+  group is the most seats any one table has (2, or 4 once a table for four is placed). A group queues together, takes
   a whole empty table (the smallest that fits) and shares it with nobody, so a lone
   guest has a table to themselves. If one of a group runs out of patience, those still
   waiting leave with them and it counts as one walkout; each of them holds a grudge.
@@ -182,8 +182,13 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Nightly crate** (parked by decision): after each day, pick one of two blueprints.
   Place it, or shelve it for two days and it returns one tier higher (max tier 3).
 - **Catalog** (built): buy furniture with money, gated by XP level. Starting list:
-  partition wall $10, counter $15, fern $20, table for two $40 (level 2), stove $80
-  (level 3). To add: more pieces to make browsing worth it, pictures on the cards.
+  partition wall $10, counter $15, fern $20, table for two $40 (level 2), booth $60
+  (level 2), stove $80 (level 3), table for four $90 (level 3). Each piece fits one cell
+  and keeps its seats on the cells beside it: the booth has a bench either side (seats two;
+  guests get a small joy bump, "A booth! How cosy"), the table for four a chair on every
+  side, so a group of four can come once one is placed. Booth and table for four come in
+  three tiers like the table for two. To add: more pieces to make browsing worth it
+  (a booth seating four over two cells needs multi-cell footprints), pictures on the cards.
 - **Floors, walls, doors, archways** (built, section 1): `sim/floorplan.gd` holds the
   plan; `Scenery.build_room` draws it. Ceilings are not planned (the camera looks down).
 - **Two currencies**: money (earned per day) and XP (10 per meal plus the tip; 100 per level).
@@ -243,7 +248,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   - A theme picker in the game (themes are an environment variable for now).
   - Station states with no gameplay behind them yet: sink full of suds, overflowing bin.
   - Hired staff (server, dishwasher, host), co-op chefs 2 to 4 (trim colours exist),
-    future dishes, the four-seat table and booth, floor lamp, awning and photo view.
+    future dishes, floor lamp, awning and photo view.
   - A bundled hand-lettered font (the HUD uses a rounded system font).
   - The open items: title screen, colour-blind support, the "Town Diner" subtitle.
 - Sound effects are synthesised placeholders (`tools/make_sfx.py`). Later: real foley.

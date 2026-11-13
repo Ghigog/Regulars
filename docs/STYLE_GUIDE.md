@@ -116,6 +116,8 @@ or a later sheet, they win. What changed:
 | Outer walls | Stand just outside the floor instead of centred on the grid edge. The front cutaway is centred on its edge. | Keeps the back row of stations and the floor whole. |
 | Cutaway | Wall colour with a dark trim cap, including the right-hand wall, which had no wall before. | "Resolved conflicts": dark cap, no coral face. |
 | Kitchen dressing | Wall cabinets on the left wall, jar shelf by the stoves, no range hood. | Nothing may hide a stove or its dial. |
+| Four-seat table | Sheet 10's square plank top on four square legs, with a chair on each side: two coral, two wood (darker legs), same size and back height as the table for two's. | One piece per cell: the chairs stand on the seat cells. |
+| Booth | Teal benches with a coral seat cushion and two coral back cushions on a dark wooden plinth, facing across a narrow plank table on a dark pedestal. Seats one guest per bench, not sheet 10's two; backs stop at the chairs' height. | Fits one cell like the other tables; a four-seat booth would need two cells. |
 | Lighting | Sconces on the far walls, a mushroom lamp on each table, a street lamp. No floor lamp. All come up as the sun goes down. | Every corner in the room is walkable. |
 | Shopfront | The hanging burger sign sits on the coral door frame. No awning or upper wall. | Those only show in title and photo views, which do not exist yet. |
 | Camera | Same angles. Between days the view is wide (size 14.5, was 13.5) so the whole slab and its edge are in frame; during service it moves in on the room and queue (size 11.5, characters about 84 px tall). | The diorama reads best wide; play reads best close. |
@@ -139,7 +141,7 @@ or a later sheet, they win. What changed:
 | Player-built partitions | The sheet 11 partition, 1.0 m at tier 1 and 10 cm taller per tier. Higher-tier furniture keeps the yellow skirting bands. | Tier dressing is a placeholder. |
 
 **Not yet done:** Blender kit, hired staff, co-op chefs 2 to 4 (trim colours exist in
-`Peg.PLAYER_TRIM`), future dishes, four-seat table and booth, title screen, colour-blind
+`Peg.PLAYER_TRIM`), future dishes, title screen, colour-blind
 support.
 
 ## Rules so far

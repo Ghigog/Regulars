@@ -382,14 +382,14 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 16, "two single-tier pieces, three with three tiers and five build tools")
+	assert_eq(Catalog.search().size(), 22, "two single-tier pieces, five with three tiers and five build tools")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 3)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen")
 	assert_eq(kitchen.size(), 4)
 	assert_eq(kitchen[0].id, "counter")
-	assert_eq(Catalog.search("seats").size(), 3, "matches what a piece does")
+	assert_eq(Catalog.search("two more seats").size(), 1, "matches what a piece does")
 	assert_eq(Catalog.search("stove ++").size(), 1)
 	assert_eq(Catalog.search("fern", "Kitchen").size(), 0)
 	assert_eq(Catalog.search("partition")[0].id, "screen")

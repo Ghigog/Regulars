@@ -29,6 +29,10 @@ const ITEMS := {
 		"blurb": "Cheers nearby guests", "up": "Cheers guests further away"},
 	"table": {"name": "Table for two", "price": 40, "level": 2, "category": "Dining", "tiers": 3,
 		"blurb": "Two more seats", "up": "Two comfier seats"},
+	"booth": {"name": "Booth", "price": 60, "level": 2, "category": "Dining", "tiers": 3,
+		"blurb": "Two cosy bench seats", "up": "Two cosier bench seats"},
+	"table4": {"name": "Table for four", "price": 90, "level": 3, "category": "Dining", "tiers": 3,
+		"blurb": "Seats a group of four", "up": "Four comfier seats"},
 	"stove": {"name": "Stove", "price": 80, "level": 3, "category": "Kitchen", "tiers": 3,
 		"blurb": "Cook two things at once", "up": "Cooks faster  burns faster"},
 }

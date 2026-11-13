@@ -427,6 +427,21 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 	return n
 
 
+## A dining chair on the seat cell `away` from the table, its back on the far side.
+static func _chair(n: Node3D, away: Vector2i, col: String) -> void:
+	var c := Node3D.new()
+	c.position = Vector3(away.x, 0, away.y)
+	c.rotation.y = atan2(-float(away.y), float(away.x))
+	n.add_child(c)
+	var legs := "#d9a56a" if col == CORAL else WOOD_DARK
+	for lx: float in [-0.21, 0.21]:
+		for lz: float in [-0.21, 0.21]:
+			_add(c, bevel_mesh(Vector3(0.075, 0.36, 0.075), 0.02), Vector3(lx, 0.18, lz), Color(legs), 0.0, R_WOOD)
+	var rough := R_MATTE if col == CORAL else R_WOOD
+	_add(c, bevel_mesh(Vector3(0.58, 0.1, 0.58), 0.035), Vector3(0, 0.4, 0), Color(col), 0.0, rough)
+	_add(c, bevel_mesh(Vector3(0.1, 0.56, 0.58), 0.035), Vector3(0.24, 0.66, 0), Color(col), 0.0, rough)
+
+
 static func _shade(col: String, amount := 0.13) -> String:
 	return Color(col).darkened(amount).to_html(false)
 
@@ -552,6 +567,32 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			# A small candle in a glass, as in the sunset frame.
 			cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
 			ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
+		"table4":
+			# Four-seat table (sheet 10): a square plank top on four square legs, two coral
+			# chairs and two wooden ones, one on each side.
+			_add(n, bevel_mesh(Vector3(1.0, 0.1, 1.0), 0.035), Vector3(0, 0.69, 0), Color("#c98f58"), 0.0, R_WOOD)
+			for lx: float in [-0.4, 0.4]:
+				for lz: float in [-0.4, 0.4]:
+					_add(n, bevel_mesh(Vector3(0.09, 0.64, 0.09), 0.025), Vector3(lx, 0.32, lz), Color(WOOD), 0.0, R_WOOD)
+			for i in 4:
+				var d: Vector2i = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)][i]
+				_chair(n, d, CORAL if i < 2 else WOOD)
+			cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
+			ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
+		"booth":
+			# Booth (sheet 10): teal benches with coral cushions facing across a narrow
+			# wooden table on a dark pedestal. One guest per bench, so it fits one cell.
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.24, 0.0], [0.26, 0.02], [0.26, 0.07], [0.24, 0.09], [0.07, 0.09], [0.07, 0.63], [0.0, 0.63]], STEEL_DARK, 0.0, R_WOOD)
+			_add(n, bevel_mesh(Vector3(0.72, 0.1, 1.0), 0.035), Vector3(0, 0.68, 0), Color("#c98f58"), 0.0, R_WOOD)
+			for sx: float in [-1.0, 1.0]:
+				_add(n, bevel_mesh(Vector3(0.66, 0.08, 0.98), 0.025), Vector3(sx * 1.02, 0.04, 0), Color(WOOD_DARK), 0.0, R_WOOD)
+				_add(n, bevel_mesh(Vector3(0.62, 0.3, 0.96)), Vector3(sx * 1.02, 0.23, 0), Color(CABINET), 0.0)
+				_add(n, bevel_mesh(Vector3(0.5, 0.08, 0.88), 0.035), Vector3(sx * 0.98, 0.41, 0), Color(CORAL), 0.0)
+				_add(n, bevel_mesh(Vector3(0.16, 0.86, 0.96)), Vector3(sx * 1.27, 0.51, 0), Color(CABINET), 0.0)
+				for cz: float in [-0.22, 0.22]:
+					_add(n, bevel_mesh(Vector3(0.07, 0.4, 0.42), 0.03), Vector3(sx * 1.16, 0.66, cz), Color(CORAL), 0.0)
+			cyl(n, Vector3(0, 0.73, 0), 0.05, 0.085, "#ffd98a", 1.3)
+			ball(n, Vector3(0, 0.83, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
 	if tier > 1:
 		for i in tier - 1:
 			box(n, Vector3(0, 0.05 + i * 0.1, 0), Vector3(1.02, 0.04, 1.02), WARN, 0.6)

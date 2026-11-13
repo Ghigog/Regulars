@@ -183,12 +183,23 @@ func _update_cooking_visuals() -> void:
 
 
 ## Redraws plate stacks and dirty dishes.
-## Where a piece's seats are: either side of a table, turning with it.
+## Pieces guests sit at: each has seats around it and takes dirty plates.
+const TABLES: Array[String] = ["table", "booth", "table4"]
+
+
+static func is_table(type_: String) -> bool:
+	return type_ in TABLES
+
+
+## Where a piece's seats are: either side of a table or booth, turning with it,
+## or all four sides of a table for four.
 static func seats_for(type_: String, cell_: Vector2i, facing_: int) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
-	if type_ == "table":
+	if type_ == "table" or type_ == "booth":
 		var side := Vector2i(1, 0) if facing_ % 2 == 0 else Vector2i(0, 1)
 		out = [cell_ - side, cell_ + side]
+	elif type_ == "table4":
+		out = [cell_ + Vector2i(-1, 0), cell_ + Vector2i(1, 0), cell_ + Vector2i(0, -1), cell_ + Vector2i(0, 1)]
 	return out
 
 
@@ -213,10 +224,10 @@ func refresh() -> void:
 			var plate := Build.item("plate")
 			plate.position = Vector3(0, 0.916 + i * 0.032, 0)
 			_stack.add_child(plate)
-	elif type == "table":
+	elif is_table(type):
 		for i in dirty:
 			var d := Build.item("dirty_plate")
-			d.position = Vector3(-0.25 + i * 0.5, 0.74, 0.3)
+			d.position = Vector3(-0.25 + (i % 2) * 0.5, 0.74, 0.3 - (i / 2) * 0.6)
 			_stack.add_child(d)
 
 
