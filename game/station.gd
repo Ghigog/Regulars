@@ -151,6 +151,7 @@ func _make_cook_bar() -> void:
 	Build.flat(_needle, Build.disc_pts(0.065), Build.TRIM, 0.002)
 	Build.flat(_needle, Build.disc_pts(0.03), "#ffffff", 0.004)
 	_bar.visible = false
+	Build.on_top(_bar, -_bar.position.z)  # never hidden behind the hood or a wall
 
 
 ## The heat ladder (sheet 13): off-white steam, warm grey smoke as the meat

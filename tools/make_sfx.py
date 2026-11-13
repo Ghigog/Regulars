@@ -198,4 +198,70 @@ for bar, (bass, tones) in enumerate(CHORDS):
             tone(music, t0 + eighth * BEAT / 2, midi(m), 0.7, 0.16, MARIMBA, decay=7, wrap=True)
 save("music", music, 0.7)
 
+# ---------------------------------------------------------------- interface props
+# Added after the music so the effects above keep their random sequence.
+WOOD = ((1, 1.0), (2.3, 0.4), (4.1, 0.15))
+
+b = buf(0.6)   # roll: a wooden wheel rolling on a desk, ticking as it turns
+noise(b, 0, 0.58, 0.18, 0.15, decay=1.5)
+for i in range(9):
+    t = 0.02 + i * 0.062
+    tone(b, t, 900 + random.uniform(-80, 80), 0.03, 0.5, WOOD, decay=90)
+    noise(b, t, 0.012, 0.35, 0.7, decay=300)
+save("roll", b, 0.55)
+
+b = buf(0.35)  # lift: a soft upward whoosh
+noise(b, 0, 0.33, 0.6, 0.35, decay=6)
+tone(b, 0, 180, 0.3, 0.4, SINE, decay=7, bend=2.5)
+save("lift", b, 0.45)
+
+b = buf(0.45)  # rattle: the calendar jiggling on its stand
+for i in range(6):
+    t = i * 0.065
+    tone(b, t, random.uniform(320, 420), 0.05, 0.9, WOOD, decay=70)
+    noise(b, t, 0.015, 0.4, 0.4, decay=220)
+save("rattle", b, 0.55)
+
+b = buf(0.4)   # page: one paper page turning over
+for i in range(14):
+    t = 0.04 + i * 0.016 + random.uniform(0, 0.01)
+    noise(b, t, 0.05, 0.25 + 0.5 * math.sin(math.pi * i / 14), 0.85, decay=50)
+noise(b, 0.26, 0.08, 0.6, 0.6, decay=40)
+save("page", b, 0.55)
+
+b = buf(0.25)  # thump: set down lightly on a desk
+tone(b, 0, 110, 0.2, 1.0, SOFT, decay=22, bend=-1.5)
+noise(b, 0, 0.04, 0.5, 0.2, decay=90)
+save("thump", b, 0.65)
+
+b = buf(0.45)  # rip: a paper tag torn off its string
+for i in range(70):
+    t = 0.02 + 0.3 * (i / 70) ** 0.8
+    noise(b, t, random.uniform(0.003, 0.012), random.uniform(0.3, 1.0), 0.8, decay=300)
+noise(b, 0.02, 0.33, 0.25, 0.9, decay=6)
+save("rip", b, 0.6)
+
+b = buf(1.1)   # flutter: paper fluttering in the air
+for i in range(26):
+    t = i * 0.04
+    noise(b, t, 0.035, 0.25 + 0.2 * math.sin(i * 1.3) ** 2, 0.8, decay=60)
+save("flutter", b, 0.4)
+
+b = buf(0.3)   # rustle: a short paper rustle
+for i in range(9):
+    noise(b, random.uniform(0, 0.2), 0.04, random.uniform(0.3, 0.8), 0.85, decay=60)
+save("rustle", b, 0.45)
+
+b = buf(0.8)   # rope: a board running on ropes, with a creak
+noise(b, 0, 0.75, 0.5, 0.3, decay=3)
+for i in range(4):
+    tone(b, 0.08 + i * 0.16, random.uniform(240, 300), 0.12, 0.35, WOOD, decay=18, bend=0.6)
+save("rope", b, 0.5)
+
+b = buf(0.35)  # stamp: a rubber stamp thumped onto card
+tone(b, 0, 140, 0.18, 1.0, SOFT, decay=26, bend=-1.2)
+noise(b, 0, 0.03, 0.8, 0.35, decay=120)
+noise(b, 0.05, 0.12, 0.2, 0.6, decay=30)
+save("stamp", b, 0.7)
+
 print("wrote", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

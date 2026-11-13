@@ -414,16 +414,52 @@ func test_cannot_shelve_past_max_tier():
 
 func test_expression_follows_the_strongest_feeling():
 	var m := GuestMood.new()
+	assert_eq(m.expression(), "content", "people look pleasant by default")
+	m.joy = 0.3
 	assert_eq(m.expression(), "neutral")
-	m.delight(0.1)
-	assert_eq(m.expression(), "content")
+	m.joy = 0.5
 	m.delight(0.3)
 	assert_eq(m.expression(), "delighted")
-	m.patience = 0.4
+	m.patience = 0.3
 	assert_eq(m.expression(), "impatient")
-	m.patience = 0.2
+	m.patience = 0.1
 	assert_eq(m.expression(), "snap")
+	m.disgust = 0.3
+	assert_eq(m.expression(), "snap", "the first stage of disgust does not change the face")
 	m.disgust = 0.6
 	assert_eq(m.expression(), "disgusted")
 	assert_eq(m.expression(true), "chewing")
 	assert_eq(m.expression(false, true), "angry")
+
+
+func test_disgust_does_nothing_until_it_crosses_a_stage():
+	var m := GuestMood.new()
+	m.savour = 1.0
+	var clean := m.satisfaction()
+	m.disgust = 0.15
+	assert_eq(m.disgust_level(), 0)
+	assert_eq(m.satisfaction(), clean, "below the first stage it has no effect")
+	m.disgust = 0.25
+	assert_eq(m.disgust_level(), 1)
+	assert_lt(m.satisfaction(), clean)
+	m.disgust = 0.5
+	assert_eq(m.disgust_level(), 2)
+	m.disgust = 0.8
+	assert_eq(m.disgust_level(), 3)
+
+
+func test_disgusted_guests_tell_friends_and_revolted_ones_never_return():
+	var t := Town.new(1)
+	var friend: int = t.people[0].friends[0]
+	assert_eq(t.record_disgust(0, 1), "", "an ick is theirs alone")
+	assert_eq(t.people[friend].affinity, 0.0)
+	assert_ne(t.record_disgust(0, 2), "")
+	assert_lt(t.people[friend].affinity, 0.0, "friends hear about it")
+	assert_false(t.people[0].gone)
+	t.record_disgust(0, 3)
+	assert_true(t.people[0].gone)
+	assert_eq(t.visit_chance(0), 0.0)
+	for day in range(1, 6):
+		assert_false(t.roll_guests(day).has(0), "never comes back")
+	assert_eq(t.status_word(0, 1), "Never coming back")
+

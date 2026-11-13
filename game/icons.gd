@@ -83,41 +83,73 @@ static func icon(id: String) -> Array:
 				o.append([rect(c.x, c.y + s * 0.8, s * 2, s * 0.42), INK])
 				o.append([rect(c.x, c.y - s * 0.8, s * 2, s * 0.42), INK])
 				o.append([PackedVector2Array([c + Vector2(s * 0.4, s), c + Vector2(s, s), c + Vector2(-s * 0.4, -s), c + Vector2(-s, -s)]), INK])
-		"stink":
+		"ick", "gross":
+			# Sheet 13: wavy stink lines; the stronger stage adds a third and a puff.
+			var lines := [-0.42, 0.18] if id == "ick" else [-0.6, -0.12, 0.36]
+			for x0: float in lines:
+				for k in 9:
+					o.append([ell(x0 + 0.13 * sin(k * 0.95), -0.7 + k * 0.17, 0.105), "#6f9f3f"])
+			if id == "gross":
+				_blob(o, [[0.52, 0.55, 0.2], [0.72, 0.42, 0.16], [0.6, 0.72, 0.14]], GREEN)
+		"stink":  # sheet 14: a green cloud on a darker base, fumes inside
+			_blob(o, [[-0.35, -0.3, 0.42], [0.2, -0.4, 0.5], [0.5, -0.05, 0.36]], "#6f8f3a")
 			_blob(o, [[-0.35, -0.1, 0.42], [0.2, -0.2, 0.5], [0.5, 0.15, 0.36], [-0.05, 0.3, 0.46]], GREEN)
-			for i in 2:
-				o.append([ell(-0.2 + i * 0.4, 0.05, 0.09), "#4c8f3f"])
-			o.append([rect(0, -0.25, 0.5, 0.1), "#4c8f3f"])
-		"heart":
-			o.append([ell(-0.36, 0.25, 0.44), CORAL])
-			o.append([ell(0.36, 0.25, 0.44), CORAL])
-			o.append([PackedVector2Array([Vector2(-0.77, 0.1), Vector2(0.77, 0.1), Vector2(0, -0.82)]), CORAL])
+			for x0: float in [-0.3, 0.02, 0.34]:
+				for k in 5:
+					o.append([ell(x0 + 0.06 * sin(k * 1.4), -0.22 + k * 0.11, 0.05), "#4c8f3f"])
+		"heart":  # a coral heart with a cream rim
+			for pass_: Array in [[1.2, CREAM], [1.0, CORAL]]:
+				var k: float = pass_[0]
+				o.append([ell(-0.36 * k, 0.25 * k - (k - 1.0) * 0.1, 0.44 * k), pass_[1]])
+				o.append([ell(0.36 * k, 0.25 * k - (k - 1.0) * 0.1, 0.44 * k), pass_[1]])
+				o.append([PackedVector2Array([Vector2(-0.77 * k, 0.1 * k - (k - 1.0) * 0.1), Vector2(0.77 * k, 0.1 * k - (k - 1.0) * 0.1), Vector2(0, -0.82 * k - (k - 1.0) * 0.1)]), pass_[1]])
 			o.append([ell(-0.42, 0.38, 0.13), "#ffc2b4"])
-		"coin":
-			o.append([ell(0, 0, 0.9), GOLD_DARK])
-			o.append([ell(0, 0.06, 0.82), GOLD])
-			o.append([ell(0, 0.06, 0.56), "#ffd76a"])
-			o.append([rect(0, 0.06, 0.2, 0.62), GOLD_DARK])
-		"tip":
-			o.append([rect(-0.15, 0.2, 1.3, 0.7, 0.25), "#5fa873"])
-			o.append([rect(-0.15, 0.2, 1.0, 0.44, 0.25), "#a9d6b4"])
-			o.append_array(_moved(icon("coin"), Vector2(0.3, -0.3), 0.6))
-		"walkout":
-			o.append([ell(0, 0, 0.9), "#a82a25"])
-			o.append([ell(0, 0.05, 0.82), RED])
+		"coin":  # sheet 14: a thick rim round an embossed crest
+			o.append([ell(0, -0.06, 0.94), GOLD_DARK])
+			o.append([ell(0, 0.04, 0.9), GOLD])
+			o.append([ell(0, 0.04, 0.68), GOLD_DARK])
+			o.append([ell(0, 0.0, 0.62), "#f7c948"])
+			o.append([PackedVector2Array([Vector2(-0.3, 0.34), Vector2(-0.1, 0.22), Vector2(0, 0.36), Vector2(0.1, 0.22), Vector2(0.3, 0.34), Vector2(0.3, -0.08), Vector2(0, -0.4), Vector2(-0.3, -0.08)]), "#ffe08a"])
+		"coins":  # a short stack, for totals
+			for i in 3:
+				o.append([ell(0.05 * (i % 2), -0.55 + i * 0.36, 0.8, 0.3), GOLD_DARK])
+				o.append([ell(0.05 * (i % 2), -0.45 + i * 0.36, 0.8, 0.3), GOLD if i < 2 else "#f7c948"])
+		"tip":  # two mint notes and a coin
+			for n: Array in [[-0.12, 0.28, 0.2], [-0.02, 0.08, 0.08]]:
+				o.append([rect(n[0], n[1], 1.5, 0.84, n[2]), "#f4f1e4"])
+				o.append([rect(n[0], n[1], 1.32, 0.66, n[2]), "#bfe3d0"])
+				o.append([ell(n[0], n[1], 0.26), "#6fb6a8"])
+			o.append_array(_moved(icon("coin"), Vector2(0.48, -0.48), 0.5))
+		"walkout":  # a red token with an angry face pressed into it
+			o.append([ell(0, -0.06, 0.94), "#b83228"])
+			o.append([ell(0, 0.04, 0.9), "#e8564a"])
+			o.append([ell(0, 0.04, 0.72), "#d9463b"])
+			o.append([ell(0, 0.02, 0.66), "#e8564a"])
 			for sx: float in [-1.0, 1.0]:
-				o.append([PackedVector2Array([Vector2(sx * 0.6, 0.5), Vector2(sx * 0.1, 0.2), Vector2(sx * 0.14, 0.05), Vector2(sx * 0.62, 0.3)]), INK])
-				o.append([ell(sx * 0.32, 0.02, 0.1), INK])
-			o.append([ell(0, -0.52, 0.34, 0.2, 0, 180, 10), INK])
-		"hourglass":
-			o.append([rect(0, 0.78, 1.3, 0.24), "#a8703f"])
-			o.append([rect(0, -0.78, 1.3, 0.24), "#a8703f"])
-			o.append([PackedVector2Array([Vector2(-0.5, 0.66), Vector2(0.5, 0.66), Vector2(0.06, 0), Vector2(0.5, -0.66), Vector2(-0.5, -0.66), Vector2(-0.06, 0)]), "#dff0f0"])
-			o.append([PackedVector2Array([Vector2(-0.32, 0.4), Vector2(0.32, 0.4), Vector2(0, 0.02)]), GOLD])
-			o.append([PackedVector2Array([Vector2(-0.44, -0.62), Vector2(0.44, -0.62), Vector2(0, -0.3)]), GOLD])
-		"star":
-			o.append([star(0, -0.03, 0.98, 5, 0.5), GOLD_DARK])
-			o.append([star(0, 0.03, 0.8, 5, 0.5), "#ffd452"])
+				o.append([PackedVector2Array([Vector2(sx * 0.48, 0.42), Vector2(sx * 0.1, 0.2), Vector2(sx * 0.13, 0.08), Vector2(sx * 0.5, 0.26)]), "#a82a22"])
+				o.append([ell(sx * 0.26, 0.04, 0.085), "#a82a22"])
+			o.append([ell(0, -0.44, 0.28, 0.2, 0, 180, 10), "#a82a22"])
+			o.append([ell(0, -0.48, 0.2, 0.12, 0, 180, 10), "#e8564a"])
+		"hourglass":  # teal caps, cream posts, sand running through
+			for y: float in [0.82, -0.82]:
+				o.append([rect(0, y, 1.36, 0.3), "#1f6470"])
+				o.append([rect(0, y + 0.05, 1.2, 0.12), "#3f8a94"])
+			for x: float in [-0.56, 0.56]:
+				o.append([rect(x, 0, 0.1, 1.36), "#efe4cc"])
+			o.append([PackedVector2Array([Vector2(-0.42, 0.66), Vector2(0.42, 0.66), Vector2(0.07, 0), Vector2(0.42, -0.66), Vector2(-0.42, -0.66), Vector2(-0.07, 0)]), "#dff0f0"])
+			o.append([PackedVector2Array([Vector2(-0.28, 0.42), Vector2(0.28, 0.42), Vector2(0, 0.04)]), "#e3b77e"])
+			o.append([PackedVector2Array([Vector2(-0.38, -0.62), Vector2(0.38, -0.62), Vector2(0, -0.26)]), "#e3b77e"])
+		"star":  # a chunky gold star with a raised centre
+			o.append([star(0, -0.05, 1.0, 5, 0.55), GOLD_DARK])
+			o.append([star(0, 0.03, 0.9, 5, 0.55), GOLD])
+			o.append([star(0, 0.03, 0.56, 5, 0.55), "#ffd76a"])
+		"day":  # a cream card in a wooden frame: the sun coming up
+			o.append([rect(0, 0, 1.6, 1.9), "#a8703f"])
+			o.append([rect(0, 0.03, 1.36, 1.64), CREAM])
+			o.append([star(0, -0.1, 0.62, 8, 0.66), GOLD])
+			o.append([ell(0, -0.1, 0.36), "#ffd76a"])
+			o.append([rect(0, -0.52, 1.36, 0.82), CREAM])
+			o.append([rect(0, -0.14, 1.0, 0.07), GOLD_DARK])
 		"sun":
 			o.append([star(0, 0, 0.98, 8, 0.62), GOLD])
 			o.append([ell(0, 0, 0.56), "#ffd76a"])

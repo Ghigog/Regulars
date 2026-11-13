@@ -74,7 +74,7 @@ many days as you can; three walkouts in one day ends the run.
   counts them down), then returns sore: 0.75 patience, -0.1 joy. A good visit forgives
   (+0.1 affinity on top of the usual). Each further walkout adds two more days away.
   Guests holding a grudge are not used to top up a thin crowd.
-- **Flyers.** On the receipt, $15 (F) buys +25% visit chance for everyone tomorrow. One
+- **Flyers.** In the build tray, $15 (F) buys +25% visit chance for everyone tomorrow. One
   batch a night. 
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
 
@@ -102,6 +102,10 @@ placed; floors and ceilings.
 
 - **Four meters** per guest: patience, disgust, joy, savour. Final satisfaction =
   `0.35 savour + 0.3 joy + 0.2 patience - 0.5 disgust`. Tip = bill x satisfaction x 0.6.
+- **Disgust stages** (built): disgust builds unseen and does nothing until a stage is
+  reached. Ick (0.2): they wince, enjoy the visit less and tip less. Disgusted (0.45): they
+  also tell their friends and think less of the place. Revolted (0.75): they also never
+  come back. Each stage has its own icon over the head.
 - **Thoughts**: short lines triggered by what they experience ("I just watched the chef
   carry rubbish past me"). The click-to-inspect guest card is built (section 1); it shows
   the last six thoughts, not the full history.

@@ -25,6 +25,8 @@ const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this i
 const SOUNDS := {  # name -> volume in dB
 	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
 	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0,
+	"roll": -8.0, "lift": -10.0, "rattle": -9.0, "page": -7.0, "thump": -6.0, "rip": -6.0,
+	"flutter": -10.0, "rustle": -9.0, "rope": -8.0, "stamp": -4.0,
 }
 const LOOPING: Array[String] = ["sizzle"]
 const MUSIC_DB := -14.0
@@ -79,6 +81,7 @@ var _sfx := {}
 var music_id := ""               # which MUSIC track is playing
 var _music: AudioStreamPlayer
 var _sun: DirectionalLight3D
+var _lens: ColorRect
 var _sconces: Array[OmniLight3D] = []
 var _env: Environment
 var _shot_path := ""
@@ -182,6 +185,10 @@ func _apply_demo(demo: String) -> void:
 					g.mood.think("Nobody has cleared that table")
 					inspect(g)
 					return)
+	elif demo == "options" or demo == "options_gfx":  # the options screen, on either tab
+		hud._options_tab = "graphics" if demo == "options_gfx" else "audio"
+		hud.toggle_options()
+		get_tree().paused = false   # so the screenshot timer still runs
 	elif demo == "closed":
 		best_path = "user://regulars_best_demo.json"
 		for i in Ledger.MAX_STRIKES:
@@ -207,10 +214,21 @@ func _apply_demo(demo: String) -> void:
 		ledger.xp = 250
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_build.bind(demo))
+	elif demo == "newday":  # the receipt, then building, then the next day turning over
+		ledger.record_sale(BILL, 5)
+		arrivals.clear()
+		get_tree().create_timer(3.0).timeout.connect(open_build)
+		get_tree().create_timer(5.0).timeout.connect(start_day)
+	elif demo == "walkout":  # one walkout stamped on the card
+		for a in arrivals:
+			a.time = 30.0
+		get_tree().create_timer(2.0).timeout.connect(ledger.record_walkout)
 	elif demo == "flyers":
 		ledger.record_sale(BILL, 5)
 		arrivals.clear()
-		get_tree().create_timer(1.5).timeout.connect(buy_flyers)
+		get_tree().create_timer(1.5).timeout.connect(func() -> void:
+			open_build()
+			buy_flyers())
 
 
 func _demo_build(demo: String) -> void:
@@ -314,21 +332,22 @@ func _build_scenery() -> void:
 	# no directional shadows at all.
 	cam.near = 1.0
 	cam.far = 80.0
-	if TILT_SHIFT:
-		var lens := CameraAttributesPractical.new()
-		var focus := CAM_OFFSET.length()  # the camera always sits this far from what it frames
-		lens.dof_blur_far_enabled = true
-		lens.dof_blur_far_distance = focus + 2.2
-		lens.dof_blur_far_transition = 5.0
-		lens.dof_blur_near_enabled = true
-		lens.dof_blur_near_distance = focus - 3.2  # the door and the queue stay readable
-		lens.dof_blur_near_transition = 5.0
-		lens.dof_blur_amount = 0.07
-		cam.attributes = lens
+	# Tilt-shift is a screen-space blur drawn over the world and under the interface.
+	var lens_layer := CanvasLayer.new()
+	lens_layer.layer = -1
+	add_child(lens_layer)
+	_lens = ColorRect.new()
+	_lens.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_lens.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var lens_mat := ShaderMaterial.new()
+	lens_mat.shader = load("res://game/shaders/tilt_shift.gdshader")
+	_lens.material = lens_mat
+	lens_layer.add_child(_lens)
 	add_child(cam)
 	cam.look_at_from_position(WIDE_FOCUS + CAM_OFFSET, WIDE_FOCUS)
 
 	_sconces = Scenery.build(self, W, H, DOOR)
+	set_tilt_shift(TILT_SHIFT)
 
 
 ## The glow of the mushroom lamp on each table. (No hanging lamps: from this
@@ -438,6 +457,8 @@ func _load_sounds() -> void:
 		else:
 			p.max_polyphony = 4
 		p.volume_db = SOUNDS[id]
+		p.bus = _bus("Sfx")
+		p.process_mode = Node.PROCESS_MODE_ALWAYS
 		p.stream = stream
 		add_child(p)
 		_sfx[id] = p
@@ -460,11 +481,31 @@ func play_music(id: String) -> void:
 	var stream: AudioStreamMP3 = load(path).duplicate()
 	stream.loop = id != "closed"
 	_music = AudioStreamPlayer.new()
+	_music.bus = _bus("Music")
+	_music.process_mode = Node.PROCESS_MODE_ALWAYS
 	_music.stream = stream
 	_music.volume_db = -50.0
 	add_child(_music)
 	_music.play()
 	_music.create_tween().tween_property(_music, "volume_db", MUSIC_DB, MUSIC_FADE)
+
+
+## The name of an audio bus, made on first use and sent to the master bus.
+func _bus(bus_name: String) -> String:
+	if AudioServer.get_bus_index(bus_name) == -1:
+		AudioServer.add_bus()
+		var at := AudioServer.bus_count - 1
+		AudioServer.set_bus_name(at, bus_name)
+		AudioServer.set_bus_send(at, "Master")
+	return bus_name
+
+
+## Volumes from the options screen, 0 to 1 each.
+func set_volumes(sfx_level: float, music_level: float) -> void:
+	for pair: Array in [["Sfx", sfx_level], ["Music", music_level]]:
+		var at := AudioServer.get_bus_index(_bus(pair[0]))
+		AudioServer.set_bus_mute(at, pair[1] <= 0.001)
+		AudioServer.set_bus_volume_db(at, linear_to_db(maxf(pair[1], 0.001)))
 
 
 ## Plays a sound with a little random pitch so repeats do not sound identical.
@@ -484,6 +525,14 @@ func shake(amount := 0.12) -> void:
 	for i in 5:
 		tw.tween_property(cam, "h_offset", randf_range(-amount, amount), 0.04)
 	tw.tween_property(cam, "h_offset", 0.0, 0.05)
+
+
+## Tilt-shift on: a sharp band across the screen, soft above and below, and richer colour, like a close-up photo of
+## a model. Off: everything sharp.
+func set_tilt_shift(on: bool) -> void:
+	_lens.visible = on
+	_env.adjustment_saturation = 1.16 if on else 1.05
+	_env.adjustment_contrast = 1.06 if on else 1.0
 
 
 ## Morning light drifts to a warm, low evening sun as the day goes on.
@@ -801,13 +850,13 @@ func _update_ghost() -> void:
 	_no_mark.position = Vector3(_ghost.position.x, 0, _ghost.position.z)
 
 
-## Flyers: pay tonight for a bigger crowd tomorrow. One batch a night.
+## Flyers: bought from the build tray at night for a bigger crowd tomorrow. One batch a night.
 func buy_flyers() -> bool:
-	if phase != Phase.SUMMARY or flyers_out or not ledger.spend(Town.FLYER_PRICE):
+	if phase != Phase.BUILD or flyers_out or not ledger.spend(Town.FLYER_PRICE):
 		return false
 	flyers_out = true
 	sfx("coin")
-	hud.show_summary(last_day, false)
+	hud.show_build()
 	return true
 
 
@@ -1017,6 +1066,9 @@ func finish_meal(g: Guest) -> void:
 	elif town.is_regular(g.idx) and not was_regular:
 		talk = "%s is now a regular!" % g.info.name
 		burst(g.position + Vector3(0, 1.5, 0), "stars")
+	var news := town.record_disgust(g.idx, g.mood.disgust_level())
+	if news != "":
+		talk = news
 	if talk != "":
 		hud.say(talk)
 	g.table.dirty += 1
@@ -1284,7 +1336,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		rotate_hand()
 	elif phase == Phase.BUILD and key == KEY_X:
 		sell_hand()
-	elif phase == Phase.SUMMARY and key == KEY_F:
+	elif phase == Phase.BUILD and key == KEY_F:
 		buy_flyers()
 	elif phase == Phase.SUMMARY and key == KEY_T:
 		hud.toggle_town()

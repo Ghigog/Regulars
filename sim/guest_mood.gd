@@ -27,6 +27,27 @@ func wait(delta: float, seconds_to_snap: float) -> void:
 
 const NOTICE := 0.005   # disgust per second below which a guest has not really noticed
 
+## Disgust does nothing until it crosses a threshold. Three stages, each worse:
+##   1 Ick        they wince, enjoy the visit less and tip less
+##   2 Disgusted  they also tell their friends, and think less of the place
+##   3 Revolted   they also never come back
+const DISGUST_STAGES: Array[float] = [0.2, 0.45, 0.75]
+const DISGUST_NAMES: Array[String] = ["", "Ick", "Disgusted", "Revolted"]
+const DISGUST_ICONS: Array[String] = ["", "ick", "gross", "stink"]
+
+
+func disgust_level() -> int:
+	var level := 0
+	for t in DISGUST_STAGES:
+		if disgust >= t:
+			level += 1
+	return level
+
+
+## The disgust that counts: none at all below the first stage.
+func felt_disgust() -> float:
+	return disgust if disgust_level() > 0 else 0.0
+
 ## How fast something nasty disgusts, per second. Every source follows one rule: it
 ## starts at `base`, doubles every `doubling` seconds of `age`, and tops out at `cap`.
 ## So a fresh plate is nothing and an old one is foul; rubbish goes from bad to awful fast.
@@ -36,7 +57,7 @@ static func gross_rate(base: float, age: float, doubling: float, cap: float) -> 
 
 func see_gross(strength: float, delta: float, thought: String) -> void:
 	disgust = minf(1.0, disgust + strength * delta)
-	if strength >= NOTICE:
+	if strength >= NOTICE:   # they notice at once; it only starts to matter at the first stage
 		think(thought)
 
 
@@ -72,7 +93,7 @@ func walked_out() -> bool:
 
 ## How they feel right now, for the dot above their head: "joy", "meh" or "mad".
 func face() -> String:
-	var live := 0.5 * patience + 0.5 * joy - disgust
+	var live := 0.5 * patience + 0.5 * joy - felt_disgust()
 	if live > 0.6:
 		return "joy"
 	return "meh" if live > 0.3 else "mad"
@@ -84,20 +105,21 @@ func expression(eating := false, stormed := false) -> String:
 		return "angry"
 	if eating:
 		return "chewing"
-	if disgust > 0.5:
+	if disgust_level() >= 2:
 		return "disgusted"
-	if patience < 0.25:
+	if patience < 0.15:
 		return "snap"
-	if patience < 0.5:
+	if patience < 0.35:
 		return "impatient"
 	if joy > 0.75:
 		return "delighted"
-	return "content" if joy > 0.55 else "neutral"
+	# Most people, most of the time, look pleasant.
+	return "content" if joy > 0.4 else "neutral"
 
 
 ## Final verdict on the visit, from -1 (furious) to 1 (delighted).
 func satisfaction() -> float:
-	return clampf(0.35 * savour + 0.3 * joy + 0.2 * patience - 0.5 * disgust, -1.0, 1.0)
+	return clampf(0.35 * savour + 0.3 * joy + 0.2 * patience - 0.5 * felt_disgust(), -1.0, 1.0)
 
 
 func tip_for(bill: int, bonus := 1.0) -> int:

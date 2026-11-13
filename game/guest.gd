@@ -30,7 +30,7 @@ var _meal_kind := ""
 var _label: Label3D
 var _gross_time := 0.0
 var _heart_time := 0.0
-var _last_disgust := 0.0
+var _last_stage := 0
 var _age := 0.0
 
 
@@ -54,6 +54,7 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH + 0.07, 0.15), Build.TRIM)
 	Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH, 0.08), "#6b5647", 0.003)
 	_fill = Build.flat(_bar, Icons.rect(0, 0, BAR_WIDTH, 0.08), "#ffffff", 0.006)
+	Build.on_top(_bar, -_bar.position.z)
 	_order = Fx.bubble()
 	_order.position = Vector3(0, 2.0 * Peg.SCALE - 0.1, 0)
 	add_child(_order)
@@ -61,7 +62,8 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.no_depth_test = true
-	_label.font_size = 30
+	_label.font = Hud.lettering()
+	_label.font_size = 36
 	_label.outline_size = 10
 	_label.pixel_size = 0.006
 	_label.modulate = Color(Build.TRIM)
@@ -171,7 +173,7 @@ func _refresh(delta: float) -> void:
 	_fill.position.x = (p - 1.0) * BAR_WIDTH / 2.0
 	var shade := snappedf(p, 0.1)  # few distinct colours, so materials stay cached
 	var col := Color(Build.DANGER).lerp(Color(Build.WARN), clampf(shade * 2.0, 0, 1)).lerp(Color(Build.GOOD), clampf(shade * 2.0 - 1.0, 0, 1))
-	_fill.material_override = Build.flat_mat(col)
+	_fill.material_override = Build.overlay_mat(col, 6)
 	# Impatient guests shake a little.
 	_body.position.x = sin(_age * 40.0) * 0.02 if (_bar.visible and p < 0.25) else 0.0
 	_body.set_face(mood.expression(state == "eating", stormed))
@@ -179,20 +181,23 @@ func _refresh(delta: float) -> void:
 	# Bored guests slump; guests about to snap lean in; disgust pitches them back.
 	var lean := 0.0
 	if state == "waiting":
-		lean = -0.2 if mood.disgust > 0.5 else (0.14 if p < 0.25 else (0.07 if p < 0.5 else 0.0))
+		lean = -0.2 if mood.disgust_level() >= 2 else (0.14 if p < 0.25 else (0.07 if p < 0.5 else 0.0))
 	elif state == "leaving" and stormed:
 		lean = 0.3
 	if state != "eating":
 		_body.rotation.x = lerpf(_body.rotation.x, lean, 1.0 - exp(-8.0 * delta))
 	# One bold icon says what is on their mind (sheet 13).
-	if mood.disgust > _last_disgust + 0.0005:
-		_gross_time = 2.5
-	_last_disgust = mood.disgust
+	# Disgust shows only once it has crossed a threshold: a stage icon pops up when
+	# they reach a new stage, and comes back every few seconds while it lasts.
+	var stage := mood.disgust_level()
+	if stage > _last_stage:
+		_gross_time = 3.0
+	_last_stage = stage
 	_gross_time -= delta
 	_heart_time -= delta
 	var want := ""
-	if _gross_time > 0.0 and (state == "waiting" or state == "eating"):
-		want = "stink"
+	if stage > 0 and (state == "waiting" or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
+		want = GuestMood.DISGUST_ICONS[stage]
 	elif state == "waiting":
 		want = "burger"
 	elif state == "queue" and p < 0.6:
@@ -200,5 +205,5 @@ func _refresh(delta: float) -> void:
 	elif _heart_time > 0.0:
 		want = "heart"
 	Fx.set_bubble(_order, want)
-	_order.position.y = 2.2 + sin(_age * 3.0) * 0.03
-	_label.position.y = 2.72 if want != "" else (1.84 if _bar.visible else 1.6)
+	_order.position.y = 2.72 + sin(_age * 3.0) * 0.03   # clear of the patience bar below it
+	_label.position.y = 3.24 if want != "" else (2.32 if _bar.visible else 2.1)

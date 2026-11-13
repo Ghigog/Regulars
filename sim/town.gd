@@ -26,7 +26,7 @@ func _init(seed_value := 1) -> void:
 	for i in NAMES.size():
 		people.append({
 			"name": NAMES[i], "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
-			"streak": 0, "away_until": 0, "sore": false, "grudges": 0,
+			"streak": 0, "away_until": 0, "sore": false, "grudges": 0, "gone": false,
 			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
 		})
 	# A ring of friendships plus a few long-distance ones, so gossip travels.
@@ -48,6 +48,8 @@ func are_friends(a: int, b: int) -> bool:
 
 
 func visit_chance(i: int) -> float:
+	if people[i].gone:
+		return 0.0
 	var affinity: float = people[i].affinity
 	return clampf(0.4 + affinity * 0.5, 0.05, 0.95)
 
@@ -57,7 +59,7 @@ func roll_guests(day: int, boost := 0.0) -> Array[int]:
 	var coming: Array[int] = []
 	var staying: Array[int] = []
 	for i in people.size():
-		if holds_grudge(i, day):
+		if holds_grudge(i, day) or people[i].gone:
 			continue   # not coming, and not available to fill out a thin crowd
 		if rng.randf() < visit_chance(i) + boost:
 			coming.append(i)
@@ -126,6 +128,8 @@ func trend(i: int) -> int:
 
 ## The word shown beside someone in the town book on `day`.
 func status_word(i: int, day: int) -> String:
+	if people[i].gone:
+		return "Never coming back"
 	if holds_grudge(i, day):
 		var left := int(people[i].away_until) - day
 		return "Grudge: %d more day%s" % [left, "" if left == 1 else "s"]
@@ -201,6 +205,23 @@ func record_visit(i: int, satisfaction: float) -> float:
 	for f: int in people[i].friends:
 		_nudge(f, delta * FRIEND_SHARE)
 	return delta
+
+
+## What a guest does about the disgust `level` they left with (GuestMood stages).
+## Disgusted: they tell their friends and think less of the place. Revolted: the
+## friends hear worse, and the guest never comes back. Returns the news, if any.
+func record_disgust(i: int, level: int) -> String:
+	if level < 2:
+		return ""
+	var revolted := level >= 3
+	_nudge(i, -0.3 if revolted else -0.1)
+	for f: int in people[i].friends:
+		_nudge(f, -0.15 if revolted else -0.08)
+	if revolted:
+		people[i].gone = true
+		people[i].streak = 0
+		return "%s is revolted and is never coming back." % people[i].name
+	return "%s is telling friends how dirty it was." % people[i].name
 
 
 func record_kindness(i: int, amount := 0.2) -> void:

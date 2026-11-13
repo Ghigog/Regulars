@@ -10,21 +10,35 @@ const PAPER := Color("#f4ead8")
 const CORAL := Color("#ee7560")
 const WOOD := Color("#b9824e")
 const SHADOW := Color("#5a423a", 0.38)   # plum-brown, never black
+const KRAFT := Color("#e6cfa6")
+
+
+## The hand-lettered face of the interface sheets (Patrick Hand, open licence).
+static func lettering() -> Font:
+	return load("res://assets/fonts/PatrickHand-Regular.ttf")
 
 var game
 var root: Control
-var day_label: Label
-var sun: SunDial
+var calendar: Calendar
+var clock: Clock
+var dangle: Dangle
+var board: Board
+var fly: Control   # props in flight draw over everything else
+var _shown_phase := -1
+var _turning := false
+var _tag_state := "hang"   # hang, fly, receipt or fall
+var _tag_tween: Tween
+var _summary_clip: Control
 var toast_sheet: Sheet
 var toast: Label
 var money: Label
 var money_tag: Sheet
-var stamps: Array[Icon] = []
+var stamps: Array[Punch] = []
 var hint: Label
 var banner: Sheet
 var banner_label: Label
 var center: CenterContainer
-var prompt: HBoxContainer
+var prompt: Control
 var prompt_label: Label
 var _shown_money := -1
 var _shown_strikes := 0
@@ -43,6 +57,7 @@ var _cards: HBoxContainer
 var _tip: Label
 var _level_label: Label
 var _sell: Button
+var _flyers: Button
 var _toast_tween: Tween
 
 
@@ -77,6 +92,64 @@ class Icon extends Control:
 			for p: Vector2 in l[0]:
 				pts.append(c + Vector2(p.x, -p.y) * r)
 			draw_colored_polygon(pts, Color(l[1]))
+
+
+## One slot on the walkout card: a dashed circle that a rubber stamp marks in
+## red. The ink is wet at first, creeps a little, then dries darker and matte.
+class Punch extends Icon:
+	var wet := 0.0
+	var _age := 0.0
+	var _smear := Vector2.ZERO
+	var _seed := 0
+
+	func _init(px: float) -> void:
+		super("", px, false)
+
+	func stamp() -> void:
+		id = "walkout"
+		wet = 1.0
+		_age = 0.0
+		_smear = Vector2.ZERO
+		_seed = randi()
+		pivot_offset = size / 2.0
+		rotation = randf_range(-0.3, 0.3)
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		if wet <= 0.0:
+			return
+		_age += delta
+		wet = maxf(0.0, wet - delta / 2.4)
+		_smear = Vector2(sin(_age * 5.0) * 1.3, (1.0 - cos(_age * 3.6)) * 0.9) * minf(1.0, _age * 3.0)
+		queue_redraw()
+
+	func _draw() -> void:
+		var c := size / 2.0
+		var r := minf(size.x, size.y) / 2.0 - 2.0
+		for i in 14:
+			var a0 := TAU * i / 14.0
+			draw_arc(c, r, a0, a0 + TAU / 14.0 * 0.55, 4, Color(Hud.INK, 0.45), 2.0, true)
+		if id == "":
+			return
+		var col := Color("#b5352e", 0.86).lerp(Color("#ec4a3e"), wet)
+		var o := c + _smear
+		draw_arc(o, r * 0.96, 0, TAU, 40, Color(col, col.a * 0.25 * wet), 7.0, true)   # ink still spreading
+		draw_arc(o, r * 0.96, 0, TAU, 40, col, 4.0, true)
+		draw_arc(o, r * 0.78, 0, TAU, 40, Color(col, col.a * 0.55), 1.5, true)
+		for sx: float in [-1.0, 1.0]:  # brows, eyes and a frown, stamped in one colour
+			draw_line(o + Vector2(sx * r * 0.5, -r * 0.34), o + Vector2(sx * r * 0.12, -r * 0.14), col, 3.5, true)
+			draw_circle(o + Vector2(sx * r * 0.28, -r * 0.02), r * 0.085, col)
+		draw_arc(o + Vector2(0, r * 0.52), r * 0.3, PI * 1.15, PI * 1.85, 10, col, 3.5, true)
+		var rng := RandomNumberGenerator.new()   # rubber texture: gaps in the ink, specks round the edge
+		rng.seed = _seed
+		for i in 30:
+			var p := o + Vector2.from_angle(rng.randf() * TAU) * r * sqrt(rng.randf()) * 1.02
+			draw_circle(p, rng.randf_range(0.6, 1.8), Hud.CREAM)
+		for i in 8:
+			var p := o + Vector2.from_angle(rng.randf() * TAU) * r * rng.randf_range(1.04, 1.14)
+			draw_circle(p, rng.randf_range(0.5, 1.3), col)
+		if wet > 0.0:   # a wet sheen
+			draw_arc(o, r * 0.9, PI * 1.1, PI * 1.45, 10, Color(1, 1, 1, 0.5 * wet), 2.0, true)
 
 
 ## Five pips for where a townsperson stands, with an arrow when it moved today.
@@ -119,31 +192,230 @@ class Meter extends Control:
 		draw_rect(Rect2(Vector2(2, 2), Vector2((size.x - 4) * clampf(value, 0.0, 1.0), size.y - 4)), Hud.CORAL)
 
 
-## The day timer: the sun crosses the sky over a cream dial.
-class SunDial extends Control:
-	var progress := 0.0
+## Draws a rounded box on any canvas item.
+static func box(ci: CanvasItem, r: Rect2, col: Color, radius: int, border := 0, border_col := INK) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(radius)
+	sb.set_border_width_all(border)
+	sb.border_color = border_col
+	sb.anti_aliasing = true
+	ci.draw_style_box(sb, r)
+
+
+## The day: a square desk calendar on a wooden back with two binder rings.
+## `flip` turns the top page over its top edge to show `next_day` beneath it;
+## `lift` raises it off the desk while its shadow stays where it was.
+class Calendar extends Control:
+	const SIDE := 100.0
+	var day := 0:
+		set(v):
+			day = v
+			queue_redraw()
+	var next_day := 0
+	var flip := 0.0:
+		set(v):
+			flip = v
+			queue_redraw()
+	var lift := 0.0:
+		set(v):
+			lift = v
+			queue_redraw()
 
 	func _init() -> void:
-		custom_minimum_size = Vector2(72, 72)
+		custom_minimum_size = Vector2(SIDE, SIDE)
+		size = custom_minimum_size
+		pivot_offset = Vector2(SIDE / 2.0, SIDE)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	## Where the money tag's string is tied, on screen.
+	func knot() -> Vector2:
+		return get_global_transform() * Vector2(SIDE / 2.0, SIDE - 6.0 - lift)
+
+	func _page(o: Vector2, n: int, sy: float) -> void:
+		var pr := Rect2(8, 0, SIDE - 16, SIDE - 22)
+		draw_set_transform(o + Vector2(0, 13), 0.0, Vector2(1, sy))
+		if sy < 0.0:   # the back of the page as it goes over the top
+			draw_rect(pr, Hud.INK)
+			draw_rect(pr.grow(-2), Hud.PAPER.darkened(0.08))
+		else:
+			Hud.box(self, pr, Hud.INK, 6)
+			Hud.box(self, pr.grow(-2), Hud.CREAM, 5)
+			var head := Rect2(pr.position + Vector2(2, 2), Vector2(pr.size.x - 4, 24))
+			Hud.box(self, head, Hud.CORAL, 5)
+			draw_rect(Rect2(head.position + Vector2(0, 14), Vector2(head.size.x, 10)), Hud.CORAL)
+			var f := Hud.lettering()
+			draw_string(f, Vector2(pr.position.x, 21), "DAY", HORIZONTAL_ALIGNMENT_CENTER, pr.size.x, 19, Hud.CREAM)
+			draw_string(f, Vector2(pr.position.x, pr.size.y - 9), str(n), HORIZONTAL_ALIGNMENT_CENTER, pr.size.x, 50, Hud.INK)
+		draw_set_transform(Vector2.ZERO)
 
 	func _draw() -> void:
-		var c := size / 2.0
-		var r := size.x / 2.0
-		draw_circle(c, r, Hud.INK)
-		draw_circle(c, r - 4, Hud.CREAM)
-		var a0 := deg_to_rad(200.0)
-		var a1 := deg_to_rad(340.0)
-		var arc_c := c + Vector2(0, r * 0.28)
-		draw_arc(arc_c, r * 0.62, a0, a1, 24, Color(Hud.INK, 0.2), 5.0, true)
-		var a := lerpf(a0, a1, progress)
-		draw_arc(arc_c, r * 0.62, a0, a, 24, Color("#f2b632"), 5.0, true)
-		draw_line(c + Vector2(-r * 0.7, r * 0.38), c + Vector2(r * 0.7, r * 0.38), Hud.INK, 3.0, true)
-		var at := arc_c + Vector2(cos(a), sin(a)) * r * 0.62
-		for l: Array in Icons.icon("sun"):
-			var pts := PackedVector2Array()
-			for p: Vector2 in l[0]:
-				pts.append(at + Vector2(p.x, -p.y) * r * 0.3)
-			draw_colored_polygon(pts, Color(l[1]))
+		# A soft shadow that stays on the desk: fainter and wider the higher it goes.
+		var fade := 1.0 / (1.0 + lift / 10.0)
+		for i in 3:
+			var g := 2.0 + i * 3.0 + lift * 0.12
+			Hud.box(self, Rect2(Vector2(-g, 6.0 - g + lift * 0.15), Vector2(SIDE + g * 2.0, SIDE + g * 2.0)),
+				Color(Hud.SHADOW, Hud.SHADOW.a * 0.4 * fade), int(10 + g))
+		var o := Vector2(0, -lift)
+		Hud.box(self, Rect2(o, Vector2(SIDE, SIDE)), Hud.INK, 10)
+		Hud.box(self, Rect2(o + Vector2(3, 3), Vector2(SIDE - 6, SIDE - 6)), Hud.WOOD.darkened(0.12), 8)
+		Hud.box(self, Rect2(o + Vector2(3, 3), Vector2(SIDE - 6, SIDE - 10)), Hud.WOOD, 8)
+		for i in 2:   # the edges of the pages still to come
+			draw_line(o + Vector2(10, SIDE - 7 + i * 2), o + Vector2(SIDE - 10, SIDE - 7 + i * 2), Hud.PAPER.darkened(0.15 + i * 0.1), 1.5)
+		_page(o, next_day if flip > 0.0 else day, 1.0)
+		if flip > 0.0:
+			var sy := cos(flip * PI)
+			if absf(sy) > 0.03:
+				_page(o, day, sy)
+		for x: float in [SIDE * 0.3, SIDE * 0.7]:   # binder rings
+			draw_arc(o + Vector2(x, 10), 7, PI * 0.95, PI * 2.05, 14, Hud.INK, 5.0, true)
+			draw_arc(o + Vector2(x, 10), 7, PI * 0.95, PI * 2.05, 14, Color("#c9c2b6"), 2.5, true)
+
+
+## The day timer: a wooden clock. Service runs from eight in the morning to
+## eight at night; a little window at the top shows the sun crossing the sky,
+## or the moon after closing. It rolls like a wheel when it moves.
+class Clock extends Control:
+	const R := 40.0
+	const NIGHT := Color("#2f3e63")
+	var progress := 0.0:
+		set(v):
+			progress = v
+			queue_redraw()
+	var night := false:
+		set(v):
+			night = v
+			queue_redraw()
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(R * 2.0, R * 2.0)
+		size = custom_minimum_size
+		pivot_offset = Vector2(R, R)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var c := Vector2(R, R)
+		var down := Vector2(0, 1).rotated(-rotation)   # light and shadow stay put while it rolls
+		draw_circle(c + down * 5.0, R, Hud.SHADOW)
+		draw_circle(c, R, Hud.INK)
+		draw_circle(c, R - 3, Hud.WOOD.darkened(0.12))
+		draw_circle(c - down * 2.0, R - 4, Hud.WOOD)
+		var face := R - 9.0
+		draw_circle(c, face + 2, Hud.INK)
+		draw_circle(c, face, Hud.CREAM)
+		var w := c + Vector2(0, -face * 0.45)
+		var wr := face * 0.3
+		draw_circle(w, wr + 1.5, Hud.INK)
+		if night:
+			draw_circle(w, wr, NIGHT)
+			draw_circle(w + Vector2(-wr * 0.15, 0), wr * 0.55, Color("#ffe9a8"))
+			draw_circle(w + Vector2(wr * 0.08, -wr * 0.12), wr * 0.5, NIGHT)
+			draw_circle(w + Vector2(wr * 0.55, wr * 0.35), 1.2, Color("#ffe9a8"))
+		else:
+			draw_circle(w, wr, Color("#bfe3f0").lerp(Color("#f6b26b"), progress))
+			var s := w + Vector2(lerpf(wr * 0.5, -wr * 0.5, progress), wr * 0.35 - sin(progress * PI) * wr * 0.55)
+			draw_circle(s, wr * 0.4, Color("#ffd452").lerp(Color("#e8621c"), progress))
+		for i in 12:
+			var d := Vector2.UP.rotated(TAU * i / 12.0)
+			var big := i % 3 == 0
+			draw_line(c + d * (face - (7.0 if big else 4.0)), c + d * (face - 1.5), Hud.INK, 3.0 if big else 1.6, true)
+		var hours := 8.0 + 12.0 * progress
+		draw_line(c, c + Vector2.UP.rotated(TAU * fmod(hours, 12.0) / 12.0) * face * 0.5, Hud.INK, 5.0, true)
+		draw_line(c, c + Vector2.UP.rotated(TAU * fmod(hours, 1.0)) * face * 0.75, Hud.INK, 3.0, true)
+		draw_circle(c, 4.5, Hud.CORAL)
+		draw_circle(c, 1.8, Hud.INK)
+
+
+## The money tag's string: a pendulum tied under the calendar. The tag swings
+## when the calendar moves and when it is jolted.
+class Dangle extends Control:
+	const LENGTH := 24.0
+	var tag: Control
+	var angle := 0.0
+	var spin := 0.0
+	var drop := 1.0      # 0 tucked behind the calendar, 1 hanging at full length
+	var tied := true
+	var _last := Vector2.ZERO
+	var _vel := Vector2.ZERO
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _hang_y() -> float:
+		return lerpf(6.0 - tag.size.y, LENGTH - 13.0, drop)
+
+	func step(at: Vector2, delta: float) -> void:
+		if delta <= 0.0:
+			return
+		var vel := (at - _last) / delta
+		var acc := (vel - _vel) / delta if _last != Vector2.ZERO else Vector2.ZERO
+		_last = at
+		_vel = vel
+		if tied:
+			spin += (-30.0 * sin(angle) + clampf(acc.x, -4000.0, 4000.0) * 0.002) * delta
+			spin *= exp(-1.6 * delta)
+			angle += spin * delta
+		else:
+			angle = 0.0
+		position = at
+		rotation = angle
+		if tag and tag.get_parent() == self:
+			tag.position = Vector2(-tag.size.x / 2.0, _hang_y())
+		queue_redraw()
+
+	func _draw() -> void:
+		if not tied:   # the torn end left on the calendar
+			draw_polyline(PackedVector2Array([Vector2.ZERO, Vector2(1, 6), Vector2(-2, 9)]), Hud.INK, 2.0, true)
+		elif tag and tag.get_parent() == self and _hang_y() + 13.0 > 0.0:
+			draw_line(Vector2.ZERO, Vector2(0, _hang_y() + 13.0), Hud.INK, 2.0, true)
+
+
+## The cork board that holds the walkout card. It hangs on two ropes from the
+## top of the screen and sways when it lands or is stamped.
+class Board extends Sheet:
+	var angle := 0.0
+	var spin := 0.0
+
+	func _init() -> void:
+		super("cork", 14, 14)
+
+	func _process(delta: float) -> void:
+		spin += -26.0 * sin(angle) * delta
+		spin *= exp(-2.2 * delta)
+		angle += spin * delta
+		pivot_offset = Vector2(size.x / 2.0, -80.0)
+		rotation = angle
+		queue_redraw()   # the ropes reach to the top of the screen wherever it is
+
+
+## A rubber stamp seen from the front. `hover` is how high it is above the spot
+## it will stamp; its shadow stays on that spot.
+class RubberStamp extends Control:
+	var target := Vector2.ZERO
+	var hover := 400.0:
+		set(v):
+			hover = v
+			position = target - Vector2(0, v)
+			queue_redraw()
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var sh := Color(Hud.SHADOW, Hud.SHADOW.a * clampf(1.0 - hover / 140.0, 0.0, 1.0))
+		draw_set_transform(Vector2(0, hover + 4.0), 0.0, Vector2(1, 0.35))
+		draw_circle(Vector2.ZERO, 30.0 + hover * 0.05, sh)
+		draw_set_transform(Vector2.ZERO)
+		var red := Color("#c9372e")
+		Hud.box(self, Rect2(-27, -8, 54, 12), Hud.INK, 3)
+		Hud.box(self, Rect2(-25, -6, 50, 8), red, 2)
+		Hud.box(self, Rect2(-31, -28, 62, 22), Hud.INK, 5)
+		Hud.box(self, Rect2(-28, -25, 56, 16), Hud.WOOD, 4)
+		draw_rect(Rect2(-7, -54, 14, 28), Hud.INK)
+		draw_rect(Rect2(-4.5, -54, 9, 28), Hud.WOOD.darkened(0.1))
+		draw_circle(Vector2(0, -60), 13, Hud.INK)
+		draw_circle(Vector2(0, -60), 10.5, Hud.CORAL)
+		draw_circle(Vector2(-3.5, -64), 3.5, Hud.CORAL.lightened(0.4))
 
 
 ## A piece of paper or wood that holds other controls.
@@ -189,11 +461,21 @@ class Sheet extends MarginContainer:
 		match kind:
 			"wood":
 				_wood(r)
-			"clip":
-				_wood(r, 16)
-				var cw := 150.0
-				_box(Rect2(size.x / 2 - cw / 2, -12, cw, 46), Color("#8f989a"), 8, 3, Hud.INK)
-				_box(Rect2(size.x / 2 - 22, -24, 44, 26), Color("#8f989a"), 12, 3, Hud.INK)
+			"clip":  # a pale, grained board with a sprung clip and its ring
+				var board := Hud.WOOD.lightened(0.18)
+				_box(Rect2(r.position + Vector2(0, 7), r.size), Hud.SHADOW, 24)
+				_box(r, Hud.INK, 24)
+				_box(r.grow(-4), board.darkened(0.16), 21)
+				_box(Rect2(r.position + Vector2(4, 4), r.size - Vector2(8, 13)), board, 21)
+				for i in 9:  # grain
+					var y := 26.0 + i * (size.y - 50.0) / 8.0 + sin(i * 2.3) * 6.0
+					draw_polyline(PackedVector2Array([Vector2(16, y), Vector2(size.x * 0.35, y + sin(i * 1.7) * 5.0), Vector2(size.x * 0.7, y - 3.0), Vector2(size.x - 16, y + cos(i * 1.3) * 4.0)]), Color(Hud.INK, 0.09), 2.0, true)
+				var cw := 170.0
+				var steel := Color("#b3aba0")
+				draw_arc(Vector2(size.x / 2, -22), 13, 0, TAU, 24, Hud.INK, 9.0, true)
+				draw_arc(Vector2(size.x / 2, -22), 13, 0, TAU, 24, steel, 4.0, true)
+				_box(Rect2(size.x / 2 - cw / 2, -14, cw, 50), steel, 12, 3, Hud.INK)
+				_box(Rect2(size.x / 2 - cw / 2 + 8, -8, cw - 16, 10), steel.lightened(0.25), 5)
 			"paper":
 				_box(Rect2(r.position + Vector2(0, 4), r.size), Hud.SHADOW, 6)
 				_box(r, Hud.CREAM, 6)
@@ -206,17 +488,58 @@ class Sheet extends MarginContainer:
 				_box(Rect2(r.position + Vector2(0, 5), r.size), Hud.SHADOW, 9)
 				_box(r, Color("#cbbfa8"), 9, 2, Hud.INK)
 				_box(Rect2(r.position + Vector2(4, 3), r.size - Vector2(8, 11)), Hud.CREAM, 7)
-			"tag":  # a price tag: pointed end with a punched hole
-				var nose := 22.0
-				var shape := PackedVector2Array([Vector2(nose, 0), Vector2(size.x, 0), Vector2(size.x, size.y), Vector2(nose, size.y), Vector2(0, size.y / 2)])
+			"tag":  # a price tag hanging on a string: clipped corners, pinked bottom
+				var k := 14.0
+				if size.x < k * 2.0 + 4.0 or size.y < k + 12.0:
+					return   # not laid out yet: the shape would be degenerate
+				var shape := PackedVector2Array([Vector2(k, 0), Vector2(size.x - k, 0), Vector2(size.x, k), Vector2(size.x, size.y - 8)])
+				var teeth := maxi(4, int(size.x / 11.0))
+				for i in range(1, teeth * 2):
+					shape.append(Vector2(size.x - i * size.x / (teeth * 2.0), size.y - (0.0 if i % 2 else 8.0)))
+				shape.append_array(PackedVector2Array([Vector2(0, size.y - 8), Vector2(0, k)]))
 				var shadow := PackedVector2Array()
 				for p in shape:
 					shadow.append(p + Vector2(0, 4))
 				draw_colored_polygon(shadow, Hud.SHADOW)
 				draw_colored_polygon(shape, Hud.CREAM)
 				draw_polyline(shape + PackedVector2Array([shape[0]]), Hud.INK, 2.0, true)
-				draw_circle(Vector2(nose, size.y / 2), 5, Hud.INK)
-				draw_line(Vector2(nose, size.y / 2), Vector2(nose + 10, -18), Hud.INK, 2.0, true)
+				draw_circle(Vector2(size.x / 2, 13), 5, Hud.INK)
+				draw_circle(Vector2(size.x / 2, 13), 2.5, Hud.CREAM)
+			"cork":  # a framed cork board hung on two ropes from the top of the screen
+				for x: float in [26.0, size.x - 26.0]:
+					var top := Vector2(x, -global_position.y - 120.0)
+					var end := Vector2(x, 10)
+					draw_line(top, end, Hud.INK, 7.0)
+					draw_line(top, end, Color("#c8a46a"), 4.0)
+					var y := end.y
+					while y > top.y:   # the twist
+						draw_line(Vector2(x - 2, y), Vector2(x + 2, y - 4), Color("#8a6a3e"), 1.5, true)
+						y -= 6.0
+				_wood(r)
+				var inner := r.grow(-9)
+				inner.size.y -= 4
+				_box(inner, Color("#c48f58"), 4, 2, Color(Hud.INK, 0.55))
+				var rng := RandomNumberGenerator.new()
+				rng.seed = 7
+				for i in int(inner.get_area() / 40.0):
+					var p := inner.position + Vector2(rng.randf(), rng.randf()) * inner.size
+					var dark := rng.randf() < 0.6
+					draw_circle(p, rng.randf_range(0.7, 1.8), Color("#9c6a3a") if dark else Color("#ddb07a"))
+				for x: float in [26.0, size.x - 26.0]:   # eyelets
+					draw_circle(Vector2(x, 10), 5.5, Hud.INK)
+					draw_circle(Vector2(x, 10), 3.0, Color("#c9c2b6"))
+			"card":  # a cream card pinned to the cork
+				_box(Rect2(r.position + Vector2(2, 4), r.size), Hud.SHADOW, 3)
+				_box(r, Hud.CREAM, 3, 2, Color(Hud.INK, 0.7))
+				for x: float in [14.0, size.x - 14.0]:
+					draw_circle(Vector2(x + 1, 13), 6, Hud.SHADOW)
+					draw_circle(Vector2(x, 11), 6, Hud.INK)
+					draw_circle(Vector2(x, 11), 4.5, Hud.CORAL)
+					draw_circle(Vector2(x - 1.5, 9.5), 1.6, Hud.CORAL.lightened(0.5))
+			"tab":  # the prompt: a keycap and a word on one wood-edged tab
+				_box(Rect2(r.position + Vector2(0, 5), r.size), Hud.SHADOW, 11)
+				_box(r, Hud.WOOD.lightened(0.1), 11, 2, Hud.INK)
+				_box(r.grow(-5), Color("#f0d9ae"), 7)
 			"receipt":  # torn at the bottom
 				var shape := PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0)])
 				var teeth := int(size.x / 16.0)
@@ -228,84 +551,90 @@ class Sheet extends MarginContainer:
 					shadow.append(p + Vector2(0, 5))
 				draw_colored_polygon(shadow, Hud.SHADOW)
 				draw_colored_polygon(shape, Hud.CREAM)
-			"note":  # the pinned gossip note
+			"note":  # the gossip note, taped on
 				_box(Rect2(r.position + Vector2(0, 4), r.size), Hud.SHADOW, 2)
 				_box(r, Color("#ffe58a"), 2)
-				draw_circle(Vector2(size.x / 2, 6), 8, Hud.INK)
-				draw_circle(Vector2(size.x / 2, 5), 6, Hud.CORAL)
+				for x: float in [-8.0, size.x - 44.0]:
+					draw_set_transform(Vector2(x + 26, 4), -0.5 if x < 0 else 0.5)
+					draw_rect(Rect2(-26, -9, 52, 18), Color(1, 1, 1, 0.55))
+				draw_set_transform(Vector2.ZERO)
 			"ribbon":
 				var n := 14.0
 				draw_colored_polygon(PackedVector2Array([Vector2(0, 0), Vector2(size.x, 0), Vector2(size.x - n, size.y / 2), Vector2(size.x, size.y), Vector2(0, size.y), Vector2(n, size.y / 2)]), tint)
-			"menu":  # a folded, coral-trimmed menu card with a curled corner
-				_box(Rect2(r.position + Vector2(0, 7), r.size), Hud.SHADOW, 10)
+			"menu":  # a coral-trimmed tent card on a wooden stand, corner curled
+				var stand := Rect2(r.position + Vector2(22, 26), r.size + Vector2(6, 0))
+				_box(Rect2(stand.position + Vector2(0, 7), stand.size), Hud.SHADOW, 12)
+				_box(stand, Hud.WOOD.darkened(0.1), 12, 3, Hud.INK)
 				_box(r, Hud.CORAL, 10, 3, Hud.INK)
 				_box(r.grow(-10), Hud.CREAM, 5)
 				_box(r.grow(-16), Hud.CREAM, 3, 2, Color(Hud.CORAL, 0.6))
-				draw_line(Vector2(size.x / 2, 12), Vector2(size.x / 2, size.y - 12), Color(Hud.INK, 0.07), 3.0)
 				var k := 34.0
 				draw_colored_polygon(PackedVector2Array([Vector2(size.x - 10 - k, size.y - 10), Vector2(size.x - 10, size.y - 10 - k), Vector2(size.x - 10 - k, size.y - 10 - k)]), Hud.PAPER.darkened(0.12))
+				draw_polyline(PackedVector2Array([Vector2(size.x - 10 - k, size.y - 10), Vector2(size.x - 10, size.y - 10 - k)]), Color(Hud.INK, 0.4), 2.0, true)
+
+const BOARD_Y := 18.0
 
 
 func setup(game_) -> void:
 	game = game_
+	process_mode = Node.PROCESS_MODE_ALWAYS  # the options screen works while the game is paused
+	load_options()
+	apply_options.call_deferred()
 	root = Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = _theme()
 	add_child(root)
 
-	# Top left: the wooden day plaque with its sun dial, and the money tag below.
-	var left := VBoxContainer.new()
-	left.position = Vector2(22, 18)
-	left.add_theme_constant_override("separation", 14)
-	root.add_child(left)
-	var plaque := Sheet.new("wood", 14, 12)
-	plaque.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	left.add_child(plaque)
-	var prow := HBoxContainer.new()
-	prow.add_theme_constant_override("separation", 12)
-	plaque.add_child(prow)
-	sun = SunDial.new()
-	prow.add_child(sun)
-	var day_paper := Sheet.new("inset", 16, 4)
-	day_paper.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	prow.add_child(day_paper)
-	day_label = _label(day_paper, 34)
-	money_tag = Sheet.new("tag").pad(38, 6, 16, 6)
-	money_tag.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	left.add_child(money_tag)
-	var mrow := HBoxContainer.new()
-	mrow.add_theme_constant_override("separation", 8)
-	money_tag.add_child(mrow)
-	mrow.add_child(Icon.new("coin", 34, false))
-	money = _label(mrow, 34)
+	# Top left: the desk calendar, the clock that rolls out from behind it, and
+	# the money tag hanging from it on a string.
+	dangle = Dangle.new()
+	root.add_child(dangle)
+	clock = Clock.new()
+	clock.position.y = 18.0 + Calendar.SIDE / 2.0 - Clock.R
+	root.add_child(clock)
+	calendar = Calendar.new()
+	calendar.position = Vector2(22, 18)
+	root.add_child(calendar)
+	_roll_clock(0.0)
+	money_tag = Sheet.new("tag").pad(12, 24, 12, 12)
+	dangle.tag = money_tag
+	dangle.add_child(money_tag)
+	var mcol := VBoxContainer.new()
+	mcol.add_theme_constant_override("separation", -2)
+	money_tag.add_child(mcol)
+	money = _label(mcol, 30)
+	money.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var coin := Icon.new("coin", 26, false)
+	coin.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	mcol.add_child(coin)
 	toast_sheet = Sheet.new("paper", 14, 6)
-	toast_sheet.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	toast_sheet.position = Vector2(22, 268)
 	toast_sheet.modulate.a = 0.0
-	left.add_child(toast_sheet)
+	root.add_child(toast_sheet)
 	toast = _label(toast_sheet, 18)
 
-	# Top right: the walkout punch-card. Each walkout stamps a red angry face.
-	var card := Sheet.new("label", 16, 10)
-	card.anchor_left = 1.0
-	card.anchor_right = 1.0
-	card.offset_left = -246
-	card.offset_right = -22
-	card.offset_top = 18
-	root.add_child(card)
+	# Top right: the cork board with the walkout card, hung on ropes.
+	board = Board.new()
+	board.anchor_left = 1.0
+	board.anchor_right = 1.0
+	board.offset_left = -246
+	board.offset_right = -22
+	board.offset_top = BOARD_Y
+	root.add_child(board)
+	var card := Sheet.new("card").pad(14, 8, 14, 10)
+	board.add_child(card)
 	var cbox := VBoxContainer.new()
-	cbox.add_theme_constant_override("separation", 4)
+	cbox.add_theme_constant_override("separation", 2)
 	card.add_child(cbox)
-	_label(cbox, 15, "WALKOUTS").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label(cbox, 24, "WALKOUTS").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var slots := HBoxContainer.new()
 	slots.alignment = BoxContainer.ALIGNMENT_CENTER
 	slots.add_theme_constant_override("separation", 12)
 	cbox.add_child(slots)
 	for i in Ledger.MAX_STRIKES:
-		var slot := Sheet.new("inset", 4, 4)
-		slots.add_child(slot)
-		var stamp := Icon.new("", 46, false)
-		slot.add_child(stamp)
+		var stamp := Punch.new(52)
+		slots.add_child(stamp)
 		stamps.append(stamp)
 
 	hint = _label(root, 15)
@@ -314,20 +643,19 @@ func setup(game_) -> void:
 	hint.offset_left = 24
 	hint.offset_top = -40
 	hint.modulate.a = 0.75
-	hint.text = "WASD move     E or Space use     Click a guest     M mute"
+	hint.text = "WASD move     E or Space use     Click a guest     O options     M mute"
 
 	# The keycap prompt that floats over the station the chef faces.
-	prompt = HBoxContainer.new()
-	prompt.add_theme_constant_override("separation", 6)
+	prompt = Sheet.new("tab").pad(10, 8, 16, 12)
 	prompt.visible = false
 	root.add_child(prompt)
-	var key := Sheet.new("key", 13, 4).pad(13, 3, 13, 9)
-	prompt.add_child(key)
-	_label(key, 22, "E")
-	var tag := Sheet.new("label", 12, 4)
-	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	prompt.add_child(tag)
-	prompt_label = _label(tag, 20)
+	var prow := HBoxContainer.new()
+	prow.add_theme_constant_override("separation", 10)
+	prompt.add_child(prow)
+	var key := Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
+	prow.add_child(key)
+	_label(key, 24, "E")
+	prompt_label = _label(prow, 26)
 
 	var banner_box := CenterContainer.new()
 	banner_box.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -344,6 +672,10 @@ func setup(game_) -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(center)
+	fly = Control.new()
+	fly.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fly.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(fly)
 
 
 static func _flat(col: Color, radius: int, margin := 0) -> StyleBoxFlat:
@@ -368,10 +700,7 @@ func _theme() -> Theme:
 	var t := Theme.new()
 	# A chunky rounded face where the system has one. (A bundled hand-lettered
 	# font is still to be chosen.)
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Arial Rounded MT Bold", "Nunito", "Varela Round", "Verdana"])
-	font.font_weight = 700
-	t.default_font = font
+	t.default_font = lettering()
 	t.set_color("font_color", "Label", INK)   # dark brown ink for all text
 	t.set_stylebox("normal", "Button", _stamp_button(CORAL))
 	t.set_stylebox("hover", "Button", _stamp_button(CORAL.lightened(0.1)))
@@ -392,6 +721,16 @@ func _theme() -> Theme:
 	t.set_color("font_color", "Button", CREAM)
 	t.set_color("font_hover_color", "Button", CREAM)
 	t.set_font_size("font_size", "Button", 20)
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(INK, 0.22)
+	track.set_corner_radius_all(5)
+	track.content_margin_top = 5
+	track.content_margin_bottom = 5
+	t.set_stylebox("slider", "HSlider", track)
+	var filled: StyleBoxFlat = track.duplicate()
+	filled.bg_color = CORAL
+	t.set_stylebox("grabber_area", "HSlider", filled)
+	t.set_stylebox("grabber_area_highlight", "HSlider", filled)
 	return t
 
 
@@ -421,7 +760,7 @@ func show_guest(g: Guest) -> void:
 	card.anchor_right = 1.0
 	card.offset_left = -246
 	card.offset_right = -22
-	card.offset_top = 132
+	card.offset_top = 160
 	root.add_child(card)
 	guest_card = card
 	var box := VBoxContainer.new()
@@ -467,29 +806,224 @@ func _update_guest() -> void:
 func update_status() -> void:
 	_update_guest()
 	var l: Ledger = game.ledger
-	# After closing the books the ledger is already on tomorrow; keep showing the day just played.
-	day_label.text = "DAY %d" % (l.day - 1 if game.phase == game.Phase.SUMMARY else l.day)
-	sun.progress = game.day_progress()
-	sun.queue_redraw()
+	var P = game.Phase
+	if game.phase != _shown_phase:
+		var first := _shown_phase == -1
+		_shown_phase = game.phase
+		match game.phase:
+			P.SERVICE:
+				_board_down()
+			P.SUMMARY:
+				_board_up(first)
+				_rip_tag()
+			P.BUILD:
+				_new_tag()
+		if first:
+			_intro()
+	# The calendar keeps the day just played until the next one opens.
+	var want: int = l.day - 1 if game.phase == P.SUMMARY or game.phase == P.BUILD else l.day
+	if calendar.day == 0:
+		calendar.day = want
+	elif want != calendar.day and not _turning:
+		_turn_day(want)
+	if not _turning:
+		clock.night = game.phase != P.SERVICE
+	clock.progress = game.day_progress()
+	hint.visible = l.day <= 1   # the controls reminder is for the first day
 	if l.money != _shown_money:
 		if _shown_money >= 0 and l.money > _shown_money:
-			money_tag.pivot_offset = money_tag.size * Vector2(0.0, 0.5)
+			money_tag.pivot_offset = money_tag.size * Vector2(0.5, 0.0)
 			money_tag.scale = Vector2(1.25, 1.25)
 			money_tag.create_tween().tween_property(money_tag, "scale", Vector2.ONE, 0.35) \
 				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			dangle.spin += randf_range(-2.5, 2.5)
 		_shown_money = l.money
 		money.text = "$%d" % l.money
+		money_tag.reset_size()
 	var strikes := l.strikes()
-	if strikes != _shown_strikes:
-		for i in stamps.size():
-			stamps[i].set_id("walkout" if i < strikes else "")
-			if i < strikes and i >= _shown_strikes:  # the stamp slams into the next slot
-				stamps[i].pivot_offset = stamps[i].size / 2.0
-				stamps[i].scale = Vector2(2.4, 2.4)
-				stamps[i].rotation = randf_range(-0.3, 0.3)
-				stamps[i].create_tween().tween_property(stamps[i], "scale", Vector2.ONE, 0.22) \
-					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		_shown_strikes = strikes
+	if strikes > _shown_strikes:   # one stamp per new walkout, in turn
+		for i in range(_shown_strikes, mini(strikes, stamps.size())):
+			_stamp(stamps[i], (i - _shown_strikes) * 0.8)
+	_shown_strikes = strikes   # a new day's reset is wiped when the board comes back down
+
+
+func _process(delta: float) -> void:
+	if not calendar:
+		return
+	dangle.step(calendar.knot(), delta)
+	if _tag_state == "receipt":
+		money_tag.visible = is_instance_valid(_summary_clip)
+		if money_tag.visible:
+			money_tag.position = _tag_goal()
+			money_tag.rotation = 0.12
+
+
+# ---------------------------------------------------------------- moving props
+
+## Puts the clock somewhere between hidden behind the calendar (0) and out on its
+## right (1), turned as a wheel would turn rolling that far.
+func _roll_clock(out: float) -> void:
+	var hidden := calendar.position.x + Calendar.SIDE / 2.0 - Clock.R
+	var shown := calendar.position.x + Calendar.SIDE - 12.0
+	clock.position.x = lerpf(hidden, shown, out)
+	clock.rotation = (clock.position.x - shown) / Clock.R
+
+
+func _intro() -> void:
+	var tw := create_tween()
+	tw.tween_interval(0.6)
+	tw.tween_callback(game.sfx.bind("roll"))
+	tw.tween_method(_roll_clock, 0.0, 1.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## A new day: the clock rolls in behind the calendar, the calendar lifts and
+## jiggles, a page turns over the top, it thumps down, and the clock rolls out.
+func _turn_day(to: int) -> void:
+	_turning = true
+	var tw := create_tween()
+	tw.tween_callback(game.sfx.bind("roll"))
+	tw.tween_method(_roll_clock, 1.0, 0.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(game.sfx.bind("lift"))
+	tw.tween_property(calendar, "lift", 15.0, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(game.sfx.bind("rattle"))
+	for i in 5:
+		tw.tween_property(calendar, "rotation", 0.07 * (1.0 if i % 2 == 0 else -1.0) * (1.0 - i * 0.16), 0.065)
+	tw.tween_property(calendar, "rotation", 0.0, 0.06)
+	tw.tween_callback(func() -> void:
+		calendar.next_day = to
+		game.sfx("page"))
+	tw.tween_property(calendar, "flip", 1.0, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(func() -> void:
+		calendar.day = to
+		calendar.flip = 0.0)
+	tw.tween_property(calendar, "lift", 0.0, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func() -> void:
+		game.sfx("thump")
+		calendar.scale = Vector2(1.06, 0.93)
+		dangle.spin += randf_range(1.5, 2.5) * (1.0 if randf() < 0.5 else -1.0))
+	tw.tween_property(calendar, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void:
+		clock.night = false
+		game.sfx("roll"))
+	tw.tween_method(_roll_clock, 0.0, 1.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(func() -> void: _turning = false)
+
+
+## Where the torn-off tag sits on the end-of-day clipboard: over its right edge.
+func _tag_goal() -> Vector2:
+	if not is_instance_valid(_summary_clip):
+		return money_tag.position
+	return _summary_clip.get_global_transform() * Vector2(_summary_clip.size.x - 6.0, 150.0)
+
+
+## End of day: the tag is torn off its string and flutters onto the receipt.
+func _rip_tag() -> void:
+	if _tag_state != "hang":
+		return
+	_tag_state = "fly"
+	game.sfx("rip")
+	money_tag.reparent(fly)
+	dangle.tied = false
+	money_tag.pivot_offset = money_tag.size * Vector2(0.5, 0.0)
+	var p0 := money_tag.position
+	var r0 := money_tag.rotation
+	_tag_tween = money_tag.create_tween()
+	_tag_tween.tween_property(money_tag, "position:y", p0.y - 18.0, 0.12).set_ease(Tween.EASE_OUT)
+	_tag_tween.tween_callback(game.sfx.bind("flutter"))
+	_tag_tween.tween_method(_flutter.bind(p0 - Vector2(0, 18), r0), 0.0, 1.0, 1.5)
+	_tag_tween.tween_callback(func() -> void:
+		_tag_state = "receipt"
+		money_tag.scale = Vector2.ONE
+		game.sfx("rustle"))
+
+
+func _flutter(t: float, p0: Vector2, r0: float) -> void:
+	var e := ease(t, -1.8)
+	var calm := 1.0 - t
+	money_tag.position = p0.lerp(_tag_goal(), e) + Vector2(sin(t * TAU * 2.0) * 60.0 * calm, -sin(t * PI) * 80.0)
+	money_tag.rotation = lerpf(r0, 0.12, e) + sin(t * TAU * 2.5) * 0.5 * calm
+	money_tag.scale = Vector2(lerpf(0.55 + 0.45 * absf(cos(t * TAU * 1.5)), 1.0, e), 1.0)
+
+
+## Building: the old tag drops away with the receipt, and a new one falls from
+## behind the calendar and dangles. (Money is needed while building.)
+func _new_tag() -> void:
+	if _tag_tween:
+		_tag_tween.kill()
+	if _tag_state == "hang":
+		return
+	_tag_state = "fall"
+	money_tag.visible = true
+	_tag_tween = money_tag.create_tween()
+	_tag_tween.set_parallel()
+	_tag_tween.tween_property(money_tag, "position:y", money_tag.position.y + 900.0, 0.7) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_tag_tween.tween_property(money_tag, "rotation", money_tag.rotation + 1.4, 0.7)
+	_tag_tween.chain().tween_callback(func() -> void:
+		money_tag.reparent(dangle, false)
+		money_tag.rotation = 0.0
+		money_tag.scale = Vector2.ONE
+		_tag_state = "hang"
+		dangle.tied = true
+		dangle.angle = 0.0
+		dangle.spin = 0.0
+		dangle.drop = 0.0
+		game.sfx("rustle"))
+	_tag_tween.tween_property(dangle, "drop", 1.12, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_tag_tween.tween_callback(func() -> void:
+		dangle.spin = randf_range(2.5, 3.5) * (1.0 if randf() < 0.5 else -1.0)
+		game.sfx("rustle"))
+	_tag_tween.tween_property(dangle, "drop", 1.0, 0.6).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+func _board_down() -> void:
+	for i in stamps.size():   # yesterday's walkouts are wiped before it comes back
+		if i >= _shown_strikes:
+			stamps[i].id = ""
+			stamps[i].wet = 0.0
+			stamps[i].rotation = 0.0
+			stamps[i].queue_redraw()
+	board.position.y = -board.size.y - 80.0
+	var tw := board.create_tween()
+	tw.tween_callback(game.sfx.bind("rope"))
+	tw.tween_property(board, "position:y", BOARD_Y, 0.75).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void: board.spin += 1.4)
+
+
+func _board_up(at_once := false) -> void:
+	var gone := -board.size.y - 80.0
+	if at_once:
+		board.position.y = gone
+		return
+	var tw := board.create_tween()
+	tw.tween_interval(0.5)
+	tw.tween_callback(func() -> void:
+		board.spin -= 0.8
+		game.sfx("rope"))
+	tw.tween_property(board, "position:y", gone, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+
+
+## A walkout: a rubber stamp comes down from above and thumps the next slot.
+func _stamp(slot: Punch, delay: float) -> void:
+	var st := RubberStamp.new()
+	st.target = slot.get_global_transform() * (slot.size / 2.0)
+	st.hover = 420.0
+	fly.add_child(st)
+	var tw := st.create_tween()
+	tw.tween_interval(delay)
+	tw.tween_property(st, "hover", 48.0, 0.32).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.1)
+	tw.tween_property(st, "hover", 0.0, 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func() -> void:
+		game.sfx("stamp")
+		slot.stamp()
+		board.spin += randf_range(-1.0, 1.0)
+		st.scale = Vector2(1.08, 0.9))
+	tw.tween_interval(0.16)
+	tw.tween_callback(func() -> void: st.scale = Vector2.ONE)
+	tw.tween_property(st, "hover", 70.0, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(st, "hover", 520.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(st.queue_free)
 
 
 ## Shows "[E] COOK" over a point on screen, or hides it when `text` is empty.
@@ -521,6 +1055,134 @@ func show_banner(s: String) -> void:
 	tw.tween_property(banner, "modulate:a", 0.0, 0.5)
 
 
+# ---------------------------------------------------------------- options
+
+const OPTIONS_FILE := "user://regulars_options.cfg"
+var options := {"sfx": 0.8, "music": 0.8, "tilt_shift": true}
+var _options_card: Control
+var _options_body: VBoxContainer
+var _options_tab := "audio"
+var _options_tabs := {}
+
+
+func load_options() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(OPTIONS_FILE) != OK:
+		return
+	for key: String in options:
+		options[key] = cfg.get_value("options", key, options[key])
+
+
+func save_options() -> void:
+	var cfg := ConfigFile.new()
+	for key: String in options:
+		cfg.set_value("options", key, options[key])
+	cfg.save(OPTIONS_FILE)
+
+
+func apply_options() -> void:
+	game.set_volumes(float(options.sfx), float(options.music))
+	game.set_tilt_shift(bool(options.tilt_shift))
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var key: int = event.physical_keycode
+	if key == KEY_O or (key == KEY_ESCAPE and _options_card != null):
+		toggle_options()
+		get_viewport().set_input_as_handled()
+
+
+## Opens or closes the options screen. The game is paused while it is open.
+func toggle_options() -> void:
+	if _options_card != null:
+		_options_card.queue_free()
+		_options_card = null
+		save_options()
+		get_tree().paused = false
+		return
+	get_tree().paused = true
+	_options_card = Control.new()
+	_options_card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(_options_card)
+	var dim := ColorRect.new()
+	dim.color = Color(SHADOW, 0.45)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_options_card.add_child(dim)
+	var mid := CenterContainer.new()
+	mid.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_options_card.add_child(mid)
+	var card := Sheet.new("paper", 30, 24)
+	card.custom_minimum_size = Vector2(480, 0)
+	mid.add_child(card)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	card.add_child(box)
+	_ribbon(box, "OPTIONS", CORAL)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 10)
+	box.add_child(tabs)
+	_options_tabs = {
+		"audio": _button(tabs, "Audio", _show_options_tab.bind("audio")),
+		"graphics": _button(tabs, "Graphics", _show_options_tab.bind("graphics")),
+	}
+	_options_body = VBoxContainer.new()
+	_options_body.add_theme_constant_override("separation", 12)
+	_options_body.custom_minimum_size = Vector2(0, 96)
+	box.add_child(_options_body)
+	_button(box, "Done   (Esc)", toggle_options)
+	_show_options_tab(_options_tab)
+	_pop_in(card)
+
+
+func _show_options_tab(tab: String) -> void:
+	_options_tab = tab
+	for id: String in _options_tabs:
+		_options_tabs[id].modulate.a = 1.0 if id == tab else 0.55
+	for c in _options_body.get_children():
+		_options_body.remove_child(c)
+		c.queue_free()
+	if tab == "audio":
+		_volume_row("Sound effects", "sfx")
+		_volume_row("Music", "music")
+	else:
+		_button(_options_body, "Tilt-shift (miniature look):  %s" % ("On" if options.tilt_shift else "Off"), _toggle_tilt_shift)
+		var note := _label(_options_body, 15, "Blurs the near and far edges so the town looks like a model.")
+		note.modulate.a = 0.7
+
+
+func _toggle_tilt_shift() -> void:
+	options.tilt_shift = not options.tilt_shift
+	apply_options()
+	_show_options_tab("graphics")
+
+
+func _volume_row(title: String, key: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	_options_body.add_child(row)
+	_label(row, 20, title).custom_minimum_size = Vector2(170, 0)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.05
+	slider.value = float(options[key])
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.focus_mode = Control.FOCUS_NONE
+	row.add_child(slider)
+	var value := _label(row, 20, "%d%%" % roundi(slider.value * 100))
+	value.custom_minimum_size = Vector2(56, 0)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	slider.value_changed.connect(func(v: float) -> void:
+		options[key] = v
+		value.text = "%d%%" % roundi(v * 100)
+		apply_options()
+		if key == "sfx":
+			game.sfx("coin"))
+
+
 func hide_card() -> void:
 	for c in center.get_children():
 		center.remove_child(c)
@@ -545,6 +1207,28 @@ func _ribbon(box: VBoxContainer, text: String, col: Color) -> void:
 	l.add_theme_color_override("font_color", CREAM)
 
 
+## A rule with a small round token in the middle, as on the game-over card.
+func _ornament(box: VBoxContainer, icon: String) -> void:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	box.add_child(row)
+	for i in 2:
+		var line := ColorRect.new()
+		line.color = Color(INK, 0.4)
+		line.custom_minimum_size = Vector2(110, 2)
+		line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(line)
+		if i == 0:
+			row.add_child(Icon.new(icon, 30))
+
+
+func _centred(box: VBoxContainer, text: String, font := 28) -> Label:
+	var l := _label(box, font, text)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return l
+
+
 func _row(box: VBoxContainer, icon: String, title: String, value: String, font := 22) -> Label:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
@@ -557,7 +1241,7 @@ func _row(box: VBoxContainer, icon: String, title: String, value: String, font :
 
 
 func _rule(box: VBoxContainer) -> void:
-	var l := _label(box, 14, "- ".repeat(34))
+	var l := _label(box, 14, "- ".repeat(60))
 	l.clip_text = true
 	l.modulate.a = 0.45
 
@@ -579,6 +1263,7 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_town_open = false
 	var clip := Sheet.new("clip").pad(26, 46, 26, 26)
 	center.add_child(clip)
+	_summary_clip = clip
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 14)
 	clip.add_child(stack)
@@ -589,34 +1274,25 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	box.add_theme_constant_override("separation", 8)
 	receipt.add_child(box)
 	_ribbon(box, "END OF DAY %d" % rec.day, CORAL)
-	_row(box, "food", "Meals served", str(rec.served))
-	_row(box, "coin", "Sales", "$%d" % rec.sales)
-	_row(box, "tip", "Tips", "$%d" % rec.tips)
-	_row(box, "walkout", "Walkouts", str(rec.walkouts))
+	_row(box, "", "MEALS SERVED:", str(rec.served))
+	_row(box, "", "SALES:", "$%d" % rec.sales)
+	_row(box, "", "TIPS:", "$%d" % rec.tips)
+	_row(box, "", "WALKOUTS:", str(rec.walkouts))
 	_rule(box)
 	var earned: int = rec.sales + rec.tips
-	var total := _row(box, "", "Earned today", "$%d" % earned, 30)
+	var total := _row(box, "", "TOTAL EARNED:", "$%d" % earned, 32)
+	total.get_parent().add_child(Icon.new("coins", 34, false))
 	if animate:
 		total.create_tween().tween_method(func(v: float) -> void: total.text = "$%d" % roundi(v), 0.0, float(earned), 0.9) \
 		.set_delay(0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-	_row(box, "", "In the bank", "$%d" % game.ledger.money)
-	var note := Sheet.new("note").pad(16, 18, 16, 10)
-	note.rotation = -0.02
+	_row(box, "", "IN THE BANK:", "$%d" % game.ledger.money)
+	var note := Sheet.new("note").pad(18, 14, 18, 12)
+	note.rotation = -0.035
 	stack.add_child(note)
-	var gossip := _label(note, 16, game.town.headline())
+	var gossip := _label(note, 19, "TOWN GOSSIP: " + game.town.headline())
 	gossip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	gossip.custom_minimum_size = Vector2(380, 0)
-	if game.flyers_out:
-		_row(box, "star", "Flyers for tomorrow", "paid")
-	var extras := HBoxContainer.new()
-	extras.add_theme_constant_override("separation", 12)
-	stack.add_child(extras)
-	var flyers := _button(extras, "Flyers  $%d   (F)" % Town.FLYER_PRICE, game.buy_flyers)
-	flyers.disabled = game.flyers_out or game.ledger.money < Town.FLYER_PRICE
-	flyers.tooltip_text = "More guests tomorrow."
-	if game.flyers_out:
-		flyers.text = "Flyers are out"
-	_button(extras, "Town book   (T)", show_town)
+	_button(stack, "Town book   (T)", show_town)
 	_button(stack, "Build, then day %d   (Enter)" % game.ledger.day, game.open_build)
 	if animate:
 		_pop_in(clip)
@@ -709,6 +1385,9 @@ func show_build() -> void:
 	_tip.modulate.a = 0.8
 	_sell = _button(last, "", game.sell_hand)
 	_sell.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_flyers = _button(last, "", game.buy_flyers)
+	_flyers.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_flyers.tooltip_text = "More guests tomorrow."
 	_button(last, "Open for day %d   (Enter)" % game.ledger.day, game.start_day).size_flags_horizontal = Control.SIZE_SHRINK_END
 	_refresh_catalog()
 
@@ -743,6 +1422,8 @@ func _refresh_catalog() -> void:
 		card.set_pressed_no_signal(held)   # the piece in hand sits pressed in
 	if found.is_empty():
 		_label(_cards, 16, "Nothing in the catalog matches.").modulate.a = 0.7
+	_flyers.disabled = game.flyers_out or l.money < Town.FLYER_PRICE
+	_flyers.text = "Flyers are out" if game.flyers_out else "Flyers  $%d   (F)" % Town.FLYER_PRICE
 	_sell.visible = game.hand.get("moving", false)
 	if game.hand.is_empty():
 		_tip.text = "Pick from the catalog, or click a piece in the room to move, turn or sell it."
@@ -769,6 +1450,7 @@ func show_town() -> void:
 	_town_open = true
 	var clip := Sheet.new("clip").pad(26, 46, 26, 26)
 	center.add_child(clip)
+	_summary_clip = clip
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 14)
 	clip.add_child(stack)
@@ -817,11 +1499,11 @@ func show_closed(days: int, earned: int, best: Dictionary, is_record: bool) -> v
 	var why := _label(box, 17, "Three guests walked out in one day.")
 	why.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	why.modulate.a = 0.75
-	_row(box, "sun", "Days survived", str(days), 26)
-	_row(box, "coin", "Total earned", "$%d" % earned, 26)
-	if is_record:
-		_row(box, "star", "New best run!", "", 26)
-	else:
-		_row(box, "star", "Best run", "%d days, $%d" % [best.days, best.earned], 20)
+	_ornament(box, "day")
+	_centred(box, "DAYS SURVIVED: %d" % days)
+	_ornament(box, "coin")
+	_centred(box, "TOTAL EARNED: $%d" % earned)
+	_ornament(box, "star")
+	_centred(box, "NEW BEST RUN!" if is_record else "BEST RUN: %d %s" % [best.days, "DAY" if best.days == 1 else "DAYS"])
 	_button(box, "Try again   (Enter)", game.restart)
 	_pop_in(menu)

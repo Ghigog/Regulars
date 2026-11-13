@@ -81,6 +81,8 @@ func test_flyers_cost_money_once_a_night_and_are_used_up_next_day():
 	game.arrivals.clear()
 	_run(0.2)
 	assert_eq(game.phase, game.Phase.SUMMARY)
+	assert_false(game.buy_flyers(), "not on the receipt: they are in the build tray")
+	game.open_build()
 	assert_true(game.buy_flyers())
 	assert_eq(game.ledger.money, 50 - Town.FLYER_PRICE)
 	assert_false(game.buy_flyers(), "one batch a night")
