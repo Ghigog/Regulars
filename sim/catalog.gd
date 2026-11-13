@@ -8,25 +8,27 @@ const MAX_TIER := 3
 const SHELF_DAYS := 2
 const CATEGORIES: Array[String] = ["Kitchen", "Dining", "Decor", "Build"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
+const TIER_JOY := 0.1   # joy a decor piece gains for each tier above the first
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
 ## A "tool" builds the room itself and is priced per tile or per wall; a "finish"
-## tool paints or papers walls. "joy" is how much a seated guest's joy rises each
-## second from a floor under them, a finish near them or a rug under them.
+## tool paints or papers walls. "joy" is the flat joy a guest gets on sitting down
+## with this piece under their seat; beside it or only in view they get less (see Decor).
+## A tiered piece gains TIER_JOY a tier.
 const ITEMS := {
 	"floor_tile": {"name": "Tiled floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "Grows the room  $5 a tile"},
 	"floor_planks": {"name": "Plank floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "Grows the room  $5 a tile"},
 	"floor_parquet": {"name": "Parquet floor", "price": 10, "level": 2, "category": "Build", "tiers": 1, "tool": true,
-		"joy": 0.005, "blurb": "Guests seated on it are happier  $10 a tile"},
+		"joy": 0.1, "blurb": "Cheers guests seated on it, a little those near  $10 a tile"},
 	"floor_marble": {"name": "Marble floor", "price": 20, "level": 3, "category": "Build", "tiers": 1, "tool": true,
-		"joy": 0.01, "blurb": "Guests seated on it are much happier  $20 a tile"},
+		"joy": 0.2, "blurb": "Delights guests seated on it, cheers those near  $20 a tile"},
 	"paint": {"name": "Sage paint", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true, "finish": true,
-		"joy": 0.003, "blurb": "Cheers guests seated near the wall  $5 a length"},
+		"joy": 0.08, "blurb": "Cheers guests seated beside the wall  $5 a length"},
 	"paper_stripe": {"name": "Striped wallpaper", "price": 10, "level": 2, "category": "Build", "tiers": 1, "tool": true, "finish": true,
-		"joy": 0.006, "blurb": "Cheers guests seated near the wall  $10 a length"},
+		"joy": 0.14, "blurb": "Cheers guests seated beside the wall  $10 a length"},
 	"paper_rose": {"name": "Rose wallpaper", "price": 20, "level": 3, "category": "Build", "tiers": 1, "tool": true, "finish": true,
-		"joy": 0.01, "blurb": "Delights guests seated near the wall  $20 a length"},
+		"joy": 0.2, "blurb": "Delights guests seated beside the wall  $20 a length"},
 	"wall": {"name": "Wall", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "Divides the room  $5 a length"},
 	"door": {"name": "Door", "price": 20, "level": 1, "category": "Build", "tiers": 1, "tool": true,
@@ -38,9 +40,10 @@ const ITEMS := {
 	"counter": {"name": "Counter", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Extra worktop"},
 	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3,
-		"blurb": "Cheers nearby guests", "up": "Cheers guests further away"},
+		"joy": 0.2, "blurb": "Cheers guests seated beside it, a little those who see it",
+		"up": "Cheers guests more, and further away"},
 	"rug": {"name": "Woven rug", "price": 25, "level": 1, "category": "Decor", "tiers": 1,
-		"joy": 0.005, "blurb": "Cheers guests seated on it"},
+		"joy": 0.15, "blurb": "Cheers guests seated on it, a little those near"},
 	"table": {"name": "Table for two", "price": 40, "level": 2, "category": "Dining", "tiers": 3,
 		"blurb": "Two more seats", "up": "Two comfier seats"},
 	"booth": {"name": "Booth", "price": 60, "level": 2, "category": "Dining", "tiers": 3,
@@ -85,9 +88,12 @@ static func is_finish(id: String) -> bool:
 	return ITEMS.has(id) and ITEMS[id].get("finish", false)
 
 
-## Joy per second a seated guest gets from this floor, finish or rug; 0 for none.
-static func joy_of(id: String) -> float:
-	return float(ITEMS[id].get("joy", 0.0)) if ITEMS.has(id) else 0.0
+## The flat joy this piece gives a guest with it under their seat; a finish or fern
+## is at best beside them, so gives half (see Decor). 0 for none.
+static func joy_of(id: String, tier := 1) -> float:
+	if not ITEMS.has(id) or not ITEMS[id].has("joy"):
+		return 0.0
+	return float(ITEMS[id].joy) + TIER_JOY * (tier - 1)
 
 
 ## Each tier above the first needs one more level.
