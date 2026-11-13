@@ -100,6 +100,23 @@ func key(k: int, echo := false) -> bool:
 	return true
 
 
+## One action from any player's device (see Controls and game.act): up and down
+## pick a button, use or confirm presses it.
+func action(a: String, echo := false) -> bool:
+	match a:
+		"up":
+			pick(sel - 1)
+		"down":
+			pick(sel + 1)
+		"use", "confirm":
+			if echo:
+				return false
+			buttons[sel].pressed.emit()
+		_:
+			return false
+	return true
+
+
 func press_id(id: String) -> void:
 	match id:
 		"play":
