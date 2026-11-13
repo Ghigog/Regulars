@@ -260,6 +260,18 @@ func test_guest_card_opens_on_the_nearest_guest_and_closes_when_they_go():
 	assert_null(game.inspected, "the card closes when the guest has gone")
 
 
+func test_walkout_starts_a_grudge_and_the_guest_returns_short_tempered():
+	var g: Guest = game.spawn_guest(3)
+	_run(12.0)
+	g.mood.patience = 0.0
+	_run(1.0)
+	assert_true(game.town.holds_grudge(3, game.ledger.day + 1))
+	assert_true(game.town.people[3].sore)
+	var back: Guest = game.spawn_guest(3)
+	assert_almost_eq(back.mood.patience, 0.75, 0.001)
+	assert_true(back.mood.thoughts.has("Last time was a disaster. One more chance"))
+
+
 func test_overcooked_meat_is_worth_less():
 	assert_eq(Station.quality_at(Station.COOK_TIME - 0.1), 0.0)
 	assert_eq(Station.quality_at(Station.COOK_TIME + 1.0), 1.0)

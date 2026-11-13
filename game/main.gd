@@ -163,6 +163,11 @@ func _apply_demo(demo: String) -> void:
 		if demo == "town":  # a spread of opinions, then the town book over the receipt
 			for i in town.people.size():
 				town.record_visit(i, [0.9, 0.9, 0.3, -0.5, 0.6][i % 5])
+				if i == 0 or i == 5:
+					town.record_visit(i, 0.9)
+					town.record_visit(i, 0.9)
+				if i == 3:
+					town.record_walkout(i, 1)
 				if i % 2 == 0:
 					town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
 			get_tree().create_timer(1.5).timeout.connect(hud.show_town)
@@ -753,9 +758,16 @@ func offer_discount(g: Guest) -> void:
 
 func finish_meal(g: Guest) -> void:
 	var bill := g.mood.bill_for(BILL)
-	var tip := g.mood.tip_for(bill)
+	var tip := g.mood.tip_for(bill, town.tip_bonus(g.idx))
+	var was_sore: bool = g.info.sore
+	var was_regular := town.is_regular(g.idx)
 	ledger.record_sale(bill, tip)
 	var talk := town.gossip_line(g.idx, town.record_visit(g.idx, g.mood.satisfaction()))
+	if was_sore and not g.info.sore:
+		talk = "%s has forgiven you." % g.info.name
+	elif town.is_regular(g.idx) and not was_regular:
+		talk = "%s is now a regular!" % g.info.name
+		burst(g.position + Vector3(0, 1.5, 0), "stars")
 	if talk != "":
 		hud.say(talk)
 	g.table.dirty += 1
@@ -772,7 +784,7 @@ func walk_out(g: Guest) -> void:
 	g.mood.think("I'm never coming back")
 	g.stormed = true
 	ledger.record_walkout()
-	var talk := town.gossip_line(g.idx, town.record_visit(g.idx, -0.5))
+	var talk := town.gossip_line(g.idx, town.record_walkout(g.idx, ledger.day))
 	hud.say(("%s walked out! " % g.info.name) + talk)
 	var mark := Fx.play(g, "anger", Vector3(0, 1.75, 0), 0.3, true)
 	mark.fps = 6.0

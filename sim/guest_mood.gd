@@ -90,5 +90,5 @@ func satisfaction() -> float:
 	return clampf(0.35 * savour + 0.3 * joy + 0.2 * patience - 0.5 * disgust, -1.0, 1.0)
 
 
-func tip_for(bill: int) -> int:
-	return roundi(bill * clampf(satisfaction(), 0.0, 1.0) * 0.6)
+func tip_for(bill: int, bonus := 1.0) -> int:
+	return roundi(bill * clampf(satisfaction(), 0.0, 1.0) * 0.6 * bonus)

@@ -36,6 +36,9 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	game = game_
 	idx = idx_
 	info = game.town.people[idx]
+	var hello: Dictionary = game.town.greeting(idx)
+	mood.patience = hello.patience
+	mood.delight(hello.joy, hello.thought)
 	cell = start
 	position = Grid.center(start)
 	_body = Peg.guest(info.name)

@@ -43,6 +43,13 @@ many days as you can; three walkouts in one day ends the run.
   and the bin (0.01, 5 cells; in the starting room that reaches the two seats nearest
   the kitchen). A partition hides any of them. A guest who can see a working stove and
   nothing nasty gains joy (0.01 a second).
+- **Regulars.** Three good visits in a row (satisfaction above 0.3) make someone a
+  regular: they arrive with +0.1 joy and tip 25% more. A poor visit resets the streak.
+  The town book shows "Regular, N in a row".
+- **Grudges.** A guest who walks out stays away for the next two days (the town book
+  counts them down), then returns sore: 0.75 patience, -0.1 joy. A good visit forgives
+  (+0.1 affinity on top of the usual). Each further walkout adds two more days away.
+  Guests holding a grudge are not used to top up a thin crowd.
 - **Flyers.** On the receipt, $15 (F) buys +25% visit chance for everyone tomorrow. One
   batch a night. 
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
@@ -79,8 +86,9 @@ furniture; floors and ceilings.
   as its own source, so "clean" means more than "nothing burning".
 - **Word of mouth**: each guest has an affinity (-1..1) that sets their chance to visit.
   A visit moves it; 40% of the change spreads to their friends.
+- **Built**: regulars with a visit streak, grudges (section 1).
 - **To add**: stay length and order size driven by mood (dessert, second drink), groups
-  arriving together, favourite dishes, regulars with a visit streak, grudges, reviews.
+  arriving together, favourite dishes (needs a second dish), reviews (needs a design).
 - **Discounts and comps**: half price is built (section 1). To add: a free meal, and
   guests who come to expect a discount.
 

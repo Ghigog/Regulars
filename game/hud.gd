@@ -428,7 +428,8 @@ func show_guest(g: Guest) -> void:
 	card.add_child(box)
 	_label(box, 24, g.info.name)
 	var town: Town = game.town
-	var standing := _label(box, 13, "%s  ·  visit %d" % [Town.STANDINGS[town.standing(g.idx)], int(g.info.visits) + 1])
+	var who := "Back after a grudge" if g.info.sore else town.status_word(g.idx, game.ledger.day)
+	var standing := _label(box, 13, "%s  ·  visit %d" % [who, int(g.info.visits) + 1])
 	standing.modulate.a = 0.7
 	_guest_state = _label(box, 15)
 	_guest_meters.clear()
@@ -783,8 +784,8 @@ func show_town() -> void:
 		var name_label := _label(row, 18, town.people[i].name)
 		name_label.custom_minimum_size = Vector2(86, 0)
 		row.add_child(Pips.new(town.standing(i) + 1, town.trend(i)))
-		var word := _label(row, 13, Town.STANDINGS[town.standing(i)])
-		word.custom_minimum_size = Vector2(92, 0)
+		var word := _label(row, 13, town.status_word(i, game.ledger.day))
+		word.custom_minimum_size = Vector2(150, 0)
 		word.modulate.a = 0.7
 	_rule(box)
 	var key := _label(box, 13, "Arrows show who changed their mind today. Friends talk to each other.")

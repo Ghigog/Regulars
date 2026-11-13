@@ -190,6 +190,50 @@ func test_gossip_line_names_the_friends():
 	assert_eq(t.gossip_line(2, 0.01), "", "a so-so visit starts no talk")
 
 
+func test_three_good_visits_make_a_regular_who_tips_more():
+	var t := Town.new(7)
+	t.record_visit(0, 0.8)
+	t.record_visit(0, 0.8)
+	assert_false(t.is_regular(0))
+	assert_eq(t.tip_bonus(0), 1.0)
+	t.record_visit(0, 0.8)
+	assert_true(t.is_regular(0))
+	assert_eq(t.greeting(0).thought, "My favourite place")
+	var m := GuestMood.new()
+	m.taste(1.0)
+	assert_gt(m.tip_for(12, t.tip_bonus(0)), m.tip_for(12))
+	assert_string_contains(t.status_word(0, 5), "Regular, 3")
+	t.record_visit(0, 0.1)
+	assert_false(t.is_regular(0), "a poor visit breaks the streak")
+
+
+func test_walkout_keeps_them_away_then_they_return_sore():
+	var t := Town.new(7)
+	t.record_walkout(4, 3)
+	for day in [4, 5]:
+		assert_true(t.holds_grudge(4, day))
+		for n in 20:
+			assert_false(t.roll_guests(day, 1.0).has(4), "stays away even when the crowd is topped up")
+	assert_string_contains(t.status_word(4, 5), "1 more day")
+	assert_false(t.holds_grudge(4, 6))
+	assert_true(t.roll_guests(6, 1.0).has(4))
+	assert_almost_eq(float(t.greeting(4).patience), 0.75, 0.001)
+
+
+func test_a_good_visit_forgives_and_a_second_walkout_lasts_longer():
+	var t := Town.new(7)
+	t.record_walkout(4, 3)
+	var before: float = t.people[4].affinity
+	var delta := t.record_visit(4, 0.8)
+	assert_false(t.people[4].sore)
+	assert_almost_eq(delta, 0.35, 0.001, "the usual 0.25 plus 0.1 for forgiving")
+	assert_gt(float(t.people[4].affinity), before)
+	assert_eq(float(t.greeting(4).patience), 1.0)
+	t.record_walkout(4, 10)
+	assert_true(t.holds_grudge(4, 14), "four days away the second time")
+	assert_false(t.holds_grudge(4, 15))
+
+
 func test_bad_visit_lowers_visit_chance():
 	var t := Town.new(7)
 	var before := t.visit_chance(3)
