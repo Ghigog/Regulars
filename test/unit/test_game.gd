@@ -243,6 +243,23 @@ func test_guests_enjoy_watching_the_stove_unless_it_is_burning():
 	assert_true(g.mood.thoughts.has("Something is burning in there"))
 
 
+func test_guest_card_opens_on_the_nearest_guest_and_closes_when_they_go():
+	var g: Guest = game.spawn_guest(0)
+	_run(12.0)
+	var at: Vector2 = game.cam.unproject_position(g.position + Vector3(0, 0.8, 0))
+	assert_eq(game.guest_at(at + Vector2(10, 5)), g)
+	assert_null(game.guest_at(at + Vector2(300, 0)))
+	game.inspect(g)
+	assert_not_null(game.hud.guest_card)
+	g.mood.think("A test thought")
+	game.hud.update_status()
+	assert_string_contains(game.hud._guest_thoughts.text, "A test thought")
+	assert_eq(game.hud._guest_state.text, "Waiting for food")
+	g.mood.patience = 0.0
+	_run(30.0)
+	assert_null(game.inspected, "the card closes when the guest has gone")
+
+
 func test_overcooked_meat_is_worth_less():
 	assert_eq(Station.quality_at(Station.COOK_TIME - 0.1), 0.0)
 	assert_eq(Station.quality_at(Station.COOK_TIME + 1.0), 1.0)

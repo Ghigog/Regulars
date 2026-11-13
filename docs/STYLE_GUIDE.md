@@ -97,6 +97,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 | Receipt buttons | A half-width "Flyers" stamp button beside "Town book"; a spent button turns driftwood grey. A bought flyer prints as a receipt row. | Not on the sheets. |
 | Half price | Uses the keycap prompt ("HALF PRICE FOR GUS"), a small star burst and the heart bubble. No new art. | Not on the sheets. |
 | Build tray | Between days a wooden tray with a paper inset sits along the bottom and holds the catalog: an ink-rimmed cream search box, category tabs and a scrolling row of stamp-button cards (name, then price or the level needed). The card in hand sits pressed in and is named in the line below. | Not on the sheets; uses the plaque and receipt materials. Cards are text only, with no picture of the piece yet. |
+| Guest card | Click a guest during service: a cream label card under the punch-card with the name, standing and visit number, what they are doing, four ink-rimmed meters read by length, and their last six thoughts, newest first. | Sheet 14 has no inspect panel; built from its label card. Nothing marks the chosen guest in the room yet. |
 | Placement ghost | The real piece bobs just off the floor under the mouse. Where it cannot go the piece is hidden and a red cross lies on the spot, drawn through any furniture already there. | Shape, not colour, says yes or no. |
 | Player-built partitions | The sheet 11 partition, 1.0 m at tier 1 and 10 cm taller per tier. Higher-tier furniture keeps the yellow skirting bands. | Tier dressing is a placeholder. |
 

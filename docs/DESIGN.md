@@ -36,6 +36,13 @@ many days as you can; three walkouts in one day ends the run.
   partition have one tier. There are no free blueprints.
 - **Tier effects:** faster stove, stronger fern, a tier 2+ table gives seated guests
   +0.05 joy per tier. Counters and partitions gain nothing but looks.
+- **Guest card.** Click a guest during service to see their standing, visit number, the
+  four meters and their last six thoughts. It follows them live and closes when they go.
+- **Sightlines.** Disgust sources a guest must be able to see: an uncleared table and
+  burning food on a stove (0.03 a second, 7 cells), the chef carrying rubbish (0.15),
+  and the bin (0.01, 5 cells; in the starting room that reaches the two seats nearest
+  the kitchen). A partition hides any of them. A guest who can see a working stove and
+  nothing nasty gains joy (0.01 a second).
 - **Flyers.** On the receipt, $15 (F) buys +25% visit chance for everyone tomorrow. One
   batch a night. 
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
@@ -59,17 +66,17 @@ focused. The logic and tests still exist.
 
 Everything else in this table is back in the game. Not built: upgrading a piece already
 placed; moving, selling or rotating
-furniture; floors and ceilings; the bin as a disgust source now that it can be hidden.
+furniture; floors and ceilings.
 
 ## 3. Guests (RollerCoaster Tycoon layer)
 
 - **Four meters** per guest: patience, disgust, joy, savour. Final satisfaction =
   `0.35 savour + 0.3 joy + 0.2 patience - 0.5 disgust`. Tip = bill x satisfaction x 0.6.
 - **Thoughts**: short lines triggered by what they experience ("I just watched the chef
-  carry rubbish past me"). Later: a click-to-inspect guest panel with full thought history.
-- **Sightlines**: disgust is line-of-sight. Sources: the bin (parked until walls return,
-  because the player cannot hide it yet), uncleared tables, the chef carrying rubbish.
-  A clean open kitchen should eventually *raise* joy.
+  carry rubbish past me"). The click-to-inspect guest card is built (section 1); it shows
+  the last six thoughts, not the full history.
+- **Sightlines**: built (section 1). To add: a dirty kitchen (sink full, bin overflowing)
+  as its own source, so "clean" means more than "nothing burning".
 - **Word of mouth**: each guest has an affinity (-1..1) that sets their chance to visit.
   A visit moves it; 40% of the change spreads to their friends.
 - **To add**: stay length and order size driven by mood (dessert, second drink), groups

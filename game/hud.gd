@@ -30,6 +30,11 @@ var _shown_money := -1
 var _shown_strikes := 0
 var _town_open := false
 var build_bar: Control
+var guest_card: Control
+var _guest: Guest
+var _guest_state: Label
+var _guest_meters := {}
+var _guest_thoughts: Label
 var _search := ""
 var _category := ""
 var _search_box: LineEdit
@@ -96,6 +101,21 @@ class Pips extends Control:
 			var d := -float(trend)   # up is negative y
 			draw_colored_polygon(PackedVector2Array([
 				Vector2(x, y + d * 7), Vector2(x - 6, y - d * 3), Vector2(x + 6, y - d * 3)]), Hud.INK)
+
+
+## A meter read by its length: an ink-rimmed trough with a filled bar.
+class Meter extends Control:
+	var value := 0.0
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(110, 14)
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		draw_rect(Rect2(Vector2.ZERO, size), Hud.INK)
+		draw_rect(Rect2(Vector2(2, 2), size - Vector2(4, 4)), Hud.PAPER)
+		draw_rect(Rect2(Vector2(2, 2), Vector2((size.x - 4) * clampf(value, 0.0, 1.0), size.y - 4)), Hud.CORAL)
 
 
 ## The day timer: the sun crosses the sky over a cream dial.
@@ -293,7 +313,7 @@ func setup(game_) -> void:
 	hint.offset_left = 24
 	hint.offset_top = -40
 	hint.modulate.a = 0.75
-	hint.text = "WASD move     E or Space use     M mute"
+	hint.text = "WASD move     E or Space use     Click a guest     M mute"
 
 	# The keycap prompt that floats over the station the chef faces.
 	prompt = HBoxContainer.new()
@@ -382,7 +402,68 @@ func _label(parent: Node, font_size: int, text := "") -> Label:
 	return l
 
 
+const STATE_WORDS := {"queue": "Queueing outside", "to_seat": "Finding a seat", "waiting": "Waiting for food",
+	"eating": "Eating", "leaving": "Leaving"}
+
+
+## The guest card (click a guest): who they are, how they feel and what they have
+## thought so far. Pass null to close it.
+func show_guest(g: Guest) -> void:
+	if guest_card:
+		guest_card.queue_free()
+		guest_card = null
+	_guest = g
+	if g == null:
+		return
+	var card := Sheet.new("label", 16, 12)
+	card.anchor_left = 1.0
+	card.anchor_right = 1.0
+	card.offset_left = -246
+	card.offset_right = -22
+	card.offset_top = 132
+	root.add_child(card)
+	guest_card = card
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 5)
+	card.add_child(box)
+	_label(box, 24, g.info.name)
+	var town: Town = game.town
+	var standing := _label(box, 13, "%s  ·  visit %d" % [Town.STANDINGS[town.standing(g.idx)], int(g.info.visits) + 1])
+	standing.modulate.a = 0.7
+	_guest_state = _label(box, 15)
+	_guest_meters.clear()
+	for id: String in ["patience", "joy", "savour", "disgust"]:
+		var row := HBoxContainer.new()
+		box.add_child(row)
+		var l := _label(row, 14, id.capitalize())
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var m := Meter.new()
+		row.add_child(m)
+		_guest_meters[id] = m
+	_rule(box)
+	_guest_thoughts = _label(box, 13)
+	_guest_thoughts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_guest_thoughts.custom_minimum_size = Vector2(190, 0)
+	_update_guest()
+
+
+func _update_guest() -> void:
+	if guest_card == null or not is_instance_valid(_guest):
+		return
+	var m: GuestMood = _guest.mood
+	_guest_state.text = STATE_WORDS.get(_guest.state, "")
+	for id: String in _guest_meters:
+		_guest_meters[id].value = float(m.get(id))
+		_guest_meters[id].queue_redraw()
+	var lines: Array[String] = []
+	for t in m.thoughts.slice(-6):
+		lines.append("\"%s\"" % t)
+	lines.reverse()   # newest first
+	_guest_thoughts.text = "No thoughts yet." if lines.is_empty() else "\n".join(lines)
+
+
 func update_status() -> void:
+	_update_guest()
 	var l: Ledger = game.ledger
 	# After closing the books the ledger is already on tomorrow; keep showing the day just played.
 	day_label.text = "DAY %d" % (l.day - 1 if game.phase == game.Phase.SUMMARY else l.day)

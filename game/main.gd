@@ -43,6 +43,7 @@ var _ghost: Node3D
 var _ghost_key := ""
 var _no_mark: Node3D
 var _demo_hover := Vector3.INF
+var inspected: Guest                 # the guest whose card is open, if any
 var flyers_out := false          # bought tonight, spent on tomorrow's crowd
 var best_path := "user://regulars_best.json"
 var player: Player
@@ -140,6 +141,17 @@ func _apply_demo(demo: String) -> void:
 			a.time = 0.2
 		get_tree().create_timer(8.0).timeout.connect(_demo_kind.bind(false))
 		get_tree().create_timer(9.5).timeout.connect(_demo_kind.bind(true))
+	elif demo == "inspect":  # a seated guest with a few thoughts and their card open; shoot at 10
+		for a in arrivals:
+			a.time = 0.2
+		get_tree().create_timer(9.0).timeout.connect(func() -> void:
+			for g in guests:
+				if g.state == "waiting":
+					g.mood.patience = 0.4
+					g.mood.disgust = 0.25
+					g.mood.think("Nobody has cleared that table")
+					inspect(g)
+					return)
 	elif demo == "closed":
 		best_path = "user://regulars_best_demo.json"
 		for i in Ledger.MAX_STRIKES:
@@ -429,6 +441,23 @@ func start_day() -> void:
 	sfx("day")
 
 
+## Opens the guest card for `g`, or closes it with null.
+func inspect(g: Guest) -> void:
+	inspected = g
+	hud.show_guest(g)
+
+
+## The guest drawn nearest a point on screen, or null if none is close.
+func guest_at(screen: Vector2, within := 60.0) -> Guest:
+	var best: Guest = null
+	for g in guests:
+		var d := cam.unproject_position(g.position + Vector3(0, 0.8, 0)).distance_to(screen)
+		if d < within:
+			within = d
+			best = g
+	return best
+
+
 # ---------------------------------------------------------------- building
 
 ## After the receipt: the room is yours to change until you open for the day.
@@ -563,6 +592,7 @@ func buy_flyers() -> bool:
 
 func _end_day() -> void:
 	phase = Phase.SUMMARY
+	inspect(null)
 	last_day = ledger.end_day()
 	hud.show_summary(last_day)
 	sfx("coin")
@@ -761,6 +791,8 @@ func _leave(g: Guest) -> void:
 
 
 func remove_guest(g: Guest) -> void:
+	if inspected == g:
+		inspect(null)
 	guests.erase(g)
 	g.queue_free()
 
@@ -951,6 +983,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				sfx("fail")
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			cancel_hand()
+		return
+	if phase == Phase.SERVICE and event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			inspect(guest_at(event.position))
 		return
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
