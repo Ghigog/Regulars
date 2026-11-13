@@ -69,8 +69,24 @@ many days as you can; three walkouts in one day ends the run.
     or a right drag. Everything taken away is paid back in full. The floor inside the
     front door, floor under furniture or seats, and floor that would strand someone
     cannot be lifted.
-  - The first room's fixtures (hood, wall cabinets, jar shelf, kitchen sconce, the rug)
+  - The first room's fixtures (hood, wall cabinets, jar shelf, kitchen sconce)
     stay only while the wall or floor they hang on does.
+  - *Finishes:* two nicer floors (parquet $10 a tile, level 2; marble $20, level 3) and
+    three wall finishes laid with the same drag as walls (sage paint $5 a length,
+    level 1; striped paper $10, level 2; rose paper $20, level 3). One finish per wall
+    edge, showing on both faces of a knee-high wall; papering over paint, laying floor
+    that takes a wall down, or cutting a door through it pays the old finish back.
+    Doorways cannot be papered. Plank, parquet and marble rooms all count as dining
+    rooms (wainscot, windows, sconces).
+  - *Rugs:* a woven rug ($25, Decor) covers 3 x 2 cells and is placed, turned, moved and
+    sold like a fern. It lies flat, so anyone walks over it and a table can stand on
+    it; picking up on a cell takes what stands there first, then the rug. Floor under a
+    rug cannot be lifted. The first room starts with one under the middle table.
+  - *Joy from surroundings* (per second while seated, in `apply_surroundings`): the
+    floor under the seat (parquet 0.005, marble 0.01), a rug under the seat (0.005), and
+    the best finish on a wall within 2 cells that the seat can see (paint 0.003, striped
+    0.006, rose 0.01). All of them together (0.025) are less than a fern ++ (0.03). The
+    values live in `Catalog.ITEMS` ("joy"), so they are easy to retune.
 - **Keyboard, controller or touch** (`game/controls.gd`). Whichever device was used last
   is the mode, so a player can switch at any moment; every hint (the corner line, the
   prompt's keycap, the build slip, the shop's key line, the receipt buttons) is reworded
@@ -200,9 +216,10 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   plan; `Scenery.build_room` draws it. Ceilings are not planned (the camera looks down).
 - **Two currencies**: money (earned per day) and XP (10 per meal plus the tip; 100 per level).
 - **Built**: moving, selling and rotating furniture (section 1).
-- **To add**: buying more lot, floor and wall finishes that affect joy, themes that
-  change the catalog. Known rough edge: the dining-room rugs are scenery and stay put
-  when a table is moved off them.
+- **Built**: floor and wall finishes that cheer seated guests, and movable rugs (section 1).
+- **To add**: buying more lot, themes that change the catalog. A reach display for
+  finishes and rugs, like the fern's, is not built: their effect only shows in guests'
+  thoughts.
 
 ## 5. Characters (Sims layer)
 

@@ -382,7 +382,7 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 22, "two single-tier pieces, five with three tiers and five build tools")
+	assert_eq(Catalog.search().size(), 28, "three single-tier pieces, five with three tiers and ten build tools")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 3)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
@@ -393,7 +393,7 @@ func test_catalog_search_by_word_and_category():
 	assert_eq(Catalog.search("stove ++").size(), 1)
 	assert_eq(Catalog.search("fern", "Kitchen").size(), 0)
 	assert_eq(Catalog.search("partition")[0].id, "screen")
-	assert_eq(Catalog.search("", "Build").size(), 6, "floors, wall, door, archway and the partition")
+	assert_eq(Catalog.search("", "Build").size(), 11, "four floors, wall, three finishes, door, archway and the partition")
 	assert_eq(Catalog.search("build", "Dining").size(), 0, "matches the category name")
 
 
@@ -529,3 +529,36 @@ func test_doors_let_people_through_but_not_their_gaze():
 	assert_false(g.has_los(Vector2i(-1, 0), Vector2i(1, 0)))
 	g.outside[Vector2i(0, 0)] = true
 	assert_false(g.reachable(Vector2i(-1, 0), Vector2i(1, 0)), "nobody walks on bare ground")
+
+
+func test_walls_take_one_finish_that_goes_with_the_wall():
+	var p := _plan()
+	var back := Vector3i(0, 0, 0)            # the north edge of the floor: an outer wall
+	assert_true(p.can_finish(back, "paint"))
+	assert_false(p.can_finish(Vector3i(1, 0, 1), "paint"), "no wall between two floors")
+	assert_false(p.can_finish(back, "glitter"), "only real finishes")
+	assert_eq(p.finish(back, "paint"), "")
+	assert_false(p.can_finish(back, "paint"), "already painted")
+	assert_eq(p.finish(back, "paper_rose"), "paint", "papering over paint hands the paint back")
+	var gone := p.lay(Vector2i(0, -1), "planks")
+	assert_eq(gone.get(back, ""), "paper_rose", "the wall came down, and its paper with it")
+	assert_false(p.finishes.has(back))
+	p.openings[Vector3i(0, 0, 1)] = "door"
+	assert_false(p.can_finish(Vector3i(0, 0, 1), "paint"), "not across a doorway")
+	p.finish(Vector3i(0, 1, 1), "paint")
+	assert_eq(p.strip(Vector3i(0, 1, 1)), "paint")
+	assert_eq(p.strip(Vector3i(0, 1, 1)), "")
+
+
+func test_nicer_finishes_cost_more_need_a_level_and_give_more_joy():
+	assert_true(Floorplan.KINDS.has("parquet") and Floorplan.KINDS.has("marble"))
+	for id in Floorplan.FINISHES:
+		assert_true(Catalog.is_finish(id) and Catalog.is_build_tool(id))
+	assert_false(Catalog.is_finish("wall"))
+	for pair: Array in [["floor_planks", "floor_parquet"], ["floor_parquet", "floor_marble"], ["paint", "paper_stripe"], ["paper_stripe", "paper_rose"]]:
+		assert_lt(Catalog.price_of(pair[0]), Catalog.price_of(pair[1]))
+		assert_lt(Catalog.level_of(pair[0]), Catalog.level_of(pair[1]))
+		assert_lt(Catalog.joy_of(pair[0]), Catalog.joy_of(pair[1]))
+	assert_eq(Catalog.joy_of("floor_tile"), 0.0, "plain floors do nothing")
+	assert_lt(Catalog.joy_of("paper_rose") + Catalog.joy_of("floor_marble") + Catalog.joy_of("rug"), 0.03,
+		"everything together is still less than a fern ++")

@@ -492,6 +492,10 @@ class ModelView extends TextureRect:
 			game._wall_visual(n, 0.9 + 0.1 * int(bp.tier))
 		elif Catalog.is_build_tool(bp.id):
 			Scenery.tool_preview(n, bp.id)
+		elif bp.id == "rug":
+			Scenery.rug(n)
+			n.scale = Vector3.ONE * 0.55
+			n.position = Vector3(0, 0.2, -0.28)
 		elif bp.id == "flyers":   # a loose stack of printed sheets
 			n.scale = Vector3.ONE * 1.7
 			for i in 4:
@@ -1491,12 +1495,12 @@ func _build_tip(hand: Dictionary) -> String:
 		var what := "%s, $%d each." % [Catalog.label(hand), int(hand.price)]
 		match m:
 			"touch":
-				var drag := "Drag along the floor for a row" if hand.id == "wall" else ("Drag across the floor for a rectangle" if floor else "Tap a wall to add one")
+				var drag := "Drag along the floor for a row" if hand.id == "wall" or Catalog.is_finish(hand.id) else ("Drag across the floor for a rectangle" if floor else "Tap a wall to add one")
 				return "%s      %s      Erase, then drag, to take away      Done" % [what, drag]
 			"pad":
 				return "%s      %s      X remove      B done" % [what, "Hold A and walk to keep laying" if floor else "A build"]
 		var how := "Hold E and walk to keep laying" if floor else "E build"
-		var drag := "drag for a row" if hand.id == "wall" else ("drag for a rectangle" if floor else "click to add")
+		var drag := "drag for a row" if hand.id == "wall" or Catalog.is_finish(hand.id) else ("drag for a rectangle" if floor else "click to add")
 		return "%s      %s      Mouse: %s, right-drag removes      X remove      Esc done" % [what, how, drag]
 	var turn := _g("turn")
 	if hand.get("moving", false):
