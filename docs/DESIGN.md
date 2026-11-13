@@ -95,11 +95,18 @@ many days as you can; three walkouts in one day ends the run.
     sold like a fern. It lies flat, so anyone walks over it and a table can stand on
     it; picking up on a cell takes what stands there first, then the rug. Floor under a
     rug cannot be lifted. The first room starts with one under the middle table.
-  - *Joy from surroundings* (per second while seated, in `apply_surroundings`): the
-    floor under the seat (parquet 0.005, marble 0.01), a rug under the seat (0.005), and
-    the best finish on a wall within 2 cells that the seat can see (paint 0.003, striped
-    0.006, rose 0.01). All of them together (0.025) are less than a fern ++ (0.03). The
-    values live in `Catalog.ITEMS` ("joy"), so they are easy to retune.
+  - *Decor* (`sim/decor.gd`, `cheer_with_decor` in `game/main.gd`) works like
+    RollerCoaster Tycoon scenery: a flat joy bonus when a guest sits down, not joy per
+    second. Each piece's "joy" in `Catalog.ITEMS` is scaled by how close it is to the
+    seat: on it (the floor or rug under the seat) 100%, beside it (within a cell) 50%,
+    in view (further, in sight, within 3 cells; a fern 2 + tier) 20%. Nobody sits on a
+    wall or a fern, so a finish or fern gives at most half. Each kind counts once, at
+    its best; kinds add up to a cap of 0.35. Values: parquet 0.1, marble 0.2, rug 0.15,
+    paint 0.08, striped 0.14, rose 0.2, fern 0.2 (+0.1 a tier). A table on a rug on
+    parquet with a fern beside it gets 0.35, about what a fern gave over a sitting
+    before (0.015 a second). The guest thinks of the piece that gave most ("Such a cosy
+    rug"). If the room changes while they sit they get the difference; building is only
+    between days, so that cannot happen yet.
 - **Keyboard, controller or touch** (`game/controls.gd`). Whichever device was used last
   is the mode, so a player can switch at any moment; every hint (the corner line, the
   prompt's keycap, the build slip, the shop's key line, the receipt buttons) is reworded
@@ -118,9 +125,11 @@ many days as you can; three walkouts in one day ends the run.
   On touch the frame and key line go, buttons and slider grabbers grow to thumb size, and
   only the Menu button stays over the card. The chef cannot walk while it is open.
 - **Reach marks.** While a piece with a reach is carried (a fern: 2 + tier cells; the bin:
-  5), a pale square on the floor shows how far it goes from the spot in front, and every
-  seat has a disc: green if the piece would reach it from there, red if not (out of range
-  or behind a partition). Green means "reached", so for the bin green is the bad news.
+  5), a pale square on the floor shows how far it goes from the spot in front and a
+  brighter 3 x 3 the cells beside it. Every seat has a disc: big and green beside it (a
+  fern gives half its joy), small and pale green in view (a fifth), red if not reached
+  (out of range or behind a partition). Green means "reached", so for the bin green is
+  the bad news.
   Stoves (seen from 7 cells) are not marked.
 - **The door card.** An OPEN / CLOSED card hangs on a string in the doorway. In the build
   phase, E at the doorway flips it to OPEN and starts the day (there is no button). From
@@ -137,7 +146,7 @@ many days as you can; three walkouts in one day ends the run.
 - **Upgrades are catalog entries.** Stove, fern and table are sold in three tiers; a
   tier costs 1x, 2x, 4x the base price and each tier needs one more level. Counter and
   partition have one tier. There are no free blueprints.
-- **Tier effects:** faster stove, stronger fern, a tier 2+ table gives seated guests
+- **Tier effects:** faster stove, a fern that gives more and is seen from further, a tier 2+ table gives seated guests
   +0.05 joy per tier. Counters and partitions gain nothing but looks.
 - **Guest card.** Click a guest during service to see their standing, visit number, the
   four meters and their last six thoughts. It follows them live and closes when they go.
@@ -342,8 +351,8 @@ Not built yet; this is the agreed direction for future sessions.
   later; meanwhile new interface should say things by shape as well as colour.
 - **Decor works like RollerCoaster Tycoon scenery:** a flat bonus by proximity, not
   joy per second. A guest seated on a rug or a fine floor gets the most, one seated
-  beside nice walls or a fern less, and one who can only see them least. (The finishes
-  merged on 13 November still add joy per second; to change.)
+  beside nice walls or a fern less, and one who can only see them least. Built: see
+  *Decor* in section 1.
 - **Free meals** (built): the proposed numbers are accepted.
 - **Selling the last table for two** stays refused even when the room has a booth or
   a table for four, for now.

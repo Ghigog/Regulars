@@ -22,7 +22,6 @@ const GROSS := {
 	"rubbish": [0.05, 1.5, 0.4],
 }
 const BIN_RANGE := 5          # the bin only bothers guests seated this close
-const FINISH_RANGE := 2       # paint and paper cheer guests seated this close
 const AREA := Rect2i(0, 0, W, H)   # the first room
 ## The lot: where floor may be laid. It grows back and to the left only: the
 ## street runs down the right, and the near edge of the floor stays where it is.
@@ -573,6 +572,7 @@ func _rebuild_room() -> void:
 		_room.queue_free()
 	for l in _room_lights:
 		_sconces.erase(l)
+	recheck_decor()   # building is only between days today, so nobody is seated yet
 	_room = Node3D.new()
 	add_child(_room)
 	var r: Dictionary = Scenery.build_room(_room, plan, DOOR)
@@ -1729,6 +1729,7 @@ func on_seated(g: Guest) -> void:
 			if town.are_friends(g.idx, mate.idx):
 				g.mood.delight(0.15, "Oh good, %s is here!" % mate.info.name)
 				mate.mood.delight(0.15, "Oh good, %s is here!" % g.info.name)
+	cheer_with_decor(g)
 
 
 ## Everything a seated guest can see changes how they feel.
@@ -1751,54 +1752,82 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 			# An open kitchen is a show, as long as nothing nasty is in view.
 			g.mood.delight(0.01 * delta, "I can watch the chef at work")
 			saw_gross = true   # one stove's worth of show, however many are on
-		if st.type == "plant" and _near(g.cell, st.cell, range_of("plant", st.tier)) and grid.has_los(g.cell, st.cell):
-			g.mood.delight(0.015 * st.tier * delta, "That fern is rather nice")
-	# A nice floor or rug under the seat, and the nicest paint or paper in view.
-	var under := Catalog.joy_of("floor_" + plan.kind(g.cell))
-	if under > 0.0:
-		g.mood.delight(under * delta, "What a fine floor")
-	if rug_at(g.cell) != null:
-		g.mood.delight(Catalog.joy_of("rug") * delta, "Such a cosy rug")
-	var paper := best_finish_seen(g.cell)
-	if paper != "":
-		g.mood.delight(Catalog.joy_of(paper) * delta, "Lovely walls in here" if paper == "paint" else "What pretty wallpaper")
 
 
-## The finish with the most joy on a wall within FINISH_RANGE cells of a seat,
-## on a side the seat can see. "" when there is none.
-func best_finish_seen(cell: Vector2i) -> String:
-	var best := ""
+## Decor cheers a guest once, as they sit down: a flat bonus from what is near the
+## seat (see Decor). If the room changes while they sit, they get the difference.
+func cheer_with_decor(g: Guest) -> void:
+	var b := decor_bonus(g.seat)
+	var gain: float = b.joy - g.decor
+	if absf(gain) > 0.0001:
+		g.mood.delight(gain, Decor.thought(b.best) if gain > 0.0 else "")
+	g.decor = b.joy
+
+
+## Works the decor bonus out again for everyone seated, after the room changes.
+func recheck_decor() -> void:
+	for g: Guest in guests:
+		if g.state == "waiting" or g.state == "eating":
+			cheer_with_decor(g)
+
+
+## The decor bonus for a seat: {"joy", "best"} from Decor.bonus.
+func decor_bonus(cell: Vector2i) -> Dictionary:
+	return Decor.bonus(decor_near(cell))
+
+
+## Every nice thing a seat can see, as {"id", "dist", "tier"} for Decor.bonus:
+## floors and rugs by cell, wall finishes by the floor beside them, and ferns.
+func decor_near(cell: Vector2i) -> Array:
+	var out: Array = []
+	var r := Decor.VIEW_RANGE
+	var sees := func(c: Vector2i, reach: int) -> bool:
+		return _near(cell, c, reach) and (c == cell or grid.has_los(cell, c))
+	for c: Vector2i in plan.floors:
+		var id := "floor_" + plan.kind(c)
+		if Catalog.joy_of(id) > 0.0 and sees.call(c, r):
+			out.append({"id": id, "dist": _dist(cell, c)})
+	for a: Vector2i in rugs:
+		for c in rug_cells(a, int(rugs[a].get_meta("facing", 0))):
+			if sees.call(c, r):
+				out.append({"id": "rug", "dist": _dist(cell, c)})
 	for e: Vector3i in plan.finishes:
-		var f: String = plan.finishes[e]
-		if best != "" and Catalog.joy_of(f) <= Catalog.joy_of(best):
-			continue
 		for side in Floorplan.sides(e):
-			if plan.has_floor(side) and _near(cell, side, FINISH_RANGE) and grid.has_los(cell, side):
-				best = f
-				break
-	return best
+			if plan.has_floor(side) and sees.call(side, r):
+				out.append({"id": plan.finishes[e], "dist": _dist(cell, side)})
+	for st: Station in stations.values():
+		if st.type == "plant" and sees.call(st.cell, Decor.reach("plant", st.tier)):
+			out.append({"id": "plant", "tier": st.tier, "dist": _dist(cell, st.cell)})
+	return out
+
+
+static func _dist(a: Vector2i, b: Vector2i) -> int:
+	return maxi(absi(a.x - b.x), absi(a.y - b.y))
 
 
 ## How far a piece's effect on guests reaches, in cells. 0 for a piece with none.
 static func range_of(id: String, tier := 1) -> int:
 	if id == "plant":
-		return 2 + tier
+		return Decor.reach(id, tier)
 	return BIN_RANGE if id == "bin" else 0
 
 
-## Every seat in the room, and whether a piece reaching `reach` cells would reach
-## it from `cell`. Partitions block it, as they block a guest's view.
+## Every seat in the room, and the share of a piece's joy (a Decor band) that would
+## reach it from `cell` with a reach of `reach` cells: Decor.BESIDE, Decor.IN_VIEW or 0.
+## Partitions block it, as they block a guest's view.
 func seats_reached(cell: Vector2i, reach: int) -> Dictionary:
 	var out := {}
 	for st: Station in stations.values():
 		for s in st.seats:
-			out[s] = _near(s, cell, reach) and grid.has_los(s, cell)
+			var seen := _near(s, cell, reach) and grid.has_los(s, cell)
+			out[s] = Decor.band(maxi(1, _dist(s, cell)), reach) if seen else 0.0
 	return out
 
 
 ## While a piece with a reach is carried: a pale square on the floor shows how far
-## it goes from the spot in front, and every seat gets a disc, green if the piece
-## would reach it from there and red if it would not.
+## it is seen from the spot in front, a brighter one the cells beside it, and every
+## seat gets a disc: big and green beside it (half its joy), small and pale green
+## in view (a fifth), red out of reach.
 func _update_range() -> void:
 	var reach := 0
 	if phase == Phase.BUILD and not hand.is_empty():
@@ -1827,6 +1856,13 @@ func _update_range() -> void:
 		wash.material_override = m
 		wash.position = Vector3(area.position.x + area.size.x / 2.0, 0.03, area.position.y + area.size.y / 2.0)
 		_range_marks.add_child(wash)
+		var close := MeshInstance3D.new()
+		var inner := PlaneMesh.new()
+		inner.size = Vector2(3, 3)
+		close.mesh = inner
+		close.material_override = m
+		close.position = Grid.center(cell) + Vector3(0, 0.035, 0)
+		_range_marks.add_child(close)
 	var seats := seats_reached(cell, reach)
 	for s: Vector2i in seats:
 		var disc := MeshInstance3D.new()
@@ -1835,11 +1871,14 @@ func _update_range() -> void:
 		puck.bottom_radius = 0.4
 		puck.height = 0.02
 		disc.mesh = puck
-		disc.material_override = Build.overlay_mat(Color(Color(Build.GOOD if seats[s] else Build.DANGER), 0.8), 2)
+		var share: float = seats[s]
+		var full := share >= Decor.BESIDE
+		disc.material_override = Build.overlay_mat(Color(Color(Build.GOOD if share > 0.0 else Build.DANGER), 0.8 if full or share == 0.0 else 0.5), 2)
 		disc.position = Grid.center(s) + Vector3(0, 0.05, 0)
 		_range_marks.add_child(disc)
 		disc.scale = Vector3(0.3, 1, 0.3)
-		disc.create_tween().tween_property(disc, "scale", Vector3.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		var size := Vector3.ONE if full or share == 0.0 else Vector3(0.6, 1, 0.6)
+		disc.create_tween().tween_property(disc, "scale", size, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 static func _near(a: Vector2i, b: Vector2i, r: int) -> bool:

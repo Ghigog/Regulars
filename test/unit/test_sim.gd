@@ -605,5 +605,57 @@ func test_nicer_finishes_cost_more_need_a_level_and_give_more_joy():
 		assert_lt(Catalog.level_of(pair[0]), Catalog.level_of(pair[1]))
 		assert_lt(Catalog.joy_of(pair[0]), Catalog.joy_of(pair[1]))
 	assert_eq(Catalog.joy_of("floor_tile"), 0.0, "plain floors do nothing")
-	assert_lt(Catalog.joy_of("paper_rose") + Catalog.joy_of("floor_marble") + Catalog.joy_of("rug"), 0.03,
-		"everything together is still less than a fern ++")
+	assert_almost_eq(Catalog.joy_of("plant", 3) - Catalog.joy_of("plant"), 2 * Catalog.TIER_JOY, 0.0001)
+
+
+# ---------------------------------------------------------------- decor
+
+func test_decor_gives_most_on_it_less_beside_and_least_in_view():
+	assert_eq(Decor.band(0), Decor.ON)
+	assert_eq(Decor.band(1), Decor.BESIDE)
+	assert_eq(Decor.band(Decor.VIEW_RANGE), Decor.IN_VIEW)
+	assert_eq(Decor.band(Decor.VIEW_RANGE + 1), 0.0, "out of sight range")
+	var rug := Catalog.joy_of("rug")
+	var on: float = Decor.bonus([{"id": "rug", "dist": 0}]).joy
+	var beside: float = Decor.bonus([{"id": "rug", "dist": 1}]).joy
+	var seen: float = Decor.bonus([{"id": "rug", "dist": 3}]).joy
+	assert_almost_eq(on, rug, 0.0001)
+	assert_almost_eq(beside, rug * Decor.BESIDE, 0.0001)
+	assert_almost_eq(seen, rug * Decor.IN_VIEW, 0.0001)
+	assert_gt(on, beside)
+	assert_gt(beside, seen)
+	assert_eq(Decor.bonus([]).joy, 0.0)
+	assert_eq(Decor.bonus([]).best, "")
+
+
+func test_decor_counts_each_kind_once_and_kinds_stack_to_a_cap():
+	var two_rugs: float = Decor.bonus([{"id": "rug", "dist": 0}, {"id": "rug", "dist": 1}, {"id": "rug", "dist": 2}]).joy
+	assert_almost_eq(two_rugs, Catalog.joy_of("rug"), 0.0001, "the best of a kind, not the sum")
+	var b := Decor.bonus([{"id": "rug", "dist": 0}, {"id": "paint", "dist": 1}])
+	assert_almost_eq(b.joy, Catalog.joy_of("rug") + Catalog.joy_of("paint") * Decor.BESIDE, 0.0001)
+	assert_eq(b.best, "rug")
+	var lavish := Decor.bonus([{"id": "rug", "dist": 0}, {"id": "floor_marble", "dist": 0},
+		{"id": "paper_rose", "dist": 1}, {"id": "plant", "tier": 3, "dist": 1}])
+	assert_eq(lavish.joy, Decor.CAP)
+	assert_eq(Decor.thought(lavish.best), "What a fine floor")
+
+
+func test_nobody_sits_on_a_wall_or_a_fern():
+	assert_almost_eq(Decor.bonus([{"id": "paper_rose", "dist": 0}]).joy, Catalog.joy_of("paper_rose") * Decor.BESIDE, 0.0001)
+	assert_almost_eq(Decor.bonus([{"id": "plant", "dist": 0}]).joy, Catalog.joy_of("plant") * Decor.BESIDE, 0.0001)
+
+
+func test_a_better_fern_is_seen_from_further_and_gives_more():
+	assert_eq(Decor.reach("plant", 1), 3)
+	assert_eq(Decor.reach("plant", 3), 5)
+	assert_eq(Decor.bonus([{"id": "plant", "tier": 1, "dist": 5}]).joy, 0.0)
+	assert_gt(Decor.bonus([{"id": "plant", "tier": 3, "dist": 5}]).joy, 0.0)
+	assert_gt(Decor.bonus([{"id": "plant", "tier": 2, "dist": 1}]).joy, Decor.bonus([{"id": "plant", "tier": 1, "dist": 1}]).joy)
+
+
+func test_a_nicely_dressed_table_is_worth_what_a_fern_once_was():
+	# A fern used to add 0.015 joy a second; a guest sits for some 20 seconds.
+	var dressed: float = Decor.bonus([{"id": "rug", "dist": 0}, {"id": "floor_parquet", "dist": 0},
+		{"id": "plant", "dist": 1}]).joy
+	assert_between(dressed, 0.25, Decor.CAP)
+	assert_lt(Decor.bonus([{"id": "plant", "dist": 3}, {"id": "paint", "dist": 3}]).joy, 0.1, "what is only seen adds a little")

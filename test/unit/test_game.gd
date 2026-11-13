@@ -207,8 +207,9 @@ func test_a_carried_fern_shows_which_seats_it_would_reach():
 	assert_eq(game.range_of("plant", 2), 4)
 	assert_eq(game.range_of("table"), 0)
 	var seat: Vector2i = game.stations[Vector2i(8, 3)].seats[0]
-	assert_true(game.seats_reached(Vector2i(8, 2), 3)[seat])
-	assert_false(game.seats_reached(seat - Vector2i(4, 0), 3)[seat], "four cells is out of reach")
+	assert_eq(game.seats_reached(seat + Vector2i(0, -1), 3)[seat], Decor.BESIDE)
+	assert_eq(game.seats_reached(seat - Vector2i(3, 0), 3)[seat], Decor.IN_VIEW)
+	assert_eq(game.seats_reached(seat - Vector2i(4, 0), 3)[seat], 0.0, "four cells is out of reach")
 	assert_true(game.pick_catalog("plant"))
 	game._update_range()
 	assert_gt(game._range_marks.get_child_count(), 1, "the wash and a disc for every seat")
@@ -1082,27 +1083,50 @@ func test_paint_and_paper_go_on_walls_and_come_off_for_a_refund():
 	assert_true(game._room.get_child_count() > 0, "the room redraws with its paint")
 
 
-func test_nice_floors_rugs_and_walls_cheer_seated_guests():
+func test_decor_cheers_a_guest_once_by_how_close_it_is():
 	_to_build()
-	var g: Guest = game.spawn_guest(0)
-	var gain := func(cell: Vector2i) -> float:
-		g.cell = cell
-		g.mood.joy = 0.2
-		game.apply_surroundings(g, 1.0)
-		return g.mood.joy - 0.2
-	var plain: float = gain.call(Vector2i(5, 3))
-	game.plan.floors[Vector2i(5, 3)] = "marble"
-	assert_almost_eq(gain.call(Vector2i(5, 3)) - plain, Catalog.joy_of("floor_marble"), 0.0001)
-	assert_true(g.mood.thoughts.has("What a fine floor"))
-	assert_eq(game.best_finish_seen(Vector2i(5, 1)), "")
+	game.stations[Vector2i(9, 0)].tier = 1
+	var on_rug: Vector2i = Vector2i(7, 4)        # the first rug lies under the middle table
+	var sees_rug := Vector2i(5, 3)              # two cells off, in sight
+	assert_not_null(game.rug_at(on_rug))
+	assert_null(game.rug_at(sees_rug))
+	var on: float = game.decor_bonus(on_rug).joy
+	var seen: float = game.decor_bonus(sees_rug).joy
+	gut.p("decor on the rug %.3f, only seeing it %.3f" % [on, seen])
+	assert_gt(on, seen, "sitting on the rug beats seeing it")
+	assert_eq(game.decor_bonus(on_rug).best, "rug")
+	game.plan.floors[sees_rug] = "marble"
+	assert_almost_eq(game.decor_bonus(sees_rug).joy - seen, Catalog.joy_of("floor_marble"), 0.0001)
 	game.plan.finishes[Vector3i(5, 0, 0)] = "paint"
 	game.plan.finishes[Vector3i(6, 0, 0)] = "paper_stripe"
-	assert_eq(game.best_finish_seen(Vector2i(5, 1)), "paper_stripe", "the nicest in view counts")
-	assert_eq(game.best_finish_seen(Vector2i(5, 4)), "", "too far from the wall")
-	var on_rug: float = gain.call(Vector2i(7, 4))
+	var near_wall: Array = game.decor_near(Vector2i(5, 1)).filter(func(n: Dictionary) -> bool: return n.id == "paper_stripe")
+	assert_eq(near_wall.size(), 1, "the paper is beside the seat")
+	assert_eq(int(near_wall[0].dist), 1)
+	# Once, on sitting, not every second; and again only if the room changes.
+	var g: Guest = game.spawn_guest(0)
+	g.seat = on_rug
+	g.cell = on_rug
+	g.mood.joy = 0.2
+	on = game.decor_bonus(on_rug).joy        # the marble is in view of the rug now
+	game.cheer_with_decor(g)
+	assert_almost_eq(g.mood.joy, 0.2 + on, 0.0001)
+	assert_true(g.mood.thoughts.has("Such a cosy rug"))
+	game.apply_surroundings(g, 1.0)
+	game.cheer_with_decor(g)
+	assert_almost_eq(g.mood.joy, 0.2 + on, 0.0001, "no more joy while they sit")
 	game.pick_up(Vector3(7.5, 0, 4.5))
 	game.sell_hand()
-	assert_almost_eq(on_rug - gain.call(Vector2i(7, 4)), Catalog.joy_of("rug"), 0.0001)
+	game.cheer_with_decor(g)
+	assert_almost_eq(g.mood.joy, 0.2 + game.decor_bonus(on_rug).joy, 0.0001, "the rug went, and its cheer with it")
+
+
+func test_seated_guests_get_the_decor_bonus_as_they_sit():
+	var g := _seat_at(Vector2i(8, 3), true)     # seat (7, 3), on the rug
+	assert_not_null(g)
+	if g == null:
+		return
+	assert_gt(g.decor, 0.0)
+	assert_almost_eq(g.decor, game.decor_bonus(g.seat).joy, 0.0001)
 
 
 # ---------------------------------------------------------------- options screen

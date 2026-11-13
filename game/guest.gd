@@ -17,6 +17,7 @@ var path: Array[Vector2i] = []
 var cell := Vector2i.ZERO
 var seat := Vector2i(-1, -1)
 var seen := {}          # nasty thing -> seconds this guest has had it in view
+var decor := 0.0        # the joy decor gave them when they sat down
 var party: Array = []   # the guests who came in together, this one included
 var table: Station
 var timer := 0.0
