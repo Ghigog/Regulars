@@ -105,9 +105,10 @@ var _range_marks: Node3D          # floor marks for the reach of the piece being
 var _range_key := ""
 var _door_turn: Node3D
 var best_path := "user://regulars_best.json"
-var player: Player
+var player: Player               # chef 1; `chefs` holds every chef, by player index
+var chefs: Array[Player] = []
 var hud: Hud
-var controls: Controls           # which device is in use; the controller and touch buttons
+var controls: Controls           # input per player: devices, touch buttons, presses sent to act()
 var cam: Camera3D
 var _cursor: Node3D
 var _gross: Array[Dictionary] = []
@@ -135,13 +136,14 @@ func _ready() -> void:
 	player = Player.new()
 	add_child(player)
 	player.setup(self, Vector2i(2, 3))
+	chefs = [player]
 	controls = Controls.new()
 	add_child(controls)
 	controls.setup(self)
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(self)
-	controls.mode_changed.connect(func(_m: String) -> void:
+	controls.mode_changed.connect(func(_m: String) -> void:   # player 0's device: the hints follow it
 		_aim_mouse = false
 		_drag = {}
 		hud.refresh_input())
@@ -256,7 +258,7 @@ func _apply_demo(demo: String) -> void:
 	elif demo == "options" or demo == "options_gfx":  # the options screen, on either tab
 		hud._options_tab = "graphics" if demo == "options_gfx" else "audio"
 		hud.toggle_options()
-		hud.options_key(KEY_DOWN)   # the highlight on the first slider (keys and pad)
+		hud.options_action("down")   # the highlight on the first slider (keys and pad)
 		get_tree().paused = false   # so the screenshot timer still runs
 	elif demo == "closed":
 		best_path = "user://regulars_best_demo.json"
@@ -2145,12 +2147,7 @@ func _process(delta: float) -> void:
 	if hud.options_open():
 		pass   # paused anyway; the arrows belong to the options screen
 	elif phase == Phase.SERVICE or (phase == Phase.BUILD and not shopping and not hud.typing()):
-		input = Vector2(
-			float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))
-			- float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),
-			float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP))
-			- float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)))
-		input = (input + controls.stick()).limit_length(1.0)
+		input = controls.move(0)
 	player.move(input, delta)
 	player.carry(not hand.is_empty())
 	if phase == Phase.BUILD:
@@ -2158,7 +2155,7 @@ func _process(delta: float) -> void:
 			_aim_mouse = false   # walking hands aim back to the chef
 		if _aim_mouse:
 			_mouse_point = floor_point(get_viewport().get_mouse_position())
-		_paint_held()
+		_paint_held(0)
 		_refresh_openings()
 	step(delta)
 	_update_camera(delta)
@@ -2201,49 +2198,36 @@ func _update_cursor() -> void:
 	hud.show_prompt(at, action)
 
 
-## Tab is taken here, before the interface can use it to move focus.
-func _input(event: InputEvent) -> void:
-	if phase == Phase.BUILD and event is InputEventKey and event.pressed and not event.echo \
-			and event.physical_keycode == KEY_TAB:
-		if shopping:
-			close_shop()
-		else:
-			open_shop()
-		get_viewport().set_input_as_handled()
-
-
-## One key press while the shop is open. Also called by the search box, which
-## would otherwise keep the arrow keys for itself.
-func shop_key(key: int, typing := false) -> bool:
-	if key == KEY_LEFT or (key == KEY_A and not typing):
-		hud.shop_move(-1)
-	elif key == KEY_RIGHT or (key == KEY_D and not typing):
-		hud.shop_move(1)
-	elif key == KEY_UP or (key == KEY_W and not typing):
-		hud.shop_category(-1)
-	elif key == KEY_DOWN or (key == KEY_S and not typing):
-		hud.shop_category(1)
-	elif key == KEY_ESCAPE:
-		if typing:
-			hud.stop_typing()
-		else:
-			close_shop()
-	elif typing:
-		return false
-	elif key == KEY_E or key == KEY_SPACE or key == KEY_ENTER or key == KEY_KP_ENTER:
-		hud.shop_buy()
-	elif key == KEY_F or key == KEY_SLASH:
-		hud.focus_search()
-	else:
-		return false
+## One action while the shop is open. Returns whether it was used.
+func shop_action(action: String) -> bool:
+	match action:
+		"left": hud.shop_move(-1)
+		"right": hud.shop_move(1)
+		"up": hud.shop_category(-1)
+		"down": hud.shop_category(1)
+		"back", "shop": close_shop()
+		"use", "confirm": hud.shop_buy()
+		"search": hud.focus_search()
+		_: return false
 	return true
+
+
+## A key typed into the shop's search box, which would otherwise keep the arrow
+## keys and Esc for itself. Letters (WASD among them) stay in the box.
+func shop_key(key: int) -> bool:
+	if key == KEY_ESCAPE:
+		hud.stop_typing()
+		return true
+	if key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
+		return shop_action(Controls.action_for_key(key))
+	return false
 
 
 ## Holding E with a floor tool keeps laying as the chef walks: each new cell in
 ## front of them is floored as they reach it, so they can pave their way out.
 ## (Not walls: the chef faces the way they walk, so walls would go across it.)
-func _paint_held() -> void:
-	var held := Input.is_physical_key_pressed(KEY_E) or Input.is_physical_key_pressed(KEY_SPACE)
+func _paint_held(p: int) -> void:
+	var held := controls.holding(p, "use")
 	if not held or shopping or hud.typing() or hand.is_empty() or floor_kind(hand.id) == "" or _aim_mouse:
 		_last_paint = Vector3i(-999, -999, -1)
 		return
@@ -2261,6 +2245,8 @@ func _build_mouse(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		_aim_mouse = true
 		return
+	# A touch on the room arrives as the mouse: the erase switch is the screen's player's.
+	var erase := controls.input_of(controls.owner_of("touch" if event.device == InputEvent.DEVICE_ID_EMULATION else "keys")).erase
 	var mb := event as InputEventMouseButton
 	if mb == null or (mb.button_index != MOUSE_BUTTON_LEFT and mb.button_index != MOUSE_BUTTON_RIGHT):
 		return
@@ -2273,7 +2259,7 @@ func _build_mouse(event: InputEvent) -> void:
 	var right := mb.button_index == MOUSE_BUTTON_RIGHT
 	if mb.pressed:
 		if tool:
-			_drag = {"from": p, "remove": right or controls.erase}
+			_drag = {"from": p, "remove": right or erase}
 		elif right:
 			cancel_hand()
 		elif not hand.is_empty():
@@ -2281,7 +2267,7 @@ func _build_mouse(event: InputEvent) -> void:
 				sfx("fail")
 		else:
 			pick_up(p)
-	elif not _drag.is_empty() and (right == bool(_drag.remove) or controls.erase):
+	elif not _drag.is_empty() and (right == bool(_drag.remove) or erase):
 		finish_drag(_drag.from, p, _drag.remove)
 
 
@@ -2296,40 +2282,65 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			inspect(guest_at(event.position))
 		return
-	if not (event is InputEventKey and event.pressed and not event.echo):
+	# Keys, controller buttons and touch buttons arrive as act() from Controls.
+
+
+## Player p pressed an action, on whatever device is theirs (see Controls).
+## The options screen and the shop are shared; the rest is done by that
+## player's chef.
+func act(p: int, action: String, echo := false) -> void:
+	if hud.options_open():
+		hud.options_action(action, echo)
 		return
-	var key: int = event.physical_keycode
-	var confirm := key == KEY_ENTER or key == KEY_KP_ENTER
-	var use := key == KEY_E or key == KEY_SPACE
-	if key == KEY_M:
+	if echo:
+		return
+	if action == "options":
+		hud.toggle_options()
+		return
+	if action == "mute":
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
 		return
-	if phase == Phase.SERVICE and use:
-		var st: Station = stations.get(player.target_cell())
-		if st != null and prompt_for(st) != "":
-			use_station(st)
-		elif not use_door() and st != null:
-			use_station(st)
-	elif phase == Phase.SUMMARY and confirm:
-		open_build()
-	elif phase == Phase.BUILD and shopping:
-		shop_key(key)
-	elif phase == Phase.BUILD and use:
-		build_interact()
-	elif phase == Phase.BUILD and key == KEY_ESCAPE:
-		cancel_hand()
-	elif phase == Phase.BUILD and key == KEY_R:
-		rotate_hand()
-	elif phase == Phase.BUILD and key == KEY_X:
-		if not hand.is_empty() and Catalog.is_build_tool(hand.id):
-			if _hover_point() != Vector3.INF and remove_at(snap(_hover_point())):
-				_plan_changed()
-				sfx("coin")
+	if p >= chefs.size():
+		return   # a seated player with no chef yet (co-op is not built)
+	match phase:
+		Phase.SERVICE:
+			if action == "use":
+				var st: Station = stations.get(player.target_cell())
+				if st != null and prompt_for(st) != "":
+					use_station(st)
+				elif not use_door() and st != null:
+					use_station(st)
+		Phase.SUMMARY:
+			if action == "confirm":
+				open_build()
+			elif action == "town":
+				hud.toggle_town()
+		Phase.CLOSED:
+			if action == "confirm":
+				restart()
+		Phase.BUILD:
+			if shopping:
+				shop_action(action)
 			else:
+				_build_act(action)
+
+
+func _build_act(action: String) -> void:
+	match action:
+		"use":
+			build_interact()
+		"back":
+			cancel_hand()
+		"turn":
+			rotate_hand()
+		"shop":
+			open_shop()
+		"sell":
+			if not hand.is_empty() and Catalog.is_build_tool(hand.id):
+				if _hover_point() != Vector3.INF and remove_at(snap(_hover_point())):
+					_plan_changed()
+					sfx("coin")
+				else:
+					sfx("fail")
+			elif not sell_hand():
 				sfx("fail")
-		elif not sell_hand():
-			sfx("fail")
-	elif phase == Phase.SUMMARY and key == KEY_T:
-		hud.toggle_town()
-	elif phase == Phase.CLOSED and confirm:
-		restart()

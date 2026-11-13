@@ -1200,43 +1200,27 @@ func apply_options() -> void:
 	game.set_tilt_shift(bool(options.tilt_shift))
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventKey and event.pressed):
-		return
-	var key: int = event.physical_keycode
-	if _options_card != null:
-		if options_key(key, event.echo):
-			get_viewport().set_input_as_handled()
-	elif key == KEY_O and not event.echo:
-		toggle_options()
-		get_viewport().set_input_as_handled()
-
-
 func options_open() -> bool:
 	return _options_card != null
 
 
-## One key press while the options screen is open: up and down pick a row, left
-## and right turn a slider or switch tabs, E/Space/Enter presses, Esc or O
-## closes. The controller sends these keys too (d-pad, A, B, Start). Held arrows
-## repeat; nothing else does. Returns whether the key was used.
-func options_key(key: int, echo := false) -> bool:
-	if key in [KEY_UP, KEY_W]:
-		_options_pick(_options_sel - 1)
-	elif key in [KEY_DOWN, KEY_S]:
-		_options_pick(_options_sel + 1)
-	elif key in [KEY_LEFT, KEY_A]:
-		_options_turn(-1)
-	elif key in [KEY_RIGHT, KEY_D]:
-		_options_turn(1)
-	elif echo:
-		return false
-	elif key in [KEY_E, KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]:
-		_options_press()
-	elif key in [KEY_ESCAPE, KEY_O]:
-		toggle_options()
-	else:
-		return false
+## One action while the options screen is open (see Controls): up and down pick
+## a row, left and right turn a slider or switch tabs, use or confirm presses,
+## back or options closes. Held browse keys repeat; nothing else does. Returns
+## whether the action was used.
+func options_action(action: String, echo := false) -> bool:
+	match action:
+		"up": _options_pick(_options_sel - 1)
+		"down": _options_pick(_options_sel + 1)
+		"left": _options_turn(-1)
+		"right": _options_turn(1)
+		_:
+			if echo:
+				return false
+			match action:
+				"use", "confirm": _options_press()
+				"back", "options": toggle_options()
+				_: return false
 	return true
 
 
@@ -1424,7 +1408,7 @@ func _volume_row(title: String, key: String) -> HBoxContainer:
 	var knob := _grabber(46 if touch else 26)
 	for icon in ["grabber", "grabber_highlight", "grabber_disabled"]:
 		slider.add_theme_icon_override(icon, knob)
-	slider.focus_mode = Control.FOCUS_NONE   # the arrows are read by options_key instead
+	slider.focus_mode = Control.FOCUS_NONE   # the arrows are read by options_action instead
 	row.add_child(slider)
 	row.set_meta("slider", slider)
 	var value := _label(row, 20, "%d%%" % roundi(slider.value * 100))
@@ -1807,7 +1791,7 @@ func show_shop() -> void:
 	_search_box.text_changed.connect(set_search)
 	_search_box.text_submitted.connect(func(_t: String) -> void: _search_box.release_focus())
 	_search_box.gui_input.connect(func(event: InputEvent) -> void:
-		if event is InputEventKey and event.pressed and game.shop_key(event.physical_keycode, true):
+		if event is InputEventKey and event.pressed and game.shop_key(event.physical_keycode):
 			_search_box.accept_event())
 	strip.add_child(_search_box)
 	var middle := HBoxContainer.new()

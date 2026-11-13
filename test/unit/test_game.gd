@@ -841,21 +841,35 @@ func test_mouse_drags_lay_floor_and_right_drags_take_it_up():
 	assert_eq(game.ledger.money, 70)
 
 
-# ---------------------------------------------------------------- controller and touch
+# ---------------------------------------------------------------- input per player
 
-func _pad(button: int, pressed: bool) -> void:
+## A controller button, delivered straight to Controls (no fake keys, no frames).
+func _pad(button: int, pressed: bool, device := 0) -> void:
 	var e := InputEventJoypadButton.new()
+	e.device = device
 	e.button_index = button
 	e.pressed = pressed
 	game.controls._input(e)
-	Input.flush_buffered_events()   # deliver the key it sent now, not on some later frame
+
+
+func _tap_pad(button: int, device := 0) -> void:
+	_pad(button, true, device)
+	_pad(button, false, device)
+
+
+func _axis(axis: int, value: float, device := 0) -> void:
+	var e := InputEventJoypadMotion.new()
+	e.device = device
+	e.axis = axis
+	e.axis_value = value
+	game.controls._input(e)
 
 
 func test_the_last_device_used_sets_the_mode_and_the_hints():
 	assert_eq(game.controls.mode, "keys")
-	_pad(JOY_BUTTON_B, true)
-	_pad(JOY_BUTTON_B, false)
+	_tap_pad(JOY_BUTTON_B)
 	assert_eq(game.controls.mode, "pad")
+	assert_eq(game.controls.input_of(0).source, "pad:0")
 	assert_eq(game.hud._prompt_key_label.text, "A", "the prompt shows the pad's button")
 	var touch := InputEventScreenTouch.new()
 	touch.position = Vector2(700, 300)
@@ -871,34 +885,82 @@ func test_the_last_device_used_sets_the_mode_and_the_hints():
 	assert_eq(game.hud._prompt_key_label.text, "E")
 
 
-func test_left_stick_walks_the_chef():
-	var e := InputEventJoypadMotion.new()
-	e.axis = JOY_AXIS_LEFT_X
-	e.axis_value = 1.0
-	game.controls._input(e)
-	assert_eq(game.controls.stick(), Vector2(1, 0))
+func test_left_stick_and_d_pad_walk_the_chef():
+	_axis(JOY_AXIS_LEFT_X, 1.0)
+	assert_eq(game.controls.move(0), Vector2(1, 0))
 	var from: Vector3 = game.player.position
 	for i in 10:
 		game._process(0.05)
 	assert_gt(game.player.position.distance_to(from), 0.5, "the chef walked")
-	e.axis_value = 0.1
-	game.controls._input(e)
-	assert_eq(game.controls.stick(), Vector2.ZERO, "inside the dead zone")
+	_axis(JOY_AXIS_LEFT_X, 0.1)
+	assert_eq(game.controls.move(0), Vector2.ZERO, "inside the dead zone")
+	_pad(JOY_BUTTON_DPAD_UP, true)
+	assert_eq(game.controls.move(0), Vector2(0, 1), "the d-pad walks too")
+	_pad(JOY_BUTTON_DPAD_UP, false)
+	assert_eq(game.controls.move(0), Vector2.ZERO)
 
 
-func test_pad_buttons_press_the_matching_keys():
+func test_pad_buttons_become_actions_for_the_phase():
 	_to_build()
 	game.ledger.money = 100
-	_pad(JOY_BUTTON_Y, true)
-	_pad(JOY_BUTTON_Y, false)
+	_tap_pad(JOY_BUTTON_Y)
 	assert_true(game.shopping, "Y opens the shop")
-	_pad(JOY_BUTTON_B, true)
-	_pad(JOY_BUTTON_B, false)
+	_tap_pad(JOY_BUTTON_B)
 	assert_false(game.shopping, "B closes it")
 	assert_true(game.pick_catalog("plant"))
-	_pad(JOY_BUTTON_RIGHT_SHOULDER, true)
-	_pad(JOY_BUTTON_RIGHT_SHOULDER, false)
+	_tap_pad(JOY_BUTTON_RIGHT_SHOULDER)
 	assert_eq(int(game.hand.facing), 1, "a shoulder button turns the piece")
+	_tap_pad(JOY_BUTTON_B)
+	assert_true(game.hand.is_empty(), "B puts it back")
+
+
+func test_a_confirms_the_receipt_and_y_opens_the_town_book():
+	game.arrivals.clear()
+	_run(0.2)
+	assert_eq(game.phase, game.Phase.SUMMARY)
+	_tap_pad(JOY_BUTTON_Y)
+	assert_true(game.hud._town_open, "Y opens the town book")
+	_tap_pad(JOY_BUTTON_Y)
+	_tap_pad(JOY_BUTTON_A)
+	assert_eq(game.phase, game.Phase.BUILD, "A carries on to the build phase")
+
+
+func test_holding_use_with_a_floor_tool_paves_ahead_on_any_device():
+	_to_build()
+	game.ledger.money = 100
+	assert_true(game.pick_catalog("floor_planks"))
+	game.player.position = Grid.center(Vector2i(5, 0))
+	game.player.look(Vector2i(0, -1))
+	_pad(JOY_BUTTON_A, true)
+	assert_true(game.plan.has_floor(Vector2i(5, -1)), "the press lays the first board")
+	assert_true(game.controls.holding(0, "use"))
+	game.player.position = Grid.center(Vector2i(6, 0))
+	game._paint_held(0)
+	assert_true(game.plan.has_floor(Vector2i(6, -1)), "held, it keeps laying")
+	_pad(JOY_BUTTON_A, false)
+	assert_false(game.controls.holding(0, "use"))
+	game.player.position = Grid.center(Vector2i(7, 0))
+	game._paint_held(0)
+	assert_false(game.plan.has_floor(Vector2i(7, -1)), "let go, it stops")
+
+
+func test_each_device_is_routed_to_the_player_it_is_seated_to():
+	var c: Controls = game.controls
+	assert_eq(c.owner_of("pad:3"), 0, "with one chef, every device is player one's")
+	c.seat("pad:1", 1)
+	assert_eq(c.players.size(), 2)
+	_axis(JOY_AXIS_LEFT_X, 1.0, 1)
+	_pad(JOY_BUTTON_A, true, 1)
+	assert_eq(c.input_of(1).mode, "pad")
+	assert_eq(c.move(1), Vector2(1, 0), "player two steers")
+	assert_true(c.holding(1, "use"))
+	assert_eq(c.mode, "keys", "player one's hints are unchanged")
+	assert_eq(c.move(0), Vector2.ZERO, "and player one stands still")
+	assert_false(c.holding(0, "use"))
+	_pad(JOY_BUTTON_A, false, 1)
+	_tap_pad(JOY_BUTTON_START, 1)
+	assert_true(game.hud.options_open(), "the options screen is shared")
+	game.hud.toggle_options()
 
 
 func test_touch_joystick_and_buttons_never_reach_the_room():
@@ -909,7 +971,7 @@ func test_touch_joystick_and_buttons_never_reach_the_room():
 	var drag := InputEventScreenDrag.new()
 	drag.position = touch.position + Vector2(200, 0)
 	game.controls._input(drag)
-	assert_almost_eq(game.controls.stick().x, 1.0, 0.01, "dragged to the right edge")
+	assert_almost_eq(game.controls.move(0).x, 1.0, 0.01, "dragged to the right edge")
 	var mouse := InputEventMouseButton.new()
 	mouse.device = InputEvent.DEVICE_ID_EMULATION
 	mouse.button_index = MOUSE_BUTTON_LEFT
@@ -919,11 +981,36 @@ func test_touch_joystick_and_buttons_never_reach_the_room():
 	assert_true(game.controls.owns_pointer(), "the mouse made from that touch is swallowed")
 	touch.pressed = false
 	game.controls._input(touch)
-	assert_eq(game.controls.stick(), Vector2.ZERO, "let go")
+	assert_eq(game.controls.move(0), Vector2.ZERO, "let go")
 	var ids := []
 	for b: Array in game.controls.buttons():
 		ids.append(b[0])
 	assert_has(ids, "use", "a Use button during service")
+
+
+func test_touch_buttons_press_and_hold_their_action():
+	_to_build()
+	game.ledger.money = 100
+	game.controls.set_mode("touch")
+	var shop: Array = game.controls.buttons().filter(func(b: Array) -> bool: return b[0] == "shop")[0]
+	var touch := InputEventScreenTouch.new()
+	touch.index = 1
+	touch.pressed = true
+	touch.position = shop[2]
+	game.controls._input(touch)
+	assert_true(game.shopping, "Shop opens the shop")
+	touch.pressed = false
+	game.controls._input(touch)
+	game.close_shop()
+	assert_true(game.pick_catalog("floor_planks"))
+	var use: Array = game.controls.buttons().filter(func(b: Array) -> bool: return b[0] == "use")[0]
+	touch.position = use[2]
+	touch.pressed = true
+	game.controls._input(touch)
+	assert_true(game.controls.holding(0, "use"), "Use is held while the finger stays")
+	touch.pressed = false
+	game.controls._input(touch)
+	assert_false(game.controls.holding(0, "use"))
 
 
 func test_booth_and_table_for_four_are_sold_under_dining():
@@ -1111,8 +1198,8 @@ func after_each():
 	get_tree().paused = false   # a failed options test must not freeze the rest
 
 
-## A key press as the keyboard (or a controller, through Controls) sends it,
-## delivered at once rather than on the next frame.
+## A key press as the keyboard sends it, delivered at once rather than on the
+## next frame.
 func _key(key: Key, pressed := true) -> void:
 	var e := InputEventKey.new()
 	e.physical_keycode = key
@@ -1125,13 +1212,6 @@ func _key(key: Key, pressed := true) -> void:
 func _tap(key: Key) -> void:
 	_key(key)
 	_key(key, false)
-
-
-func _tap_pad(button: int) -> void:
-	_pad(button, true)
-	Input.flush_buffered_events()
-	_pad(button, false)
-	Input.flush_buffered_events()
 
 
 func test_options_screen_works_from_the_keyboard():
@@ -1182,17 +1262,12 @@ func test_options_screen_works_with_a_controller():
 	_tap_pad(JOY_BUTTON_DPAD_DOWN)
 	_tap_pad(JOY_BUTTON_DPAD_RIGHT)
 	assert_almost_eq(float(hud.options.sfx), 0.6, 0.001, "the d-pad turns a slider")
-	var e := InputEventJoypadMotion.new()   # the stick browses too
-	e.axis = JOY_AXIS_LEFT_X
-	e.axis_value = 1.0
-	game.controls._input(e)
+	_axis(JOY_AXIS_LEFT_X, 1.0)   # the stick browses too
 	game.controls._process(0.01)
-	Input.flush_buffered_events()
+	game.controls._process(0.01)
 	assert_almost_eq(float(hud.options.sfx), 0.7, 0.001, "a flick of the stick is one notch")
-	e.axis_value = 0.0
-	game.controls._input(e)
+	_axis(JOY_AXIS_LEFT_X, 0.0)
 	game.controls._process(0.01)
-	Input.flush_buffered_events()
 	_tap_pad(JOY_BUTTON_DPAD_DOWN)
 	_tap_pad(JOY_BUTTON_DPAD_DOWN)
 	assert_eq(hud._options_row(), hud._options_done)

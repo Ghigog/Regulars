@@ -100,8 +100,10 @@ many days as you can; three walkouts in one day ends the run.
     the best finish on a wall within 2 cells that the seat can see (paint 0.003, striped
     0.006, rose 0.01). All of them together (0.025) are less than a fern ++ (0.03). The
     values live in `Catalog.ITEMS` ("joy"), so they are easy to retune.
-- **Keyboard, controller or touch** (`game/controls.gd`). Whichever device was used last
-  is the mode, so a player can switch at any moment; every hint (the corner line, the
+- **Keyboard, controller or touch** (`game/controls.gd`, `game/player_input.gd`). Each
+  device is a source ("keys" for keyboard and mouse, "pad:<id>" per controller, "touch")
+  seated to a player; with one chef every source is player one's. Whichever device a
+  player used last is their mode, so they can switch at any moment; every hint (the corner line, the
   prompt's keycap, the build slip, the shop's key line, the receipt buttons) is reworded
   for it. Controller: left stick or d-pad walk, A use (and confirm the receipt and the end
   screen), B back, X sell or remove, Y shop (town book on the receipt), LB/RB turn,
@@ -109,9 +111,11 @@ many days as you can; three walkouts in one day ends the run.
   down the right a big Use button that names the action, and above it, by night, Shop,
   Drop or Done, Turn, Sell, or Erase (with a build tool, Erase makes drags take things
   away); a small Menu button for options. Taps on the room work as clicks (pick a guest,
-  place a piece, drag floors), and a touch on a control never reaches the room. The
-  buttons and the controller send the same key presses as the keyboard, so there is one
-  set of rules. The options screen works from the keys and the pad: up and down (d-pad,
+  place a piece, drag floors), and a touch on a control never reaches the room. Keys,
+  pad buttons and touch buttons all become the same actions (use, back, turn, sell,
+  shop, town, options, confirm, search, mute and the four browse directions), sent to the
+  game as `act(player, action)`, so there is one set of rules; held actions (hold Use to
+  keep laying floor) and movement are read per player. The options screen works from the keys and the pad: up and down (d-pad,
   arrows or the stick) choose a row (the tabs, each slider, the switch, Done), left and
   right turn a slider a tenth or switch tabs, A, E or Enter presses, B, Esc or Start
   closes. The chosen row gets an ink frame with a coral pointer, for keys and pad only.
@@ -259,7 +263,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Theme and location** chosen at the start of a run (seaside diner first). Location sets
   the town's size and tastes; theme sets the menu and starting furniture.
 - **Menu growth**: new dishes add stations and steps (chopping, frying, drinks).
-- **Local co-op**: the game is structured so a second directly-controlled chef can be added.
+- **Local co-op**: input is already per player (see section 9); a second chef is the next step.
 - **Lose condition** today is three walkouts in a day. Alternatives to test: reputation
   stars, rent you must make each week.
 
@@ -335,9 +339,24 @@ Not built yet; this is the agreed direction for future sessions.
   forgets it if the critic found the place clean. A good
   review brings more guests (which can backfire on a kitchen that is not ready); a bad
   one keeps them away.
-- **Co-op: local, same screen first;** online later. Controller input today goes into
-  the game as shared key presses (`game/controls.gd`), so co-op needs input per
-  player: refactor that first.
+- **Co-op: local, same screen first;** online later. Input is now per player (done
+  13 November 2026): `Controls` seats each device to a player index, keeps a
+  `PlayerInput` per player (device in use, stick, held actions, touch erase) and calls
+  `game.act(player, action)`. Adding chef 2 means `controls.seat("pad:1", 1)`, a second
+  `Player` in `chefs`, and moving the per-chef state below out of `main.gd`.
+  - *Per player*: the chef (position, facing, what they carry), the build hand (the
+    piece or tool held, its facing, the moving flag), the drag, the ghost and its
+    no-go cross, the reach marks, the station cursor and prompt bubble, the paint-held
+    spot, mouse aim (the mouse and keyboard player only), touch erase, the hint wording
+    (each player's device). Already split: device mode, stick, held actions, erase.
+    Still in `main.gd` as one: `hand`, `_drag`, `_aim_mouse`, `_mouse_point`,
+    `_last_paint`, the ghost, the cursor and prompt (they read `player`).
+  - *Shared*: the phase and the day, money and the ledger, the shop (one open at a time;
+    whoever opens it browses), the options screen (pauses everyone), the receipt and
+    town book, the door, the plan and the room, guests, music and camera.
+  - *Open*: who may open the shop or confirm the receipt (anyone, today); hints on one
+    screen for players on different devices (today they follow player one); how a pad
+    joins (press Start?).
 - **Title screen: a placeholder** with Play, Settings and Quit. Accessibility comes
   later; meanwhile new interface should say things by shape as well as colour.
 - **Decor works like RollerCoaster Tycoon scenery:** a flat bonus by proximity, not
