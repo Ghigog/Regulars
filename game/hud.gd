@@ -40,6 +40,10 @@ var banner_label: Label
 var center: CenterContainer
 var prompt: Control
 var prompt_label: Label
+var last_action := ""      # the word on the prompt, for the touch Use button
+var _prompt_key: Control
+var _prompt_key_label: Label
+var _shop_keys: Label
 var _shown_money := -1
 var _shown_strikes := 0
 var _town_open := false
@@ -486,6 +490,8 @@ class ModelView extends TextureRect:
 		spin.add_child(n)
 		if bp.id == "screen":
 			game._wall_visual(n, 0.9 + 0.1 * int(bp.tier))
+		elif Catalog.is_build_tool(bp.id):
+			Scenery.tool_preview(n, bp.id)
 		elif bp.id == "flyers":   # a loose stack of printed sheets
 			n.scale = Vector3.ONE * 1.7
 			for i in 4:
@@ -728,7 +734,7 @@ func setup(game_) -> void:
 	hint.offset_left = 24
 	hint.offset_top = -40
 	hint.modulate.a = 0.75
-	hint.text = "WASD move     E or Space use     Click a guest     O options     M mute"
+	hint.text = _hint_text()
 
 	# The keycap prompt that floats over the station the chef faces.
 	prompt = Sheet.new("tab").pad(10, 8, 16, 12)
@@ -739,7 +745,8 @@ func setup(game_) -> void:
 	prompt.add_child(prow)
 	var key := Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
 	prow.add_child(key)
-	_label(key, 24, "E")
+	_prompt_key = key
+	_prompt_key_label = _label(key, 24, "E")
 	prompt_label = _label(prow, 26)
 
 	var banner_box := CenterContainer.new()
@@ -1121,6 +1128,7 @@ func _stamp(slot: Punch, delay: float) -> void:
 
 ## Shows "[E] COOK" over a point on screen, or hides it when `text` is empty.
 func show_prompt(at: Vector2, text: String) -> void:
+	last_action = text
 	prompt.visible = text != ""
 	if text != "":
 		prompt_label.text = text.to_upper()
@@ -1224,7 +1232,7 @@ func toggle_options() -> void:
 	_options_body.add_theme_constant_override("separation", 12)
 	_options_body.custom_minimum_size = Vector2(0, 96)
 	box.add_child(_options_body)
-	_button(box, "Done   (Esc)", toggle_options)
+	_button(box, "Done" + _key_note("back"), toggle_options)
 	_show_options_tab(_options_tab)
 	_pop_in(card)
 
@@ -1385,13 +1393,13 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	var gossip := _label(note, 19, "TOWN GOSSIP: " + game.town.headline())
 	gossip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	gossip.custom_minimum_size = Vector2(380, 0)
-	_button(stack, "Town book   (T)", show_town)
-	_button(stack, "Set up for day %d   (Enter)" % game.ledger.day, game.open_build)
+	_button(stack, "Town book" + _key_note("town"), show_town)
+	_button(stack, ("Set up for day %d" % game.ledger.day) + _key_note("confirm"), game.open_build)
 	if animate:
 		_pop_in(clip)
 
 
-const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Walls", "Extras"]
+const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
 const TRAY_DROP := 260.0   # how far below its place the shop tray waits
 
 
@@ -1438,6 +1446,84 @@ func stop_typing() -> void:
 		_search_box.release_focus()
 
 
+## What a control is called for the device in use ("E", "A", "Use").
+func _g(action: String) -> String:
+	return game.controls.glyph(action) if game.controls else str(Controls.GLYPHS.keys[action])
+
+
+func _mode() -> String:
+	return game.controls.mode if game.controls else "keys"
+
+
+## "   (Enter)" after a button's words; nothing on touch, where it is tapped.
+func _key_note(action: String) -> String:
+	return "" if _mode() == "touch" or _g(action) == "" else "   (%s)" % _g(action)
+
+
+func _hint_text() -> String:
+	match _mode():
+		"pad":
+			return "Stick move     A use     B back     Start options"
+		"touch":
+			return ""   # the joystick sits there; the Use button names the action
+	return "WASD move     E or Space use     Click a guest     O options     M mute"
+
+
+func _shop_keys_text() -> String:
+	match _mode():
+		"pad":
+			return "A buy      D-pad browse      B close"
+		"touch":
+			return "Tap a piece, then tap it again to buy"
+	return "E buy      Tab close"
+
+
+## The build slip's words for what is in hand, for the device in use.
+func _build_tip(hand: Dictionary) -> String:
+	var m := _mode()
+	var use := _g("use")
+	if hand.is_empty():
+		if m == "touch":
+			return "Joystick walk      Tap a piece to pick it up      Shop      Flip the door card to open for day %d" % game.ledger.day
+		return "%s walk      %s pick up      %s shop      Flip the door card to open for day %d" % [_g("move"), use, _g("shop"), game.ledger.day]
+	if Catalog.is_build_tool(hand.id):
+		var floor: bool = game.floor_kind(hand.id) != ""
+		var what := "%s, $%d each." % [Catalog.label(hand), int(hand.price)]
+		match m:
+			"touch":
+				var drag := "Drag along the floor for a row" if hand.id == "wall" else ("Drag across the floor for a rectangle" if floor else "Tap a wall to add one")
+				return "%s      %s      Erase, then drag, to take away      Done" % [what, drag]
+			"pad":
+				return "%s      %s      X remove      B done" % [what, "Hold A and walk to keep laying" if floor else "A build"]
+		var how := "Hold E and walk to keep laying" if floor else "E build"
+		var drag := "drag for a row" if hand.id == "wall" else ("drag for a rectangle" if floor else "click to add")
+		return "%s      %s      Mouse: %s, right-drag removes      X remove      Esc done" % [what, how, drag]
+	var turn := _g("turn")
+	if hand.get("moving", false):
+		var why: String = game.sell_block()
+		var sell := ("%s for $%d" % ["Sell" if m == "touch" else _g("sell") + " sell", game.sell_value()]) if why == "" else why
+		if m == "touch":
+			return "Carrying the %s.      Tap the floor to put it down      Turn      %s      Drop puts it back" % [game.piece_name(hand).to_lower(), sell]
+		return "Carrying the %s.      %s put down      %s turn      %s      %s put back" % [
+			game.piece_name(hand).to_lower(), use, turn, sell, _g("back")]
+	if m == "touch":
+		return "%s, $%d when it is put down.      Tap the floor to put it down      Turn      Drop" % [Catalog.label(hand), int(hand.price)]
+	return "%s, $%d when it is put down.      %s put down      %s turn      %s drop" % [
+		Catalog.label(hand), int(hand.price), use, turn, _g("back")]
+
+
+## Redraws every hint for a new device: the corner hint, the prompt's keycap,
+## the build slip and the shop's key line.
+func refresh_input() -> void:
+	hint.text = _hint_text()
+	_prompt_key.visible = _mode() != "touch"
+	_prompt_key_label.text = _g("use")
+	if _shop_keys:
+		_shop_keys.text = _shop_keys_text()
+	if build_bar:
+		show_build()
+
+
 ## The build phase: a paper slip along the bottom says what the keys do. The
 ## shop (show_shop) slides up over it. Later calls only redraw.
 func show_build() -> void:
@@ -1460,15 +1546,7 @@ func show_build() -> void:
 		game.sfx("rustle")
 	build_bar.visible = _shop == null
 	var hand: Dictionary = game.hand
-	if hand.is_empty():
-		_tip.text = "WASD walk      E pick up      Tab shop      Flip the door card to open for day %d" % game.ledger.day
-	elif hand.get("moving", false):
-		var why: String = game.sell_block()
-		_tip.text = "Carrying the %s.      E put down      R turn      %s      Esc put back" % [
-			game.piece_name(hand).to_lower(), "X sell for $%d" % game.sell_value() if why == "" else why]
-	else:
-		_tip.text = "%s, $%d when it is put down.      E put down      R turn      Esc drop" % [
-			Catalog.label(hand), int(hand.price)]
+	_tip.text = _build_tip(hand)
 	_refresh_catalog()
 
 
@@ -1588,7 +1666,8 @@ func show_shop() -> void:
 		tab.toggle_mode = true
 		tab.set_meta("cat", cat)
 		_tabs.append(tab)
-	var keys := _label(strip, 15, "E buy      Tab close")
+	var keys := _label(strip, 15, _shop_keys_text())
+	_shop_keys = keys
 	keys.custom_minimum_size = Vector2(210, 0)   # as wide as the search box, so the tabs sit dead centre
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	keys.modulate.a = 0.75
@@ -1832,5 +1911,5 @@ func show_closed(days: int, earned: int, best: Dictionary, is_record: bool) -> v
 	_centred(box, "TOTAL EARNED: $%d" % earned)
 	_ornament(box, "star")
 	_centred(box, "NEW BEST RUN!" if is_record else "BEST RUN: %d %s" % [best.days, "DAY" if best.days == 1 else "DAYS"])
-	_button(box, "Try again   (Enter)", game.restart)
+	_button(box, "Try again" + _key_note("confirm"), game.restart)
 	_pop_in(menu)

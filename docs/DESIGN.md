@@ -34,11 +34,50 @@ many days as you can; three walkouts in one day ends the run.
   middle, much bigger than the small ones either side (about five show each way), on a
   soft white disc, lifted, tipped and spinning slowly, with its price underneath and its
   name and a few words on what it does on the line below. Left and right browse (wrapping), up and down change
-  category (Kitchen, Dining, Decor, Walls, Extras, centred under the row; there is no
+  category (Kitchen, Dining, Decor, Build, Extras, centred under the row; there is no
   "All"), E buys, F or / types in the search box at the bottom left. A search looks
   through every category, and picking a category ends it. A bought piece goes into the chef's hands
   and is paid for when it is put down; it stays in hand for another while there is money.
-  The mouse still works on the shop's cards, tabs and Buy button, but not on the room.
+  The mouse works too: moving it over the room aims the piece in hand at the floor
+  under the pointer (walking hands aim back to the chef), a left click puts it down or
+  picks a piece up, and a right click drops it.
+- **Building the room** (Build tab). Tiled floor and plank floor ($5 a tile), wall ($5 a
+  length), door ($20) and archway ($15) are tools: they stay in hand while there is money.
+  - *Floors* grow the room. New floor must touch floor already laid (a dragged
+    rectangle is laid outward from the room) and stay on the lot, which reaches 5 cells
+    left and 2 back (`LOT`): the street is on the right and the near edge stays put.
+    Laying one kind over the other swaps it. The outer walls are never placed: any
+    edge with floor on one side is a wall, so they move out as the floor grows, and
+    the wall between the old room and the new floor comes down.
+  - *Walls* divide the room: they go on an edge between two floors and are refused if
+    they would cut a seat, a station or the chef off from the door.
+  - *Doors and archways* go in any wall, outer ones included, so a door can be cut
+    before the room behind it is floored. A door lets people through but blocks sight;
+    an archway lets both through. One that nobody can use (bare ground or a piece of
+    furniture on a side, or not reachable from the front door) is drawn grey under a
+    yellow warning sign. Laying floor past a door in an outer wall merges the rooms and
+    pays the door back.
+  - *Placing:* E builds at the spot in front of the chef; holding E with a floor tool
+    and walking keeps laying, so the chef can pave their way out. With the mouse, a left
+    drag lays a rectangle of floor or a straight row of wall (the prompt shows the count
+    and the cost), and a click adds a door or archway. Removing: X at the spot in front,
+    or a right drag. Everything taken away is paid back in full. The floor inside the
+    front door, floor under furniture or seats, and floor that would strand someone
+    cannot be lifted.
+  - The first room's fixtures (hood, wall cabinets, jar shelf, kitchen sconce, the rug)
+    stay only while the wall or floor they hang on does.
+- **Keyboard, controller or touch** (`game/controls.gd`). Whichever device was used last
+  is the mode, so a player can switch at any moment; every hint (the corner line, the
+  prompt's keycap, the build slip, the shop's key line, the receipt buttons) is reworded
+  for it. Controller: left stick or d-pad walk, A use (and confirm the receipt and the end
+  screen), B back, X sell or remove, Y shop (town book on the receipt), LB/RB turn,
+  Start options; in the shop the stick and d-pad browse. Touch: a joystick bottom left;
+  down the right a big Use button that names the action, and above it, by night, Shop,
+  Drop or Done, Turn, Sell, or Erase (with a build tool, Erase makes drags take things
+  away); a small Menu button for options. Taps on the room work as clicks (pick a guest,
+  place a piece, drag floors), and a touch on a control never reaches the room. The
+  buttons and the controller send the same key presses as the keyboard, so there is one
+  set of rules. Not yet: moving the options sliders with a controller.
 - **Reach marks.** While a piece with a reach is carried (a fern: 2 + tier cells; the bin:
   5), a pale square on the floor shows how far it goes from the spot in front, and every
   seat has a disc: green if the piece would reach it from there, red if not (out of range
@@ -145,11 +184,11 @@ placed; floors and ceilings.
 - **Catalog** (built): buy furniture with money, gated by XP level. Starting list:
   partition wall $10, counter $15, fern $20, table for two $40 (level 2), stove $80
   (level 3). To add: more pieces to make browsing worth it, pictures on the cards.
-- **Walls, floors, ceilings**: free-form placement. Walls sit on cell edges and block
-  sight and movement. Placement is refused if it cuts a seat or the chef off from the door.
+- **Floors, walls, doors, archways** (built, section 1): `sim/floorplan.gd` holds the
+  plan; `Scenery.build_room` draws it. Ceilings are not planned (the camera looks down).
 - **Two currencies**: money (earned per day) and XP (10 per meal plus the tip; 100 per level).
 - **Built**: moving, selling and rotating furniture (section 1).
-- **To add**: expanding the lot, floor and wall finishes that affect joy, themes that
+- **To add**: buying more lot, floor and wall finishes that affect joy, themes that
   change the catalog. Known rough edge: the dining-room rugs are scenery and stay put
   when a table is moved off them.
 

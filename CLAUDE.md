@@ -11,15 +11,17 @@ as many days as possible. Working title. The current build is a vertical slice.
 /Applications/Godot.app/Contents/MacOS/Godot --headless -s addons/gut/gut_cmdln.gd   # tests (GUT 9.7.1)
 ```
 
-All 79 tests should pass before and after any change. Screenshots for checking visuals:
+All 91 tests should pass before and after any change. Screenshots for checking visuals:
 `REGULARS_SHOT=/abs/path.png REGULARS_SHOT_AT=13.5 REGULARS_DEMO=cook godot --path .`
-(`REGULARS_DEMO` is `cook`, `summary`, `closed`, `lineup`, `fx`, `town`, `kind`, `flyers`, `build` (the shop), `build_no`, `build_find`, `build_move`, `build_range` (a fern's reach), `door`, `close` (closing early), `inspect`, `newday` (receipt, build, then the calendar turning) or `walkout` (one stamp); see `_apply_demo` in `game/main.gd`.
-Add `REGULARS_THEME=seaside` for the second theme.) Run `--headless --import` once after
+(`REGULARS_DEMO` is `cook`, `summary`, `closed`, `lineup`, `fx`, `town`, `kind`, `flyers`, `build` (the shop), `build_no`, `build_find`, `build_move`, `build_range` (a fern's reach), `build_tools` (the shop's Build tab), `build_room` (an extension, walls, doors, two greyed out), `build_drag` (a floor drag in progress), `door`, `close` (closing early), `inspect`, `newday` (receipt, build, then the calendar turning) or `walkout` (one stamp); see `_apply_demo` in `game/main.gd`.
+Add `REGULARS_THEME=seaside` for the second theme, and `REGULARS_INPUT=touch` or `=pad`
+to show the touch buttons or controller hints.) Run `--headless --import` once after
 adding a script with a new `class_name`.
 
 ## Layout
 
 - `sim/`: pure game logic, no scene dependencies, unit-tested. Keep it that way.
+  `floorplan.gd` is the room's shape (floors, built walls, doors); outer walls are derived.
 - `game/`: the scene layer. `main.gd` owns the world and the day loop. Visuals are generated
   in code: `build.gd` (palette, bevelled boxes, lathed shapes, food, stations), `peg.gd`
   (characters), `scenery.gd` (room, street, themes), `icons.gd` and `fx.gd` (flat icons,

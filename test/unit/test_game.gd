@@ -624,3 +624,185 @@ func test_chef_aims_at_the_station_most_in_front():
 	# With nothing useful in reach, nothing is targeted.
 	game.player.position = Grid.center(Vector2i(2, 5))
 	assert_false(game.stations.has(game.player.target_cell()))
+
+
+# ---------------------------------------------------------------- building the room
+
+func test_floor_tool_grows_the_room_and_charges_per_tile():
+	_to_build()
+	game.ledger.money = 100
+	assert_true(game.pick_catalog("floor_planks"))
+	assert_true(game.grid.is_blocked(Vector2i(5, -1)), "bare ground behind the dining room")
+	assert_eq(game.finish_drag(Vector3(4.5, 0, -0.5), Vector3(7.5, 0, -1.5), false), 8)
+	assert_eq(game.ledger.money, 60)
+	assert_false(game.grid.is_blocked(Vector2i(5, -1)), "now floor")
+	assert_true(game.grid.reachable(Vector2i(5, 1), Vector2i(5, -2)), "the old back wall came down")
+	assert_eq(game.hand.id, "floor_planks", "still in hand for more")
+	assert_eq(game.finish_drag(Vector3(4.5, 0, -3.5), Vector3(7.5, 0, -3.5), false), 0, "nothing past the edge of the lot")
+	assert_true(game.place(Vector3i(3, 1, 0)), "laid beside the room one at a time")
+	assert_true(game.remove_at(Vector3i(3, 1, 0)))
+	assert_eq(game.ledger.money, 60, "taking a tile up pays it back")
+	assert_false(game.remove_at(Vector3i(9, 4, 0)), "never the floor inside the front door")
+	assert_false(game.remove_at(Vector3i(6, 1, 0)), "nor under a table")
+
+
+func test_walls_divide_the_room_but_never_shut_anyone_in():
+	_to_build()
+	game.ledger.money = 500
+	game.pick_catalog("floor_planks")
+	game.finish_drag(Vector3(4.5, 0, -0.5), Vector3(9.5, 0, -1.5), false)
+	assert_true(game.pick_catalog("wall"))
+	var built: int = game.finish_drag(Vector3(4, 0, 0), Vector3(10, 0, 0), false)
+	assert_eq(built, 6)
+	assert_false(game.grid.reachable(Vector2i(5, 1), Vector2i(5, -1)), "the back room is walled off")
+	assert_false(game.grid.has_los(Vector2i(5, 1), Vector2i(5, -1)))
+	# A wall across the front of a table's seats would cut them off: refused.
+	var seat: Vector2i = game.find_station("table").seats[0]
+	var shut := 0
+	for e in Floorplan.cell_edges(seat):
+		if game.can_place(e):
+			game.place(e)
+			shut += 1
+	assert_true(game.grid.reachable(game.DOOR, seat), "the seat can still be reached")
+	assert_lt(shut, 4)
+
+
+func test_doors_and_archways_open_walls_and_warn_when_unusable():
+	_to_build()
+	game.ledger.money = 500
+	assert_true(game.pick_catalog("door"))
+	var back := Vector3i(6, 0, 0)
+	assert_true(game.place(back), "a door can go in the back wall before there is a room behind it")
+	assert_false(game.opening_usable(back), "it leads onto bare ground")
+	assert_eq(game.ledger.money, 480)
+	game.pick_catalog("floor_planks")
+	assert_true(game.place(Vector3i(6, -1, 0)))
+	assert_false(game.plan.openings.has(back), "laying floor past an outer door merges the rooms")
+	assert_eq(game.ledger.money, 495, "and the door is paid back")
+	game.pick_catalog("wall")
+	assert_true(game.place(back))
+	game.pick_catalog("arch")
+	assert_true(game.place(back))
+	assert_true(game.opening_usable(back))
+	assert_true(game.grid.has_los(Vector2i(6, 0), Vector2i(6, -1)), "an archway lets guests see through")
+	assert_true(game.remove_at(back))
+	game.pick_catalog("door")
+	assert_true(game.place(back))
+	assert_true(game.grid.reachable(Vector2i(6, 0), Vector2i(6, -1)))
+	assert_false(game.grid.has_los(Vector2i(6, 0), Vector2i(6, -1)), "a door does not")
+	# A door with a stove in front of it cannot be used.
+	assert_true(game.place(Vector3i(0, 3, 1)))
+	assert_false(game.opening_usable(Vector3i(0, 3, 1)))
+	assert_false(game.plan.has_floor(Vector2i(-1, 3)))
+
+
+func _mouse(at: Vector3, button: int, pressed: bool) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = button
+	e.pressed = pressed
+	e.position = game.cam.unproject_position(at)
+	game._unhandled_input(e)
+
+
+func test_mouse_drags_lay_floor_and_right_drags_take_it_up():
+	_to_build()
+	game.cam.position = game._frame[0] + game.CAM_OFFSET   # settled, as after a frame or two
+	game.cam.size = game._frame[1]
+	game.ledger.money = 100
+	game.pick_catalog("floor_tile")
+	_mouse(Vector3(0.5, 0, 1.5), MOUSE_BUTTON_LEFT, true)
+	assert_eq(game.build_action().begins_with("Lay"), true, "the prompt counts the drag")
+	_mouse(Vector3(3.5, 0, 0.5), MOUSE_BUTTON_LEFT, false)
+	assert_eq(game.plan.kind(Vector2i(0, 0)), "tile", "the corner behind the kitchen is floored")
+	assert_eq(game.ledger.money, 60)
+	_mouse(Vector3(0.5, 0, 0.5), MOUSE_BUTTON_RIGHT, true)
+	_mouse(Vector3(1.5, 0, 0.5), MOUSE_BUTTON_RIGHT, false)
+	assert_false(game.plan.has_floor(Vector2i(1, 0)))
+	assert_eq(game.ledger.money, 70)
+
+
+# ---------------------------------------------------------------- controller and touch
+
+func _pad(button: int, pressed: bool) -> void:
+	var e := InputEventJoypadButton.new()
+	e.button_index = button
+	e.pressed = pressed
+	game.controls._input(e)
+
+
+func test_the_last_device_used_sets_the_mode_and_the_hints():
+	assert_eq(game.controls.mode, "keys")
+	_pad(JOY_BUTTON_B, true)
+	_pad(JOY_BUTTON_B, false)
+	assert_eq(game.controls.mode, "pad")
+	assert_eq(game.hud._prompt_key_label.text, "A", "the prompt shows the pad's button")
+	var touch := InputEventScreenTouch.new()
+	touch.position = Vector2(700, 300)
+	touch.pressed = true
+	game.controls._input(touch)
+	assert_eq(game.controls.mode, "touch")
+	assert_false(game.hud._prompt_key.visible, "no keycap on touch: the Use button says it")
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_W
+	key.pressed = true
+	game.controls._input(key)
+	assert_eq(game.controls.mode, "keys")
+	assert_eq(game.hud._prompt_key_label.text, "E")
+
+
+func test_left_stick_walks_the_chef():
+	var e := InputEventJoypadMotion.new()
+	e.axis = JOY_AXIS_LEFT_X
+	e.axis_value = 1.0
+	game.controls._input(e)
+	assert_eq(game.controls.stick(), Vector2(1, 0))
+	var from: Vector3 = game.player.position
+	for i in 10:
+		game._process(0.05)
+	assert_gt(game.player.position.distance_to(from), 0.5, "the chef walked")
+	e.axis_value = 0.1
+	game.controls._input(e)
+	assert_eq(game.controls.stick(), Vector2.ZERO, "inside the dead zone")
+
+
+func test_pad_buttons_press_the_matching_keys():
+	_to_build()
+	game.ledger.money = 100
+	_pad(JOY_BUTTON_Y, true)
+	_pad(JOY_BUTTON_Y, false)
+	await wait_frames(2)
+	assert_true(game.shopping, "Y opens the shop")
+	_pad(JOY_BUTTON_B, true)
+	_pad(JOY_BUTTON_B, false)
+	await wait_frames(2)
+	assert_false(game.shopping, "B closes it")
+	assert_true(game.pick_catalog("plant"))
+	_pad(JOY_BUTTON_RIGHT_SHOULDER, true)
+	_pad(JOY_BUTTON_RIGHT_SHOULDER, false)
+	await wait_frames(2)
+	assert_eq(int(game.hand.facing), 1, "a shoulder button turns the piece")
+
+
+func test_touch_joystick_and_buttons_never_reach_the_room():
+	var touch := InputEventScreenTouch.new()
+	touch.pressed = true
+	touch.position = game.controls._stick_home()
+	game.controls._input(touch)
+	var drag := InputEventScreenDrag.new()
+	drag.position = touch.position + Vector2(200, 0)
+	game.controls._input(drag)
+	assert_almost_eq(game.controls.stick().x, 1.0, 0.01, "dragged to the right edge")
+	var mouse := InputEventMouseButton.new()
+	mouse.device = InputEvent.DEVICE_ID_EMULATION
+	mouse.button_index = MOUSE_BUTTON_LEFT
+	mouse.pressed = true
+	mouse.position = touch.position
+	game.controls._input(mouse)
+	assert_true(game.controls.owns_pointer(), "the mouse made from that touch is swallowed")
+	touch.pressed = false
+	game.controls._input(touch)
+	assert_eq(game.controls.stick(), Vector2.ZERO, "let go")
+	var ids := []
+	for b: Array in game.controls.buttons():
+		ids.append(b[0])
+	assert_has(ids, "use", "a Use button during service")

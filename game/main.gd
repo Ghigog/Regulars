@@ -20,7 +20,11 @@ const GROSS := {
 	"rubbish": [0.05, 1.5, 0.4],
 }
 const BIN_RANGE := 5          # the bin only bothers guests seated this close
-const AREA := Rect2i(0, 0, W, H)   # where the player may build
+const AREA := Rect2i(0, 0, W, H)   # the first room
+## The lot: where floor may be laid. It grows back and to the left only: the
+## street runs down the right, and the near edge of the floor stays where it is.
+const LOT := Rect2i(-5, -2, W + 5, H + 2)
+const ENTRANCE_CELL := Vector2i(W - 1, DOOR.y)   # the floor just inside the front door; never lifted
 const DOORWAY := Vector3(W, 0, DOOR.y + 0.5)   # the middle of the doorway, on the floor
 const DOOR_REACH := 1.25
 const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
@@ -69,6 +73,18 @@ var catalog: Catalog
 ## a piece picked up from the room also has {moving, node, from, from_facing}.
 var hand := {}
 var wall_nodes := {}                   # Vector3i edge -> Node3D, player-built partitions only
+var plan: Floorplan                    # floors, walls, doors and archways
+var _room: Node3D                      # the room as drawn from the plan; rebuilt when it changes
+var _room_lights: Array[OmniLight3D] = []
+var _openings := {}                    # Vector3i edge -> Scenery opening info
+var _opening_ok := {}                  # Vector3i edge -> whether it was last drawn usable
+var _frame := [WIDE_FOCUS, WIDE_SIZE, CLOSE_FOCUS, CLOSE_SIZE]   # the camera, fitted to the floor
+var _aim_mouse := false                # build phase: the mouse, not the chef, says where things go
+var _mouse_point := Vector3.INF
+var _drag := {}                        # a mouse drag with a build tool: {"from": Vector3, "remove": bool}
+var _tool_ghost: Node3D
+var _tool_key := ""
+var _last_paint := Vector3i(-999, -999, -1)   # the spot E last built on while held
 const PIECE_NAMES := {"fridge": "Fridge", "sink": "Sink", "bin": "Bin", "plates": "Plate stack", "pass": "Pass counter"}
 var _ghost: Node3D
 var _ghost_key := ""
@@ -86,6 +102,7 @@ var _door_turn: Node3D
 var best_path := "user://regulars_best.json"
 var player: Player
 var hud: Hud
+var controls: Controls           # which device is in use; the controller and touch buttons
 var cam: Camera3D
 var _cursor: Node3D
 var _gross: Array[Dictionary] = []
@@ -102,19 +119,29 @@ var _shot_time := 0.0
 
 func _ready() -> void:
 	var seed_value := int(Time.get_unix_time_from_system())
-	grid = Grid.new(W + 2, H)   # columns W and W + 1 are the pavement outside
+	grid = Grid.new(W + 2 - LOT.position.x, LOT.size.y, LOT.position)   # columns W and W + 1 are the pavement outside
 	town = Town.new(seed_value)
 	ledger = Ledger.new()
 	catalog = Catalog.new(seed_value)
 	_build_scenery()
 	_build_layout()
+	_start_plan()
 	_load_sounds()
 	player = Player.new()
 	add_child(player)
 	player.setup(self, Vector2i(2, 3))
+	controls = Controls.new()
+	add_child(controls)
+	controls.setup(self)
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(self)
+	controls.mode_changed.connect(func(_m: String) -> void:
+		_aim_mouse = false
+		_drag = {}
+		hud.refresh_input())
+	if OS.get_environment("REGULARS_INPUT") != "":   # dev switch for screenshots: touch or pad
+		controls.set_mode(OS.get_environment("REGULARS_INPUT"))
 	# A warm frame around the top of the station the chef is facing.
 	_cursor = Node3D.new()
 	add_child(_cursor)
@@ -270,6 +297,9 @@ func _demo_build(demo: String) -> void:
 	if demo == "door":  # at the doorway, about to flip the card
 		player.position = Grid.center(Vector2i(W - 1, DOOR.y))
 		player.look(Vector2i(1, 0))
+	elif demo == "build_tools":   # the shop's Build tab: floors, walls and ways through
+		open_shop()
+		hud._set_category("Build")
 	elif demo == "build" or demo == "build_find":  # the shop, three items along
 		open_shop()
 		if demo == "build_find":
@@ -280,6 +310,29 @@ func _demo_build(demo: String) -> void:
 		pick_up(Vector3(8.5, 0, 3.5))
 		rotate_hand()
 		_demo_hover = Vector3(7.5, 0, 2.5)
+	elif demo == "build_room" or demo == "build_drag":
+		# A back room behind the dining room through a door, the kitchen grown to the
+		# left behind a new wall, and a door the bin stands in front of (greyed out).
+		ledger.money = 2000
+		pick_catalog("floor_planks")
+		finish_drag(Vector3(4.5, 0, -1.5), Vector3(9.5, 0, -0.5), false)
+		pick_catalog("wall")
+		finish_drag(Vector3(4, 0, 0), Vector3(10, 0, 0), false)
+		pick_catalog("door")
+		place(Vector3i(7, 0, 0))
+		pick_catalog("floor_tile")
+		finish_drag(Vector3(-2.5, 0, 2.5), Vector3(-0.5, 0, 6.5), false)
+		pick_catalog("wall")
+		finish_drag(Vector3(0, 0, 2), Vector3(0, 0, 7), false)
+		pick_catalog("arch")
+		place(Vector3i(0, 5, 1))
+		pick_catalog("door")
+		place(Vector3i(1, 2, 0))
+		cancel_hand()
+		if demo == "build_drag":   # more floor being dragged out, part of it off the lot
+			pick_catalog("floor_planks")
+			_drag = {"from": Vector3(-0.5, 0, -1.5), "remove": false}
+			_demo_hover = Vector3(3.5, 0, 1.5)
 	elif demo == "build_range":  # a fern carried past the tables: its reach and the seats it touches
 		pick_catalog("plant", 1)
 		_demo_hover = Vector3(6.5, 0, 3.5)
@@ -387,7 +440,7 @@ func _build_scenery() -> void:
 	add_child(cam)
 	cam.look_at_from_position(WIDE_FOCUS + CAM_OFFSET, WIDE_FOCUS)
 
-	_sconces = Scenery.build(self, W, H, DOOR)
+	_sconces = Scenery.build_ground(self, W, H)
 	set_tilt_shift(TILT_SHIFT)
 
 
@@ -416,18 +469,75 @@ func _build_layout() -> void:
 	]:
 		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
 	Build.register(stations[Vector2i(4, 2)])  # the till lives on the pass and moves with it
-	# The front wall (drawn by Scenery as a knee-high cutaway) has a doorway;
-	# guests cannot see or walk through the rest.
-	for y in H:
-		if y != DOOR.y:
-			grid.walls[Vector3i(W, y, 1)] = true
-	# The room is an L: the corner behind the kitchen is not part of it.
-	for x in Scenery.KITCHEN_W:
-		grid.walls[Vector3i(x, Scenery.KITCHEN_Z, 0)] = true
-		for y in Scenery.KITCHEN_Z:
-			grid.blocked[Vector2i(x, y)] = true
-	for y in Scenery.KITCHEN_Z:
-		grid.walls[Vector3i(Scenery.KITCHEN_W, y, 1)] = true
+
+
+## The first room is an L (sheet 1): a tiled kitchen on the left, set forward of
+## the planked dining room, with the front door in the right-hand wall.
+func _start_plan() -> void:
+	plan = Floorplan.new(LOT)
+	plan.fill(Rect2i(0, Scenery.KITCHEN_Z, Scenery.KITCHEN_W, H - Scenery.KITCHEN_Z), "tile")
+	plan.fill(Rect2i(Scenery.KITCHEN_W, 0, W - Scenery.KITCHEN_W, H), "planks")
+	plan.openings[Vector3i(DOOR.x, DOOR.y, 1)] = "entrance"
+	_sync_grid()
+	_rebuild_room()
+
+
+## Copies the plan's walls, doors and bare ground into the grid, with the partitions.
+func _sync_grid() -> void:
+	grid.walls.clear()
+	for e in plan.solid_walls():
+		grid.walls[e] = true
+	for e: Vector3i in wall_nodes:
+		grid.walls[e] = true
+	grid.doors.clear()
+	for e in plan.doors():
+		grid.doors[e] = true
+	grid.outside.clear()
+	for x in range(LOT.position.x, LOT.end.x):
+		for y in range(LOT.position.y, LOT.end.y):
+			if not plan.has_floor(Vector2i(x, y)):
+				grid.outside[Vector2i(x, y)] = true
+
+
+## Redraws the room from the plan and fits the camera round it.
+func _rebuild_room() -> void:
+	if _room:
+		remove_child(_room)
+		_room.queue_free()
+	for l in _room_lights:
+		_sconces.erase(l)
+	_room = Node3D.new()
+	add_child(_room)
+	var r: Dictionary = Scenery.build_room(_room, plan, DOOR)
+	_room_lights.assign(r.lights)
+	_sconces.append_array(_room_lights)
+	_openings = r.openings
+	_opening_ok.clear()
+	_refresh_openings()
+	# The camera keeps the whole floor in view as it grows back and to the left.
+	var b := plan.bounds()
+	var shift := Vector3((b.position.x + b.end.x - W) / 2.0, 0, (b.position.y + b.end.y - H) / 2.0)
+	var grow := maxf(1.0, float(b.size.x + b.size.y + 2) / float(W + H + 2))
+	_frame = [WIDE_FOCUS + shift, WIDE_SIZE * grow, CLOSE_FOCUS + shift, CLOSE_SIZE * grow]
+
+
+## Greys out each door and archway nobody can get through: one with bare
+## ground or furniture on a side, or none of it reachable from the front door.
+func _refresh_openings() -> void:
+	var seen := grid.flood(DOOR)
+	for e: Vector3i in _openings:
+		var ok := opening_usable(e, seen)
+		if _opening_ok.get(e, null) != ok:
+			_opening_ok[e] = ok
+			Scenery.dress_opening(_openings[e], ok)
+
+
+func opening_usable(e: Vector3i, seen := {}) -> bool:
+	if seen.is_empty():
+		seen = grid.flood(DOOR)
+	var s := Floorplan.sides(e)
+	return plan.opening_has_floor(e) and not grid.blocked.has(s[0]) and not grid.blocked.has(s[1]) \
+		and (seen.has(s[0]) or seen.has(s[1]))
 
 
 func add_station(type: String, cell: Vector2i, tier := 1, facing := 0) -> Station:
@@ -755,6 +865,7 @@ func pick_catalog(id: String, tier := 1) -> bool:
 
 ## Puts down whatever is in hand: a new piece is dropped, a moved one goes back.
 func cancel_hand() -> void:
+	_drag = {}
 	if hand.get("moving", false):
 		_put_down(hand.from, int(hand.from_facing))
 	hand = {}
@@ -807,7 +918,7 @@ func _put_down(spot: Vector3i, facing: int) -> void:
 
 ## Turns the piece in hand a quarter turn. Partitions turn by where you point.
 func rotate_hand() -> void:
-	if not hand.is_empty() and hand.id != "screen":
+	if not hand.is_empty() and not on_edge(hand.id) and not Catalog.is_build_tool(hand.id):
 		hand.facing = (int(hand.facing) + 1) % 4
 		sfx("pickup")
 
@@ -858,24 +969,53 @@ static func snap_edge(p: Vector3) -> Vector3i:
 ## Where the piece in hand would go for a point on the floor: (x, y, axis).
 ## Furniture snaps to the cell (axis 0); a partition snaps to the nearest cell edge.
 func snap(p: Vector3) -> Vector3i:
-	if hand.get("id", "") == "screen":
+	if on_edge(hand.get("id", "")):
 		return snap_edge(p)
 	var c := Grid.to_cell(p)
 	return Vector3i(c.x, c.y, 0)
+
+
+## Pieces that sit on a cell edge rather than in a cell.
+static func on_edge(id: String) -> bool:
+	return id == "screen" or id == "wall" or id == "door" or id == "arch"
+
+
+## The floor kind a floor tool lays, or "".
+static func floor_kind(id: String) -> String:
+	return id.trim_prefix("floor_") if id.begins_with("floor_") else ""
+
+
+## Everyone who must still be able to get about after a change: the chef, every
+## seat (must_reach) and a side of every station (must_touch).
+func _reach() -> Array[Vector2i]:
+	var reach: Array[Vector2i] = [player.cell()]
+	reach.assign(reach + grid.reserved.keys())
+	return reach
+
+
+func _touch() -> Array[Vector2i]:
+	var touch: Array[Vector2i] = []
+	touch.assign(stations.keys())
+	return touch
 
 
 ## Would the piece in hand fit at this spot without cutting anyone off?
 func can_place(spot: Vector3i) -> bool:
 	if hand.is_empty():
 		return false
-	var reach: Array[Vector2i] = [player.cell()]
-	reach.assign(reach + grid.reserved.keys())
-	var touch: Array[Vector2i] = []
-	touch.assign(stations.keys())
-	if hand.id == "screen":
-		return grid.can_place_wall(spot, AREA, DOOR, reach, touch)
+	var reach := _reach()
+	var touch := _touch()
 	var cell := Vector2i(spot.x, spot.y)
-	return grid.can_place_block(cell, Station.seats_for(hand.id, cell, int(hand.facing)), AREA, DOOR, reach, touch)
+	match hand.id:
+		"floor_tile", "floor_planks":
+			return plan.can_lay(cell, floor_kind(hand.id))
+		"wall":
+			return plan.can_build(spot) and grid.can_place_wall(spot, LOT, DOOR, reach, touch)
+		"door", "arch":
+			return plan.can_open(spot, hand.id)
+	if hand.id == "screen":
+		return grid.can_place_wall(spot, LOT, DOOR, reach, touch) and not plan.is_wall(spot)
+	return grid.can_place_block(cell, Station.seats_for(hand.id, cell, int(hand.facing)), LOT, DOOR, reach, touch)
 
 
 ## Builds the piece in hand and pays for it, so cancelling before this is free.
@@ -884,6 +1024,13 @@ func can_place(spot: Vector3i) -> bool:
 func place(spot: Vector3i) -> bool:
 	if phase != Phase.BUILD or not can_place(spot):
 		return false
+	if Catalog.is_build_tool(hand.id):
+		if not _build_at(spot):
+			return false
+		_plan_changed()
+		sfx("putdown")
+		_after_building()
+		return true
 	var cell := Vector2i(spot.x, spot.y)
 	if hand.get("moving", false):
 		_put_down(spot, int(hand.facing))
@@ -901,10 +1048,149 @@ func place(spot: Vector3i) -> bool:
 		add_station(hand.id, cell, int(hand.tier), int(hand.facing))
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
 	sfx("putdown")
+	_after_building()
+	return true
+
+
+## A new piece or tool stays in hand while there is money for another.
+func _after_building() -> void:
 	if not catalog.can_buy(hand.id, ledger.money, ledger.level(), int(hand.tier)):
 		hand = {}
 	hud.show_build()
+
+
+# ---------------------------------------------------------------- building the room
+
+## One tile, wall, door or archway from the tool in hand, if it fits and can be
+## paid for. Keeps the grid in step; the room is redrawn by the caller.
+func _build_at(spot: Vector3i) -> bool:
+	if not can_place(spot) or not ledger.spend(int(hand.price)):
+		return false
+	var cell := Vector2i(spot.x, spot.y)
+	match hand.id:
+		"floor_tile", "floor_planks":
+			var was := plan.kind(cell)
+			if was != "":   # laying over another floor: the old one is taken up and paid back
+				ledger.refund(Catalog.price_of("floor_" + was))
+			for what: String in plan.lay(cell, floor_kind(hand.id)).values():
+				ledger.refund(Catalog.price_of(what))
+		"wall":
+			plan.build(spot)
+		"door", "arch":
+			plan.openings[spot] = hand.id
+	_sync_grid()
 	return true
+
+
+## Takes away the floor, built wall or opening at a spot, for the tool in hand,
+## and pays back what it cost. Refused if it would cut anyone off.
+func remove_at(spot: Vector3i) -> bool:
+	if phase != Phase.BUILD or hand.is_empty() or not Catalog.is_build_tool(hand.id):
+		return false
+	var cell := Vector2i(spot.x, spot.y)
+	match hand.id:
+		"floor_tile", "floor_planks":
+			if not plan.has_floor(cell) or cell == ENTRANCE_CELL or stations.has(cell) \
+					or grid.reserved.has(cell) or cell == player.cell():
+				return false
+			for e in Floorplan.cell_edges(cell):
+				if wall_nodes.has(e):
+					return false
+			grid.outside[cell] = true
+			var ok := grid.layout_ok(DOOR, _reach(), _touch())
+			grid.outside.erase(cell)
+			if not ok:
+				return false
+			ledger.refund(Catalog.price_of("floor_" + plan.kind(cell)))
+			for e in Floorplan.cell_edges(cell):
+				if plan.built.has(e):
+					ledger.refund(Catalog.price_of("wall"))
+			for what: String in plan.lift(cell).values():
+				ledger.refund(Catalog.price_of(what))
+		"wall":
+			if not plan.built.has(spot):
+				return false
+			ledger.refund(Catalog.price_of("wall"))
+			var had := plan.unbuild(spot)
+			if had != "":
+				ledger.refund(Catalog.price_of(had))
+		"door", "arch":
+			var what: String = plan.openings.get(spot, "")
+			if what != "door" and what != "arch":
+				return false
+			grid.walls[spot] = true   # closing it up must not shut anyone in
+			var ok := grid.layout_ok(DOOR, _reach(), _touch())
+			grid.walls.erase(spot)
+			if not ok:
+				return false
+			plan.openings.erase(spot)
+			ledger.refund(Catalog.price_of(what))
+	_sync_grid()
+	return true
+
+
+## After the plan changes: redraw the room and say so.
+func _plan_changed() -> void:
+	_rebuild_room()
+	hud.show_build()
+
+
+## The spots a mouse drag covers, from where it started to `to`: a rectangle of
+## cells for floors, a straight line of edges for walls, one spot otherwise.
+func drag_spots(from: Vector3, to: Vector3) -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	var id: String = hand.get("id", "")
+	if floor_kind(id) != "":
+		var cells := Floorplan.rect_cells(Grid.to_cell(from), Grid.to_cell(to))
+		if not _drag.get("remove", false):
+			cells = plan.lay_order(cells, floor_kind(id))
+		for c in cells:
+			out.append(Vector3i(c.x, c.y, 0))
+	elif id == "wall":
+		var a := Vector2i(roundi(from.x), roundi(from.z))
+		var b := Vector2i(roundi(to.x), roundi(to.z))
+		if a == b:
+			out.append(snap_edge(to))
+		else:
+			out.assign(Floorplan.line(a, b))
+	elif id != "":
+		out.append(snap(to))
+	return out
+
+
+## Builds (or removes) along a whole drag, as far as the money goes.
+func finish_drag(from: Vector3, to: Vector3, remove: bool) -> int:
+	_drag = {"from": from, "remove": remove}
+	var done := 0
+	for spot in drag_spots(from, to):
+		if remove:
+			done += int(remove_at(spot))
+		elif _build_at(spot):
+			done += 1
+		elif not ledger.money >= int(hand.price):
+			break
+	_drag = {}
+	if done > 0:
+		_plan_changed()
+		sfx("coin" if remove else "putdown")
+		if not remove:
+			_after_building()
+	else:
+		sfx("fail")
+	return done
+
+
+## What a drag in progress would do, for the prompt: "Lay 6 tiles  $30".
+func drag_summary() -> String:
+	if _drag.is_empty() or hand.is_empty() or _hover_point() == Vector3.INF:
+		return ""
+	var spots := drag_spots(_drag.from, _hover_point())
+	if _drag.remove:
+		return "Remove"
+	var n := spots.size() if floor_kind(hand.id) != "" else spots.filter(can_place).size()
+	var price := int(hand.price)
+	var noun: String = "tile" if floor_kind(hand.id) != "" else ("wall" if hand.id == "wall" else hand.id)
+	return "%s %d %s%s  $%d" % ["Lay" if floor_kind(hand.id) != "" else "Build", n, noun, "s" if n != 1 else "", n * price]
 
 
 ## A point on the floor in front of the chef: the middle of the next cell, or (for
@@ -917,7 +1203,18 @@ func _front_point(edge := false) -> Vector3:
 func _hover_point() -> Vector3:
 	if _demo_hover != Vector3.INF:
 		return _demo_hover
-	return _front_point(hand.get("id", "") == "screen")
+	if _aim_mouse:
+		return _mouse_point
+	return _front_point(on_edge(hand.get("id", "")))
+
+
+## Where a point on the screen lands on the floor.
+func floor_point(screen: Vector2) -> Vector3:
+	var o := cam.project_ray_origin(screen)
+	var d := cam.project_ray_normal(screen)
+	if absf(d.y) < 0.0001:
+		return Vector3.INF
+	return o + d * (-o.y / d.y)
 
 
 ## A point on the piece the chef could pick up: the partition on the edge ahead,
@@ -935,6 +1232,17 @@ func build_action() -> String:
 	if phase != Phase.BUILD or shopping:
 		return ""
 	if not hand.is_empty():
+		if not _drag.is_empty():
+			return drag_summary()
+		match hand.id:
+			"floor_tile", "floor_planks":
+				return "Lay floor"
+			"wall":
+				return "Build wall"
+			"door":
+				return "Add door"
+			"arch":
+				return "Add archway"
 		return "Put down"
 	if _piece_in_front() != Vector3.INF:
 		return "Pick up"
@@ -942,9 +1250,13 @@ func build_action() -> String:
 
 
 func build_interact() -> void:
-	match build_action():
+	var action := build_action()
+	if not hand.is_empty():
+		action = "Put down"
+	match action:
 		"Put down":
-			if not place(snap(_hover_point())):
+			_last_paint = snap(_hover_point())
+			if not place(_last_paint):
 				sfx("fail")
 		"Pick up":
 			pick_up(_piece_in_front())
@@ -955,7 +1267,8 @@ func build_interact() -> void:
 ## The piece in hand is held over the spot in front of the chef; a cross marks
 ## spots where it cannot go.
 func _update_ghost() -> void:
-	var key := "%s:%s" % [hand.get("id", ""), hand.get("tier", 0)] if phase == Phase.BUILD and not hand.is_empty() else ""
+	_update_tool_ghost()
+	var key := "%s:%s" % [hand.get("id", ""), hand.get("tier", 0)] if phase == Phase.BUILD and not hand.is_empty() and not Catalog.is_build_tool(hand.id) else ""
 	if key != _ghost_key:
 		_ghost_key = key
 		if _ghost:
@@ -976,7 +1289,7 @@ func _update_ghost() -> void:
 		return
 	var spot := snap(p)
 	var ok := can_place(spot)
-	if hand.id == "screen":
+	if on_edge(hand.id):
 		_place_on_edge(_ghost, spot)
 	else:
 		_ghost.position = Grid.center(Vector2i(spot.x, spot.y))
@@ -985,6 +1298,50 @@ func _update_ghost() -> void:
 	_ghost.visible = ok
 	_no_mark.visible = not ok
 	_no_mark.position = Vector3(_ghost.position.x, 0, _ghost.position.z)
+
+
+## A build tool shows what it would do: pale squares for floor, bars along the
+## edges for walls, the door or archway itself; green where it fits, coral
+## where it does not, and coral everywhere a drag would remove.
+func _update_tool_ghost() -> void:
+	var p := _hover_point()
+	var tool := phase == Phase.BUILD and not hand.is_empty() and Catalog.is_build_tool(hand.id) and not shopping and p != Vector3.INF
+	var spots: Array[Vector3i] = []
+	if tool:
+		spots = drag_spots(_drag.from, p) if not _drag.is_empty() else [snap(p)] as Array[Vector3i]
+	var key := "%s|%s|%s|%d" % [hand.get("id", ""), spots, _drag.get("remove", false), ledger.money] if tool else ""
+	if key == _tool_key:
+		return
+	_tool_key = key
+	if _tool_ghost:
+		_tool_ghost.queue_free()
+		_tool_ghost = null
+	if not tool:
+		return
+	_tool_ghost = Node3D.new()
+	add_child(_tool_ghost)
+	var removing: bool = _drag.get("remove", false)
+	var dragging := not _drag.is_empty()
+	for spot in spots:
+		var ok := not removing and (dragging and floor_kind(hand.id) != "" or can_place(spot))
+		var col := Color(Build.DANGER if removing or not ok else Build.GOOD, 0.55)
+		if floor_kind(hand.id) != "":
+			var tile := Build.box(_tool_ghost, Vector3(spot.x + 0.5, 0.02, spot.y + 0.5), Vector3(0.94, 0.03, 0.94), Build.GOOD)
+			tile.material_override = Build.overlay_mat(col, 3)
+		elif hand.id == "wall":
+			var bar := Node3D.new()
+			_tool_ghost.add_child(bar)
+			_place_on_edge(bar, spot)
+			Build.box(bar, Vector3(0, 0, 0), Vector3(1.0, Scenery.CUT_H, Scenery.WALL_T), Build.GOOD).material_override = Build.overlay_mat(col, 3)
+		else:
+			var n := Node3D.new()
+			_tool_ghost.add_child(n)
+			_place_on_edge(n, spot)
+			var inner := Node3D.new()
+			n.add_child(inner)
+			Scenery.dress_opening({"holder": inner, "kind": hand.id, "tall": false}, true)
+			if removing or not ok:
+				Build.box(n, Vector3(0, 0, 0), Vector3(1.0, 0.9, Scenery.WALL_T + 0.1), Build.DANGER).material_override = Build.overlay_mat(col, 3)
 
 
 ## Flyers: bought from the shop's Extras at night for a bigger crowd tomorrow. One batch a night.
@@ -1254,7 +1611,9 @@ func _update_range() -> void:
 	var reach := 0
 	if phase == Phase.BUILD and not hand.is_empty():
 		reach = range_of(hand.id, int(hand.tier))
-	var cell := Grid.to_cell(_hover_point())
+	if _hover_point() == Vector3.INF:
+		reach = 0
+	var cell := Grid.to_cell(_hover_point()) if reach > 0 else Vector2i.ZERO
 	var key := "%d:%s:%d:%d" % [reach, cell, stations.size(), grid.walls.size()] if reach > 0 else ""
 	if key == _range_key:
 		return
@@ -1263,7 +1622,7 @@ func _update_range() -> void:
 		c.queue_free()
 	if key == "":
 		return
-	var area := Rect2i(cell - Vector2i(reach, reach), Vector2i(reach, reach) * 2 + Vector2i.ONE).intersection(AREA)
+	var area := Rect2i(cell - Vector2i(reach, reach), Vector2i(reach, reach) * 2 + Vector2i.ONE).intersection(LOT)
 	if area.has_area():
 		var wash := MeshInstance3D.new()
 		var plane := PlaneMesh.new()
@@ -1555,8 +1914,16 @@ func _process(delta: float) -> void:
 			- float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),
 			float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP))
 			- float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)))
+		input = (input + controls.stick()).limit_length(1.0)
 	player.move(input, delta)
 	player.carry(not hand.is_empty())
+	if phase == Phase.BUILD:
+		if input != Vector2.ZERO:
+			_aim_mouse = false   # walking hands aim back to the chef
+		if _aim_mouse:
+			_mouse_point = floor_point(get_viewport().get_mouse_position())
+		_paint_held()
+		_refresh_openings()
 	step(delta)
 	_update_camera(delta)
 	_update_cursor()
@@ -1574,8 +1941,8 @@ func _process(delta: float) -> void:
 func _update_camera(delta: float) -> void:
 	var close := phase == Phase.SERVICE
 	var k := 1.0 - exp(-2.5 * delta)
-	cam.size = lerpf(cam.size, CLOSE_SIZE if close else WIDE_SIZE, k)
-	cam.position = cam.position.lerp((CLOSE_FOCUS if close else WIDE_FOCUS) + CAM_OFFSET, k)
+	cam.size = lerpf(cam.size, _frame[3] if close else _frame[1], k)
+	cam.position = cam.position.lerp((_frame[2] if close else _frame[0]) + CAM_OFFSET, k)
 
 
 func _update_cursor() -> void:
@@ -1590,7 +1957,7 @@ func _update_cursor() -> void:
 	if action == "":   # nothing to cook or serve: the build phase and the door card
 		action = build_action() if phase == Phase.BUILD else door_action()
 		var p := DOORWAY + Vector3(0, 2.9, 0)
-		if action == "Put down":
+		if not hand.is_empty() and _hover_point() != Vector3.INF:
 			p = _hover_point() + Vector3(0, 2.0, 0)
 		elif action == "Pick up":
 			p = _piece_in_front() + Vector3(0, 2.0, 0)
@@ -1636,9 +2003,58 @@ func shop_key(key: int, typing := false) -> bool:
 	return true
 
 
+## Holding E with a floor tool keeps laying as the chef walks: each new cell in
+## front of them is floored as they reach it, so they can pave their way out.
+## (Not walls: the chef faces the way they walk, so walls would go across it.)
+func _paint_held() -> void:
+	var held := Input.is_physical_key_pressed(KEY_E) or Input.is_physical_key_pressed(KEY_SPACE)
+	if not held or shopping or hud.typing() or hand.is_empty() or floor_kind(hand.id) == "" or _aim_mouse:
+		_last_paint = Vector3i(-999, -999, -1)
+		return
+	var spot := snap(_hover_point())
+	if spot != _last_paint:
+		_last_paint = spot
+		if can_place(spot):
+			place(spot)
+
+
+## The mouse in the build phase: it aims whatever is in hand. Left click puts a
+## piece down or picks one up; with a build tool, a left drag lays a rectangle of
+## floor or a line of wall and a right drag takes them away. Right click drops a piece.
+func _build_mouse(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_aim_mouse = true
+		return
+	var mb := event as InputEventMouseButton
+	if mb == null or (mb.button_index != MOUSE_BUTTON_LEFT and mb.button_index != MOUSE_BUTTON_RIGHT):
+		return
+	var p := floor_point(mb.position)
+	_aim_mouse = true
+	_mouse_point = p
+	if p == Vector3.INF:
+		return
+	var tool := not hand.is_empty() and Catalog.is_build_tool(hand.id)
+	var right := mb.button_index == MOUSE_BUTTON_RIGHT
+	if mb.pressed:
+		if tool:
+			_drag = {"from": p, "remove": right or controls.erase}
+		elif right:
+			cancel_hand()
+		elif not hand.is_empty():
+			if not place(snap(p)):
+				sfx("fail")
+		else:
+			pick_up(p)
+	elif not _drag.is_empty() and (right == bool(_drag.remove) or controls.erase):
+		finish_drag(_drag.from, p, _drag.remove)
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if phase == Phase.BUILD and event is InputEventMouseButton and event.pressed:
-		hud.stop_typing()   # a click on the room leaves the search box
+	if phase == Phase.BUILD and (event is InputEventMouseButton or event is InputEventMouseMotion):
+		if event is InputEventMouseButton and event.pressed:
+			hud.stop_typing()   # a click on the room leaves the search box
+		if not shopping:
+			_build_mouse(event)
 		return
 	if phase == Phase.SERVICE and event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -1669,7 +2085,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif phase == Phase.BUILD and key == KEY_R:
 		rotate_hand()
 	elif phase == Phase.BUILD and key == KEY_X:
-		if not sell_hand():
+		if not hand.is_empty() and Catalog.is_build_tool(hand.id):
+			if _hover_point() != Vector3.INF and remove_at(snap(_hover_point())):
+				_plan_changed()
+				sfx("coin")
+			else:
+				sfx("fail")
+		elif not sell_hand():
 			sfx("fail")
 	elif phase == Phase.SUMMARY and key == KEY_T:
 		hud.toggle_town()
