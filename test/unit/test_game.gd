@@ -2400,3 +2400,15 @@ func test_every_ingredient_has_a_model():
 		Build.fillet(f, look)
 		assert_gt(f.get_child_count(), 0, "fish fillet looks %s" % look)
 		f.free()
+
+
+func test_a_roll_dish_icon_is_side_on_not_a_burger():
+	var burger := Icons.icon("dish:bun,patty")
+	var roll := Icons.icon("dish:roll,fish")
+	assert_gt(roll.size(), 0)
+	assert_ne(roll.size(), burger.size(), "a roll dish is drawn its own way")
+	var tail := false
+	for layer: Array in roll:
+		if (layer[0] as PackedVector2Array).size() == 3 and layer[1] == Pantry.ITEMS.fish.prepped:
+			tail = true
+	assert_true(tail, "the fish in the roll has a tail")

@@ -105,6 +105,8 @@ static func _dish(ings: Array) -> Array:
 		o.append([PackedVector2Array([Vector2(-0.47, 0.4), Vector2(0.47, 0.4), Vector2(0.4, -0.25), Vector2(-0.4, -0.25)]), col])
 		o.append([rect(0.18, 0.86, 0.12, 0.6, -0.3), CREAM])
 		return o
+	if Pantry.is_bread(ings[0]) and Pantry.ITEMS[ings[0]].shape == "roll" and ings.size() > 1:
+		return _long_roll(ings)
 	ings = ings.duplicate()
 	if ings.size() > 1 and Pantry.is_bread(ings[0]) and ings.count(ings[0]) == 1:
 		ings.append(ings[0])   # one bread wraps the stack: a heel below and a dome on top
@@ -122,6 +124,40 @@ static func _dish(ings: Array) -> Array:
 			o.append([rect(0, y + h / 2.0, w + 0.12, h + 0.08), INK])
 			o.append([rect(0, y + h / 2.0, w, h - 0.04), col])
 		y += h
+	return o
+
+
+## A dish in a bread roll, seen side on so it never reads as a burger: the back crust
+## with scored lines, the fillings lying across it and poking out at both ends (a fish
+## as a fish, tail and all), then the front of the roll over their lower half.
+static func _long_roll(ings: Array) -> Array:
+	var o: Array = []
+	var crust: String = Pantry.ITEMS[ings[0]].prepped
+	var fill: Array = []
+	for id: String in ings:
+		if not Pantry.is_bread(id):
+			fill.append(id)
+	o.append([ell(0, -0.22, 0.82, 0.76, 0, 180), INK])
+	o.append([ell(0, -0.18, 0.74, 0.68, 0, 180), crust])
+	for k in 3:
+		o.append([rect(-0.34 + 0.34 * k, 0.36, 0.07, 0.26, 0.5), "#a8692f"])
+	var n := fill.size()
+	for k in n:
+		var id: String = fill[n - 1 - k]
+		var col: String = Pantry.ITEMS[id].prepped
+		var y := 0.02 + 0.16 * (n - 1 - k) - 0.08 * (n - 1)
+		if Pantry.ITEMS[id].tags.has("fish"):
+			o.append([ell(0.1, y, 0.92, 0.36), INK])
+			o.append([PackedVector2Array([Vector2(-0.7, y), Vector2(-1.1, y + 0.38), Vector2(-1.1, y - 0.38)]), INK])
+			o.append([ell(0.1, y, 0.84, 0.28), col])
+			o.append([PackedVector2Array([Vector2(-0.68, y), Vector2(-1.02, y + 0.28), Vector2(-1.02, y - 0.28)]), col])
+			o.append([ell(0.72, y + 0.08, 0.07), INK])
+		else:
+			o.append([rect(0, y, 1.94, 0.24), INK])
+			o.append([rect(0, y, 1.84, 0.16), col])
+	o.append([ell(0, -0.2, 0.84, 0.5, 180, 360), INK])
+	o.append([ell(0, -0.2, 0.76, 0.42, 180, 360), crust])
+	o.append([rect(-0.3, -0.42, 0.5, 0.08), "#e8b878"])
 	return o
 
 

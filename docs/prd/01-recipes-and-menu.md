@@ -1,5 +1,6 @@
 # PRD 1: Recipes, ingredients and the menu
 
+**Status:** built, all seven milestones (13 November 2026). What it built is in `docs/DESIGN.md` section 1.
 **Size:** very large; build it in the seven milestones at the end, each mergeable.
 **Needs:** nothing. **Touches:** new `sim/pantry.gd` (ingredients), `sim/menu.gd`,
 `sim/prep.gd` (minigame scoring), `sim/town.gd` (tastes), `sim/catalog.gd`,
