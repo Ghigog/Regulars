@@ -119,6 +119,10 @@ var _door_turn: Node3D
 var best_path := "user://regulars_best.json"
 var player: Player               # chef 1; `chefs` holds every chef, by player index
 var chefs: Array[Player] = []
+## Press- or hold-based prep minigames being played (chop, slice, pour), by player
+## index: {tool, st, ing, t, hits, presses, fill, last}. Each chef has their own, so
+## co-op needs no rework. The chef stands still while one runs.
+var preps := {}
 var hud: Hud
 var controls: Controls           # input per player: devices, touch buttons, presses sent to act()
 var cam: Camera3D
@@ -260,6 +264,8 @@ func _apply_demo(demo: String) -> void:
 		for a in arrivals:
 			a.time = 0.2
 		get_tree().create_timer(8.0).timeout.connect(_demo_ticket.bind(demo == "tray"))
+	elif demo.begins_with("prep_"):  # a minigame mid-play at the chef's tool (frozen there); shoot at 2
+		_demo_prep(demo.trim_prefix("prep_"))
 	elif demo == "kind":  # an impatient guest and the half-price prompt; shoot at about 9 and 10.5
 		for a in arrivals:
 			a.time = 0.2
@@ -506,6 +512,54 @@ func _demo_ticket(full: bool) -> void:
 		player.look(Vector2i(1, 0))
 		player.set_held("prep:patty", 1.0)
 	hud.refresh_tickets()
+
+
+## The chef at (1, 4) facing a tool at (2, 4) (and a second at (2, 5) where the
+## tool has two looks), the minigame stopped part-way so a shot can catch it.
+func _demo_prep(which: String) -> void:
+	player.position = Grid.center(Vector2i(1, 4))
+	player.look(Vector2i(1, 0))
+	var at := Vector2i(2, 4)
+	match which:
+		"grill":
+			var st := find_station("stove")
+			st.set_item("raw:patty")
+			st.cook = 5.0
+			player.position = Grid.center(Vector2i(1, 3))
+			player.look(Vector2i(-1, 0))
+		"fry":
+			add_station("fryer", at, 1, 1).set_item("raw:potato")
+			stations[at].cook = 1.0
+			var rack := add_station("fryer", at + Vector2i(0, 1), 1, 1)
+			rack.lift_to_rack("prep:potato", Prep.GOOD, "good")
+			rack.rest = Prep.FRY_REST * 0.6
+		"boil":
+			add_station("pot", at, 1, 1).set_item("raw:corn")
+			stations[at].cook = 1.0
+			add_station("pot", at + Vector2i(0, 1), 1, 1).set_item("prep:corn")
+		"chop", "slice", "pour":
+			var type: String = {"chop": "board", "slice": "slicer", "pour": "crate_soda"}[which]
+			var ing: String = {"chop": "tomato", "slice": "cheese", "pour": "soda"}[which]
+			start_prep(0, add_station(type, at, 1, 1), which, ing)
+			var s: Dictionary = preps[0]
+			s.frozen = true
+			match which:
+				"chop":
+					s.t = Prep.CHOP_SWEEP_TIME * 1.3
+					s.hits = [true]
+				"slice":
+					s.t = Prep.SLICE_TIME * 0.45
+					s.presses = 4
+				"pour":
+					s.fill = 0.72
+			_show_prep(0)
+		"good", "bad":
+			player.set_held("prep:tomato", Prep.GOOD if which == "good" else Prep.BAD)
+			add_station("board", at, 1, 1)
+			player.look(Vector2i(0, 1))
+			PrepWidget.pop(stations[at], Vector3(0, 2.0, 0), which)
+			player.boost("burst" if which == "good" else "penalty")
+			player.boost_left = 999.0
 
 
 func _demo_kind(offer: bool) -> void:
@@ -1816,6 +1870,7 @@ func close_early() -> void:
 
 
 func _end_day() -> void:
+	_cancel_all_preps()
 	set_door(false)
 	shopping = false
 	phase = Phase.SUMMARY
@@ -1827,6 +1882,7 @@ func _end_day() -> void:
 
 
 func _close_down() -> void:
+	_cancel_all_preps()
 	play_music("closed")
 	phase = Phase.CLOSED
 	var days := ledger.day
@@ -2637,6 +2693,10 @@ func remove_guest(g: Guest) -> void:
 
 ## What using this station would do right now, e.g. "Cook". Empty when nothing.
 func prompt_for(st: Station) -> String:
+	var s := prep_of(chefs.find(player))
+	if not s.is_empty():
+		return {"chop": "Chop on the notch", "slice": "Slice %d times" % Prep.SLICE_COUNT,
+			"pour": "Let go to stop"}.get(s.tool, "")
 	return use_station(st, true)
 
 
@@ -2653,8 +2713,13 @@ func use_station(st: Station, dry_run := false) -> String:
 	var ing := Catalog.ingredient_of(st.type)
 	if ing != "":
 		var ready: bool = Catalog.ITEMS[st.type].get("ready", false)
-		if held == "":
-			act = ("Pour %s" if Pantry.is_drink(ing) else "Take %s") % Pantry.name_of(ing).to_lower()
+		if held == "" and Pantry.tool_of(ing) == "pour":
+			act = "Pour %s" % Pantry.name_of(ing).to_lower()
+			if not dry_run:
+				start_prep(chefs.find(player), st, "pour", ing)
+				return act
+		elif held == "":
+			act = "Take %s" % Pantry.name_of(ing).to_lower()
 			if not dry_run:
 				if ready or not Pantry.needs_prep(ing):
 					player.set_held(Tray.kind("prep", ing), Prep.PLAIN)
@@ -2678,8 +2743,64 @@ func use_station(st: Station, dry_run := false) -> String:
 					var res := Prep.grill(st.cook)
 					player.set_held(Tray.kind(res.state, p.id), res.quality)
 					st.set_item("")
+					_prep_done(chefs.find(player), st, "grill", res.result)
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go on the grill" % Pantry.name_of(held_ing.id)
+		"fryer":
+			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "fry":
+				act = "Fry"
+				if not dry_run:
+					st.set_item(held)
+					player.set_held("")
+			elif held == "" and st.on_rack():
+				if st.draining():
+					why = "Still draining"
+				else:
+					act = "Pick up"
+					if not dry_run:
+						player.set_held(st.item, st.quality)
+						st.set_item("")
+			elif held == "" and st.item != "":
+				act = "Lift basket"
+				if not dry_run:
+					var p := Tray.parse(st.item)
+					var res := Prep.fry(st.cook)
+					if res.state == "prep":
+						st.lift_to_rack(Tray.kind("prep", p.id), res.quality, res.result)
+					else:
+						player.set_held(Tray.kind(res.state, p.id), res.quality)
+						st.set_item("")
+					_prep_done(chefs.find(player), st, "fry", res.result)
+			elif not held_ing.is_empty() and st.item == "":
+				why = "%s doesn't go in the fryer" % Pantry.name_of(held_ing.id)
+		"pot":
+			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "boil":
+				act = "Boil"
+				if not dry_run:
+					st.set_item(held)
+					player.set_held("")
+			elif held == "" and st.item.begins_with("raw"):
+				why = "Still boiling"
+			elif held == "" and st.item != "":
+				act = "Take out"
+				if not dry_run:
+					player.set_held(st.item, Prep.PLAIN)
+					st.set_item("")
+			elif not held_ing.is_empty() and st.item == "":
+				why = "%s doesn't go in the pot" % Pantry.name_of(held_ing.id)
+		"board", "slicer":
+			var tool := "chop" if st.type == "board" else "slice"
+			if st.prep_by >= 0:
+				why = "In use"
+			elif not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == tool:
+				act = "Chop" if tool == "chop" else "Slice"
+				if not dry_run:
+					start_prep(chefs.find(player), st, tool, held_ing.id)
+					return act
+			elif not held_ing.is_empty() and held_ing.state == "prep" and Pantry.tool_of(held_ing.id) == tool:
+				why = "%s is already %s" % [Pantry.name_of(held_ing.id), "chopped" if tool == "chop" else "sliced"]
+			elif not held_ing.is_empty():
+				why = "%s doesn't go on the %s" % [Pantry.name_of(held_ing.id), Pantry.TOOL_NAMES[tool]]
 		"counter", "pass":
 			if held == "tray" and st.item == "":
 				act = "Put tray down"
@@ -2824,6 +2945,133 @@ func use_station(st: Station, dry_run := false) -> String:
 	return act
 
 
+# ---------------------------------------------------------------- prep minigames
+
+func start_prep(p: int, st: Station, tool: String, ing: String) -> void:
+	var chef: Player = chefs[p]
+	preps[p] = {"tool": tool, "st": st, "ing": ing, "t": 0.0, "hits": [], "presses": 0, "fill": 0.0, "last": 0.0}
+	st.prep_by = p
+	chef.set_held("")
+	if tool != "pour":
+		st.set_item(Tray.kind("raw", ing))
+	st.show_widget(tool)
+	chef.punch()
+	st.used()
+	_show_prep(p)
+
+
+func prep_of(p := 0) -> Dictionary:
+	return preps.get(p, {})
+
+
+## Use was pressed during a minigame.
+func prep_press(p: int) -> void:
+	var s: Dictionary = preps[p]
+	match s.tool:
+		"chop":
+			if s.hits.size() == int(s.t / Prep.CHOP_SWEEP_TIME) and s.hits.size() < Prep.CHOP_SWEEPS:
+				var hit := Prep.chop_hit(_chop_pos(s))
+				s.hits.append(hit)
+				sfx("chop", 0.1, 1.0 if hit else 0.8)
+				chefs[p].punch()
+		"slice":
+			s.presses += 1
+			s.last = s.t
+			sfx("slice", 0.15)
+			chefs[p].punch()
+	_show_prep(p)
+
+
+## Back leaves a press-based minigame and gives the ingredient back raw.
+func cancel_prep(p: int) -> void:
+	var s: Dictionary = preps[p]
+	preps.erase(p)
+	var st: Station = s.st
+	st.prep_by = -1
+	st.hide_widget()
+	if s.tool != "pour":
+		st.set_item("")
+		chefs[p].set_held(Tray.kind("raw", s.ing))
+	sfx("putdown")
+
+
+func _chop_pos(s: Dictionary) -> float:
+	return fmod(s.t, Prep.CHOP_SWEEP_TIME) / Prep.CHOP_SWEEP_TIME
+
+
+func _tick_preps(delta: float) -> void:
+	for p: int in preps.keys():
+		var s: Dictionary = preps[p]
+		if s.get("frozen", false):
+			continue   # a demo shot
+		s.t += delta
+		var result := ""
+		match s.tool:
+			"chop":
+				while s.hits.size() < mini(int(s.t / Prep.CHOP_SWEEP_TIME), Prep.CHOP_SWEEPS):
+					s.hits.append(false)   # a sweep went by without a press
+				if s.hits.size() >= Prep.CHOP_SWEEPS:
+					result = Prep.chop(s.hits.count(true))
+			"slice":
+				if s.t >= Prep.SLICE_TIME or (s.presses >= Prep.SLICE_COUNT and s.t - s.last > 0.5):
+					result = Prep.slice(s.presses)
+			"pour":
+				if controls.holding(p, "use"):
+					s.fill += Prep.POUR_RATE * delta
+					if s.fill > 1.04:
+						result = "bad"   # overflowed
+				else:
+					result = Prep.pour(s.fill)
+		if result != "":
+			_finish_prep(p, result)
+		else:
+			_show_prep(p)
+
+
+func _show_prep(p: int) -> void:
+	var s: Dictionary = preps[p]
+	var w: PrepWidget = s.st.widget
+	match s.tool:
+		"chop":
+			w.show_state({"pos": _chop_pos(s), "hits": s.hits})
+		"slice":
+			w.show_state({"presses": s.presses, "left": 1.0 - s.t / Prep.SLICE_TIME})
+		"pour":
+			w.show_state({"fill": s.fill})
+
+
+func _finish_prep(p: int, result: String) -> void:
+	var s: Dictionary = preps[p]
+	preps.erase(p)
+	var st: Station = s.st
+	st.prep_by = -1
+	st.hide_widget()
+	if s.tool != "pour":
+		st.set_item("")
+	chefs[p].set_held(Tray.kind("prep", s.ing), Prep.quality_of(result))
+	sfx("pickup")
+	_prep_done(p, st, s.tool, result)
+
+
+## A minigame ended: a mark over the tool, and the chef's burst or penalty.
+func _prep_done(p: int, st: Station, tool: String, result: String) -> void:
+	if result == "" or p < 0:
+		return
+	PrepWidget.pop(st, Vector3(0, 2.0, 0), result)
+	match Prep.reward(tool, result):
+		"burst":
+			chefs[p].boost("burst")
+			sfx("zoom")
+		"penalty":
+			chefs[p].boost("penalty")
+			sfx("wobble")
+
+
+func _cancel_all_preps() -> void:
+	for p: int in preps.keys():
+		cancel_prep(p)
+
+
 func _tick_stoves(delta: float) -> void:
 	var sizzling := false
 	for st: Station in stations.values():
@@ -2834,6 +3082,8 @@ func _tick_stoves(delta: float) -> void:
 		elif stage == "burnt":
 			sfx("burn")
 			shake(0.08)
+		elif stage == "rested":
+			sfx("tick")
 		sizzling = sizzling or st.is_cooking()
 	if _sfx.has("sizzle") and _sfx.sizzle.playing != sizzling:
 		_sfx.sizzle.playing = sizzling
@@ -2849,6 +3099,9 @@ func step(delta: float) -> void:
 		var a: Dictionary = arrivals.pop_front()
 		spawn_group(a.get("group", [a.get("idx", 0)]))
 	_tick_stoves(delta)
+	_tick_preps(delta)
+	for c in chefs:
+		c.tick(delta)
 	_collect_gross()
 	_seat_waiting_guests()
 	for g in guests.duplicate():
@@ -2867,6 +3120,8 @@ func _process(delta: float) -> void:
 		pass   # paused anyway; the arrows belong to the options screen
 	elif phase == Phase.SERVICE or (phase == Phase.BUILD and not shopping and not hud.typing()):
 		input = controls.move(0)
+	if preps.has(0):
+		input = Vector2.ZERO   # the chef stands at the tool while a minigame runs
 	player.move(input, delta)
 	player.carry(not hand.is_empty())
 	if phase == Phase.BUILD:
@@ -2912,7 +3167,10 @@ func _update_cursor() -> void:
 	if st != null:
 		var top := 0.9
 		_cursor.position = st.position + Vector3(0, top, 0)
-		at = cam.unproject_position(st.position + Vector3(0, 2.25 if st.type == "stove" else top + 0.7, 0))
+		var over := 2.25 if st.type in ["stove", "fryer"] else top + 0.7
+		if st.widget != null and st.widget.visible:
+			over = 2.6   # above a minigame gauge
+		at = cam.unproject_position(st.position + Vector3(0, over, 0))
 	if action == "":   # nothing to cook or serve: the build phase and the door card
 		action = build_action() if phase == Phase.BUILD else door_action()
 		var p := DOORWAY + Vector3(0, 2.9, 0)
@@ -3044,7 +3302,12 @@ func act(p: int, action: String, echo := false) -> void:
 		return   # a seated player with no chef yet (co-op is not built)
 	match phase:
 		Phase.SERVICE:
-			if action == "turn":
+			if preps.has(p):
+				if action == "use":
+					prep_press(p)
+				elif action == "back":
+					cancel_prep(p)
+			elif action == "turn":
 				turn_tray(stations.get(player.target_cell()))
 			elif action == "use":
 				var st: Station = stations.get(player.target_cell())

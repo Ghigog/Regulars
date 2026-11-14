@@ -19,6 +19,10 @@ var _held_node: Node3D
 var _held_size := 1.0   # the carried item's size in the world; it pops in from 0.4
 var _body: Peg
 var _stride := 0.0
+var boost_speed := 1.0   # times SPEED: a prep minigame's burst (1.5) or penalty (0.5)
+var boost_left := 0.0    # seconds of it left
+var _boost_fx: Node3D    # speed lines and a star, or a sweat drop
+var _boost_age := 0.0
 
 
 func setup(game_, start: Vector2i) -> void:
@@ -44,6 +48,74 @@ func set_held(kind: String, quality := 1.0, tray_: Tray = null, tag := "") -> vo
 		_held_size = 0.4
 		_held_node.create_tween().tween_property(self, "_held_size", 1.0, 0.18) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## A prep minigame's reward ("burst") or penalty ("penalty"): faster or slower for
+## a moment, shown on the chef by shape and motion (speed lines and a spinning star;
+## a sweat drop and a wobble), not only colour.
+func boost(kind: String) -> void:
+	boost_speed = Prep.BURST_SPEED if kind == "burst" else Prep.PENALTY_SPEED
+	boost_left = Prep.BOOST_TIME
+	_boost_age = 0.0
+	if _boost_fx:
+		_boost_fx.queue_free()
+	_boost_fx = Node3D.new()
+	_boost_fx.basis = Build.CAM_BASIS
+	add_child(_boost_fx)
+	if kind == "burst":
+		var star := Node3D.new()
+		star.name = "star"
+		star.position = Vector3(0.0, 1.95, 0.0)
+		_boost_fx.add_child(star)
+		Build.flat(star, Build.star_pts(0.13, 5, 0.48), Build.TRIM)
+		Build.flat(star, Build.star_pts(0.095, 5, 0.48), "#f2b632", 0.004)
+		var lines := Node3D.new()
+		lines.name = "lines"
+		_boost_fx.add_child(lines)
+		for k in 3:
+			Build.flat(lines, Icons.rect(0.0, 0.55 + k * 0.22, 0.34 - k * 0.06, 0.05), Build.PAPER, 0.002 * k)
+	else:
+		var drop := Node3D.new()
+		drop.name = "drop"
+		drop.position = Vector3(0.3, 1.6, 0.0)
+		_boost_fx.add_child(drop)
+		var pts := Build.disc_pts(0.07, Vector2.ZERO, 14)
+		Build.flat(drop, pts, Build.TRIM)
+		Build.flat(drop, PackedVector2Array([Vector2(-0.06, 0.03), Vector2(0.06, 0.03), Vector2(0, 0.15)]), Build.TRIM)
+		Build.flat(drop, Build.disc_pts(0.05, Vector2.ZERO, 14), "#8fc6e8", 0.004)
+		Build.flat(drop, PackedVector2Array([Vector2(-0.042, 0.02), Vector2(0.042, 0.02), Vector2(0, 0.12)]), "#8fc6e8", 0.004)
+	Build.on_top(_boost_fx)
+
+
+## Runs down a burst or penalty. Called every step of service.
+func tick(delta: float) -> void:
+	if boost_left <= 0.0:
+		return
+	boost_left -= delta
+	_boost_age += delta
+	if boost_left <= 0.0:
+		boost_left = 0.0
+		boost_speed = 1.0
+		_body.rotation.z = 0.0
+		if _boost_fx:
+			_boost_fx.queue_free()
+			_boost_fx = null
+		return
+	if _boost_fx == null:
+		return
+	if boost_speed > 1.0:
+		_boost_fx.get_node("star").rotation.z = _boost_age * 6.0
+		# The lines trail behind: to the side of the screen the chef is running from.
+		var lines: Node3D = _boost_fx.get_node("lines")
+		var side := -signf(aim.dot(Vector3(1, 0, -1)))
+		lines.position.x = (0.42 if side >= 0.0 else -0.42)
+	else:
+		_body.rotation.z = sin(_boost_age * 22.0) * 0.12   # the wobble
+		_boost_fx.get_node("drop").position.y = 1.6 - fmod(_boost_age * 0.3, 0.12)
+
+
+func speed() -> float:
+	return SPEED * boost_speed
 
 
 ## A quick squash and stretch whenever the chef does something.
@@ -162,7 +234,7 @@ func move(input: Vector2, delta: float) -> void:
 			facing = Vector2i(0, signi(roundi(dir.z)))
 		elif facing.x != signi(roundi(dir.x)) and facing.y != signi(roundi(dir.z)):
 			facing = Vector2i(signi(roundi(dir.x)), 0)
-	_velocity = _velocity.lerp(dir * SPEED, 1.0 - exp(-16.0 * delta))
+	_velocity = _velocity.lerp(dir * speed(), 1.0 - exp(-16.0 * delta))
 	var step := _velocity * delta
 	var next := position + Vector3(step.x, 0, 0)
 	if _can_stand(position, next):
@@ -174,7 +246,7 @@ func move(input: Vector2, delta: float) -> void:
 		position = next
 	else:
 		_velocity.z = 0.0
-	var pace := _velocity.length() / SPEED
+	var pace := minf(_velocity.length() / SPEED, 1.4)
 	var before := floori(_stride / PI)
 	_stride += delta * 13.0 * pace
 	if floori(_stride / PI) != before and pace > 0.3:

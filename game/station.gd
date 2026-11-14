@@ -24,6 +24,7 @@ var stocked := true   # an ingredient station: stocked for tomorrow (switched at
 var cook := 0.0       # seconds the piece has been on the heat (stove, fryer, pot)
 var rest := 0.0       # a fryer: seconds left draining on the rack before it can be picked up
 var result := ""      # a fryer: how the piece on the rack came out (good, plain)
+var prep_by := -1        # the player playing a press-based minigame here, or -1
 var widget: PrepWidget   # the gauge over a pot or fryer rack, or a press-based minigame
 var count := 0        # clean trays in a tray stack; scraps in a bin
 var dirty := 0        # dirty trays left on a table, or soaking in a sink
@@ -281,6 +282,9 @@ func show_widget(kind: String) -> PrepWidget:
 		widget.queue_free()
 	widget = PrepWidget.make(kind)
 	widget.position = Vector3(0, 1.72, 0)
+	if kind in ["chop", "slice"]:
+		widget.scale = Vector3.ONE * 1.4   # flat bars: as easy to read as the round dial
+		widget.position.y = 1.85
 	add_child(widget)
 	return widget
 

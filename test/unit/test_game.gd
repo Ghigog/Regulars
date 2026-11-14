@@ -1862,7 +1862,10 @@ func test_a_three_item_tray_is_one_bill():
 	game.use_station(_the_pass())
 	var t: Tray = _the_pass().tray
 	for k in ["crate_bun", "crate_soda", "crate_bun"]:
-		_use(k)
+		if k == "crate_soda":
+			_pour(game.find_station(k), Prep.POUR_GOOD + 0.05)
+		else:
+			_use(k)
 		game.use_station(_the_pass())
 	assert_eq(game.use_station(_the_pass(), true), "Needs patty")
 	_use("crate_patty")
@@ -1951,3 +1954,160 @@ func test_a_guest_who_finds_no_main_keeps_friends_company():
 	_run(pair[0].eat_time + 0.5)
 	assert_eq(pair[1].state, "leaving", "they go with their friend")
 	assert_eq(game.ledger.strikes(), 0)
+
+
+# ---------- Prep minigames (PRD 1, milestone 3) ----------
+
+## Holds Use at a drink station until the cup is `fill` full, then lets go.
+func _pour(st: Station, fill: float) -> void:
+	var who: PlayerInput = game.controls.players[0]
+	assert_eq(game.use_station(st), "Pour %s" % Pantry.name_of(Catalog.ingredient_of(st.type)).to_lower())
+	who.hold("test", "a", "use", true)
+	while game.prep_of(0).get("fill", 9.0) < fill:
+		game.step(0.02)
+	who.hold("test", "a", "use", false)
+	game.step(0.02)
+
+
+## Plays the chop minigame, pressing Use on the notch for the first `hits` sweeps.
+func _chop(hits: int) -> void:
+	for k in Prep.CHOP_SWEEPS:
+		var notch := (k + 0.5) * Prep.CHOP_SWEEP_TIME
+		while float(game.prep_of(0).get("t", 99.0)) < notch:
+			game.step(0.01)
+		if k < hits:
+			game.act(0, "use")
+	_run(Prep.CHOP_SWEEP_TIME)
+
+
+func _tool(type: String, cell: Vector2i, crate: String) -> Station:
+	game.add_station(crate, cell + Vector2i(0, 1))
+	return game.add_station(type, cell)
+
+
+func test_chopping_all_three_on_the_notch_is_good_and_speeds_the_chef():
+	var board := _tool("board", Vector2i(2, 5), "crate_lettuce")
+	_use("crate_lettuce")
+	assert_eq(game.player.held, "raw:lettuce")
+	assert_eq(game.use_station(board), "Chop")
+	assert_eq(game.player.held, "", "the lettuce goes on the board")
+	assert_false(game.prep_of(0).is_empty())
+	_chop(3)
+	assert_true(game.prep_of(0).is_empty(), "the minigame is over")
+	assert_eq(game.player.held, "prep:lettuce")
+	assert_eq(game.player.held_quality, Prep.GOOD)
+	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.BURST_SPEED, 0.01, "a good result is a burst")
+	_run(Prep.BOOST_TIME + 0.1)
+	assert_eq(game.player.speed(), Player.SPEED, "for one second")
+
+
+func test_a_bad_chop_slows_the_chef_and_a_plain_one_does_neither():
+	var board := _tool("board", Vector2i(2, 5), "crate_onion")
+	_use("crate_onion")
+	game.use_station(board)
+	_chop(0)
+	assert_eq(game.player.held_quality, Prep.BAD)
+	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.PENALTY_SPEED, 0.01, "a bad result slows")
+	_run(Prep.BOOST_TIME + 0.1)
+	assert_eq(game.player.speed(), Player.SPEED)
+	game.player.set_held("")
+	_use("crate_onion")
+	game.use_station(board)
+	_chop(2)
+	assert_eq(game.player.held_quality, Prep.PLAIN)
+	assert_eq(game.player.speed(), Player.SPEED, "plain does neither")
+
+
+func test_the_chef_stands_still_and_back_gives_the_ingredient_back_raw():
+	var board := _tool("board", Vector2i(2, 5), "crate_tomato")
+	_use("crate_tomato")
+	game.use_station(board)
+	var at: Vector3 = game.player.position
+	_axis(JOY_AXIS_LEFT_X, 1.0)
+	for i in 4:
+		game._process(0.05)
+	_axis(JOY_AXIS_LEFT_X, 0.0)
+	assert_eq(game.player.position, at, "no walking off mid-chop")
+	game.act(0, "back")
+	assert_true(game.prep_of(0).is_empty())
+	assert_eq(game.player.held, "raw:tomato")
+	assert_eq(board.item, "")
+
+
+func test_slicing_to_the_count_is_good_and_over_it_is_plain():
+	var slicer := _tool("slicer", Vector2i(2, 5), "crate_cheese")
+	for presses: int in [Prep.SLICE_COUNT, Prep.SLICE_COUNT + 2, Prep.SLICE_COUNT - 1]:
+		game.player.set_held("")
+		_use("crate_cheese")
+		assert_eq(game.use_station(slicer), "Slice")
+		for k in presses:
+			game.act(0, "use")
+			game.step(0.05)
+		_run(Prep.SLICE_TIME)
+		assert_eq(game.player.held, "prep:cheese")
+		assert_eq(game.player.held_quality, {Prep.SLICE_COUNT: Prep.GOOD, Prep.SLICE_COUNT + 2: Prep.PLAIN}.get(presses, Prep.BAD), "%d presses" % presses)
+
+
+func test_a_tool_refuses_what_it_does_not_prep():
+	var board := _tool("board", Vector2i(2, 5), "crate_cheese")
+	_use("crate_cheese")
+	assert_eq(game.use_station(board, true), "Cheese doesn't go on the chopping board")
+
+
+func test_pouring_into_the_top_band_is_good_and_overflowing_is_bad():
+	var fountain: Station = game.add_station("crate_soda", Vector2i(2, 5))
+	_pour(fountain, 0.9)
+	assert_eq(game.player.held, "prep:soda")
+	assert_eq(game.player.held_quality, Prep.GOOD)
+	game.player.set_held("")
+	_pour(fountain, 0.7)
+	assert_eq(game.player.held_quality, Prep.PLAIN)
+	game.player.set_held("")
+	_pour(fountain, 2.0)   # never let go: it overflows and ends itself
+	assert_eq(game.player.held_quality, Prep.BAD)
+
+
+func test_fries_rest_on_the_rack_before_they_can_be_picked_up():
+	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
+	_use("crate_potato")
+	assert_eq(game.use_station(fryer), "Fry")
+	_run(Prep.FRY_GOOD + 0.5)
+	assert_eq(game.use_station(fryer), "Lift basket")
+	assert_eq(game.player.held, "", "lifted onto the rack, not into the hands")
+	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.BURST_SPEED, 0.01, "lifted in the window")
+	assert_eq(game.use_station(fryer, true), "Still draining")
+	_run(Prep.FRY_REST + 0.1)
+	assert_eq(game.use_station(fryer), "Pick up")
+	assert_eq(game.player.held, "prep:potato")
+	assert_eq(game.player.held_quality, Prep.GOOD)
+
+
+func test_fries_left_in_burn_and_slow_the_chef():
+	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
+	_use("crate_potato")
+	game.use_station(fryer)
+	_run(Prep.FRY_BURN + 0.5)
+	game.use_station(fryer)
+	assert_eq(game.player.held, "burnt:potato")
+	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.PENALTY_SPEED, 0.01)
+
+
+func test_boiling_waits_when_done_and_never_gives_a_burst():
+	var pot := _tool("pot", Vector2i(2, 5), "crate_corn")
+	_use("crate_corn")
+	assert_eq(game.use_station(pot), "Boil")
+	assert_eq(game.use_station(pot, true), "Still boiling")
+	_run(Prep.BOIL_TIME + 20.0)
+	assert_eq(game.use_station(pot), "Take out")
+	assert_eq(game.player.held, "prep:corn")
+	assert_eq(game.player.held_quality, Prep.PLAIN)
+	assert_eq(game.player.speed(), Player.SPEED)
+
+
+func test_a_good_grill_gives_a_burst():
+	_use("crate_patty")
+	_use("stove")
+	_run(Prep.GRILL_DONE + 0.5)
+	_use("stove")
+	assert_eq(game.player.held_quality, Prep.GOOD)
+	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.BURST_SPEED, 0.01)
