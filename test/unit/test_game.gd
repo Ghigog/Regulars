@@ -1386,3 +1386,17 @@ func test_title_quit_where_quitting_is_a_thing():
 	assert_eq(game.hud.title.sel, 2, "down stops at Quit")
 	_tap(KEY_SPACE)
 	assert_true(game.quit_asked)
+
+
+func test_a_tool_in_hand_draws_its_ghost_every_frame_without_errors():
+	_to_build()
+	game.ledger.money = 100
+	for id in ["floor_tile", "wall", "door", "arch", "paint"]:
+		assert_true(game.pick_catalog(id), id)
+		game._demo_hover = Vector3(3.5, 0, 1.5)
+		game._update_ghost()   # no drag: the one spot under the hover point
+		assert_not_null(game._tool_ghost, "%s shows a ghost" % id)
+		game._drag = {"from": Vector3(0.5, 0, 1.5), "remove": false}
+		game._update_ghost()   # mid-drag: every spot along it
+		game._drag = {}
+		game.cancel_hand()

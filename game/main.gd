@@ -1500,7 +1500,10 @@ func _update_tool_ghost() -> void:
 	var tool := phase == Phase.BUILD and not hand.is_empty() and Catalog.is_build_tool(hand.id) and not shopping and p != Vector3.INF
 	var spots: Array[Vector3i] = []
 	if tool:
-		spots = drag_spots(_drag.from, p) if not _drag.is_empty() else [snap(p)] as Array[Vector3i]
+		if _drag.is_empty():
+			spots.append(snap(p))
+		else:   # not a one-line `a if c else b`: that drops the array's type and fails at run time
+			spots = drag_spots(_drag.from, p)
 	var key := "%s|%s|%s|%d" % [hand.get("id", ""), spots, _drag.get("remove", false), ledger.money] if tool else ""
 	if key == _tool_key:
 		return

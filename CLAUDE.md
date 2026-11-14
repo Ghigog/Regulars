@@ -11,7 +11,7 @@ as many days as possible. Working title. The current build is a vertical slice.
 /Applications/Godot.app/Contents/MacOS/Godot --headless -s addons/gut/gut_cmdln.gd   # tests (GUT 9.7.1)
 ```
 
-All 129 tests should pass before and after any change. Screenshots for checking visuals:
+All 130 tests should pass before and after any change. Screenshots for checking visuals:
 `REGULARS_SHOT=/abs/path.png REGULARS_SHOT_AT=13.5 REGULARS_DEMO=cook godot --path .`
 (`REGULARS_DEMO` is `cook`, `summary`, `closed`, `lineup`, `fx`, `town`, `kind`, `flyers`, `build` (the shop), `build_no`, `build_find`, `build_move`, `build_range` (a fern's reach), `build_dining` (a booth and a table for four in the room; `build_dining_shop` for the shop's Dining tab), `build_tools` (the shop's Build tab), `build_room` (an extension, walls, doors, two greyed out), `build_drag` (a floor drag in progress), `build_finish` (parquet, marble, paint, both wallpapers and a moved rug), `door`, `close` (closing early), `messy` (a piled sink, an overflowing bin, the chef carrying the bag), `options` or `options_gfx` (the options screen, first slider chosen), `inspect`, `newday` (receipt, build, then the calendar turning), `walkout` (one stamp), `comp` (a free meal for a fed-up guest) or `title` (the title
 screen, which a plain run shows first); see `_apply_demo` in `game/main.gd`.
