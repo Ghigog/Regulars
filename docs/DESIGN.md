@@ -206,6 +206,24 @@ Survive as many days as you can; three walkouts in one day ends the run.
     before (0.015 a second). The guest thinks of the piece that gave most ("Such a cosy
     rug"). If the room changes while they sit they get the difference; building is only
     between days, so that cannot happen yet.
+  - *More pieces and themed shops* (PRD 7, 13 November 2026): every catalog entry may
+    carry a `"theme"` (`diner` or `seaside`; none: sold in both), and the shop and
+    `pick_catalog` only offer the run's theme (`Catalog.sold_in`, `Catalog.search`).
+    Twelve one-cell pieces: floor lamp ($30, level 2, joy 0.12, reach 1, lit at night),
+    flower stand ($15, 0.1, reach 1), coat stand ($20, 0.06, reach 1, "Somewhere for my
+    coat"), and for the diner a jukebox ($120, level 4, 0.25, reach 4, three tiers) and a
+    gumball machine ($45, level 2, 0.15, reach 2); for the seaside an aquarium (as the
+    jukebox), a potted palm (the seaside's fern; the fern is now diner only, and each
+    theme's room starts with its own) and a ship's lantern (as the gumball machine). A
+    decor piece's reach is data (`"reach"` in `Catalog.ITEMS`, one more a tier) read by
+    `Decor.reach`; the fern is no longer a special case (3 + tier - 1). Each has a thought
+    line and shows reach marks while carried. Dining: a counter stool ($25, three tiers),
+    a little round table with one stool, so only a guest alone sits there (the smallest
+    free table that fits is chosen, so a single takes a stool first). Kitchen: a bin
+    ($30, level 2) and a sink ($70, level 3), which are now catalog pieces like any other
+    (the last of each cannot be sold), and a dish rack ($50, level 3): a sink with one
+    beside it piles at 5 trays, not 3. Each sink and bin has its own mess and sightline,
+    and the "still dirty" note counts them ("2 sinks").
 - **Keyboard, controller or touch** (`game/controls.gd`, `game/player_input.gd`). Each
   device is a source ("keys" for keyboard and mouse, "pad:<id>" per controller, "touch")
   seated to a player; with one chef every source is player one's. Whichever device a
@@ -227,7 +245,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   closes. The chosen row gets an ink frame with a coral pointer, for keys and pad only.
   On touch the frame and key line go, buttons and slider grabbers grow to thumb size, and
   only the Menu button stays over the card. The chef cannot walk while it is open.
-- **Reach marks.** While a piece with a reach is carried (a fern: 2 + tier cells; the bin:
+- **Reach marks.** While a piece with a reach is carried (a decor piece: its own reach, a fern 2 + tier cells; the bin:
   5; a fine floor, paint, wallpaper or a rug: `Decor.VIEW_RANGE`, 3), every seat gets a
   mark for the share of the piece's joy it would get, worked out by the same sight rule
   the decor bonus uses (`Decor.nearest` and `Decor.share`), so the marks are always true:
@@ -372,14 +390,16 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   and keeps its seats on the cells beside it: the booth has a bench either side (seats two;
   guests get a small joy bump, "A booth! How cosy"), the table for four a chair on every
   side, so a group of four can come once one is placed. Booth and table for four come in
-  three tiers like the table for two. To add: more pieces to make browsing worth it
-  (a booth seating four over two cells needs multi-cell footprints), pictures on the cards.
+  three tiers like the table for two. *Built* (PRD 7): twelve more one-cell pieces and a
+  shop that sells by theme (section 1, *More pieces and themed shops*). To add: more
+  pieces after playtesting (a booth seating four over two cells needs multi-cell
+  footprints), wall-mounted pieces, pictures on the cards.
 - **Floors, walls, doors, archways** (built, section 1): `sim/floorplan.gd` holds the
   plan; `Scenery.build_room` draws it. Ceilings are not planned (the camera looks down).
 - **Two currencies**: money (earned per day) and XP (10 per meal plus the tip; 100 per level).
 - **Built**: moving, selling and rotating furniture (section 1).
 - **Built**: floor and wall finishes that cheer seated guests, and movable rugs (section 1).
-- **To add**: buying more lot, themes that change the catalog.
+- **Built** (PRD 7): themes that change the catalog. **To add**: buying more lot.
 
 ## 5. Characters (Sims layer)
 
@@ -403,12 +423,19 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 
 ## 7. Run structure
 
-- **Theme and location** chosen at the start of a run (seaside diner first). Location sets
-  the town's size and tastes; theme sets the menu and starting furniture.
+- **Theme** chosen at the start of a run: *built* (PRD 7). After Play, a card offers the
+  diner ("Burgers, fries and soda") and the seaside ("Fish, vegetables and white wine"),
+  each with a swatch of its room; keys and pad move the title's ink frame, touch taps,
+  Back returns. The choice holds for the run (a different theme reloads the scene so the
+  room is built for it), the last one is remembered (`user://regulars_theme.cfg`) and
+  chosen to start with, and starting over after a game over shows the card again (the
+  title is still skipped). `REGULARS_THEME` stays as a developer switch that skips it.
+  **Location** (the town's size and tastes) is not chosen: Dylan decided the picker
+  chooses the theme only.
 - **Menu growth**: *built* (PRD 1): the player writes the menu each night from the
   stations they own; new dishes need new ingredient and tool stations (grill, fry,
   boil, chop, slice, pour). Two themes have their content (diner, seaside); the theme
-  is still picked with `REGULARS_THEME`, not in the game (PRD 7).
+  is picked on the theme card at the start of a run (PRD 7).
 - **Night zero**: *built*: the run opens on an empty kitchen and $150; the first
   ingredient, tool and menu are the player's.
 - **Local co-op**: input is already per player (see section 9); a second chef is the next step.
@@ -439,9 +466,9 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
     shapes, flat cut-out cards). `concept/concept_scene.py` shows the Blender toolchain
     works; swap pieces in where a sculpted model would beat the generated one (hair, hats,
     the fridge, the tree are the best candidates).
-  - A theme picker in the game (themes are an environment variable for now).
+  - *Built* (PRD 7): a theme picker in the game, after Play on the title.
   - Hired staff (server, dishwasher, host), co-op chefs 2 to 4 (trim colours exist),
-    future dishes, floor lamp, awning and photo view.
+    future dishes, awning and photo view (the floor lamp is built, PRD 7).
   - A bundled hand-lettered font (the HUD uses a rounded system font).
   - The open items: the real title screen composition, colour-blind support, the "Town
     Diner" subtitle.

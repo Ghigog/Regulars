@@ -2,6 +2,7 @@ extends GutTest
 ## Drives the real game scene headlessly through its public methods.
 
 var game
+const THEME_TEST_PATH := "user://regulars_theme_test.cfg"
 
 
 func before_each():
@@ -10,6 +11,8 @@ func before_each():
 	add_child_autofree(game)
 	game.set_process(false)
 	game.best_path = "user://regulars_best_test.json"
+	game.theme_path = THEME_TEST_PATH
+	DirAccess.remove_absolute(THEME_TEST_PATH)   # no theme remembered: the card starts on the diner
 	# One guest far in the future keeps the day open while a test works.
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
 	game.test_kitchen()   # the old burger line and a one-Burger menu; a run starts empty
@@ -292,8 +295,11 @@ func test_game_opens_on_the_title_then_the_night_before_day_one():
 	fresh.get_script()._title_seen = false   # as on a fresh launch
 	add_child_autofree(fresh)
 	fresh.set_process(false)
+	fresh.theme_path = THEME_TEST_PATH
 	assert_true(fresh.hud.title_open(), "the title comes first")
 	fresh.play()
+	assert_true(fresh.hud.title.themes_open, "Play turns the card over to the themes")
+	fresh.choose_theme("diner")
 	assert_eq(fresh.phase, fresh.Phase.BUILD)
 	assert_false(fresh.door_open)
 	assert_true(fresh.arrivals.is_empty())
@@ -1533,6 +1539,9 @@ func test_title_play_starts_the_first_night_from_the_keyboard():
 	_tap(KEY_UP)
 	assert_eq(game.hud.title.sel, 0, "Play is chosen")
 	_tap(KEY_ENTER)
+	assert_true(game.hud.title.themes_open, "the theme card")
+	assert_eq(game.hud.title.theme_ids[game.hud.title.sel], "diner")
+	_tap(KEY_ENTER)
 	assert_false(game.hud.title_open())
 	assert_eq(game.phase, game.Phase.BUILD, "the night before day 1")
 	assert_false(game.door_open)
@@ -1541,7 +1550,9 @@ func test_title_play_starts_the_first_night_from_the_keyboard():
 func test_title_play_with_a_controller():
 	game.open_title()
 	_tap_pad(JOY_BUTTON_A)
-	assert_false(game.hud.title_open(), "A presses Play")
+	assert_true(game.hud.title.themes_open, "A presses Play")
+	_tap_pad(JOY_BUTTON_A)
+	assert_false(game.hud.title_open(), "and A picks the theme")
 	assert_eq(game.phase, game.Phase.BUILD)
 
 
@@ -2412,3 +2423,159 @@ func test_a_roll_dish_icon_is_side_on_not_a_burger():
 		if (layer[0] as PackedVector2Array).size() == 3 and layer[1] == Pantry.ITEMS.fish.prepped:
 			tail = true
 	assert_true(tail, "the fish in the roll has a tail")
+
+
+# ---------------------------------------------------------------- PRD 7: catalog and themes
+
+func test_play_offers_the_themes_and_back_returns_to_the_title():
+	game.open_title()
+	game.play()
+	var t: Title = game.hud.title
+	assert_true(t.themes_open)
+	assert_eq(t.theme_ids, ["diner", "seaside"] as Array[String])
+	assert_eq(t.buttons.size(), 3, "a row a theme and Back")
+	_tap(KEY_ESCAPE)
+	assert_false(t.themes_open, "Back: the title again")
+	assert_eq(t.buttons[0].text, "Play")
+	assert_eq(game.phase, game.Phase.TITLE)
+
+
+func test_the_picker_sets_the_theme_and_remembers_it():
+	game.open_title()
+	game.play()
+	_tap(KEY_DOWN)
+	assert_eq(game.hud.title.theme_ids[game.hud.title.sel], "seaside")
+	_tap(KEY_ENTER)
+	assert_eq(Scenery.theme_id, "seaside", "the theme holds for the run")
+	assert_eq(game.phase, game.Phase.BUILD)
+	assert_eq(game.remembered_theme(), "seaside")
+	Scenery.theme_id = "diner"
+	game.open_title()
+	game.play()
+	assert_eq(game.hud.title.theme_ids[game.hud.title.sel], "seaside", "last time's theme is chosen to start with")
+
+
+func test_regulars_theme_skips_the_picker():
+	OS.set_environment("REGULARS_THEME", "diner")
+	game.open_title()
+	game.play()
+	OS.unset_environment("REGULARS_THEME")
+	assert_false(game.hud.title_open(), "straight to the night before day 1")
+	assert_eq(game.phase, game.Phase.BUILD)
+
+
+func test_starting_over_shows_the_theme_card_but_not_the_title():
+	var script = game.get_script()
+	script._title_seen = true
+	script._theme_picked = false   # as restart() leaves it
+	var fresh = load("res://game/main.tscn").instantiate()
+	fresh.theme_path = THEME_TEST_PATH
+	add_child_autofree(fresh)
+	fresh.set_process(false)
+	assert_true(fresh.hud.title_open())
+	assert_true(fresh.hud.title.themes_open, "the theme card, the title skipped")
+	fresh.choose_theme("diner")
+	assert_eq(fresh.phase, fresh.Phase.BUILD)
+
+
+func test_the_shop_lists_only_what_the_theme_sells():
+	var ids := func() -> Array:
+		return game.shop_items().map(func(bp: Dictionary) -> String: return str(bp.id))
+	var diner: Array = ids.call()
+	assert_true(diner.has("jukebox") and diner.has("plant") and diner.has("floor_lamp"))
+	assert_false(diner.has("aquarium") or diner.has("palm"))
+	Scenery.theme_id = "seaside"
+	var sea: Array = ids.call()
+	assert_true(sea.has("aquarium") and sea.has("palm") and sea.has("floor_lamp"))
+	assert_false(sea.has("jukebox") or sea.has("plant"))
+	_to_build()
+	game.ledger.money = 999
+	game.ledger.xp = 9999
+	assert_false(game.pick_catalog("jukebox"), "not sold at the seaside")
+	assert_true(game.pick_catalog("aquarium"))
+
+
+func test_every_catalog_piece_builds_a_model_in_both_themes():
+	for theme: String in ["diner", "seaside"]:
+		Scenery.theme_id = theme
+		for id: String in Catalog.ITEMS:
+			if Catalog.is_build_tool(id) or id in ["rug", "screen"]:
+				continue
+			for tier in range(1, int(Catalog.ITEMS[id].tiers) + 1):
+				var n := Node3D.new()
+				Build.station(n, id, tier)
+				assert_gt(n.get_child_count(), 0, "%s %d has a model" % [id, tier])
+				n.free()
+
+
+func test_a_new_decor_piece_cheers_by_its_reach_and_shows_it_while_carried():
+	_to_build()
+	game.ledger.money = 999
+	game.ledger.xp = 9999
+	assert_eq(game.range_of("jukebox", 1), 4)
+	assert_eq(game.range_of("flower_stand"), 1)
+	var seat: Vector2i = game.stations[Vector2i(8, 3)].seats[0]
+	var before := float(game.decor_bonus(seat).joy)
+	game.add_station("flower_stand", seat + Vector2i(0, -1))
+	assert_almost_eq(float(game.decor_bonus(seat).joy) - before, Catalog.joy_of("flower_stand") * Decor.BESIDE, 0.0001)
+	var with_flowers := float(game.decor_bonus(seat).joy)
+	game.add_station("coat_stand", seat + Vector2i(0, -3))
+	assert_eq(float(game.decor_bonus(seat).joy), with_flowers, "three cells off: out of a coat stand's reach")
+	assert_true(game.pick_catalog("jukebox"))
+	game._update_range()
+	assert_gt(game._range_marks.get_child_count(), 1, "the reach marks, like the fern's")
+	game.cancel_hand()
+
+
+func test_a_counter_stool_seats_one_guest_and_never_a_pair():
+	assert_eq(Station.seats_for("stool", Vector2i(8, 5), 0), [Vector2i(9, 5)] as Array[Vector2i])
+	assert_eq(Station.seats_for("stool", Vector2i(8, 5), 1).size(), 1)
+	var stool: Station = game.add_station("stool", Vector2i(8, 5))
+	assert_eq(game.max_party(), 2, "a stool does not make groups bigger")
+	var solo: Guest = game.spawn_guest(5)
+	_run(14.0)
+	assert_eq(solo.table, stool, "a single takes the stool before a table for two")
+	var pair: Array[Guest] = game.spawn_group([0, 1])
+	_run(14.0)
+	assert_ne(pair[0].table, stool)
+	assert_eq(pair[0].table, pair[1].table)
+
+
+func test_a_dish_rack_beside_the_sink_takes_two_more_trays():
+	var sink: Station = game.find_station("sink")
+	sink.dirty = Station.SINK_PILED
+	assert_true(sink.messy())
+	var rack: Station = game.add_station("dish_rack", sink.cell + Vector2i(0, 1))
+	assert_true(sink.racked)
+	assert_eq(Station.piled_at(true), Station.SINK_PILED + 2)
+	assert_false(sink.messy(), "the rack takes the overflow")
+	sink.dirty = Station.SINK_PILED + 2
+	assert_true(sink.messy(), "piled at SINK_PILED + 2")
+	game._unregister(rack)
+	assert_false(sink.racked)
+
+
+func test_a_second_sink_and_bin_each_have_their_own_mess():
+	_to_build()
+	var sink2: Station = game.add_station("sink", Vector2i(2, 4))
+	var bin2: Station = game.add_station("bin", Vector2i(1, 5))
+	game.find_station("sink").dirty = 1
+	sink2.dirty = 1
+	assert_eq(game.dirty_note(), "Still dirty: 2 sinks.")
+	sink2.dirty = 0
+	bin2.count = 2
+	assert_eq(game.dirty_note(), "Still dirty: the sink, the bin.")
+	game._collect_gross()
+	var keys := {}
+	for g: Dictionary in game._gross:
+		if g.kind == "bin":
+			keys[g.key] = true
+	assert_eq(keys.size(), 2, "each bin its own sightline")
+	game.ledger.money = 0
+	assert_true(game.pick_up(Grid.center(Vector2i(2, 4))))
+	assert_true(game.sell_hand(), "a second sink sells for half")
+	assert_eq(game.ledger.money, Catalog.price_of("sink") / 2)
+	game.find_station("sink").dirty = 0
+	assert_true(game.pick_up(Grid.center(game.find_station("sink").cell)))
+	assert_eq(game.sell_block(), "Your last sink")
+	game.cancel_hand()

@@ -11,7 +11,6 @@ const BESIDE := 0.5    # within a cell: the next tile, the wall the seat is agai
 const IN_VIEW := 0.2   # further off, but in sight and within reach
 const VIEW_RANGE := 3  # cells a floor, rug or wall finish can be seen from
 const CAP := 0.35      # the most joy decor can add, however much there is
-const FERN_REACH := 2  # a fern is seen from 2 + its tier cells
 const THOUGHTS := {
 	"floor_parquet": "What a fine floor",
 	"floor_marble": "What a fine floor",
@@ -20,6 +19,14 @@ const THOUGHTS := {
 	"paper_stripe": "What pretty wallpaper",
 	"paper_rose": "What pretty wallpaper",
 	"plant": "That fern is rather nice",
+	"palm": "What a lovely palm",
+	"flower_stand": "Fresh flowers, how nice",
+	"coat_stand": "Somewhere for my coat",
+	"floor_lamp": "Such a warm light",
+	"gumball": "I'll get a gumball on the way out",
+	"jukebox": "I love this song",
+	"lantern": "What a charming old lantern",
+	"aquarium": "Look at the little fish",
 }
 
 
@@ -58,11 +65,11 @@ static func nearest(grid: Grid, seat: Vector2i, cells: Array, reach: int) -> int
 
 
 ## The share of a piece's joy a seat gets when the nearest cell of it it can see is
-## `d` away (-1: none). Nobody sits on a wall or a fern, so those are at best beside.
+## `d` away (-1: none). Nobody sits on a wall or a decor piece, so those are at best beside.
 static func share(id: String, d: int, tier := 1) -> float:
 	if d < 0:
 		return 0.0
-	if Catalog.is_finish(id) or id == "plant":
+	if Catalog.is_finish(id) or Catalog.is_decor_piece(id):
 		d = maxi(d, 1)
 	return band(d, reach(id, tier))
 
@@ -99,9 +106,12 @@ static func is_full(near: Array) -> bool:
 	return float(bonus(near).joy) >= CAP - FULL_EPS
 
 
-## How far a piece can be seen from, in cells.
+## How far a piece can be seen from, in cells: a decor piece's own "reach" (one
+## more a tier), else VIEW_RANGE for floors, rugs and finishes.
 static func reach(id: String, tier := 1) -> int:
-	return FERN_REACH + tier if id == "plant" else VIEW_RANGE
+	if Catalog.is_decor_piece(id):
+		return int(Catalog.ITEMS[id].reach) + tier - 1
+	return VIEW_RANGE
 
 
 ## `near` is what a seat can see: {"id", "dist", "tier" (optional)}, with dist in cells

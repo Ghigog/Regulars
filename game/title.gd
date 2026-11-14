@@ -4,10 +4,16 @@ extends Control
 ## Settings and Quit on a paper card. Keys and the controller move a framed
 ## pointer between the buttons (shape as well as colour); touch taps them.
 ## Quit is left off where quitting is not a thing (phones and the web).
+## Play turns the card over to the theme picker (PRD 7): one row a theme, with a
+## little swatch of its room, and Back to return.
 
 var hud: Hud
 var buttons: Array[Button] = []
 var sel := 0
+var themes_open := false
+var theme_ids: Array[String] = []   # on the theme card: the theme of each row, in order
+var _rows: Array[Control] = []      # what the pointer frame goes round, one per button
+var _box: VBoxContainer
 var _keys: Label
 var _frame: Control
 
@@ -37,38 +43,99 @@ func setup(hud_: Hud) -> void:
 	card.custom_minimum_size = Vector2(360, 0)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(card)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 14)
-	card.add_child(box)
-	buttons.append(hud._button(box, "Play", press_id.bind("play")))
-	buttons.append(hud._button(box, "Settings", press_id.bind("settings")))
-	if can_quit():
-		buttons.append(hud._button(box, "Quit", press_id.bind("quit")))
-	for b in buttons:
-		b.add_theme_font_size_override("font_size", 24)
-		b.mouse_entered.connect(func() -> void: pick(buttons.find(b)))
-	_keys = hud._label(box, 15)
-	_keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_keys.modulate.a = 0.7
+	_box = VBoxContainer.new()
+	_box.add_theme_constant_override("separation", 14)
+	card.add_child(_box)
 	_frame = Control.new()
 	_frame.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_frame.draw.connect(func() -> void:
-		if hud._mode() != "touch" and sel < buttons.size():
-			var r := buttons[sel].get_global_rect().grow_individual(14, 6, 10, 6)
+		if hud._mode() != "touch" and sel < _rows.size():
+			var r := _rows[sel].get_global_rect().grow_individual(14, 6, 10, 6)
 			r.position -= _frame.get_global_rect().position
 			Hud.pick_frame(_frame, r))
 	add_child(_frame)
+	show_main()
+
+
+func _clear() -> void:
+	for c in _box.get_children():
+		_box.remove_child(c)
+		c.queue_free()
+	buttons.clear()
+	_rows.clear()
+	theme_ids.clear()
+
+
+func _add_button(parent: Container, text: String, id: String, row: Control = null) -> Button:
+	var b := hud._button(parent, text, press_id.bind(id))
+	b.add_theme_font_size_override("font_size", 24)
+	var i := buttons.size()
+	b.mouse_entered.connect(func() -> void: pick(i))
+	buttons.append(b)
+	_rows.append(row if row != null else b)
+	return b
+
+
+## The first card: Play, Settings and (where it makes sense) Quit.
+func show_main() -> void:
+	_clear()
+	themes_open = false
+	_add_button(_box, "Play", "play")
+	_add_button(_box, "Settings", "settings")
+	if can_quit():
+		_add_button(_box, "Quit", "quit")
+	_add_keys()
+	sel = 0
 	refresh()
+
+
+## The theme card: a row a theme (swatch, name, what it serves), then Back. The
+## theme picked last time is chosen to start with.
+func show_themes() -> void:
+	_clear()
+	themes_open = true
+	var head := hud._label(_box, 26, "Which restaurant?")
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var last: String = hud.game.remembered_theme()
+	sel = 0
+	for id: String in Scenery.THEMES:
+		var t: Dictionary = Scenery.THEMES[id]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		_box.add_child(row)
+		var sw := Swatch.new(id)
+		row.add_child(sw)
+		var b := _add_button(row, "%s\n%s" % [t.name, t.line], "theme:" + id, row)
+		b.add_theme_font_size_override("font_size", 20)
+		b.custom_minimum_size.x = 250
+		sw.gui_input.connect(func(e: InputEvent) -> void:
+			if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+				b.pressed.emit())
+		if id == last:
+			sel = buttons.size() - 1
+		theme_ids.append(id)
+	_add_button(_box, "Back", "back")
+	_add_keys()
+	refresh()
+
+
+func _add_keys() -> void:
+	_keys = hud._label(_box, 15)
+	_keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_keys.modulate.a = 0.7
 
 
 ## Sizes the buttons and rewords the key line for the device in use.
 func refresh() -> void:
 	var touch := hud._mode() == "touch"
 	for b in buttons:
-		b.custom_minimum_size.y = 72.0 if touch else 52.0
+		b.custom_minimum_size.y = (72.0 if touch else 52.0) * (1.4 if b.text.contains("\n") else 1.0)
 	_keys.visible = not touch
-	_keys.text = "%s choose     %s press     %s settings" % [hud._g("browse"), hud._g("use"), hud._g("options")]
+	if themes_open:
+		_keys.text = "%s choose     %s pick     %s back" % [hud._g("browse"), hud._g("use"), hud._g("back")]
+	else:
+		_keys.text = "%s choose     %s press     %s settings" % [hud._g("browse"), hud._g("use"), hud._g("options")]
 	_frame.queue_redraw()
 
 
@@ -95,6 +162,8 @@ func key(k: int, echo := false) -> bool:
 		return false
 	elif k in [KEY_E, KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]:
 		buttons[sel].pressed.emit()
+	elif k == KEY_ESCAPE and themes_open:
+		show_main()
 	else:
 		return false
 	return true
@@ -112,6 +181,10 @@ func action(a: String, echo := false) -> bool:
 			if echo:
 				return false
 			buttons[sel].pressed.emit()
+		"back":
+			if echo or not themes_open:
+				return false
+			show_main()
 		_:
 			return false
 	return true
@@ -125,6 +198,50 @@ func press_id(id: String) -> void:
 			hud.toggle_options()
 		"quit":
 			hud.game.quit_game()
+		"back":
+			show_main()
+		_:
+			if id.begins_with("theme:"):
+				hud.game.choose_theme(id.trim_prefix("theme:"))
+
+
+## A little picture of a theme's room: the back wall with its cutaway stripe over
+## the kitchen's chequered tiles and the dining room's planks, ink-edged.
+class Swatch extends Control:
+	var theme_id := ""
+
+	func _init(id: String) -> void:
+		theme_id = id
+		custom_minimum_size = Vector2(92, 70)
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mouse_filter = Control.MOUSE_FILTER_STOP
+
+	func _draw() -> void:
+		var t: Dictionary = Scenery.THEMES[theme_id]
+		var r := Rect2(Vector2.ZERO, size)
+		Hud.box(self, Rect2(r.position + Vector2(0, 4), r.size), Hud.SHADOW, 10)
+		Hud.box(self, r, Color(t.backdrop), 10, 3, Hud.INK)
+		var inner := r.grow(-6)
+		var wall_h := inner.size.y * 0.42
+		draw_rect(Rect2(inner.position, Vector2(inner.size.x, wall_h)), Color(t.wall))
+		draw_rect(Rect2(inner.position + Vector2(0, wall_h - 6), Vector2(inner.size.x, 6)), Color(t.wall_low))
+		draw_rect(Rect2(inner.position + Vector2(0, wall_h * 0.45), Vector2(inner.size.x, 4)), Color(t.cut))
+		var floor_y := inner.position.y + wall_h
+		var floor_h := inner.size.y - wall_h
+		var split := inner.size.x * 0.45
+		var sq := floor_h / 3.0
+		for gy in 3:
+			for gx in int(ceil(split / sq)):
+				var w := minf(sq, split - gx * sq)
+				draw_rect(Rect2(inner.position.x + gx * sq, floor_y + gy * sq, w, sq), Color(t.tile_a if (gx + gy) % 2 == 0 else t.tile_b))
+		var planks: Array = t.planks
+		var ph := floor_h / 4.0
+		for i in 4:
+			draw_rect(Rect2(inner.position.x + split, floor_y + i * ph, inner.size.x - split, ph), Color(planks[i % planks.size()]))
+		# A window on the back wall, so the swatch reads as a room.
+		var win := Rect2(inner.position + Vector2(inner.size.x * 0.6, 5), Vector2(inner.size.x * 0.28, wall_h * 0.5))
+		Hud.box(self, win, Color("#bfe3ef"), 3, 2, Hud.INK)
+		draw_rect(r.grow(-6), Hud.INK, false, 2.0)
 
 
 ## The peg-doll logo (sheet 15, bottom left): chunky gold and orange letters

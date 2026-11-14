@@ -56,17 +56,16 @@ static func aged(age: float, delta: float, messy: bool, in_service: bool) -> flo
 
 
 ## The build-phase note for what is still dirty, e.g.
-## "Still dirty: 2 tables, the sink, the bin." Empty when nothing is.
-static func dirty_note(tables: int, sink: bool, bin: bool) -> String:
+## "Still dirty: 2 tables, the sink, the bin." Empty when nothing is. Sinks and
+## bins are counted like tables: one is "the sink", more are "2 sinks".
+static func dirty_note(tables: int, sinks: int, bins: int) -> String:
 	var parts: Array[String] = []
-	if tables == 1:
-		parts.append("a table")
-	elif tables > 1:
-		parts.append("%d tables" % tables)
-	if sink:
-		parts.append("the sink")
-	if bin:
-		parts.append("the bin")
+	for pair: Array in [[tables, "a table", "tables"], [sinks, "the sink", "sinks"], [bins, "the bin", "bins"]]:
+		var n: int = pair[0]
+		if n == 1:
+			parts.append(pair[1])
+		elif n > 1:
+			parts.append("%d %s" % [n, pair[2]])
 	if parts.is_empty():
 		return ""
 	return "Still dirty: %s." % ", ".join(parts)
