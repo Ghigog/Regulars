@@ -44,6 +44,7 @@ const SOUNDS := {  # name -> volume in dB
 	"roll": -8.0, "lift": -10.0, "rattle": -9.0, "page": -7.0, "thump": -6.0, "rip": -6.0,
 	"flutter": -10.0, "rustle": -9.0, "rope": -8.0, "stamp": -4.0,
 	"slide": -8.0, "tick": -9.0, "tab": -8.0, "flip": -5.0,
+	"zoom": -6.0, "wobble": -6.0, "chop": -7.0, "slice": -9.0, "glug": -8.0,
 }
 const LOOPING: Array[String] = ["sizzle"]
 const MUSIC_DB := -14.0
@@ -2276,7 +2277,7 @@ func _collect_gross() -> void:
 			_gross.append({"cell": st.cell, "kind": "bin", "key": "bin", "range": BIN_RANGE, "thought": "I can see the bin from my seat"})
 		elif st.type == "sink" and st.messy():
 			_gross.append({"cell": st.cell, "kind": "sink", "age": st.dirty_age, "thought": "Look at that washing-up"})
-		elif st.type == "stove" and st.item.begins_with("burnt:"):
+		elif (st.type == "stove" or st.type == "fryer") and st.item.begins_with("burnt:"):
 			_gross.append({"cell": st.cell, "kind": "burning", "age": st.cook - Station.BURN_TIME, "thought": "Something is burning in there"})
 	if player.carrying_something_gross():
 		_gross.append({"cell": player.cell(), "kind": "rubbish", "key": "rubbish", "thought": "I just watched the chef carry rubbish past me"})

@@ -287,4 +287,33 @@ for i, t in enumerate([0.2, 0.34, 0.44]):
     noise(b, t, 0.02, 0.4 - 0.1 * i, 0.5, decay=150)
 save("flip", b, 0.6)
 
+
+# ---------------------------------------------------------------- prep (PRD 1)
+
+b = buf(0.45)  # zoom: a prep done well, a quick rising whoosh and a sparkle
+noise(b, 0, 0.3, 0.6, 0.85, decay=8)
+tone(b, 0.0, 500, 0.3, 0.5, SOFT, decay=9, bend=2.5)
+tone(b, 0.22, 1568, 0.2, 0.4, BELL, decay=18)
+save("zoom", reverb(b, 0.25), 0.6)
+
+b = buf(0.6)   # wobble: a prep done badly, a sagging boing
+tone(b, 0, 300, 0.55, 1.0, SOFT, decay=5, bend=-0.9)
+tone(b, 0.05, 220, 0.5, 0.4, SINE, decay=6, bend=-0.6)
+save("wobble", b, 0.6)
+
+b = buf(0.12)  # chop: a knife on a board
+tone(b, 0, 240, 0.08, 0.9, WOOD, decay=55)
+noise(b, 0, 0.03, 0.6, 0.7, decay=160)
+save("chop", b, 0.55)
+
+b = buf(0.14)  # slice: a short steel shick
+noise(b, 0, 0.1, 0.8, 0.95, decay=35)
+tone(b, 0, 2400, 0.08, 0.2, SINE, decay=40, bend=-0.5)
+save("slice", b, 0.45)
+
+b = buf(0.25)  # glug: a drink going into a cup
+for i in range(3):
+    tone(b, i * 0.07, 330 + i * 60, 0.08, 0.7, SOFT, decay=40, bend=1.5)
+save("glug", b, 0.5)
+
 print("wrote", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

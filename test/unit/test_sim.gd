@@ -1051,3 +1051,70 @@ func test_tag_hint_needs_three_items():
 	var items := _menu_items()
 	assert_eq(Menu.tag_hint(items, ["vegetable"]), "vegetable", "salad, fries and corn")
 	assert_eq(Menu.tag_hint(items, ["meat"]), "")
+
+
+# ---------- Prep minigames (PRD 1) ----------
+
+func test_chop_scores_hits_in_the_notch():
+	assert_eq(Prep.chop(3), "good")
+	assert_eq(Prep.chop(2), "plain")
+	assert_eq(Prep.chop(1), "bad")
+	assert_eq(Prep.chop(0), "bad")
+	assert_true(Prep.chop_hit(0.5))
+	assert_true(Prep.chop_hit(0.5 + Prep.CHOP_NOTCH))
+	assert_false(Prep.chop_hit(0.5 + Prep.CHOP_NOTCH + 0.01))
+
+
+func test_slice_scores_the_count():
+	var n := Prep.SLICE_COUNT
+	assert_eq(Prep.slice(n), "good", "exact")
+	assert_eq(Prep.slice(n + 1), "plain")
+	assert_eq(Prep.slice(n + 3), "plain")
+	assert_eq(Prep.slice(n + 4), "bad")
+	assert_eq(Prep.slice(n - 1), "bad", "out of time short of the count")
+
+
+func test_pour_scores_the_fill():
+	assert_eq(Prep.pour(0.84), "plain")
+	assert_eq(Prep.pour(0.85), "good")
+	assert_eq(Prep.pour(1.0), "good")
+	assert_eq(Prep.pour(1.01), "bad", "overflowed")
+	assert_eq(Prep.pour(0.59), "bad")
+	assert_eq(Prep.pour(0.6), "plain")
+
+
+func test_fry_and_grill_windows():
+	assert_eq(Prep.fry(Prep.FRY_MIN - 0.1).state, "raw")
+	assert_eq(Prep.fry(Prep.FRY_GOOD - 0.1).result, "plain", "early")
+	assert_eq(Prep.fry(Prep.FRY_GOOD).result, "good")
+	assert_eq(Prep.fry(Prep.FRY_LATE).result, "good")
+	assert_eq(Prep.fry(Prep.FRY_LATE + 0.1).result, "plain", "late")
+	assert_eq(Prep.fry(Prep.FRY_BURN).result, "spoiled")
+	assert_eq(Prep.grill(Prep.GRILL_DONE - 0.1).result, "plain", "underdone")
+	assert_eq(Prep.grill(Prep.GRILL_DONE).result, "good")
+	assert_eq(Prep.grill(Prep.GRILL_PERFECT + 0.1).result, "plain", "drying out")
+	assert_eq(Prep.grill(Prep.GRILL_BURN).result, "spoiled")
+	assert_lt(float(Prep.grill(Prep.GRILL_BURN - 0.1).quality), 0.5, "the curve falls toward bad")
+
+
+func test_boil_is_always_plain_and_never_rewards():
+	assert_eq(Prep.boil(Prep.BOIL_TIME - 0.1).state, "raw")
+	assert_eq(Prep.boil(Prep.BOIL_TIME).result, "plain")
+	assert_eq(Prep.boil(999.0).result, "plain", "it cannot overcook")
+	assert_eq(Prep.reward("boil", "good"), "")
+	assert_eq(Prep.reward("chop", "good"), "burst")
+	assert_eq(Prep.reward("pour", "bad"), "penalty")
+	assert_eq(Prep.reward("grill", "spoiled"), "penalty")
+	assert_eq(Prep.reward("slice", "plain"), "")
+
+
+func test_results_set_quality():
+	assert_eq(Prep.quality_of("good"), Prep.GOOD)
+	assert_eq(Prep.quality_of("plain"), Prep.PLAIN)
+	assert_eq(Prep.quality_of("bad"), Prep.BAD)
+	var t := Tray.new()
+	var m := Menu.new()
+	t.assign(1, [m.add("main", ["bun", "patty"])])
+	t.add("prep:bun", Prep.PLAIN)
+	t.add("prep:patty", Prep.GOOD)
+	assert_almost_eq(t.quality(), (Prep.PLAIN + Prep.GOOD) / 2.0, 0.001, "a tray's quality is the average")
