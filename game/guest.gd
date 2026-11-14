@@ -14,7 +14,11 @@ var game
 var idx := 0
 var info: Dictionary
 var mood := GuestMood.new()
-var state := "queue"  # queue, to_seat, ordering, waiting (for food), eating, company, leaving
+var state := "queue"  # queue, to_seat, ordering, waiting (for food), eating, company, browse, leaving
+## browse: reading the menu at the door, having found no main; they walk on after.
+const BROWSE_TIME := 2.2
+var hint_tag := ""        # a liked tag the menu is full of, which they remarked on
+var liked_meal := false   # their tray had something they like
 ## What they asked for once the chef took their order: {main, side, drink} (menu
 ## items, any of them {}) and "ticket", the ticket id (-1 if they ordered nothing).
 ## Empty until then. `planned` is what they will order, chosen at the door.
@@ -262,6 +266,14 @@ func tick(delta: float) -> void:
 				return is_instance_valid(m) and m != self and m.state != "leaving" and m.state != "company")
 			if not staying:
 				game.leave_with_friends(self)
+		"browse":
+			if _advance(delta):
+				_face(Vector3(-1, 0, 0), delta)   # towards the window and the menu
+				if timer == BROWSE_TIME:
+					game.read_board(self)
+				timer -= delta
+				if timer <= 0.0:
+					game.leave_with_friends(self)
 		"leaving":
 			if _advance(delta):
 				game.remove_guest(self)

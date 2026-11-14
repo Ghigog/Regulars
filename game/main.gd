@@ -292,6 +292,31 @@ func _apply_demo(demo: String) -> void:
 					g.mood.think("Nobody has cleared that table")
 					inspect(g)
 					return)
+	elif demo == "walkon":  # a pair who find nothing they like turn away at the door; shoot at about 7
+		for i in [0, 1]:
+			(town.people[i].dislikes as Array).append("patty")
+		arrivals.clear()
+		arrivals.append({"time": 0.2, "group": [0, 1]})
+		arrivals.append({"time": 2.5, "idx": 2})
+		(town.people[2].dislikes as Array).erase("patty")
+		(town.people[2].dislikes as Array).erase("bun")
+	elif demo == "orders_card":  # a seated guest's card with their orders so far, one item renamed; shoot at 10
+		for a in arrivals:
+			a.time = 0.2
+		get_tree().create_timer(9.0).timeout.connect(func() -> void:
+			for g in guests:
+				if g.seated_waiting():
+					var burger: int = menu.items[0].id
+					var fries := menu.add("side", ["potato"], "Fries")
+					for k in 3:
+						town.record_order(g.idx, burger)
+					town.record_order(g.idx, int(fries.id))
+					town.record_order(g.idx, int(fries.id))
+					menu.rename(burger, "Stupid Burger")   # the counts follow the rename
+					menu.remove(int(fries.id))             # and a deleted item keeps its last name
+					g.mood.think(Menu.LIKED_THOUGHT)
+					inspect(g)
+					return)
 	elif demo == "options" or demo == "options_gfx":  # the options screen, on either tab
 		hud._options_tab = "graphics" if demo == "options_gfx" else "audio"
 		hud.toggle_options()
@@ -304,6 +329,7 @@ func _apply_demo(demo: String) -> void:
 	elif demo == "summary" or demo == "town":
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.record_sale(DEMO_BILL, 3)
+		ledger.record_found_nothing(3)
 		arrivals.clear()
 		if demo == "town":  # a spread of opinions, then the town book over the receipt
 			for i in town.people.size():
@@ -1943,7 +1969,15 @@ func spawn_group(ids: Array) -> Array[Guest]:
 		party.append(g)
 		guests.append(g)
 		queue.append(g)
-	_plan_orders(party)
+	var plan := _plan_orders(party)
+	if plan.walk:   # nobody has a main: they read the menu at the door and walk on
+		for k in party.size():
+			var g := party[k]
+			queue.erase(g)
+			g.state = "browse"
+			g.timer = Guest.BROWSE_TIME
+			g.hold = 0.4 * k
+			g.walk_to(Vector2i(W + 1, Grid.to_cell(queue_spot(0)).y + k), queue_spot(0) + Vector3(1.0, 0, k * 0.9))
 	_reflow_queue()
 	return party
 
@@ -1954,10 +1988,34 @@ func _plan_orders(party: Array[Guest]) -> Dictionary:
 	var tastes := []
 	for g in party:
 		tastes.append(town.tastes_of(g.idx))
-	var plan := Menu.group_order(tonight_menu(), tastes, order_rng)
+	var available := tonight_menu()
+	var plan := Menu.group_order(available, tastes, order_rng)
 	for k in party.size():
-		party[k].planned = plan.orders[k]
+		var g := party[k]
+		g.planned = plan.orders[k]
+		if plan.walk:
+			continue   # they think it at the board (read_board)
+		if plan.found_nothing.has(k):   # stays with the group, with a drink or nothing
+			g.mood.think(Menu.NOTHING_THOUGHT)
+			town.record_found_nothing(g.idx)
+			ledger.record_found_nothing()
+		else:
+			g.hint_tag = Menu.tag_hint(available, g.info.liked_tags)
+			if g.hint_tag != "":
+				g.mood.think(Menu.hint_thought(g.hint_tag))
 	return plan
+
+
+## A guest who found no main stops at the menu, says so and walks on. Not a walkout
+## and not a strike, but they think a little less of the place, friends hear it, and
+## the receipt counts them.
+func read_board(g: Guest) -> void:
+	g.mood.think(Menu.NOTHING_THOUGHT)
+	popup("Nothing I liked", g.position + Vector3(0, 2.3, 0), Color(Build.CABINET))
+	ledger.record_found_nothing()
+	var talk := town.gossip_line(g.idx, town.record_found_nothing(g.idx), "there was nothing on the menu for them")
+	if g == g.party[0] and talk != "":
+		hud.say(talk)
 
 
 ## Where the guest `i`th in line stands: a single file up the pavement along the
@@ -2555,6 +2613,9 @@ func serve(g: Guest, t: Tray) -> void:
 	tickets.erase(find_ticket(t.ticket))
 	t.ticket = -1
 	hud.refresh_tickets()
+	g.liked_meal = Menu.liked_count(t.ingredients(), g.info.likes) > 0
+	if g.liked_meal:
+		g.mood.think(Menu.LIKED_THOUGHT)
 	var settled := g.start_eating(q, t)
 	if settled != "":
 		g.mood.think(settled)
@@ -2613,7 +2674,8 @@ func finish_meal(g: Guest) -> void:
 	var was_sore: bool = g.info.sore
 	var was_regular := town.is_regular(g.idx)
 	ledger.record_sale(bill, tip)
-	var talk := town.gossip_line(g.idx, town.record_visit(g.idx, g.mood.satisfaction()))
+	var delta := town.record_visit(g.idx, g.mood.satisfaction())
+	var talk := town.gossip_line(g.idx, delta, Town.praise_about(g.liked_meal, g.hint_tag) if delta > 0.0 else "")
 	if was_sore and not g.info.sore:
 		talk = "%s has forgiven you." % g.info.name
 	elif town.is_regular(g.idx) and not was_regular:
