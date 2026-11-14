@@ -280,7 +280,8 @@ func show_widget(kind: String) -> PrepWidget:
 		return widget
 	if widget != null:
 		widget.queue_free()
-	widget = PrepWidget.make(kind)
+	var ing := Catalog.ingredient_of(type)
+	widget = PrepWidget.make(kind, str(Pantry.ITEMS[ing].prepped) if kind == "pour" and ing != "" else "")
 	widget.position = Vector3(0, 1.72, 0)
 	if kind in ["chop", "slice"]:
 		widget.scale = Vector3.ONE * 1.4   # flat bars: as easy to read as the round dial

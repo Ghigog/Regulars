@@ -35,23 +35,23 @@ const ITEMS := {
 	"soda": {"name": "Soda", "theme": "diner", "tool": "pour", "tags": ["drink"], "worth": 3, "fee": 3, "drink": true,
 		"colour": "#7a3b2e", "prepped": "#7a3b2e", "shape": "cup"},
 	"roll": {"name": "Bread roll", "theme": "seaside", "tool": "none", "tags": ["bread"], "worth": 2, "fee": 3,
-		"colour": "#d8a868", "prepped": "#d8a868", "shape": "bun"},
+		"colour": "#d49a55", "prepped": "#d49a55", "shape": "roll"},
 	"fish": {"name": "Fish fillet", "theme": "seaside", "tool": "grill", "tags": ["fish"], "worth": 7, "fee": 9,
-		"colour": "#e9c9c0", "prepped": "#d9a066", "shape": "fillet"},
+		"colour": "#f27d5e", "prepped": "#ef8a5e", "shape": "fillet"},
 	"calamari": {"name": "Calamari", "theme": "seaside", "tool": "fry", "tags": ["fish", "fried"], "worth": 5, "fee": 6,
-		"colour": "#eee6dc", "prepped": "#e8b04e", "shape": "ring"},
+		"colour": "#f1e2dc", "prepped": "#e8b04e", "shape": "squid"},
 	"lemon": {"name": "Lemon", "theme": "seaside", "tool": "slice", "tags": ["fruit"], "worth": 1, "fee": 2,
-		"colour": "#f5dc3c", "prepped": "#f8e66a", "shape": "round"},
+		"colour": "#f5d936", "prepped": "#f8e46a", "shape": "lemon"},
 	"courgette": {"name": "Courgette", "theme": "seaside", "tool": "chop", "tags": ["vegetable"], "worth": 2, "fee": 2,
-		"colour": "#4f8f3a", "prepped": "#9fcf6a", "shape": "round"},
+		"colour": "#3f7f34", "prepped": "#d9e6a0", "shape": "courgette"},
 	"pepper": {"name": "Pepper", "theme": "seaside", "tool": "chop", "tags": ["vegetable"], "worth": 2, "fee": 2,
-		"colour": "#d9473a", "prepped": "#e86a4a", "shape": "leaf"},
+		"colour": "#d9473a", "prepped": "#e0503e", "shape": "pepper"},
 	"new_potato": {"name": "New potatoes", "theme": "seaside", "tool": "boil", "tags": ["vegetable"], "worth": 3, "fee": 3,
-		"colour": "#d9c08a", "prepped": "#e6cf8f", "shape": "pebbles"},
+		"colour": "#c9a96e", "prepped": "#eed58a", "shape": "pebbles"},
 	"beans": {"name": "Green beans", "theme": "seaside", "tool": "boil", "tags": ["vegetable"], "worth": 2, "fee": 2,
-		"colour": "#5f9f45", "prepped": "#6fb04f", "shape": "sticks"},
+		"colour": "#5f9f45", "prepped": "#72bf4a", "shape": "beans"},
 	"wine": {"name": "White wine", "theme": "seaside", "tool": "pour", "tags": ["drink"], "worth": 5, "fee": 5, "drink": true,
-		"colour": "#efe39a", "prepped": "#efe39a", "shape": "glass"},
+		"colour": "#e8cf5e", "prepped": "#e8cf5e", "shape": "glass"},
 }
 
 
@@ -73,6 +73,11 @@ static func is_drink(id: String) -> bool:
 
 static func tags_of(id: String) -> Array:
 	return ITEMS[id].tags
+
+
+## Bread wraps a stack when it is the one bread in it: a heel below, a top above.
+static func is_bread(id: String) -> bool:
+	return ITEMS.has(id) and ITEMS[id].tags.has("bread")
 
 
 ## Whether it needs a step at a tool station before it goes on a tray. Pour is done

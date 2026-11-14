@@ -84,6 +84,20 @@ static func _dish(ings: Array) -> Array:
 	var o: Array = []
 	if ings.is_empty():
 		return o
+	if Pantry.is_drink(ings[0]) and Pantry.ITEMS[ings[0]].shape == "glass":
+		# A stemmed wine glass: an ink bowl with the wine in it, a stem and a foot.
+		var wine: String = Pantry.ITEMS[ings[0]].prepped
+		o.append([ell(0, 0.3, 0.68, 0.7, 180, 360), INK])
+		o.append([rect(0, 0.56, 1.36, 0.56), INK])
+		o.append([ell(0, 0.3, 0.54, 0.56, 180, 360), "#eef6f4"])
+		o.append([rect(0, 0.54, 1.08, 0.48), "#eef6f4"])
+		o.append([ell(0, 0.34, 0.54, 0.56, 180, 360), wine])
+		o.append([rect(0, -0.55, 0.26, 0.5), INK])
+		o.append([rect(0, -0.84, 1.04, 0.24), INK])
+		o.append([rect(0, -0.55, 0.1, 0.46), "#eef6f4"])
+		o.append([rect(0, -0.84, 0.88, 0.1), "#eef6f4"])
+		o.append([rect(-0.32, 0.5, 0.1, 0.34, 0.15), CREAM])
+		return o
 	if Pantry.is_drink(ings[0]):
 		var col: String = Pantry.ITEMS[ings[0]].prepped
 		o.append([PackedVector2Array([Vector2(-0.62, 0.7), Vector2(0.62, 0.7), Vector2(0.46, -0.9), Vector2(-0.46, -0.9)]), INK])
@@ -92,7 +106,7 @@ static func _dish(ings: Array) -> Array:
 		o.append([rect(0.18, 0.86, 0.12, 0.6, -0.3), CREAM])
 		return o
 	ings = ings.duplicate()
-	if ings.size() > 1 and Pantry.ITEMS[ings[0]].shape == "bun" and ings.count(ings[0]) == 1:
+	if ings.size() > 1 and Pantry.is_bread(ings[0]) and ings.count(ings[0]) == 1:
 		ings.append(ings[0])   # one bread wraps the stack: a heel below and a dome on top
 	var n := ings.size()
 	var h := 1.5 / maxf(n, 2.0)
@@ -101,7 +115,7 @@ static func _dish(ings: Array) -> Array:
 		var info: Dictionary = Pantry.ITEMS[ings[k]]
 		var col: String = info.prepped
 		var w := 1.7 - 0.12 * absf(k - (n - 1) / 2.0)
-		if info.shape == "bun" and k == n - 1 and n > 1:
+		if Pantry.is_bread(ings[k]) and k == n - 1 and n > 1:
 			o.append([ell(0, y, w / 2.0, h * 1.6, 0, 180), INK])
 			o.append([ell(0, y + 0.04, w / 2.0 - 0.08, h * 1.6 - 0.08, 0, 180), col])
 		else:

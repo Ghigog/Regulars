@@ -20,11 +20,14 @@ var _ring: Array = []
 var _lid: Node3D
 var _drips: Array = []
 var _age := 0.0
+var _liquid := "#7a3b2e"   # pour: the drink's colour
 
 
-static func make(kind_: String) -> PrepWidget:
+static func make(kind_: String, liquid := "") -> PrepWidget:
 	var w := PrepWidget.new()
 	w.kind = kind_
+	if liquid != "":
+		w._liquid = liquid
 	w.basis = Build.CAM_BASIS
 	w._build()
 	Build.on_top(w)
@@ -72,7 +75,7 @@ func _build() -> void:
 			_fill = Node3D.new()
 			_fill.position = Vector3(0, -0.28, 0.004)
 			add_child(_fill)
-			Build.flat(_fill, Icons.rect(0, 0.28, 0.36, 0.56), "#7a3b2e")
+			Build.flat(_fill, Icons.rect(0, 0.28, 0.36, 0.56), _liquid)
 			var band := -0.28 + 0.56 * Prep.POUR_GOOD
 			Build.flat(self, Icons.rect(0, band, 0.44, 0.02), Build.TRIM, 0.008)
 			Build.flat(self, Build.star_pts(0.05, 5, 0.5, Vector2(0.27, band)), Build.WARN, 0.008)
@@ -80,8 +83,8 @@ func _build() -> void:
 			_spill.position.z = 0.01
 			add_child(_spill)
 			for x: float in [-0.24, 0.24]:
-				Build.flat(_spill, Build.disc_pts(0.035, Vector2(x, 0.2), 10), "#7a3b2e")
-				Build.flat(_spill, Build.disc_pts(0.025, Vector2(x * 1.15, 0.05), 10), "#7a3b2e")
+				Build.flat(_spill, Build.disc_pts(0.035, Vector2(x, 0.2), 10), _liquid)
+				Build.flat(_spill, Build.disc_pts(0.025, Vector2(x * 1.15, 0.05), 10), _liquid)
 		"boil":
 			Build.flat(self, Build.disc_pts(0.34), Build.TRIM)
 			Build.flat(self, Build.disc_pts(0.3), "#5a4636", 0.002)

@@ -3,6 +3,17 @@ extends Node3D
 
 enum Phase { SERVICE, SUMMARY, CLOSED, BUILD, TITLE }
 
+## The fixed menu until the menu screen is built: one main per theme, a bread and
+## something grilled, and the starting kitchen has a station for each.
+const FIXED_MAIN := {
+	"diner": {"name": "Burger", "bread": "bun", "grill": "patty"},
+	"seaside": {"name": "Fish roll", "bread": "roll", "grill": "fish"},
+}
+## What the prep demos use for each tool, per theme.
+const DEMO_PREP := {
+	"diner": {"fry": "potato", "boil": "corn", "chop": "tomato", "slice": "cheese", "pour": "soda"},
+	"seaside": {"fry": "calamari", "boil": "new_potato", "chop": "courgette", "slice": "lemon", "pour": "wine"},
+}
 const W := 10            # restaurant interior is 10 x 7 cells
 const H := 7             # columns 10 and 11 are the pavement outside, to the right
 const DOOR := Vector2i(W, 4)         # the pavement cell just outside the doorway, on the right-hand wall
@@ -148,7 +159,7 @@ func _ready() -> void:
 	_build_scenery()
 	town.make_tastes(Scenery.theme_id)
 	order_rng.seed = seed_value
-	menu.add("main", ["bun", "patty"], "Burger")   # the fixed menu until the menu screen is built
+	menu.add("main", [fixed_main().bread, fixed_main().grill], fixed_main().name)   # until the menu screen is built
 	_build_layout()
 	_start_plan()
 	_load_sounds()
@@ -206,7 +217,7 @@ func _ready() -> void:
 ## Dev aid for screenshots: REGULARS_DEMO=cook or =summary jumps to that moment.
 func _apply_demo(demo: String) -> void:
 	if demo == "cook":   # a patty on the grill, the chef with a tray for it
-		find_station("stove").set_item("raw:patty")
+		find_station("stove").set_item("raw:" + fixed_main().grill)
 		find_station("stove").cook = -8.2
 		player.position = Grid.center(Vector2i(1, 3))
 		player.look(Vector2i(-1, 0))
@@ -504,13 +515,13 @@ func _demo_ticket(full: bool) -> void:
 		player.position = Grid.center(Vector2i(2, 5))
 		player.look(Vector2i(0, 1))
 	else:
-		t.add("prep:bun", Prep.PLAIN)
+		t.add("prep:" + fixed_main().bread, Prep.PLAIN)
 		pass_st.set_tray(t, tray_tag(t))
-		find_station("stove").set_item("raw:patty")
+		find_station("stove").set_item("raw:" + fixed_main().grill)
 		find_station("stove").cook = 3.0
 		player.position = Grid.center(Vector2i(3, 4))
 		player.look(Vector2i(1, 0))
-		player.set_held("prep:patty", 1.0)
+		player.set_held("prep:" + fixed_main().grill, 1.0)
 	hud.refresh_tickets()
 
 
@@ -520,26 +531,27 @@ func _demo_prep(which: String) -> void:
 	player.position = Grid.center(Vector2i(1, 4))
 	player.look(Vector2i(1, 0))
 	var at := Vector2i(2, 4)
+	var use: Dictionary = DEMO_PREP.get(Scenery.theme_id, DEMO_PREP.diner)
 	match which:
 		"grill":
 			var st := find_station("stove")
-			st.set_item("raw:patty")
+			st.set_item("raw:" + fixed_main().grill)
 			st.cook = 5.0
 			player.position = Grid.center(Vector2i(1, 3))
 			player.look(Vector2i(-1, 0))
 		"fry":
-			add_station("fryer", at, 1, 1).set_item("raw:potato")
+			add_station("fryer", at, 1, 1).set_item("raw:" + use.fry)
 			stations[at].cook = 1.0
 			var rack := add_station("fryer", at + Vector2i(0, 1), 1, 1)
-			rack.lift_to_rack("prep:potato", Prep.GOOD, "good")
+			rack.lift_to_rack("prep:" + use.fry, Prep.GOOD, "good")
 			rack.rest = Prep.FRY_REST * 0.6
 		"boil":
-			add_station("pot", at, 1, 1).set_item("raw:corn")
+			add_station("pot", at, 1, 1).set_item("raw:" + use.boil)
 			stations[at].cook = 1.0
-			add_station("pot", at + Vector2i(0, 1), 1, 1).set_item("prep:corn")
+			add_station("pot", at + Vector2i(0, 1), 1, 1).set_item("prep:" + use.boil)
 		"chop", "slice", "pour":
-			var type: String = {"chop": "board", "slice": "slicer", "pour": "crate_soda"}[which]
-			var ing: String = {"chop": "tomato", "slice": "cheese", "pour": "soda"}[which]
+			var ing: String = use[which]
+			var type: String = {"chop": "board", "slice": "slicer", "pour": "crate_" + ing}[which]
 			start_prep(0, add_station(type, at, 1, 1), which, ing)
 			var s: Dictionary = preps[0]
 			s.frozen = true
@@ -554,7 +566,7 @@ func _demo_prep(which: String) -> void:
 					s.fill = 0.72
 			_show_prep(0)
 		"good", "bad":
-			player.set_held("prep:tomato", Prep.GOOD if which == "good" else Prep.BAD)
+			player.set_held("prep:" + use.chop, Prep.GOOD if which == "good" else Prep.BAD)
 			add_station("board", at, 1, 1)
 			player.look(Vector2i(0, 1))
 			PrepWidget.pop(stations[at], Vector3(0, 2.0, 0), which)
@@ -625,7 +637,7 @@ func _demo_fx() -> void:
 		seated[1].mood.patience = 0.0             # walkout: anger mark and a stamp
 	if seated.size() > 2:
 		seated[2]._gross_time = 6.0               # green cloud
-	find_station("crate_patty").used()
+	find_station("crate_" + fixed_main().grill).used()
 	burst(find_station("sink").position + Vector3(0, 1.15, 0), "bubbles", 0.4)
 
 
@@ -716,12 +728,16 @@ func _add_lamp(over: Vector3) -> OmniLight3D:
 	return light
 
 
+static func fixed_main() -> Dictionary:
+	return FIXED_MAIN.get(Scenery.theme_id, FIXED_MAIN.diner)
+
+
 func _build_layout() -> void:
 	for spot: Array in [
 		# The cooking line runs down the left wall under the hood, as in sheet 1.
 		# The cell in front of the back doorway stays clear, so the patties can be reached.
-		["crate_patty", 0, 2], ["trays", 2, 2], ["sink", 3, 2],
-		["stove", 0, 3, 1], ["stove", 0, 4, 1], ["bin", 0, 5, 1], ["crate_bun", 0, 6, 1],
+		["crate_" + fixed_main().grill, 0, 2], ["trays", 2, 2], ["sink", 3, 2],
+		["stove", 0, 3, 1], ["stove", 0, 4, 1], ["bin", 0, 5, 1], ["crate_" + fixed_main().bread, 0, 6, 1],
 		["pass", 4, 2], ["pass", 4, 3], ["pass", 4, 4], ["pass", 4, 5],
 		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], ["plant", 9, 0],
 	]:

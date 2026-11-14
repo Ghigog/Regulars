@@ -844,6 +844,42 @@ func test_every_ingredient_has_its_fields():
 	assert_eq(Pantry.TOOLS.size(), 7)
 
 
+## The seaside list from the PRD: tool, tags, worth and fee as in the table.
+func test_seaside_ingredients_are_complete():
+	var table := {
+		"roll": ["none", ["bread"], 2, 3], "fish": ["grill", ["fish"], 7, 9],
+		"calamari": ["fry", ["fish", "fried"], 5, 6], "lemon": ["slice", ["fruit"], 1, 2],
+		"courgette": ["chop", ["vegetable"], 2, 2], "pepper": ["chop", ["vegetable"], 2, 2],
+		"new_potato": ["boil", ["vegetable"], 3, 3], "beans": ["boil", ["vegetable"], 2, 2],
+		"wine": ["pour", ["drink"], 5, 5],
+	}
+	assert_eq(Pantry.for_theme("seaside").size(), table.size())
+	for id: String in table:
+		var row: Array = table[id]
+		var it: Dictionary = Pantry.ITEMS[id]
+		assert_eq(it.theme, "seaside")
+		assert_eq(it.tool, row[0], "%s's tool" % id)
+		assert_eq(it.tags, row[1], "%s's tags" % id)
+		assert_eq(it.worth, row[2], "%s's worth" % id)
+		assert_eq(it.fee, row[3], "%s's fee" % id)
+		assert_true(Pantry.TOOLS.has(it.tool), "%s's tool is one of the seven" % id)
+		if Pantry.needs_prep(id):
+			var tool_station: String = Pantry.TOOL_STATION[it.tool]
+			assert_true(Catalog.ITEMS.has(tool_station), "%s's tool is sold" % id)
+			assert_eq(Catalog.tool_of(tool_station), it.tool)
+			assert_false(Catalog.ITEMS[tool_station].has("theme"), "tools are sold to both themes")
+		var crate := Pantry.station_id(id)
+		assert_true(Catalog.ITEMS.has(crate), "%s has a station" % id)
+		assert_eq(Catalog.ITEMS[crate].theme, "seaside")
+		assert_eq(Catalog.ingredient_of(crate), id)
+		assert_eq(Catalog.ITEMS.has(Pantry.station_id(id, true)), Pantry.can_be_ready(id),
+			"%s is sold ready-made only if it is on the list" % id)
+	assert_eq(Catalog.tool_of("crate_wine"), "pour", "wine is poured at its own barrel")
+	for id in ["courgette", "pepper"]:
+		assert_eq(Catalog.ITEMS[Pantry.station_id(id, true)].theme, "seaside")
+	assert_false(Pantry.can_be_ready("lemon"), "only the chopped ones and cheese come ready-made")
+
+
 func test_every_theme_has_all_three_courses():
 	for theme in Pantry.THEMES:
 		var ings := Pantry.for_theme(theme)
