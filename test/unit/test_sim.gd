@@ -819,3 +819,232 @@ func test_dirty_note_lists_what_is_left():
 	assert_eq(Cleaning.dirty_note(1, false, true), "Still dirty: a table, the bin.")
 	assert_eq(Cleaning.dirty_note(0, true, false), "Still dirty: the sink.")
 	assert_eq(Cleaning.dirty_note(0, false, false), "")
+
+
+# ---------- Pantry and Menu (PRD 1) ----------
+
+func _stations(ids: Array, ready := [], off := []) -> Array:
+	var out := []
+	for id: String in ids:
+		out.append({"ingredient": id, "ready": ready.has(id), "stocked": not off.has(id)})
+	return out
+
+
+func test_every_ingredient_has_its_fields():
+	for id: String in Pantry.ITEMS:
+		var it: Dictionary = Pantry.ITEMS[id]
+		for key in ["name", "theme", "tool", "tags", "worth", "fee", "colour", "prepped", "shape"]:
+			assert_true(it.has(key), "%s has %s" % [id, key])
+		assert_true(Pantry.TOOLS.has(it.tool), "%s's tool is one of the seven" % id)
+		assert_true(Pantry.THEMES.has(it.theme))
+		assert_eq(Pantry.is_drink(id), it.tool == "pour", "only drinks are poured")
+	assert_eq(Pantry.TOOLS.size(), 7)
+
+
+func test_every_theme_has_all_three_courses():
+	for theme in Pantry.THEMES:
+		var ings := Pantry.for_theme(theme)
+		assert_true(ings.any(func(i: String) -> bool: return Pantry.is_drink(i)), "%s has a drink" % theme)
+		assert_gt(ings.filter(func(i: String) -> bool: return not Pantry.is_drink(i)).size(), 3)
+
+
+func test_price_is_worth_times_level():
+	var burger := {"ingredients": ["bun", "patty", "cheese"], "price_level": "fair"}
+	assert_almost_eq(float(Menu.price_of(burger)), 12.0, 2.0, "a plain cheeseburger is about the old 12")
+	assert_eq(Menu.price_of(burger), 10)
+	burger.price_level = "cheap"
+	assert_eq(Menu.price_of(burger), 8)
+	burger.price_level = "dear"
+	assert_eq(Menu.price_of(burger), 13, "12.5 rounds up")
+	assert_eq(Menu.price_of({"ingredients": ["lettuce"], "price_level": "cheap"}), 1, "never below 1")
+
+
+func test_night_cost_sums_stocked_fees():
+	assert_eq(Menu.night_cost(_stations(["bun", "patty"])), 11)
+	assert_eq(Menu.night_cost(_stations(["bun", "patty"], [], ["patty"])), 3, "an unstocked station costs nothing")
+	assert_eq(Menu.night_cost(_stations(["cheese"], ["cheese"])), 5, "ready-made at 1.5 times, rounded")
+	assert_eq(Menu.night_cost([]), 0)
+
+
+func test_item_off_menu_without_stock_or_tool():
+	var item := {"ingredients": ["bun", "patty"], "off": false}
+	assert_eq(Menu.off_reason(item, _stations(["bun", "patty"]), ["grill"]), "")
+	assert_eq(Menu.off_reason(item, _stations(["bun", "patty"]), []), "No grill")
+	assert_eq(Menu.off_reason(item, _stations(["bun"]), ["grill"]), "No patty")
+	assert_eq(Menu.off_reason(item, _stations(["bun", "patty"], [], ["patty"]), ["grill"]), "Patty not stocked")
+	var salad := {"ingredients": ["lettuce"], "off": false}
+	assert_eq(Menu.off_reason(salad, _stations(["lettuce"]), []), "No chopping board")
+	assert_eq(Menu.off_reason(salad, _stations(["lettuce"], ["lettuce"]), []), "", "ready-made needs no tool")
+	item.off = true
+	assert_eq(Menu.off_reason(item, _stations(["bun", "patty"]), ["grill"]), "Off tonight")
+
+
+func test_course_rules():
+	assert_ne(Menu.refusal("drink", ["soda", "lettuce"]), "", "a drink with a non-drink is refused")
+	assert_ne(Menu.refusal("main", ["soda"]), "", "a drink is not a main")
+	assert_eq(Menu.refusal("main", ["cheese"]), "", "a one-ingredient main is fine")
+	assert_eq(Menu.refusal("main", ["bun", "patty", "patty", "cheese", "onion", "bun"]), "")
+	assert_ne(Menu.refusal("main", ["bun", "patty", "patty", "cheese", "onion", "tomato", "bun"]), "", "more than 6 is refused")
+	var m := Menu.new()
+	assert_true(m.add("drink", ["soda", "bun"]).is_empty())
+	assert_false(m.add("main", ["bun", "patty", "patty"]).is_empty(), "the same ingredient twice is a double")
+
+
+func test_new_item_gets_a_default_name():
+	var m := Menu.new()
+	assert_eq(m.add("main", ["bun", "patty", "cheese"]).name, "Cheese Patty Bun")
+	assert_eq(m.add("side", ["potato"]).name, "Fries")
+	var it := m.add("main", ["patty"], "   ")
+	assert_eq(it.name, "Patty")
+	m.rename(it.id, "A very long name for a burger indeed")
+	assert_eq(m.find(it.id).name.length(), Menu.MAX_NAME)
+
+
+func test_tastes_obey_the_limits():
+	for s in [1, 2, 7, 42, 1234]:
+		for theme in Pantry.THEMES:
+			var t := Town.new(s)
+			t.make_tastes(theme)
+			var ings := Pantry.for_theme(theme)
+			var haters := {}
+			for p in t.people:
+				assert_lte((p.dislikes as Array).size(), floori(ings.size() / 3.0), "nobody dislikes over a third")
+				var staple := false
+				for ing: String in p.likes:
+					assert_false((p.dislikes as Array).has(ing), "never likes and dislikes one thing")
+					staple = staple or Pantry.tool_of(ing) == "grill" or Pantry.tags_of(ing).has("vegetable")
+				assert_true(staple, "%s likes a grill ingredient or vegetable" % p.name)
+				for ing: String in p.dislikes:
+					haters[ing] = int(haters.get(ing, 0)) + 1
+			for ing in haters:
+				assert_lte(int(haters[ing]), floori(t.people.size() / 5.0), "%s disliked by at most a fifth" % ing)
+
+
+func test_tastes_are_the_same_for_a_seed():
+	var a := Town.new(9)
+	var b := Town.new(9)
+	for i in a.people.size():
+		assert_eq(a.people[i].likes, b.people[i].likes)
+		assert_eq(a.people[i].dislikes, b.people[i].dislikes)
+	var c := Town.new(10)
+	var same := true
+	for i in a.people.size():
+		same = same and a.people[i].likes == c.people[i].likes
+	assert_false(same, "a different seed, different tastes")
+
+
+func test_tastes_leave_visits_alone():
+	var a := Town.new(3)
+	a.make_tastes("seaside")
+	var b := Town.new(3)
+	assert_eq(a.roll_guests(1), b.roll_guests(1), "taste rolls do not use the town's own generator")
+
+
+func _menu_items() -> Array:
+	var m := Menu.new()
+	m.add("main", ["bun", "patty"])
+	m.add("main", ["lettuce", "tomato"])
+	m.add("side", ["potato"])
+	m.add("side", ["corn"])
+	m.add("drink", ["soda"])
+	return m.items
+
+
+func test_order_never_has_a_disliked_ingredient():
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var items := _menu_items()
+	for k in 200:
+		var o := Menu.order(items, [], ["patty"], rng)
+		assert_eq(o.main.ingredients, ["lettuce", "tomato"])
+	assert_true(Menu.order(items, [], ["patty", "lettuce"], rng).main.is_empty(), "no acceptable main")
+
+
+func test_side_and_drink_need_a_liked_ingredient():
+	var rng := RandomNumberGenerator.new()
+	var items := _menu_items()
+	for k in 50:
+		var o := Menu.order(items, [], [], rng)
+		assert_true(o.side.is_empty() and o.drink.is_empty(), "neutral sides and drinks are not added")
+	for k in 50:
+		var o := Menu.order(items, ["potato", "soda"], [], rng)
+		assert_eq(o.side.ingredients, ["potato"])
+		assert_eq(o.drink.ingredients, ["soda"])
+
+
+func test_cheap_is_ordered_more_than_dear():
+	var m := Menu.new()
+	var cheap := m.add("main", ["bun", "patty"], "Cheap", "cheap")
+	m.add("main", ["bun", "patty"], "Dear", "dear")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var n := 0
+	for k in 1000:
+		if Menu.order(m.items, [], [], rng).main.id == cheap.id:
+			n += 1
+	assert_gt(n, 600, "1.5 against 0.6 is about 71%")
+
+
+func test_group_walks_on_only_when_nobody_has_a_main():
+	var rng := RandomNumberGenerator.new()
+	var items := _menu_items()
+	var picky := {"likes": [], "dislikes": ["patty", "lettuce"]}
+	var easy := {"likes": [], "dislikes": []}
+	var g := Menu.group_order(items, [picky, easy], rng)
+	assert_false(g.walk, "the group stays")
+	assert_eq(g.found_nothing, [0])
+	assert_eq(g.orders[0].drink.ingredients, ["soda"], "the picky one just has a drink, even a neutral one")
+	assert_true(g.orders[0].main.is_empty())
+	var alone := Menu.group_order(items, [picky], rng)
+	assert_true(alone.walk, "on their own they walk on")
+	var no_soda := {"likes": [], "dislikes": ["patty", "lettuce", "soda"]}
+	var g2 := Menu.group_order(items, [no_soda, easy], rng)
+	assert_false(g2.walk)
+	assert_true(g2.orders[0].drink.is_empty(), "sits with nothing")
+	assert_true(Menu.group_order(items, [picky, picky], rng).walk)
+
+
+func test_savour_is_average_plus_capped_liked_bonus():
+	assert_almost_eq(Menu.savour([1.0, 0.5], ["bun", "patty"], []), 0.75, 0.001)
+	assert_almost_eq(Menu.savour([0.75], ["patty"], ["patty"]), 0.85, 0.001)
+	assert_almost_eq(Menu.savour([0.5, 0.5, 0.5, 0.5], ["bun", "patty", "cheese", "onion"],
+		["bun", "patty", "cheese", "onion"]), 0.8, 0.001, "liked bonus caps at +0.3")
+
+
+func test_order_counts_survive_a_rename():
+	var t := Town.new(1)
+	var m := Menu.new()
+	var a := m.add("main", ["bun", "patty"], "Burger")
+	var b := m.add("side", ["potato"], "Fries")
+	t.record_order(0, a.id)
+	t.record_order(0, b.id)
+	t.record_order(0, a.id)
+	m.rename(a.id, "Stupid Burger")
+	assert_eq(t.order_summary(0, m), "Stupid Burger x2, Fries x1")
+	m.remove(b.id)
+	assert_eq(t.order_summary(0, m), "Stupid Burger x2, Fries x1", "a deleted item keeps its last name")
+
+
+func test_finding_nothing_costs_a_little_and_friends_hear():
+	var t := Town.new(1)
+	var f: int = t.people[0].friends[0]
+	t.record_found_nothing(0)
+	assert_almost_eq(float(t.people[0].affinity), -Town.NOTHING_LIKED_DROP, 0.001)
+	assert_lt(float(t.people[f].affinity), 0.0)
+	assert_eq(t.people[0].grudges, 0, "not a walkout")
+
+
+func test_stock_is_paid_only_when_affordable():
+	var l := Ledger.new()
+	l.money = 20
+	assert_false(l.pay_stock(25))
+	assert_eq(l.money, 20)
+	assert_true(l.pay_stock(15))
+	assert_eq(l.today.stock, 15)
+	assert_eq(l.strikes(), 0)
+
+
+func test_tag_hint_needs_three_items():
+	var items := _menu_items()
+	assert_eq(Menu.tag_hint(items, ["vegetable"]), "vegetable", "salad, fries and corn")
+	assert_eq(Menu.tag_hint(items, ["meat"]), "")
