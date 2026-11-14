@@ -50,8 +50,64 @@ const ITEMS := {
 		"blurb": "Two cosy bench seats", "up": "Two cosier bench seats"},
 	"table4": {"name": "Table for four", "price": 90, "level": 3, "category": "Dining", "tiers": 3,
 		"blurb": "Seats a group of four", "up": "Four comfier seats"},
-	"stove": {"name": "Stove", "price": 80, "level": 3, "category": "Kitchen", "tiers": 3,
-		"blurb": "Cook two things at once", "up": "Cooks faster  burns faster"},
+	"stove": {"name": "Stove", "price": 50, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "grill",
+		"blurb": "Grills patties and fish", "up": "Grills faster  burns faster"},
+	"fryer": {"name": "Fryer", "price": 50, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "fry",
+		"blurb": "Fries potatoes and calamari", "up": "Fries faster  burns faster"},
+	"pot": {"name": "Stock pot", "price": 35, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "boil",
+		"blurb": "Boils corn, potatoes and beans", "up": "Boils faster"},
+	"board": {"name": "Chopping board", "price": 25, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "chop",
+		"blurb": "Chops vegetables", "up": "A slower, kinder knife"},
+	"slicer": {"name": "Slicer", "price": 30, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "slice",
+		"blurb": "Slices cheese and lemons", "up": "More time to slice"},
+	"crate_bun": {"name": "Bun crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "bun", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_patty": {"name": "Patty fridge", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "patty", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_lettuce": {"name": "Lettuce crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "lettuce", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_tomato": {"name": "Tomato crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "tomato", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_onion": {"name": "Onion sack", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "onion", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_cheese": {"name": "Cheese fridge", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "cheese", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_potato": {"name": "Potato sack", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "potato", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_corn": {"name": "Corn crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "corn", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_soda": {"name": "Soda fountain", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "soda", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_roll": {"name": "Bread basket", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "roll", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_fish": {"name": "Fish icebox", "price": 25, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "fish", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_calamari": {"name": "Calamari icebox", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "calamari", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_lemon": {"name": "Lemon crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "lemon", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_courgette": {"name": "Courgette crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "courgette", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_pepper": {"name": "Pepper crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "pepper", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_new_potato": {"name": "New potato sack", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "new_potato", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_beans": {"name": "Bean crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "beans", "blurb": "Hands out ingredients. Stocked each night"},
+	"crate_wine": {"name": "Wine barrel", "price": 45, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "wine", "blurb": "Hands out ingredients. Stocked each night"},
+	"ready_lettuce": {"name": "Chopped lettuce tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "lettuce", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
+	"ready_tomato": {"name": "Sliced tomato tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "tomato", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
+	"ready_onion": {"name": "Onion rings tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "onion", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
+	"ready_cheese": {"name": "Cheese slices", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "cheese", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
+	"ready_courgette": {"name": "Chopped courgette tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "courgette", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
+	"ready_pepper": {"name": "Chopped pepper tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "pepper", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
 }
 
 var shelf: Array[Dictionary] = []
@@ -77,6 +133,21 @@ func offer() -> Array[Dictionary]:
 
 static func price_of(id: String, tier := 1) -> int:
 	return int(ITEMS[id].price) * TIER_PRICE[tier - 1]
+
+
+## The ingredient a station hands out ("" if it is not an ingredient station).
+static func ingredient_of(id: String) -> String:
+	return str(ITEMS[id].get("ingredient", "")) if ITEMS.has(id) else ""
+
+
+## The prep tool a piece is ("" if none). A drink's station is its own pour tool.
+static func tool_of(id: String) -> String:
+	if not ITEMS.has(id):
+		return ""
+	if ITEMS[id].has("tool_of"):
+		return ITEMS[id].tool_of
+	var ing := ingredient_of(id)
+	return "pour" if ing != "" and Pantry.is_drink(ing) else ""
 
 
 static func is_build_tool(id: String) -> bool:
@@ -111,12 +182,14 @@ func can_buy(id: String, money: int, level: int, tier := 1) -> bool:
 
 ## Everything for sale that matches, cheapest first. `query` is matched against the
 ## name, the category and what the piece does; an empty query or category matches all.
-static func search(query := "", category := "") -> Array[Dictionary]:
+static func search(query := "", category := "", theme := "") -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	var words := query.strip_edges().to_lower().split(" ", false)
 	for id: String in ITEMS:
 		var item: Dictionary = ITEMS[id]
 		if category != "" and item.category != category:
+			continue
+		if theme != "" and item.has("theme") and item.theme != theme:
 			continue
 		for tier in range(1, int(item.tiers) + 1):
 			var bp := {"id": id, "tier": tier}

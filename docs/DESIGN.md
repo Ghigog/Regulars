@@ -8,12 +8,75 @@ lost while the core loop is polished. Sections are ordered roughly by when to bu
 
 ## 1. The vertical slice (what is in the game now)
 
-An endless run. Each day guests arrive, you cook meat, serve it, and get paid. Survive as
-many days as you can; three walkouts in one day ends the run.
+An endless run. Each night you build the kitchen and write the menu; each day guests
+arrive, read the menu, order, and you prep, assemble and serve their trays and get paid.
+Survive as many days as you can; three walkouts in one day ends the run.
 
 - Direct control of one chef (WASD, E/Space).
-- One dish: a burger. Fridge > stove > plate > table. Dirty plates go into the sink and
-  soak there until washed, one press each, back onto the stack.
+- **Ingredients** (PRD 1, `sim/pantry.gd`). Two themes of nine each. Diner: bun,
+  patty, lettuce, tomato, onion, cheese, fries, corn cob, soda. Seaside: bread roll,
+  fish fillet, calamari, lemon, courgette, pepper, new potatoes, green beans, white
+  wine. Each has a tool, tags (meat, vegetable, bread, fish, fried, drink...), a worth
+  (what it adds to a price) and a fee (what stocking it costs a night).
+- **Stations.** Every ingredient comes from its own station in the room (a crate,
+  sack, fridge, icebox, basket, barrel or the soda fountain, $15 to $45 in the shop's
+  Kitchen tab), so a bigger menu needs a bigger kitchen. Each prep tool is its own
+  station too: stove (grill, $50), fryer ($50), stock pot (boil, $35), chopping board
+  ($25), slicer ($30). Pour happens at the drink's own station. Chopped ingredients
+  and cheese can be bought ready-made (a steel tub of the prepped food, always plain,
+  1.5x the fee: `READY_FEE`). Every station can be sold, the last stove included.
+- **Tickets and trays** (`sim/tray.gd`). Taking a table's order puts a ticket for each
+  guest who ordered on the rail along the top of the screen (oldest on the left, five
+  shown, more counted on a last tab; each in the guest's shirt colour). The chef takes
+  an empty tray from the tray stack and puts it on a counter or the pass: it takes the
+  oldest ticket with no tray. Turning to it moves it to the next ticket (a tray with
+  something on it only to a ticket for the same items). Ingredients go on in any order;
+  the tray refuses one its ticket does not need, or a raw one that needs prep ("Grill
+  it first"), and says what is missing ("Needs fries"). A finished tray is picked up
+  and served at the guest's table; the bill is the sum of the item prices. After the
+  meal the dirty tray goes to the sink and soaks until washed, one press each, back
+  onto the stack. A guest who leaves tears their ticket off; a tray made for it keeps
+  what is on it.
+- **Prep minigames** (`sim/prep.gd`, gauges in `game/prep_widget.gd`). One per tool,
+  each ending good, plain or bad: *grill* (the doneness dial: take it off in the green
+  window), *fry* (the same, then two seconds draining on the rack before it can be
+  picked up), *boil* (start it and leave it; done after five seconds, it waits and
+  never burns, always plain), *chop* (a marker sweeps a bar three times: press in the
+  notch; three hits good, two plain), *slice* (mash to six presses in 2.6 s and stop:
+  exact is good, one to three over plain), *pour* (hold to fill, let go between 85%
+  and full; overflowing is bad). Good, plain and bad give the ingredient a quality of
+  1.0, 0.75 and 0.45; a pop over the tool says which by shape (star, dot, cross). A
+  good result gives the chef a one-second burst of speed (1.5x, speed lines and a
+  spinning star), a bad one a one-second penalty (half speed, a sweat drop and a
+  wobble). Boil and no-prep ingredients give neither.
+- **Quality.** A tray's quality is the average of its ingredients'; the guest's
+  savour is that, raised by 0.1 for each ingredient they like, up to +0.3
+  (`Menu.savour`). It sets the tip as before.
+- **The menu screen** (`game/menu_screen.gd`, `sim/menu.gd`; at night, N, Back on a
+  pad, or a click on the board by the door). A tent card with three columns: mains, sides and drinks.
+  Each item is a named list of up to six ingredients (stacked in the order given; that
+  only changes the look), with a live picture of the stack, a made-up name the player
+  can replace (keys, the touch keyboard or a letter grid on a pad), a price level
+  (cheap 0.8x, fair, dear 1.25x the summed worth; cheap is ordered more often), an
+  "off tonight" switch and delete. A drink holds only drink ingredients. An item
+  missing a stocked station or a tool is greyed with the reason ("No fryer", "Onion
+  not stocked"). Below, tomorrow's stock: a switch per kind of ingredient station and
+  the night's cost.
+- **Stocking.** Each stocked ingredient station costs its fee every night, paid when
+  the door card flips; an unstocked one costs nothing and gives nothing. A taped
+  restock note on the build slip lists tomorrow's cost by station. The door will not
+  flip with no makeable main or when the stock cannot be paid. Tonight's item names are
+  chalked on the A-frame board by the door (`game/menu_board.gd`).
+- **The empty start.** A run opens on night zero with $150 and a kitchen holding only
+  the sink, the bin, the tray stack and the counters. Three hints lead the way, one at
+  a time ("Buy an ingredient and a tool in the shop.", "Write a menu.", "Flip the door
+  card to open."). Tests and most demos start from `test_kitchen()`: the theme's fixed
+  main (diner Burger: bun and patty; seaside Fish roll: roll and fish) with its stations.
+- **Seaside food.** Its own stations (a sea-blue icebox for fish and calamari, a
+  wicker bread basket, a wine barrel, crates and sacks) and food models (salmon
+  fillet, calamari rings, lemon wheels, courgette rounds, pepper strips, new potatoes,
+  green beans, a stemmed wine glass). A dish in a bread roll shows as a side-on roll
+  with its filling, a fish as a fish, so it never reads as a burger.
 - **A dirty kitchen.** Three or more plates soaking pile up in suds. Every patty thrown
   away or burger scraped off goes in the bin; at four it overflows (it still takes more).
   "Empty bin" hands the chef a bag, which goes out of the front door ("Take out rubbish");
@@ -34,14 +97,28 @@ many days as you can; three walkouts in one day ends the run.
   table). Only then do they wait for food, and their bubble shows what they ordered.
   Patience drains while they wait to order, 1.25x as fast as while waiting for food
   (`ORDER_PATIENCE_SCALE` 0.8 in `game/main.gd`); taking the order gives back 0.1
-  (`ORDER_RELIEF`). Holding a burger at a table that has not ordered shows "Take order
+  (`ORDER_RELIEF`). Holding a tray at a table that has not ordered shows "Take order
   first" and E only says why (`ORDER_HANDS_FREE`; set it false to let the chef take
   orders with full hands). Taking an order comes before half price and the free meal at
-  the same table. An order is data on the guest (`Guest.order`, `{"dish": "burger"}`),
-  chosen by `order_for` in `game/main.gd`, and serving matches the dish in hand against
-  it. `REGULARS_DEMO=order`.
-- Meat has doneness. A radial dial over the stove has a green "perfect" window; pull it late
-  and it is dry (worse tips), leave it and it burns. The patty changes look as it goes.
+  the same table. An order is data on the guest (`Guest.order`: `{main, side, drink,
+  ticket}`, each an item or empty), chosen at the door by `Menu.group_order` (or by
+  `order_for` in `game/main.gd` for a guest who came in another way), and serving
+  matches the tray against its ticket. `REGULARS_DEMO=order`.
+- **What guests order.** Each townsperson has hidden tastes: liked and disliked
+  ingredient tags. A guest orders a main with nothing they dislike, plus a side and a
+  drink only when one has something they like, all on one tray. Items with liked
+  ingredients and cheap ones are picked more often. In a group, someone with no main
+  orders a drink they do not mind, or nothing; the group walks on only if nobody finds
+  a main. A guest who walks on stops at the board, thinks "Nothing I liked on the menu"
+  and leaves: no strike, a small drop in opinion that friends hear about; the receipt
+  counts them. Tastes are never listed: the guest card shows how often they ordered
+  each item ("Orders:"), a guest reading a menu with three or more items of a kind they
+  like says so ("So many things with vegetables. I love vegetables!"), a liked
+  ingredient on the tray gives "Just how I like it", and gossip names what they
+  praised. `REGULARS_DEMO=walkon`, `orders_card`.
+- Grilled and fried food has doneness: the stove's radial dial has a green "perfect"
+  window; pull it late and it is dry (plain, falling toward bad), leave it and it burns
+  (thrown away). The patty and the fish change look as they go.
 - Guests are named townsfolk with patience, disgust, joy and savour. These set the tip.
 - Each day is busier and guests are less patient. Money carries across days.
 - **Word of mouth is visible.** A visit that moves a guest's opinion says who they will
@@ -278,7 +355,10 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Built**: regulars with a visit streak, grudges (section 1).
 - **Built**: groups arriving together (section 1).
 - **Built**: stay length and bill driven by mood (section 1). Parked: a second round
-  (dessert, second drink). **To add**: favourite dishes (needs a second dish), reviews (needs a design).
+  (dessert, second drink). **Built** (PRD 1, section 1): tastes (liked and disliked
+  ingredients, never shown), ordering from the player's menu, walking on when nothing
+  suits, order counts on the guest card and taste hints in thoughts and gossip.
+  **To add**: reviews (PRD 2, the critic).
 - **Discounts and comps** (built, section 1): half price, a free meal, and guests who
   come to expect a deal.
 
@@ -314,13 +394,23 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Ledger screen**: income, tips, wages, spending, day-by-day history chart.
 - **Investments**: flyers (built, section 1), loans, supplier stakes (cheaper or
   better ingredients), equipment leases.
-- **Costs**: ingredient cost per dish, wages, rent that rises with the location.
+- **Costs**: *built* (PRD 1): a nightly stock fee per stocked ingredient station
+  (ready-made at 1.5x), on the restock note and the receipt's STOCK line; prices come
+  from ingredient worth and a cheap/fair/dear level. **To add**: wages, rent that rises
+  with the location.
+- **Starting money**: $150 on night zero, enough for one simple main with change
+  (`Ledger.money`).
 
 ## 7. Run structure
 
 - **Theme and location** chosen at the start of a run (seaside diner first). Location sets
   the town's size and tastes; theme sets the menu and starting furniture.
-- **Menu growth**: new dishes add stations and steps (chopping, frying, drinks).
+- **Menu growth**: *built* (PRD 1): the player writes the menu each night from the
+  stations they own; new dishes need new ingredient and tool stations (grill, fry,
+  boil, chop, slice, pour). Two themes have their content (diner, seaside); the theme
+  is still picked with `REGULARS_THEME`, not in the game (PRD 7).
+- **Night zero**: *built*: the run opens on an empty kitchen and $150; the first
+  ingredient, tool and menu are the player's.
 - **Local co-op**: input is already per player (see section 9); a second chef is the next step.
 - **Lose condition** today is three walkouts in a day. Alternatives to test: reputation
   stars, rent you must make each week.
@@ -363,7 +453,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 
 Not built yet, except where marked; this is the agreed direction for future sessions.
 
-- **Order-taking is a step.** *Built (section 1)* for the single dish. The chef walks to
+- **Order-taking is a step.** *Built (section 1)*, now with the menu. The chef walks to
   the table to take the order before cooking. For the menu below, `order_for(guest)` in
   `game/main.gd` is the one place that picks a dish from the player's menu; the guest
   stores it (`Guest.order`), the bubble draws its icon and serving checks the dish in
@@ -377,7 +467,9 @@ Not built yet, except where marked; this is the agreed direction for future sess
   cheeseburgers, say), and guests order from it. Every restaurant type has mains, a
   sides system and a drinks system: the diner is burgers, fries and soda; the seaside
   is fish, vegetables and white wine. This replaces the hard-coded burger flow
-  (fridge, stove, plates). Agreed details:
+  (fridge, stove, plates). *Built (section 1, PRD 1)*: tickets and trays, a station
+  per ingredient and per tool, prep minigames with a burst and a penalty, the menu
+  screen, nightly stock, tastes and walking on. Agreed details:
   - *Ingredients are restocked each night* and cost money. The build phase shows a
     note with what tomorrow's restock will cost, so the player can plan, or take a
     dish off the menu for a night to save on it.
@@ -388,6 +480,10 @@ Not built yet, except where marked; this is the agreed direction for future sess
   - *Ingredient order only sets how a dish looks stacked*; it never refuses one.
   - *At most one prep step per ingredient*, and some need none (used as they are).
   - *Each townsperson likes and dislikes ingredients*, so a varied menu pays off.
+  - *Decided while building (13 November 2026)*: each tool is its own station; the
+    ready-made ingredients are the chopped ones plus cheese; an empty tray put down
+    takes the oldest ticket without one; boiling never gives the burst; a group walks
+    on only if nobody has a main; every station can be sold, the last stove included.
 - **The critic.** One critic per run, always the same townsperson in that run and
   unknown to the player unless they work it out. They come every fifth day (each day
   is a working day, so day 5 is Friday; there are no weekends), are served like anyone, and rate service time,

@@ -1,5 +1,6 @@
 # PRD 1: Recipes, ingredients and the menu
 
+**Status:** built, all seven milestones (13 November 2026). What it built is in `docs/DESIGN.md` section 1.
 **Size:** very large; build it in the seven milestones at the end, each mergeable.
 **Needs:** nothing. **Touches:** new `sim/pantry.gd` (ingredients), `sim/menu.gd`,
 `sim/prep.gd` (minigame scoring), `sim/town.gd` (tastes), `sim/catalog.gd`,
@@ -328,6 +329,12 @@ says otherwise.
 - *Confirmed by Dylan, 13 November 2026:* slice (exact is good, one to three over is
   plain, more is bad), the penalty (half movement speed), and that every minigame
   result sets the food's quality.
+- *Confirmed by Dylan, 13 November 2026:* each tool is its own station (pour at the
+  drink's station); the ready-made ingredients are the chopped ones plus cheese; an
+  empty tray put down takes the oldest ticket without a tray; boiling never gives the
+  burst. In a group, someone who finds no main stays and orders any drink with nothing
+  they dislike, or sits with nothing; the group walks on only if nobody has a main.
+  Every station can be sold, the last stove included.
 - **Where prep happens.** Default: at a separate tool station, except pour, which is at
   the drink's own station.
 - **Which ingredients have a ready-made version.** Default: the chopped ones and cheese.

@@ -72,10 +72,103 @@ static func _grown(pts: PackedVector2Array, by: float) -> PackedVector2Array:
 	return out
 
 
+## The icon id for a menu item: its ingredients, drawn as a little stack.
+static func dish_id(item: Dictionary) -> String:
+	return "dish:" + ",".join(PackedStringArray(item.ingredients))
+
+
+## A menu item as a flat icon, readable at 20 px: a drink is a cup in its colour;
+## anything else is its ingredients as bands, bread as a dome on top and a heel
+## below, everything else as a layer in its prepped colour.
+static func _dish(ings: Array) -> Array:
+	var o: Array = []
+	if ings.is_empty():
+		return o
+	if Pantry.is_drink(ings[0]) and Pantry.ITEMS[ings[0]].shape == "glass":
+		# A stemmed wine glass: an ink bowl with the wine in it, a stem and a foot.
+		var wine: String = Pantry.ITEMS[ings[0]].prepped
+		o.append([ell(0, 0.3, 0.68, 0.7, 180, 360), INK])
+		o.append([rect(0, 0.56, 1.36, 0.56), INK])
+		o.append([ell(0, 0.3, 0.54, 0.56, 180, 360), "#eef6f4"])
+		o.append([rect(0, 0.54, 1.08, 0.48), "#eef6f4"])
+		o.append([ell(0, 0.34, 0.54, 0.56, 180, 360), wine])
+		o.append([rect(0, -0.55, 0.26, 0.5), INK])
+		o.append([rect(0, -0.84, 1.04, 0.24), INK])
+		o.append([rect(0, -0.55, 0.1, 0.46), "#eef6f4"])
+		o.append([rect(0, -0.84, 0.88, 0.1), "#eef6f4"])
+		o.append([rect(-0.32, 0.5, 0.1, 0.34, 0.15), CREAM])
+		return o
+	if Pantry.is_drink(ings[0]):
+		var col: String = Pantry.ITEMS[ings[0]].prepped
+		o.append([PackedVector2Array([Vector2(-0.62, 0.7), Vector2(0.62, 0.7), Vector2(0.46, -0.9), Vector2(-0.46, -0.9)]), INK])
+		o.append([PackedVector2Array([Vector2(-0.5, 0.6), Vector2(0.5, 0.6), Vector2(0.37, -0.8), Vector2(-0.37, -0.8)]), CORAL])
+		o.append([PackedVector2Array([Vector2(-0.47, 0.4), Vector2(0.47, 0.4), Vector2(0.4, -0.25), Vector2(-0.4, -0.25)]), col])
+		o.append([rect(0.18, 0.86, 0.12, 0.6, -0.3), CREAM])
+		return o
+	if Pantry.is_bread(ings[0]) and Pantry.ITEMS[ings[0]].shape == "roll" and ings.size() > 1:
+		return _long_roll(ings)
+	ings = ings.duplicate()
+	if ings.size() > 1 and Pantry.is_bread(ings[0]) and ings.count(ings[0]) == 1:
+		ings.append(ings[0])   # one bread wraps the stack: a heel below and a dome on top
+	var n := ings.size()
+	var h := 1.5 / maxf(n, 2.0)
+	var y := -0.75
+	for k in n:
+		var info: Dictionary = Pantry.ITEMS[ings[k]]
+		var col: String = info.prepped
+		var w := 1.7 - 0.12 * absf(k - (n - 1) / 2.0)
+		if Pantry.is_bread(ings[k]) and k == n - 1 and n > 1:
+			o.append([ell(0, y, w / 2.0, h * 1.6, 0, 180), INK])
+			o.append([ell(0, y + 0.04, w / 2.0 - 0.08, h * 1.6 - 0.08, 0, 180), col])
+		else:
+			o.append([rect(0, y + h / 2.0, w + 0.12, h + 0.08), INK])
+			o.append([rect(0, y + h / 2.0, w, h - 0.04), col])
+		y += h
+	return o
+
+
+## A dish in a bread roll, seen side on so it never reads as a burger: the back crust
+## with scored lines, the fillings lying across it and poking out at both ends (a fish
+## as a fish, tail and all), then the front of the roll over their lower half.
+static func _long_roll(ings: Array) -> Array:
+	var o: Array = []
+	var crust: String = Pantry.ITEMS[ings[0]].prepped
+	var fill: Array = []
+	for id: String in ings:
+		if not Pantry.is_bread(id):
+			fill.append(id)
+	o.append([ell(0, -0.22, 0.82, 0.76, 0, 180), INK])
+	o.append([ell(0, -0.18, 0.74, 0.68, 0, 180), crust])
+	for k in 3:
+		o.append([rect(-0.34 + 0.34 * k, 0.36, 0.07, 0.26, 0.5), "#a8692f"])
+	var n := fill.size()
+	for k in n:
+		var id: String = fill[n - 1 - k]
+		var col: String = Pantry.ITEMS[id].prepped
+		var y := 0.02 + 0.16 * (n - 1 - k) - 0.08 * (n - 1)
+		if Pantry.ITEMS[id].tags.has("fish"):
+			o.append([ell(0.1, y, 0.92, 0.36), INK])
+			o.append([PackedVector2Array([Vector2(-0.7, y), Vector2(-1.1, y + 0.38), Vector2(-1.1, y - 0.38)]), INK])
+			o.append([ell(0.1, y, 0.84, 0.28), col])
+			o.append([PackedVector2Array([Vector2(-0.68, y), Vector2(-1.02, y + 0.28), Vector2(-1.02, y - 0.28)]), col])
+			o.append([ell(0.72, y + 0.08, 0.07), INK])
+		else:
+			o.append([rect(0, y, 1.94, 0.24), INK])
+			o.append([rect(0, y, 1.84, 0.16), col])
+	o.append([ell(0, -0.2, 0.84, 0.5, 180, 360), INK])
+	o.append([ell(0, -0.2, 0.76, 0.42, 180, 360), crust])
+	o.append([rect(-0.3, -0.42, 0.5, 0.08), "#e8b878"])
+	return o
+
+
 static func icon(id: String) -> Array:
 	if _cache.has(id):
 		return _cache[id]
 	var o: Array = []
+	if id.begins_with("dish:"):
+		o = _dish(Array(id.trim_prefix("dish:").split(",", false)))
+		_cache[id] = o
+		return o
 	match id:
 		"burger":
 			o.append([ell(0, -0.42, 0.78, 0.36, 180, 360), "#e6a542"])
@@ -86,6 +179,11 @@ static func icon(id: String) -> Array:
 			o.append([ell(0, 0.26, 0.8, 0.62, 0, 180), "#e6a542"])
 		"food":
 			o = _moved(icon("burger"), Vector2.ZERO, 1.0)
+		"tray":  # a wooden tray seen from the front: a rimmed board
+			o.append([rect(0, -0.25, 2.0, 0.62), INK])
+			o.append([rect(0, -0.25, 1.82, 0.46), "#c98f58"])
+			o.append([rect(0, -0.05, 1.82, 0.1), "#7a5235"])
+			o.append([ell(-0.35, 0.25, 0.42, 0.3, 0, 180), "#f6efe0"])
 		"order":  # waiting to order: an order pad with a coral binding and a pencil
 			o.append([rect(-0.12, -0.04, 1.36, 1.72, -0.1), INK])
 			o.append([rect(-0.12, -0.08, 1.12, 1.48, -0.1), CREAM])

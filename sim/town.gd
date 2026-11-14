@@ -26,24 +26,148 @@ const DEALS_COMP := 2         # how much a free meal adds
 const EXPECT_AT := 3          # deals at which someone expects one
 const EXPECTED_KINDNESS := 0.5  # an expected deal earns only this share of the goodwill
 const LETDOWN_JOY := 0.15     # joy lost paying full price when they expected a deal
+## Tastes. Hidden: guests only order what has nothing they dislike.
+const TASTE_LIKE_TAG := 0.8      # tunable: chance an ingredient with a liked tag is liked
+const TASTE_DISLIKE_TAG := 0.7   # tunable: chance one with the disliked tag is disliked
+const TASTE_STRAY_LIKE := 0.12   # tunable: chance any other ingredient is liked
+const TASTE_STRAY_DISLIKE := 0.08
+const TASTE_TWO_TAGS := 0.3      # tunable: chance someone likes two tags, not one
+const TASTE_HATE_TAG := 0.4      # tunable: chance someone dislikes a whole tag
+const MAX_DISLIKED_SHARE := 1.0 / 3.0   # nobody dislikes more than this share of the theme
+const MAX_DISLIKERS_SHARE := 0.2        # no ingredient is disliked by more than this share of the town
+const NOTHING_LIKED_DROP := 0.05        # tunable: opinion lost finding nothing on the menu
 
 var people: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
+var taste_seed := 1
+var theme := "diner"
 
 
 func _init(seed_value := 1) -> void:
 	rng.seed = seed_value
+	taste_seed = seed_value
 	for i in NAMES.size():
 		people.append({
 			"name": NAMES[i], "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
 			"streak": 0, "away_until": 0, "sore": false, "grudges": 0, "gone": false, "deals": 0,
 			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
+			"likes": [], "dislikes": [], "liked_tags": [], "orders": {},
 		})
 	# A ring of friendships plus a few long-distance ones, so gossip travels.
 	for i in NAMES.size():
 		_befriend(i, (i + 1) % NAMES.size())
 		if i % 3 == 0:
 			_befriend(i, (i + 5) % NAMES.size())
+	make_tastes(theme)
+
+
+# ---------------------------------------------------------------- tastes
+
+## Gives everyone liked and disliked ingredients for `theme_id`, from the town's seed.
+## Tastes mostly follow tags. Nobody dislikes more than a third of the theme, no
+## ingredient is disliked by more than a fifth of the town, and everyone likes at least
+## one grill ingredient or vegetable. Uses its own generator, so it never changes who
+## visits or how groups form.
+func make_tastes(theme_id: String) -> void:
+	theme = theme_id
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("%d:%s" % [taste_seed, theme_id])
+	var ings := Pantry.for_theme(theme_id)
+	var tags: Array[String] = []
+	for ing in ings:
+		for t: String in Pantry.tags_of(ing):
+			if not tags.has(t):
+				tags.append(t)
+	for p in people:
+		var liked_tags: Array[String] = [tags[r.randi_range(0, tags.size() - 1)]]
+		if r.randf() < TASTE_TWO_TAGS:
+			var t2 := tags[r.randi_range(0, tags.size() - 1)]
+			if not liked_tags.has(t2):
+				liked_tags.append(t2)
+		var hated := ""
+		if r.randf() < TASTE_HATE_TAG:
+			var t3 := tags[r.randi_range(0, tags.size() - 1)]
+			if not liked_tags.has(t3):
+				hated = t3
+		var likes: Array[String] = []
+		var dislikes: Array[String] = []
+		for ing in ings:
+			var its: Array = Pantry.tags_of(ing)
+			var tagged_like := liked_tags.any(func(t: String) -> bool: return its.has(t))
+			if tagged_like:
+				if r.randf() < TASTE_LIKE_TAG:
+					likes.append(ing)
+			elif hated != "" and its.has(hated):
+				if r.randf() < TASTE_DISLIKE_TAG:
+					dislikes.append(ing)
+			else:
+				var roll := r.randf()
+				if roll < TASTE_STRAY_LIKE:
+					likes.append(ing)
+				elif roll < TASTE_STRAY_LIKE + TASTE_STRAY_DISLIKE:
+					dislikes.append(ing)
+		var cap := floori(ings.size() * MAX_DISLIKED_SHARE)
+		while dislikes.size() > cap:
+			dislikes.remove_at(r.randi_range(0, dislikes.size() - 1))
+		p.likes = likes
+		p.dislikes = dislikes
+		p.liked_tags = liked_tags
+	var most := floori(people.size() * MAX_DISLIKERS_SHARE)
+	for ing in ings:
+		var haters: Array[int] = []
+		for i in people.size():
+			if (people[i].dislikes as Array).has(ing):
+				haters.append(i)
+		while haters.size() > most:
+			var k := r.randi_range(0, haters.size() - 1)
+			(people[haters[k]].dislikes as Array).erase(ing)
+			haters.remove_at(k)
+	var staples: Array[String] = []
+	for ing in ings:
+		if Pantry.tool_of(ing) == "grill" or Pantry.tags_of(ing).has("vegetable"):
+			staples.append(ing)
+	for p in people:
+		var likes: Array = p.likes
+		if staples.any(func(s: String) -> bool: return likes.has(s)):
+			continue
+		var open := staples.filter(func(s: String) -> bool: return not (p.dislikes as Array).has(s))
+		likes.append(open[r.randi_range(0, open.size() - 1)])
+	# Liked tags that came to nothing are dropped, so hints never point at nothing.
+	for p in people:
+		p.liked_tags = (p.liked_tags as Array).filter(func(t: String) -> bool:
+			return (p.likes as Array).any(func(ing: String) -> bool: return Pantry.tags_of(ing).has(t)))
+
+
+func tastes_of(i: int) -> Dictionary:
+	return {"likes": people[i].likes, "dislikes": people[i].dislikes}
+
+
+## Counts an order of menu item `item_id` on guest `i`'s card.
+func record_order(i: int, item_id: int) -> void:
+	var orders: Dictionary = people[i].orders
+	orders[item_id] = int(orders.get(item_id, 0)) + 1
+
+
+## "Stupid Burger x3, Fries x2": what someone has ordered, most first. Names come from
+## the menu, so they follow renames; a deleted item keeps its last name.
+func order_summary(i: int, menu: Menu) -> String:
+	var orders: Dictionary = people[i].orders
+	var ids: Array = orders.keys()
+	ids.sort_custom(func(a: int, b: int) -> bool:
+		return orders[a] > orders[b] if orders[a] != orders[b] else a < b)
+	var parts: Array[String] = []
+	for id: int in ids:
+		parts.append("%s x%d" % [menu.name_of(id), orders[id]])
+	return ", ".join(parts)
+
+
+## Guest `i` read the menu and found no main they would eat. Not a walkout and no
+## strike, but they think a little less of the place and their friends hear it.
+func record_found_nothing(i: int) -> float:
+	_nudge(i, -NOTHING_LIKED_DROP)
+	for f: int in people[i].friends:
+		_nudge(f, -NOTHING_LIKED_DROP * FRIEND_SHARE)
+	return -NOTHING_LIKED_DROP
 
 
 func _befriend(a: int, b: int) -> void:
@@ -158,13 +282,25 @@ func friend_names(i: int) -> String:
 
 
 ## What a visit that moved their opinion by `delta` sets going. Empty when nothing much.
-func gossip_line(i: int, delta: float) -> String:
+## `about` is what they will tell, if anything ("it was just how they like it").
+func gossip_line(i: int, delta: float, about := "") -> String:
 	var friends := friend_names(i)
-	if friends == "" or absf(delta) < 0.05:
+	if friends == "" or absf(delta) < 0.05 - 0.0001:
 		return ""
+	var tail := "." if about == "" else " " + about + "."
 	if delta > 0.0:
-		return "%s will tell %s." % [people[i].name, friends]
-	return "%s will warn %s." % [people[i].name, friends]
+		return "%s will tell %s%s" % [people[i].name, friends, tail]
+	return "%s will warn %s%s" % [people[i].name, friends, tail]
+
+
+## What a guest tells friends about the food, hinting at their tastes without naming
+## them: a meal with something they like, or a menu full of a tag they like.
+static func praise_about(liked_meal: bool, hint_tag: String) -> String:
+	if liked_meal:
+		return "it was just how they like it"
+	if hint_tag != "":
+		return "about all the things with " + Menu.tag_word(hint_tag)
+	return ""
 
 
 func is_regular(i: int) -> bool:

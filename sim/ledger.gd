@@ -5,7 +5,7 @@ extends RefCounted
 const MAX_STRIKES := 3
 const XP_PER_LEVEL := 100
 
-var money := 50
+var money := 150   # tunable: buys one simple main with change for a second ingredient
 var xp := 0
 var day := 1
 var today := _blank()
@@ -13,7 +13,7 @@ var history: Array[Dictionary] = []
 
 
 static func _blank() -> Dictionary:
-	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0}
+	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "found_nothing": 0}
 
 
 func level() -> int:
@@ -26,6 +26,21 @@ func record_sale(bill: int, tip: int) -> void:
 	today.tips += tip
 	today.served += 1
 	xp += 10 + tip
+
+
+## Pays for tonight's stock as the door opens. False, and nothing paid, if it is
+## more than the money there is.
+func pay_stock(amount: int) -> bool:
+	if amount > money:
+		return false
+	money -= amount
+	today.stock += amount
+	return true
+
+
+## Someone read the menu and found no main they would eat. Not a strike.
+func record_found_nothing(count := 1) -> void:
+	today.found_nothing += count
 
 
 func record_walkout() -> void:
