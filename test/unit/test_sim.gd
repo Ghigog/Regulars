@@ -736,3 +736,44 @@ func test_a_guest_who_expects_a_deal_is_let_down_even_when_the_bill_moved():
 	assert_ne(m.pay_for(12), 12, "the scaled bill is not the base price")
 	assert_true(m.paid_full(), "but it is still full price")
 	assert_gt(t.paid_full_price(0) if m.paid_full() else 0.0, 0.0)
+
+
+# ---------- Cleaning (night cleaning, PRD 5) ----------
+
+func test_cleaning_knows_what_is_still_dirty():
+	assert_true(Cleaning.needs_cleaning("table", 1, 0))
+	assert_false(Cleaning.needs_cleaning("table", 0, 0))
+	assert_true(Cleaning.needs_cleaning("sink", 1, 0), "one plate soaking still needs washing")
+	assert_true(Cleaning.needs_cleaning("bin", 0, 1))
+	assert_false(Cleaning.needs_cleaning("bin", 0, 0))
+	assert_false(Cleaning.needs_cleaning("stove", 3, 3), "only tables, sinks and bins get dirty")
+
+
+func test_cleaning_names_the_night_actions_and_nothing_else():
+	assert_eq(Cleaning.night_action("Clear plate"), "Clear table")
+	assert_eq(Cleaning.night_action("Wash"), "Wash up")
+	assert_eq(Cleaning.night_action("Empty bin"), "Take the bag out")
+	assert_eq(Cleaning.night_action("Put in sink"), "Put in sink")
+	assert_eq(Cleaning.night_action("Take meat"), "", "no cooking at night")
+	assert_eq(Cleaning.night_action("Scrape off"), "")
+
+
+func test_cleaning_carried_mess_is_a_plate_or_the_bag():
+	assert_true(Cleaning.carrying_mess("dirty_plate"))
+	assert_true(Cleaning.carrying_mess("rubbish_bag"))
+	assert_false(Cleaning.carrying_mess(""))
+	assert_false(Cleaning.carrying_mess("plate"))
+
+
+func test_mess_ages_in_service_only():
+	assert_eq(Cleaning.aged(2.0, 1.0, true, true), 3.0)
+	assert_eq(Cleaning.aged(2.0, 1.0, true, false), 2.0 if not Cleaning.AGES_AT_NIGHT else 3.0)
+	assert_eq(Cleaning.aged(2.0, 1.0, false, true), 0.0, "clean is back to zero")
+	assert_eq(Cleaning.aged(2.0, 1.0, false, false), 0.0)
+
+
+func test_dirty_note_lists_what_is_left():
+	assert_eq(Cleaning.dirty_note(2, true, true), "Still dirty: 2 tables, the sink, the bin.")
+	assert_eq(Cleaning.dirty_note(1, false, true), "Still dirty: a table, the bin.")
+	assert_eq(Cleaning.dirty_note(0, true, false), "Still dirty: the sink.")
+	assert_eq(Cleaning.dirty_note(0, false, false), "")

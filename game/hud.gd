@@ -60,6 +60,8 @@ var _search_box: LineEdit
 var _tabs: Array[Button] = []
 var _cards: Control
 var _tip: Label
+var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, over the slip
+var _dirty_label: Label
 var _shop: Control             # the shop's sliding tray; null while the shop is shut
 var _info: Label
 var _info_blurb: Label
@@ -1682,6 +1684,10 @@ func _shop_keys_text() -> String:
 func _build_tip(hand: Dictionary) -> String:
 	var m := _mode()
 	var use := _g("use")
+	if hand.is_empty() and Cleaning.carrying_mess(game.player.held):
+		if game.player.held == "rubbish_bag":
+			return "Carrying the rubbish bag.      Take it out the front door before building or shopping"
+		return "Carrying a dirty plate.      Put it in the sink before building or shopping"
 	if hand.is_empty():
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Flip the door card to open for day %d" % game.ledger.day
@@ -1740,10 +1746,29 @@ func show_build() -> void:
 		root.add_child(holder)
 		root.move_child(holder, center.get_index())
 		build_bar = holder
+		var stack := VBoxContainer.new()
+		stack.size_flags_vertical = Control.SIZE_SHRINK_END
+		stack.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		stack.alignment = BoxContainer.ALIGNMENT_END
+		stack.add_theme_constant_override("separation", 6)
+		stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(stack)
+		# Night cleaning: a note taped above the slip while anything is still dirty.
+		var note := Sheet.new("note").pad(14, 8, 18, 8)
+		note.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		note.rotation = -0.02
+		stack.add_child(note)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		note.add_child(row)
+		row.add_child(Icon.new("stink", 30))
+		_dirty_label = _label(row, 20)
+		_dirty_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_dirty_note = note
 		var slip := Sheet.new("paper", 22, 10)
-		slip.size_flags_vertical = Control.SIZE_SHRINK_END
 		slip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		holder.add_child(slip)
+		stack.add_child(slip)
 		_tip = _label(slip, 20)
 		holder.modulate.a = 0.0
 		holder.create_tween().tween_property(holder, "modulate:a", 1.0, 0.3)
@@ -1751,6 +1776,8 @@ func show_build() -> void:
 	build_bar.visible = _shop == null
 	var hand: Dictionary = game.hand
 	_tip.text = _build_tip(hand)
+	_dirty_label.text = game.dirty_note()
+	_dirty_note.visible = _dirty_label.text != ""
 	_refresh_catalog()
 
 

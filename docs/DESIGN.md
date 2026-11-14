@@ -18,6 +18,16 @@ many days as you can; three walkouts in one day ends the run.
   away or burger scraped off goes in the bin; at four it overflows (it still takes more).
   "Empty bin" hands the chef a bag, which goes out of the front door ("Take out rubbish");
   carried, it counts as rubbish. Both are disgust sources (table below).
+- **Night cleaning.** Mess carries over: plates on tables, the sink and the bin open the
+  next day as they closed, and so does how old the mess is, so guests notice it at once.
+  Mess does not age at night. In the build phase, with empty hands, E at a messy piece
+  cleans it with the service actions ("Clear table", "Put in sink", "Wash up", "Take
+  the bag out"); cleaning comes before "Pick up". A messy piece cannot be picked up to
+  move or sell ("Clean it first."); the mouse cannot clean ("Walk over and press Use").
+  While a dirty plate or the bag is carried, the shop stays shut and nothing is picked
+  up; whatever is carried when the door card flips goes into service. A taped note over
+  the build slip, with a stink cloud, lists what is left ("Still dirty: 2 tables, the
+  sink, the bin."). Rules and tunables in `sim/cleaning.gd`.
 - **Taking orders.** A seated guest first waits to order (a notepad in their thought
   bubble, "Waiting to order" on their card). With empty hands, E at the table takes
   the order ("Take order", or "Take 2 orders" for a group: one press takes the whole
@@ -252,7 +262,8 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   carry rubbish past me"). The click-to-inspect guest card is built (section 1); it shows
   the last six thoughts, not the full history.
 - **Sightlines**: built (section 1), including a dirty kitchen (piled sink, overflowing
-  bin). To add: night cleaning; the sink and bin stay as they are overnight, like tables.
+  bin), with night cleaning: mess stays overnight and is cleaned in the build phase
+  (section 1).
 - **Word of mouth**: each guest has an affinity (-1..1) that sets their chance to visit.
   A visit moves it; 40% of the change spreads to their friends.
 - **Built**: regulars with a visit streak, grudges (section 1).
