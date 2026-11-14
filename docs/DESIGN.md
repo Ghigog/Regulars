@@ -18,6 +18,18 @@ many days as you can; three walkouts in one day ends the run.
   away or burger scraped off goes in the bin; at four it overflows (it still takes more).
   "Empty bin" hands the chef a bag, which goes out of the front door ("Take out rubbish");
   carried, it counts as rubbish. Both are disgust sources (table below).
+- **Taking orders.** A seated guest first waits to order (a notepad in their thought
+  bubble, "Waiting to order" on their card). With empty hands, E at the table takes
+  the order ("Take order", or "Take 2 orders" for a group: one press takes the whole
+  table). Only then do they wait for food, and their bubble shows what they ordered.
+  Patience drains while they wait to order, 1.25x as fast as while waiting for food
+  (`ORDER_PATIENCE_SCALE` 0.8 in `game/main.gd`); taking the order gives back 0.1
+  (`ORDER_RELIEF`). Holding a burger at a table that has not ordered shows "Take order
+  first" and E only says why (`ORDER_HANDS_FREE`; set it false to let the chef take
+  orders with full hands). Taking an order comes before half price and the free meal at
+  the same table. An order is data on the guest (`Guest.order`, `{"dish": "burger"}`),
+  chosen by `order_for` in `game/main.gd`, and serving matches the dish in hand against
+  it. `REGULARS_DEMO=order`.
 - Meat has doneness. A radial dial over the stove has a green "perfect" window; pull it late
   and it is dry (worse tips), leave it and it burns. The patty changes look as it goes.
 - Guests are named townsfolk with patience, disgust, joy and savour. These set the tip.
@@ -312,10 +324,13 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 
 ## 9. Decisions (13 November 2026)
 
-Not built yet; this is the agreed direction for future sessions.
+Not built yet, except where marked; this is the agreed direction for future sessions.
 
-- **Order-taking is a step.** The chef walks to the table to take the order before
-  cooking. Build it together with the menu below, since the guest orders from the menu.
+- **Order-taking is a step.** *Built (section 1)* for the single dish. The chef walks to
+  the table to take the order before cooking. For the menu below, `order_for(guest)` in
+  `game/main.gd` is the one place that picks a dish from the player's menu; the guest
+  stores it (`Guest.order`), the bubble draws its icon and serving checks the dish in
+  hand against it. A guest whose order is a dish not yet cooked just keeps waiting.
 - **Recipes, ingredients and a menu the player designs.** Every dish is data: a recipe
   is a list of ingredients (burger: bun, patty, salad, cheese; salad: lettuce, tomato,
   onion). Each ingredient comes from a station in the room dedicated to it, so a

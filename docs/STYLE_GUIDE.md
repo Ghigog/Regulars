@@ -108,7 +108,7 @@ or a later sheet, they win. What changed:
 | Mood tint | Tints the whole head (orange about to snap, green disgust, red angry), not a gradient from the top. | Flat colour only; reads the same at 60 px. |
 | Patience | A chunky patience meter stays under the thought bubble. | The face and tint alone were too slow to read across six guests. |
 | Names | A small ink name tag stays over each guest. | "Named townsfolk" is the point of the game; prompts say "Serve Mabel". |
-| Thoughts | Bubbles show one icon (burger, Zzz, green cloud, heart). The written thoughts are still recorded in `sim/` but no longer shown. | Sheet 13. |
+| Thoughts | Bubbles show one icon (burger, Zzz, green cloud, heart). A guest waiting to order shows a notepad: a cream pad with an ink rim, coral binding, three ink lines and a gold pencil (not on the sheets); once ordered, the bubble shows the dish. The written thoughts are still recorded in `sim/` but no longer shown. | Sheet 13. |
 | Popups | "+$12" stays as ink text beside the coin. "ready!", "burnt!" and "walked out" became stars, flames and the anger mark. | Amounts matter; the rest reads without words. |
 | Felix and Nell | Looks invented from the kit (auburn side-sweep and cream collar; top-knot and periwinkle dungarees). | Never drawn. |
 | Logo (title screen) | A placeholder drawn in code (`game/title.gd`) after the bottom-left peg-doll logo on sheet 15: gold and orange letters with an ink outline, four peg heads on them (chef, two buns, red cap), a teal slab on a wooden rim with a chequered dome behind, a burger at the foot. No "Town Diner" banner. | The subtitle is undecided. A drawn logo should replace it. |

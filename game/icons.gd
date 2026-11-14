@@ -60,6 +60,18 @@ static func _moved(layers: Array, by: Vector2, scale := 1.0) -> Array:
 	return out
 
 
+## A convex outline pushed out from its centre, for an ink rim.
+static func _grown(pts: PackedVector2Array, by: float) -> PackedVector2Array:
+	var c := Vector2.ZERO
+	for p: Vector2 in pts:
+		c += p
+	c /= pts.size()
+	var out := PackedVector2Array()
+	for p: Vector2 in pts:
+		out.append(p + (p - c).normalized() * by)
+	return out
+
+
 static func icon(id: String) -> Array:
 	if _cache.has(id):
 		return _cache[id]
@@ -74,6 +86,16 @@ static func icon(id: String) -> Array:
 			o.append([ell(0, 0.26, 0.8, 0.62, 0, 180), "#e6a542"])
 		"food":
 			o = _moved(icon("burger"), Vector2.ZERO, 1.0)
+		"order":  # waiting to order: an order pad with a coral binding and a pencil
+			o.append([rect(-0.12, -0.04, 1.36, 1.72, -0.1), INK])
+			o.append([rect(-0.12, -0.08, 1.12, 1.48, -0.1), CREAM])
+			o.append([rect(-0.06, 0.62, 1.24, 0.32, -0.1), CORAL])
+			for i in 3:
+				o.append([rect(-0.2 + i * 0.03, 0.2 - i * 0.34, 0.74 - i * 0.18, 0.13, -0.1), INK])
+			var pen := PackedVector2Array([Vector2(0.98, 0.62), Vector2(1.12, 0.5), Vector2(0.4, -0.5), Vector2(0.26, -0.38)])
+			o.append([_grown(pen, 0.07), INK])
+			o.append([pen, GOLD])
+			o.append([PackedVector2Array([Vector2(0.26, -0.38), Vector2(0.4, -0.5), Vector2(0.2, -0.7)]), INK])
 		"warning":  # a gold road-sign triangle with an ink rim and a bold "!"
 			o.append([PackedVector2Array([Vector2(0, 1.0), Vector2(-1.05, -0.82), Vector2(1.05, -0.82)]), INK])
 			o.append([PackedVector2Array([Vector2(0, 0.74), Vector2(-0.8, -0.66), Vector2(0.8, -0.66)]), GOLD])

@@ -32,6 +32,10 @@ const DOOR_REACH := 1.25
 const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
 const FLYERS := {"id": "flyers", "tier": 1}   # sold in the shop's Extras, never placed
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
+## Taking orders (DESIGN.md section 9). A seated guest waits to order, then for food.
+const ORDER_PATIENCE_SCALE := 0.8   # waiting to order drains patience 1.25x as fast as waiting for food
+const ORDER_RELIEF := 0.1           # patience back when the chef comes over and takes the order
+const ORDER_HANDS_FREE := true      # the chef needs empty hands to take an order
 const BOOTH_DELIGHT := 0.08   # a booth's benches are cosier than chairs
 const SOUNDS := {  # name -> volume in dB
 	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
@@ -239,6 +243,11 @@ func _apply_demo(demo: String) -> void:
 		while arrivals.size() < 8:
 			arrivals.append({"time": 0.2, "idx": arrivals.size()})
 		get_tree().create_timer(6.0).timeout.connect(_demo_fx)
+	elif demo == "order":  # a table waiting to order, then the chef taking it; shoot at about 9 and 10.5
+		for a in arrivals:
+			a.time = 0.2
+		get_tree().create_timer(8.0).timeout.connect(_demo_order.bind(false))
+		get_tree().create_timer(9.5).timeout.connect(_demo_order.bind(true))
 	elif demo == "kind":  # an impatient guest and the half-price prompt; shoot at about 9 and 10.5
 		for a in arrivals:
 			a.time = 0.2
@@ -254,7 +263,7 @@ func _apply_demo(demo: String) -> void:
 			a.time = 0.2
 		get_tree().create_timer(9.0).timeout.connect(func() -> void:
 			for g in guests:
-				if g.state == "waiting":
+				if g.seated_waiting():
 					g.mood.patience = 0.4
 					g.mood.disgust = 0.25
 					g.mood.think("Nobody has cleared that table")
@@ -397,9 +406,22 @@ func _demo_build(demo: String) -> void:
 		_demo_hover = Vector3(6.5, 0, 5.5) if demo == "build_no" else Vector3(3.5, 0, 5.5)
 
 
+func _demo_order(take: bool) -> void:
+	for g in guests:
+		if g.state == "ordering":
+			if take:
+				use_station(g.table)
+				return
+			player.position = Grid.center(g.table.cell + Vector2i(0, 1))
+			player.look(Vector2i(0, -1))
+			hud.show_guest(g)
+			return
+
+
 func _demo_kind(offer: bool) -> void:
 	for g in guests:
-		if g.state == "waiting":
+		if g.seated_waiting():
+			take_orders(g.table)
 			if offer:
 				use_station(g.table)
 				return
@@ -411,7 +433,8 @@ func _demo_kind(offer: bool) -> void:
 
 func _demo_comp(offer: bool) -> void:
 	for g in guests:
-		if g.state == "waiting":
+		if g.seated_waiting():
+			take_orders(g.table)
 			if offer:
 				use_station(g.table)
 				return
@@ -429,7 +452,7 @@ func _demo_comp(offer: bool) -> void:
 func _demo_fx() -> void:
 	var seated: Array[Guest] = []
 	for g in guests:
-		if g.state == "waiting":
+		if g.seated_waiting():
 			seated.append(g)
 		elif g.state == "queue":
 			g.mood.patience = 0.5                 # Zzz bubble
@@ -1803,7 +1826,7 @@ func cheer_with_decor(g: Guest) -> void:
 ## Works the decor bonus out again for everyone seated, after the room changes.
 func recheck_decor() -> void:
 	for g: Guest in guests:
-		if g.state == "waiting" or g.state == "eating":
+		if g.seated_waiting() or g.state == "eating":
 			cheer_with_decor(g)
 
 
@@ -1938,14 +1961,50 @@ func _collect_gross() -> void:
 		_gross.append({"cell": player.cell(), "kind": "rubbish", "key": "rubbish", "thought": "I just watched the chef carry rubbish past me"})
 
 
+## The most impatient guest sat at this table, waiting to order or for food.
 func _waiting_guest_at(table: Station) -> Guest:
 	var best: Guest = null
 	for s in table.seats:
 		if seat_taken.has(s):
 			var g: Guest = seat_taken[s]
-			if g.state == "waiting" and (best == null or g.mood.patience < best.mood.patience):
+			if g.seated_waiting() and (best == null or g.mood.patience < best.mood.patience):
 				best = g
 	return best
+
+
+## The guest at this table who ordered what the chef is holding, most impatient first.
+func _guest_wanting(table: Station, held: String) -> Guest:
+	var best: Guest = null
+	for s in table.seats:
+		if seat_taken.has(s):
+			var g: Guest = seat_taken[s]
+			if g.state == "waiting" and held != "" and g.order.get("dish", "") == held \
+					and (best == null or g.mood.patience < best.mood.patience):
+				best = g
+	return best
+
+
+## Everyone at this table who is sat down and has not ordered yet.
+func _guests_to_order(table: Station) -> Array[Guest]:
+	var out: Array[Guest] = []
+	for s in table.seats:
+		if seat_taken.has(s) and seat_taken[s].state == "ordering":
+			out.append(seat_taken[s])
+	return out
+
+
+## What this guest orders. Today there is one dish; the menu system will choose
+## here from the player's menu, by taste and price.
+func order_for(_g: Guest) -> Dictionary:
+	return {"dish": "burger"}
+
+
+## The chef takes the whole table's order in one go.
+func take_orders(table: Station) -> void:
+	for g in _guests_to_order(table):
+		g.take_order(order_for(g))
+		g.mood.patience = minf(1.0, g.mood.patience + ORDER_RELIEF)
+	sfx("page")
 
 
 func serve(g: Guest, quality: float) -> void:
@@ -2019,7 +2078,7 @@ func finish_meal(g: Guest) -> void:
 func walk_out(g: Guest) -> void:
 	var going: Array[Guest] = []
 	for m: Guest in (g.party if not g.party.is_empty() else [g]):
-		if is_instance_valid(m) and (m == g or m.state == "queue" or m.state == "to_seat" or m.state == "waiting"):
+		if is_instance_valid(m) and (m == g or m.state == "queue" or m.state == "to_seat" or m.seated_waiting()):
 			going.append(m)
 	ledger.record_walkout()
 	var names: Array[String] = []
@@ -2148,11 +2207,23 @@ func use_station(st: Station, dry_run := false) -> String:
 				st.refresh()
 		"table", "booth", "table4":
 			var g := _waiting_guest_at(st)
-			if held == "burger" and g != null:
-				act = "Serve %s" % g.info.name
+			var fed := _guest_wanting(st, held)
+			var to_order := _guests_to_order(st)
+			if fed != null:
+				act = "Serve %s" % fed.info.name
 				if not dry_run:
 					player.set_held("")
-					serve(g, q)
+					serve(fed, q)
+			elif not to_order.is_empty() and (held == "" or not ORDER_HANDS_FREE):
+				act = "Take order" if to_order.size() == 1 else "Take %d orders" % to_order.size()
+				if not dry_run:
+					take_orders(st)
+			elif held == "burger" and not to_order.is_empty():
+				act = "Take order first"   # a refusal: nothing changes
+				if not dry_run:
+					hud.say("%s hasn't ordered yet. Free your hands and take the order." % to_order[0].info.name)
+					sfx("fail")
+					return act
 			elif held == "" and st.dirty > 0:
 				act = "Clear plate"
 				if not dry_run:
@@ -2173,7 +2244,7 @@ func use_station(st: Station, dry_run := false) -> String:
 		if act == "Wash":
 			sfx("wash")
 			burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
-		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free")):
+		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free") or act.begins_with("Take order") or act.ends_with(" orders")):
 			sfx("pickup" if player.held != "" else "putdown")
 	return act
 
