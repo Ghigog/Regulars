@@ -1409,6 +1409,7 @@ func test_seated_guests_get_the_decor_bonus_as_they_sit():
 
 func after_each():
 	get_tree().paused = false   # a failed options test must not freeze the rest
+	Scenery.theme_id = "diner"   # a seaside test must not leak its theme
 
 
 ## A key press as the keyboard sends it, delivered at once rather than on the
@@ -2347,3 +2348,55 @@ func test_night_zero_hints_come_one_at_a_time():
 	assert_eq(game.night_hint(), game.NIGHT_HINTS[2])
 	game.ledger.history.append({})
 	assert_eq(game.night_hint(), "", "only on night zero")
+
+
+# ---------------------------------------------------------------- seaside
+
+## The seaside kitchen starts with a fish icebox and a bread basket, and its fixed
+## Fish roll goes from ticket to paid bill like the Burger.
+func test_seaside_fish_roll_from_ticket_to_bill():
+	Scenery.theme_id = "seaside"
+	game = load("res://game/main.tscn").instantiate()
+	game.first_night = false
+	add_child_autofree(game)
+	game.set_process(false)
+	game.best_path = "user://regulars_best_test.json"
+	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
+	_neutral_tastes()
+	game.test_kitchen()
+	assert_null(game.find_station("crate_patty"), "no diner stations by the sea")
+	var g := _ordered_guest()
+	assert_eq(g.order.main.name, "Fish roll")
+	_use("trays")
+	game.use_station(_the_pass())
+	_use("crate_fish")
+	assert_eq(game.player.held, "raw:fish")
+	_use("stove")
+	_run(Station.COOK_TIME + 0.5)
+	_use("stove")
+	game.use_station(_the_pass())
+	_use("crate_roll")
+	game.use_station(_the_pass())
+	game.use_station(_the_pass())
+	assert_true(game.player.tray.is_complete())
+	game.use_station(g.table)
+	_run(g.eat_time + 0.5)
+	assert_eq(g.bill_base, 9, "the Fish roll: roll 2 and fish 7")
+
+
+## Every ingredient has a model in each state it can be in, and a stacked layer.
+func test_every_ingredient_has_a_model():
+	for id: String in Pantry.ITEMS:
+		for state in ["raw", "prep", "burnt"]:
+			var n := Node3D.new()
+			Build.ingredient(n, id, state)
+			assert_gt(n.get_child_count(), 0, "%s %s is drawn" % [id, state])
+			n.free()
+		var t := Node3D.new()
+		assert_gt(Build._layer(t, id, 0.0, true, true), 0.0, "%s stacks on a plate" % id)
+		t.free()
+	for look in ["raw", "nearly", "perfect", "dry", "burnt"]:
+		var f := Node3D.new()
+		Build.fillet(f, look)
+		assert_gt(f.get_child_count(), 0, "fish fillet looks %s" % look)
+		f.free()
