@@ -63,8 +63,8 @@ func test_guest_is_seated_served_and_pays():
 	assert_eq(g.state, "eating")
 	assert_eq(game.player.held, "")
 	var table: Station = g.table
-	_run(Guest.EAT_TIME + 0.5)
-	assert_gt(game.ledger.money, 50 + game.BILL - 1)
+	_run(g.eat_time + 0.5)
+	assert_gt(game.ledger.money, 50 + g.mood.scaled_price(game.BILL) - 1)
 	assert_eq(table.dirty, 1)
 	assert_gt(float(game.town.people[0].affinity), 0.0, "a good visit makes them like the place")
 
@@ -82,8 +82,8 @@ func test_half_price_calms_an_impatient_guest_and_costs_half_the_bill():
 	assert_eq(game.prompt_for(g.table), "", "only once")
 	_cook_burger()
 	game.use_station(g.table)
-	_run(Guest.EAT_TIME + 0.5)
-	assert_eq(int(game.ledger.today.sales), 6)
+	_run(g.eat_time + 0.5)
+	assert_eq(int(game.ledger.today.sales), ceili(g.mood.scaled_price(game.BILL) / 2.0), "half of the mood-scaled bill")
 
 
 func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
@@ -102,7 +102,7 @@ func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
 	assert_true(g.mood.thoughts.has("On the house? That's really kind"))
 	_cook_burger()
 	game.use_station(g.table)
-	_run(Guest.EAT_TIME + 0.5)
+	_run(g.eat_time + 0.5)
 	assert_eq(int(game.ledger.today.sales), 0)
 
 
@@ -122,7 +122,7 @@ func test_a_guest_who_expects_a_deal_is_let_down_by_full_price():
 	_order(g)
 	_cook_burger()
 	game.use_station(g.table)
-	_run(Guest.EAT_TIME + 0.5)
+	_run(g.eat_time + 0.5)
 	assert_true(g.mood.thoughts.has("Full price this time? Hm"))
 	assert_eq(int(game.town.people[0].deals), Town.EXPECT_AT - 1)
 
@@ -639,7 +639,7 @@ func test_overcooked_meat_is_worth_less():
 	game.take_orders(g.table)   # hands are full, so straight to the order
 	game.use_station(g.table)
 	assert_lt(g.mood.savour, 0.7)
-	assert_eq(g.mood.latest_thought(), "A bit dry, this")
+	assert_true(g.mood.thoughts.has("A bit dry, this"))
 
 
 func test_prompt_names_the_action_without_doing_it():
@@ -1540,3 +1540,34 @@ func test_serving_a_guest_who_has_not_ordered_is_refused():
 
 func test_guest_card_says_waiting_to_order():
 	assert_eq(Hud.STATE_WORDS.ordering, "Waiting to order")
+
+
+func _serve_one(idx: int, joy: float, patience: float) -> Guest:
+	var g: Guest = game.spawn_guest(idx)
+	_run(12.0)
+	_order(g)
+	_cook_burger()
+	g.mood.joy = joy
+	g.mood.patience = patience
+	g.mood.disgust = 0.0
+	game.use_station(g.table)
+	return g
+
+
+func test_a_comfortable_guest_eats_longer_and_pays_more():
+	var cosy := _serve_one(0, 1.0, 1.0)
+	assert_true(cosy.mood.thoughts.has(GuestMood.COSY_THOUGHTS[0]))
+	var start := int(game.ledger.today.sales)
+	_run(Guest.EAT_TIME + 0.5)
+	assert_eq(cosy.state, "eating", "still lingering after the plain eating time")
+	_run(cosy.eat_time)
+	var cosy_paid := int(game.ledger.today.sales) - start
+	var rushed := _serve_one(1, 0.0, 0.1)
+	assert_true(rushed.mood.thoughts.has(GuestMood.HURRIED_THOUGHTS[1]))
+	assert_lt(rushed.eat_time, cosy.eat_time)
+	start = int(game.ledger.today.sales)
+	_run(rushed.eat_time + 0.5)
+	assert_eq(rushed.state, "leaving")
+	var rushed_paid := int(game.ledger.today.sales) - start
+	assert_gt(cosy_paid, game.BILL)
+	assert_lt(rushed_paid, game.BILL)

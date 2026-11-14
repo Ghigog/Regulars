@@ -100,7 +100,68 @@ func offer_comp() -> bool:
 	return true
 
 
-## What they pay for a meal with this list price.
+## Comfort: how they feel about the room and the service, from 0 to 1. Read once,
+## when the food arrives, and kept in `served_comfort` so the bill and the stay agree.
+## Savour is left out on purpose: comfort is about the place, not the dish.
+const COMFORT_JOY := 0.6        # tunable
+const COMFORT_PATIENCE := 0.4   # tunable
+const BILL_LOW := 0.90    # tunable: bill scale at comfort 0 ("let's eat and go")
+const BILL_HIGH := 1.25   # tunable: bill scale at comfort 1 ("they ordered extras")
+const STAY_LOW := 0.80    # tunable: eating-time scale at comfort 0
+const STAY_HIGH := 1.50   # tunable: eating-time scale at comfort 1
+const COSY_FROM := 0.75   # comfort at and above which they say they could stay all day
+const HURRIED_BELOW := 0.3  # comfort at and below which they want to eat and go
+const COSY_THOUGHTS: Array[String] = ["I could stay here all day", "So cosy in here", "Maybe a little extra, then"]
+const HURRIED_THOUGHTS: Array[String] = ["Let's eat and go", "Quick bite, then out", "Not lingering here"]
+
+var served_comfort := -1.0   # below 0 until the food has arrived
+
+
+func comfort() -> float:
+	return clampf(COMFORT_JOY * joy + COMFORT_PATIENCE * patience - felt_disgust(), 0.0, 1.0)
+
+
+## Called as the food lands on the table. Returns the thought it prompts, or "".
+## `pick` chooses among the written variants (the caller passes something stable).
+func settle_comfort(pick := 0) -> String:
+	served_comfort = comfort()
+	if served_comfort >= COSY_FROM:
+		return COSY_THOUGHTS[pick % COSY_THOUGHTS.size()]
+	if served_comfort <= HURRIED_BELOW:
+		return HURRIED_THOUGHTS[pick % HURRIED_THOUGHTS.size()]
+	return ""
+
+
+## The comfort that counts for pay and stay: fixed at serving, or the live value before.
+func pay_comfort() -> float:
+	return served_comfort if served_comfort >= 0.0 else comfort()
+
+
+static func bill_scale(c: float) -> float:
+	return lerpf(BILL_LOW, BILL_HIGH, clampf(c, 0.0, 1.0))
+
+
+static func stay_scale(c: float) -> float:
+	return lerpf(STAY_LOW, STAY_HIGH, clampf(c, 0.0, 1.0))
+
+
+## The list price scaled by their mood: whole money, at least 1.
+func scaled_price(price: int) -> int:
+	return maxi(1, roundi(price * bill_scale(pay_comfort())))
+
+
+## The whole bill: base price, then the mood scale, then half price or free meal.
+## Every caller goes through here, so a menu only changes the base price.
+func pay_for(price: int) -> int:
+	return bill_for(scaled_price(price))
+
+
+## True when they paid the full (mood-scaled) price, with no deal.
+func paid_full() -> bool:
+	return not (discounted or comped)
+
+
+## What they pay with this price after deals (half price, free meal) only.
 func bill_for(price: int) -> int:
 	if comped:
 		return 0

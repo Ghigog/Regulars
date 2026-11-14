@@ -206,6 +206,18 @@ many days as you can; three walkouts in one day ends the run.
   Guests holding a grudge are not used to top up a thin crowd.
 - **Flyers.** In the shop's Extras tab, $15 buys +25% visit chance for everyone tomorrow. One
   batch a night. 
+- **Mood drives pay and stay.** When the food reaches the table the guest's comfort is
+  read once and kept: `0.6 joy + 0.4 patience - felt disgust`, 0 to 1 (savour is left
+  out: comfort is about the room and the service). It scales the bill from x0.90 to
+  x1.25 ("they ordered extras"), rounded, at least $1, and the eating time from x0.80 to
+  x1.50 (5 s base). So a cosy room earns more per guest but turns tables slower. Order on
+  the bill: base price, mood scale, then half price or a free meal; the tip is on the
+  final bill, XP is unchanged. A guest who expects a deal is let down whenever they had
+  no deal, whatever the scaled bill. At 0.75 and up they think "I could stay here all
+  day" (or a variant); at 0.3 and under, "Let's eat and go". The guest card shows
+  "Paying $N" once served, with "ordered extras" or "in a hurry". All in `GuestMood`
+  (`comfort`, `bill_scale`, `stay_scale`, `pay_for`). `REGULARS_DEMO=mood`. Comfort does
+  not change how much mess a guest leaves.
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
 
 Code map: `sim/` is pure logic with no scene dependencies (unit-tested with GUT).
@@ -245,8 +257,8 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   A visit moves it; 40% of the change spreads to their friends.
 - **Built**: regulars with a visit streak, grudges (section 1).
 - **Built**: groups arriving together (section 1).
-- **To add**: stay length and order size driven by mood (dessert, second drink),
-  favourite dishes (needs a second dish), reviews (needs a design).
+- **Built**: stay length and bill driven by mood (section 1). Parked: a second round
+  (dessert, second drink). **To add**: favourite dishes (needs a second dish), reviews (needs a design).
 - **Discounts and comps** (built, section 1): half price, a free meal, and guests who
   come to expect a deal.
 
@@ -358,9 +370,6 @@ Not built yet, except where marked; this is the agreed direction for future sess
   - *Ingredient order only sets how a dish looks stacked*; it never refuses one.
   - *At most one prep step per ingredient*, and some need none (used as they are).
   - *Each townsperson likes and dislikes ingredients*, so a varied menu pays off.
-- **Mood drives pay and stay.** Happy guests pay more and stay longer: secure income,
-  but the table turns over slower, so a fast-food player may keep guests a little
-  less comfortable on purpose.
 - **The critic.** One critic per run, always the same townsperson in that run and
   unknown to the player unless they work it out. They come every fifth day (each day
   is a working day, so day 5 is Friday; there are no weekends), are served like anyone, and rate service time,

@@ -659,3 +659,80 @@ func test_a_nicely_dressed_table_is_worth_what_a_fern_once_was():
 		{"id": "plant", "dist": 1}]).joy
 	assert_between(dressed, 0.25, Decor.CAP)
 	assert_lt(Decor.bonus([{"id": "plant", "dist": 3}, {"id": "paint", "dist": 3}]).joy, 0.1, "what is only seen adds a little")
+
+
+func test_comfort_rises_with_joy_and_patience_and_falls_with_disgust():
+	var m := GuestMood.new()
+	m.joy = 0.0
+	m.patience = 0.0
+	assert_eq(m.comfort(), 0.0)
+	m.joy = 1.0
+	m.patience = 1.0
+	assert_eq(m.comfort(), 1.0)
+	m.joy = 0.5
+	var base := m.comfort()
+	m.joy = 0.6
+	assert_gt(m.comfort(), base)
+	m.patience = 0.5
+	assert_lt(m.comfort(), base + 0.1)
+	var before := m.comfort()
+	m.disgust = 0.5
+	assert_lt(m.comfort(), before)
+	m.disgust = 1.0
+	assert_eq(m.comfort(), 0.0, "never below 0")
+	m.savour = 1.0
+	assert_eq(m.comfort(), 0.0, "the dish does not count")
+
+
+func test_bill_and_stay_scales_hit_their_ends_and_only_rise():
+	assert_almost_eq(GuestMood.bill_scale(0.0), GuestMood.BILL_LOW, 0.0001)
+	assert_almost_eq(GuestMood.bill_scale(1.0), GuestMood.BILL_HIGH, 0.0001)
+	assert_almost_eq(GuestMood.stay_scale(0.0), GuestMood.STAY_LOW, 0.0001)
+	assert_almost_eq(GuestMood.stay_scale(1.0), GuestMood.STAY_HIGH, 0.0001)
+	for i in 10:
+		assert_lt(GuestMood.bill_scale(i / 10.0), GuestMood.bill_scale((i + 1) / 10.0))
+		assert_lt(GuestMood.stay_scale(i / 10.0), GuestMood.stay_scale((i + 1) / 10.0))
+
+
+func test_comfort_is_fixed_when_the_food_arrives():
+	var m := GuestMood.new()
+	m.joy = 1.0
+	m.patience = 1.0
+	assert_eq(m.settle_comfort(), GuestMood.COSY_THOUGHTS[0])
+	m.joy = 0.0
+	m.patience = 0.0
+	assert_eq(m.served_comfort, 1.0, "the bill and the stay agree")
+	assert_eq(m.scaled_price(12), 15)
+	assert_eq(m.settle_comfort(4), GuestMood.HURRIED_THOUGHTS[1])
+	assert_eq(m.scaled_price(12), 11)
+	assert_eq(m.scaled_price(1), 1, "never below 1")
+	m.joy = 0.5
+	m.patience = 0.5
+	assert_eq(m.settle_comfort(), "", "nothing to say in the middle")
+
+
+func test_deals_apply_after_the_mood_scale():
+	var m := GuestMood.new()
+	m.joy = 1.0
+	m.patience = 1.0
+	m.settle_comfort()
+	assert_eq(m.pay_for(12), 15)
+	assert_true(m.paid_full())
+	m.discounted = true
+	assert_eq(m.pay_for(12), 8, "half of 15, in the house's favour")
+	assert_false(m.paid_full())
+	m.comped = true
+	assert_eq(m.pay_for(12), 0)
+	assert_eq(m.tip_for(m.pay_for(12)), 0, "the tip is on the final bill")
+
+
+func test_a_guest_who_expects_a_deal_is_let_down_even_when_the_bill_moved():
+	var t := Town.new()
+	t.people[0].deals = Town.EXPECT_AT
+	var m := GuestMood.new()
+	m.joy = 0.0
+	m.patience = 0.2
+	m.settle_comfort()
+	assert_ne(m.pay_for(12), 12, "the scaled bill is not the base price")
+	assert_true(m.paid_full(), "but it is still full price")
+	assert_gt(t.paid_full_price(0) if m.paid_full() else 0.0, 0.0)

@@ -170,16 +170,25 @@ func take_order(what: Dictionary) -> void:
 	state = "waiting"
 
 
-func start_eating(quality: float) -> void:
+## How long this guest eats, once served: longer when they are comfortable.
+var eat_time := EAT_TIME
+
+
+## Comfort is read here, as the food arrives and before they taste it. Returns the
+## thought it prompts ("" for none).
+func start_eating(quality: float) -> String:
+	var said := mood.settle_comfort(idx)
+	eat_time = EAT_TIME * GuestMood.stay_scale(mood.served_comfort)
 	mood.taste(quality)
 	if quality > 0.95:
 		_heart_time = 2.5
 	state = "eating"
-	timer = EAT_TIME
+	timer = eat_time
 	_set_meal("burger", quality)
 	var tw := _body.create_tween()
 	tw.tween_property(_body, "position:y", SEAT_HEIGHT + 0.3, 0.12).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_body, "position:y", SEAT_HEIGHT, 0.25).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	return said
 
 
 func _set_meal(kind: String, quality: float) -> void:
@@ -220,7 +229,7 @@ func tick(delta: float) -> void:
 			timer -= delta
 			# Lean in for a bite, and the burger shrinks as it is eaten.
 			_body.rotation.x = maxf(0.0, sin(_age * 7.0)) * 0.22
-			if timer < EAT_TIME * 0.55 and _meal_kind == "burger":
+			if timer < eat_time * 0.55 and _meal_kind == "burger":
 				_set_meal("burger_bitten", mood.savour)
 			game.apply_surroundings(self, delta)
 			if timer <= 0.0:

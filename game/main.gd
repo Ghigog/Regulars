@@ -259,6 +259,11 @@ func _apply_demo(demo: String) -> void:
 			a.time = 0.2
 		get_tree().create_timer(8.0).timeout.connect(_demo_comp.bind(false))
 		get_tree().create_timer(9.5).timeout.connect(_demo_comp.bind(true))
+	elif demo == "mood":  # a content and a fed-up guest, both served at 8 with the content one's card open;
+		# shoot at 9 (card), 12.4 (the fed-up guest pays less) and 15.7 (the content one pays more)
+		for a in arrivals:
+			a.time = 0.2
+		get_tree().create_timer(8.0).timeout.connect(_demo_mood)
 	elif demo == "inspect":  # a seated guest with a few thoughts and their card open; shoot at 10
 		for a in arrivals:
 			a.time = 0.2
@@ -458,6 +463,24 @@ func _demo_comp(offer: bool) -> void:
 			player.look(Vector2i(0, -1))
 			hud.show_guest(g)
 			return
+
+
+func _demo_mood() -> void:
+	var seated: Array[Guest] = []
+	for g in guests:
+		if g.seated_waiting():
+			seated.append(g)
+	if seated.size() < 2:
+		return
+	var feel := [[1.0, 1.0], [0.0, 0.1]]   # joy and patience: content, then fed up
+	for i in 2:
+		var g := seated[i]
+		take_orders(g.table)
+		g.mood.joy = feel[i][0]
+		g.mood.patience = feel[i][1]
+		g.mood.disgust = 0.0
+		serve(g, 1.0 if i == 0 else 0.7)
+	inspect(seated[0])
 
 
 func _demo_fx() -> void:
@@ -2062,7 +2085,9 @@ func serve(g: Guest, quality: float) -> void:
 		g.mood.delight(0.15, "That was quick!")
 	var perfect := quality > 0.95
 	g.mood.think("Perfectly juicy" if perfect else "A bit dry, this")
-	g.start_eating(quality)
+	var settled := g.start_eating(quality)
+	if settled != "":
+		g.mood.think(settled)
 	sfx("serve")
 	if perfect:
 		sfx("perfect")
@@ -2093,8 +2118,8 @@ func offer_comp(g: Guest) -> void:
 
 
 func finish_meal(g: Guest) -> void:
-	var bill := g.mood.bill_for(BILL)
-	if bill == BILL:   # someone used to deals is let down by full price
+	var bill := g.mood.pay_for(BILL)
+	if g.mood.paid_full():   # someone used to deals is let down by full price
 		var letdown := town.paid_full_price(g.idx)
 		if letdown > 0.0:
 			g.mood.delight(-letdown, "Full price this time? Hm")

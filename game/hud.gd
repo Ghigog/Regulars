@@ -51,6 +51,7 @@ var build_bar: Control
 var guest_card: Control
 var _guest: Guest
 var _guest_state: Label
+var _guest_bill: Label   # what a served guest is paying (mood scales it)
 var _guest_meters := {}
 var _guest_thoughts: Label
 var _search := ""
@@ -870,6 +871,8 @@ func show_guest(g: Guest) -> void:
 	if town.expects_deal(g.idx):   # discounting has a cost: they now expect it
 		_label(box, 13, "Expects a deal").add_theme_color_override("font_color", Color(Build.CORAL_DARK))
 	_guest_state = _label(box, 15)
+	_guest_bill = _label(box, 14)
+	_guest_bill.add_theme_color_override("font_color", Color(Build.CABINET))
 	_guest_meters.clear()
 	for id: String in ["patience", "joy", "savour", "disgust"]:
 		var row := HBoxContainer.new()
@@ -891,6 +894,9 @@ func _update_guest() -> void:
 		return
 	var m: GuestMood = _guest.mood
 	_guest_state.text = STATE_WORDS.get(_guest.state, "")
+	_guest_bill.visible = m.served_comfort >= 0.0
+	if _guest_bill.visible:
+		_guest_bill.text = _bill_words(m, game.BILL)
 	for id: String in _guest_meters:
 		_guest_meters[id].value = float(m.get(id))
 		_guest_meters[id].queue_redraw()
@@ -899,6 +905,21 @@ func _update_guest() -> void:
 		lines.append("\"%s\"" % t)
 	lines.reverse()   # newest first
 	_guest_thoughts.text = "No thoughts yet." if lines.is_empty() else "\n".join(lines)
+
+
+## "Paying $14 · ordered extras": the served guest's bill, and why it moved.
+static func _bill_words(m: GuestMood, base: int) -> String:
+	var text := "Paying $%d" % m.pay_for(base)
+	var scaled := m.scaled_price(base)
+	if m.comped:
+		text += "  ·  on the house"
+	elif m.discounted:
+		text += "  ·  half price"
+	if scaled > base:
+		text += "  ·  ordered extras"
+	elif scaled < base:
+		text += "  ·  in a hurry"
+	return text
 
 
 func update_status() -> void:
