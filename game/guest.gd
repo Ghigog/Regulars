@@ -7,6 +7,8 @@ const QUEUE_PATIENCE := 40.0
 const EAT_TIME := 5.0
 const BAR_WIDTH := 0.6
 const SEAT_HEIGHT := 0.33
+const PERSONAL := 0.6     # another guest closer than this, straight ahead, is in the way
+const GIVE_WAY := 1.0     # the longest a walker waits behind someone before carrying on
 
 var game
 var idx := 0
@@ -14,6 +16,11 @@ var info: Dictionary
 var mood := GuestMood.new()
 var state := "queue"  # queue, to_seat, waiting, eating, leaving
 var path: Array[Vector2i] = []
+var goal := Vector3.ZERO  # the exact spot to stop on once the path is walked
+var heading := Vector3.ZERO   # which way they stepped last frame; zero when standing
+var line_place := -1      # place in the queue at the door, 0 at the front
+var _waited := 0.0
+var hold := 0.0           # seconds to stand still before setting off
 var cell := Vector2i.ZERO
 var seat := Vector2i(-1, -1)
 var seen := {}          # nasty thing -> seconds this guest has had it in view
@@ -44,6 +51,7 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	mood.delight(hello.joy, hello.thought)
 	cell = start
 	position = Grid.center(start)
+	goal = position
 	_body = Peg.guest(info.name)
 	_body.rotation.y = -PI / 2
 	add_child(Peg.rigged(_body))
@@ -74,8 +82,11 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	add_child(_label)
 
 
-func walk_to(target: Vector2i) -> void:
+## Walks the grid to `target`, then on to `at` (somewhere in or near that cell;
+## its middle if not given).
+func walk_to(target: Vector2i, at: Variant = null) -> void:
 	path = game.grid.find_path(cell, target)
+	goal = at if at != null else Grid.center(target)
 
 
 func _face(dir: Vector3, delta: float) -> void:
@@ -83,18 +94,58 @@ func _face(dir: Vector3, delta: float) -> void:
 		_body.rotation.y = lerp_angle(_body.rotation.y, atan2(dir.x, dir.z), 1.0 - exp(-12.0 * delta))
 
 
-## Moves along the path. Returns true once there is nowhere left to go.
+## Moves along the path, then onto the goal. Returns true once there is nowhere
+## left to go. Someone just ahead going the same way is followed, not walked
+## through; anyone else in the way is stepped round.
 func _advance(delta: float) -> bool:
-	if path.is_empty():
-		_body.position.y = 0.0
+	if hold > 0.0:
+		hold -= delta
+		return false
+	var target := goal if path.is_empty() else Grid.center(path[0])
+	if path.is_empty() and position.distance_to(target) < 0.01:
+		_stand()
 		return true
-	var target := Grid.center(path[0])
-	_face(target - position, delta)
-	position = position.move_toward(target, SPEED * delta)
+	var dir := (target - position).normalized()
+	var other: Guest = game.guest_in_way(self, dir)
+	var move := dir
+	if other != null:
+		_waited += delta
+		if other.heading.normalized().dot(dir) > 0.3 and _waited < GIVE_WAY:
+			heading = dir * 0.001   # still "going that way", so whoever is behind waits too
+			_body.position.y = 0.0
+			_face(dir, delta)
+			return false
+		var side := Vector3(dir.z, 0, -dir.x)
+		if (other.position - position).dot(side) > 0.0:
+			side = -side
+		move = (dir * 0.6 + side * 0.8).normalized()
+	else:
+		_waited = 0.0
+	_face(dir, delta)
+	var was := position
+	if other != null:
+		position += move * SPEED * delta
+	else:
+		position = position.move_toward(target, SPEED * delta)
+	heading = (position - was).normalized()
 	_body.position.y = absf(sin(_age * 11.0)) * 0.06
-	if position.distance_to(target) < 0.01:
+	# Stepping round someone counts as passing the cell they were heading for.
+	if position.distance_to(target) < (0.35 if other != null and path.size() > 1 else 0.01):
+		if path.is_empty():
+			_stand()
+			return true
 		cell = path.pop_front()
-	return path.is_empty()
+	return false
+
+
+func _stand() -> void:
+	position = goal
+	heading = Vector3.ZERO
+	_waited = 0.0
+	_body.position.y = 0.0
+	var c := Grid.to_cell(goal)
+	if game.grid.in_bounds(c):
+		cell = c
 
 
 func _sit() -> void:

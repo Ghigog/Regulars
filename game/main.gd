@@ -6,7 +6,8 @@ enum Phase { SERVICE, SUMMARY, CLOSED, BUILD, TITLE }
 const W := 10            # restaurant interior is 10 x 7 cells
 const H := 7             # columns 10 and 11 are the pavement outside, to the right
 const DOOR := Vector2i(W, 4)         # the pavement cell just outside the doorway, on the right-hand wall
-const SPAWN := Vector2i(W + 1, 0)
+const SPAWN := Vector2i(W + 1, LOT.position.y)   # the far end of the pavement; guests walk down from beyond it
+const QUEUE_GAP := 0.8   # metres between guests standing in line on the pavement
 const EXIT := Vector2i(W + 1, H - 1)
 const BILL := 12
 const SIGHT_RANGE := 7
@@ -305,6 +306,16 @@ func _apply_demo(demo: String) -> void:
 		player.position = Grid.center(Vector2i(W - 1, DOOR.y))
 		player.look(Vector2i(1, 0))
 		get_tree().create_timer(2.0).timeout.connect(use_door)
+	elif demo == "crowd":  # a rush: every table taken and a dozen in line at the door; shoot at about 12
+		arrivals.clear()
+		var n := mini(town.people.size(), 20)
+		var at := 0.3
+		var i := 0
+		while i < n:
+			var size: int = [2, 1, 3, 1, 2, 4][arrivals.size() % 6]
+			arrivals.append({"time": at, "group": range(i, mini(i + size, n))})
+			i += size
+			at += 0.9
 	elif demo == "walkout":  # one walkout stamped on the card
 		for a in arrivals:
 			a.time = 30.0
@@ -1704,6 +1715,13 @@ func spawn_group(ids: Array) -> Array[Guest]:
 		var g := Guest.new()
 		add_child(g)
 		g.setup(self, idx, SPAWN)
+		# Up the street past the end of the line, so newcomers walk towards the door
+		# like everyone else; friends come in single file, not stacked on one spot.
+		var back := minf(Grid.center(SPAWN).z, queue_spot(queue.size()).z) - 1.5
+		for o: Guest in guests:
+			if o.position.x > W and o.state != "leaving":   # out on the pavement, coming in
+				back = minf(back, o.position.z - QUEUE_GAP)
+		g.position.z = back
 		g.party = party
 		party.append(g)
 		guests.append(g)
@@ -1712,9 +1730,40 @@ func spawn_group(ids: Array) -> Array[Guest]:
 	return party
 
 
+## Where the guest `i`th in line stands: a single file up the pavement along the
+## wall, one QUEUE_GAP apart, starting a step up from the doorway so guests on
+## their way out pass the head of the line. A long line runs on up the street,
+## past the edge of the lot.
+func queue_spot(i: int) -> Vector3:
+	return Grid.center(DOOR) - Vector3(0, 0, QUEUE_GAP * (i + 1))
+
+
+## Everyone in line steps up to their own place. Newcomers walk down the outer
+## half of the pavement and step in beside their place, so they never walk
+## through the people already waiting.
 func _reflow_queue() -> void:
 	for i in queue.size():
-		queue[i].walk_to(Vector2i(W, maxi(DOOR.y - i, 0)))
+		var g := queue[i]
+		var at := queue_spot(i)
+		var row := clampi(Grid.to_cell(at).y, LOT.position.y, LOT.end.y - 1)
+		g.walk_to(Vector2i(W if g.cell.x == W else W + 1, row), at)
+		g.line_place = i
+
+
+## The nearest other guest standing close, straight ahead of `g` going `dir`.
+func guest_in_way(g: Guest, dir: Vector3) -> Guest:
+	var best: Guest = null
+	var near := Guest.PERSONAL
+	for o: Guest in guests:
+		if o == g:
+			continue
+		var d := o.position - g.position
+		d.y = 0.0
+		var dist := d.length()
+		if dist < near and dist > 0.001 and d.dot(dir) > dist * 0.5:
+			best = o
+			near = dist
+	return best
 
 
 ## A table nobody is sitting at with room for `count`; the smallest that fits.
@@ -1745,6 +1794,7 @@ func _seat_waiting_guests() -> void:
 		for i in party.size():
 			var g := party[i]
 			queue.erase(g)
+			g.line_place = -1
 			g.table = table
 			g.seat = table.seats[i]
 			seat_taken[g.seat] = g
@@ -2021,6 +2071,11 @@ func walk_out(g: Guest) -> void:
 	for m: Guest in (g.party if not g.party.is_empty() else [g]):
 		if is_instance_valid(m) and (m == g or m.state == "queue" or m.state == "to_seat" or m.state == "waiting"):
 			going.append(m)
+	# Out of the line one after another, the one nearest the door first.
+	var in_line := going.filter(func(m: Guest) -> bool: return m.line_place >= 0)
+	in_line.sort_custom(func(a: Guest, b: Guest) -> bool: return a.line_place < b.line_place)
+	for k in in_line.size():
+		in_line[k].hold = 0.5 * k
 	ledger.record_walkout()
 	var names: Array[String] = []
 	var talk := ""
@@ -2039,11 +2094,16 @@ func walk_out(g: Guest) -> void:
 
 func _leave(g: Guest) -> void:
 	seat_taken.erase(g.seat)
+	g.stand_up()
+	g.walk_to(EXIT)
 	if queue.has(g):
 		queue.erase(g)
 		_reflow_queue()
-	g.stand_up()
-	g.walk_to(EXIT)
+		g.line_place = -1
+		# Out of the line onto the outer half of the pavement first, not down
+		# through the people still waiting.
+		var out := Vector2i(W + 1, g.cell.y)
+		g.path.assign(grid.find_path(g.cell, out) + grid.find_path(out, EXIT))
 
 
 func remove_guest(g: Guest) -> void:

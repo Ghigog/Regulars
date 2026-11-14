@@ -175,6 +175,13 @@ many days as you can; three walkouts in one day ends the run.
   a whole empty table (the smallest that fits) and shares it with nobody, so a lone
   guest has a table to themselves. If one of a group runs out of patience, those still
   waiting leave with them and it counts as one walkout; each of them holds a grudge.
+- **The line at the door.** Guests walk down the street from beyond the end of the
+  line and wait in single file along the wall, 0.8 m apart, starting a step up from
+  the doorway so people leaving can pass; a long line runs on up the street. Each has
+  their own place and the line steps up as the front goes in. Friends arrive in single
+  file. Walkers stay on the grid but stop for someone just ahead going their way (for a
+  second at most) and step round anyone else, so nobody walks through anybody. Guests
+  walking out of the line go one after another, onto the outer half of the pavement.
 - **Reaching stations.** E uses the nearest station within 1.3 m that has something to
   do, with a small preference for the one the chef faces and for serving over putting
   down. A table also counts as near when one of its seated guests is.
@@ -380,8 +387,6 @@ Not built yet; this is the agreed direction for future sessions.
 - **Free meals** (built): the proposed numbers are accepted.
 - **Selling the last table for two** stays refused even when the room has a booth or
   a table for four, for now.
-- **To fix:** names drawn over each other in the queue at the door, and members of a
-  group walking through one another.
 - **No language model for townspeople** (dropped): a small local model is too heavy for
   phones. Thoughts, gossip and reviews stay written lines chosen by the simulation.
 - **Banked:** the size of the lot is for the metagame (between runs); staff waits
