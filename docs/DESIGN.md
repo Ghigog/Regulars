@@ -332,6 +332,35 @@ Survive as many days as you can; three walkouts in one day ends the run.
   "Paying $N" once served, with "ordered extras" or "in a hurry". All in `GuestMood`
   (`comfort`, `bill_scale`, `stay_scale`, `pay_for`). `REGULARS_DEMO=mood`. Comfort does
   not change how much mess a guest leaves.
+- **The critic** (PRD 2, `sim/critic.gd`). One townsperson, picked with the run's seed
+  (`critic_idx`), eats as a critic every fifth day (5, 10, 15 ...). They always come,
+  alone, at a time in the middle half of the day: no visit roll, no grudge, and the menu
+  never turns them away (they order the best match). Closing the door before they arrive
+  puts them off to the next day. They are served like anyone. Ratings, 1 to 5: speed
+  from their patience as the tray lands (5 at 0.85 and up, then 0.7, 0.5, 0.3), cleanliness
+  from their disgust as they leave (5 if they noticed nothing, 4 below Ick, then 3, 2, 1
+  at Ick, Disgusted, Revolted), food from the tray's average quality mapped evenly onto
+  1 to 5, variety from tonight's menu (a point per course with an item, one for a course
+  of three or more, one for eight or more ingredients). Stars are the rounded mean; a
+  walkout (out of patience or revolted) rates speed 1 and caps stars at 2 (food 1 if they
+  never ate). Opinions by topic (`Town`): each person's affinity is the sum of five parts,
+  `speed`, `clean`, `quality`, `variety` (each -0.25 to 0.25, the rest spilling into
+  `other`) and `other`. Every change is filed after the usual clamp, so nothing moves
+  until a review: disgust is `clean`, a visit is split by the satisfaction terms
+  (patience `speed`, savour up to the tray's quality `quality`, savour from liked
+  ingredients `variety`, joy and the baseline `other`), finding nothing on the menu is
+  `variety`, kindness, walkouts and forgiving are `other`; friends hear it under the
+  same topic. The review, printed at the end of the day, replaces everyone's four topics
+  with (rating - 3) x 0.1, leaves `other`, grudges and "never coming back" alone, and
+  gives `roll_guests` an extra -0.25 to +0.25 for the next four days (stacks with flyers,
+  replaced by the next review). The clipping (headline by stars, the four ratings with
+  icons and pips, stars, a line confirming or contradicting the town's average on the
+  topic with the biggest gap, the critic's name and peg) comes with the receipt. The
+  first review names them; after that a quill marks them in the town book and on their
+  guest card, and the town book can show the last clipping again. Before the reveal
+  nothing marks them, but their own thoughts ("Making a note of that sink") are on the
+  guest card. Written lines, picked by the simulation. `REGULARS_DEMO=critic`,
+  `critic_bad`, `critic_known`, `critic_town`.
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
 
 Code map: `sim/` is pure logic with no scene dependencies (unit-tested with GUT).
@@ -376,7 +405,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   (dessert, second drink). **Built** (PRD 1, section 1): tastes (liked and disliked
   ingredients, never shown), ordering from the player's menu, walking on when nothing
   suits, order counts on the guest card and taste hints in thoughts and gossip.
-  **To add**: reviews (PRD 2, the critic).
+  **Built** (PRD 2, section 1): reviews from the critic.
 - **Discounts and comps** (built, section 1): half price, a free meal, and guests who
   come to expect a deal.
 
@@ -511,15 +540,7 @@ Not built yet, except where marked; this is the agreed direction for future sess
     ready-made ingredients are the chopped ones plus cheese; an empty tray put down
     takes the oldest ticket without one; boiling never gives the burst; a group walks
     on only if nobody has a main; every station can be sold, the last stove included.
-- **The critic.** One critic per run, always the same townsperson in that run and
-  unknown to the player unless they work it out. They come every fifth day (each day
-  is a working day, so day 5 is Friday; there are no weekends), are served like anyone, and rate service time,
-  cleanliness, food quality and variety, then give stars out of 5. The review confirms
-  or contradicts the rumours going round, and resets townspeople's opinions on what it
-  rated (cleanliness, speed, quality, variety), and only that: someone put off by dirt
-  forgets it if the critic found the place clean. A good
-  review brings more guests (which can backfire on a kitchen that is not ready); a bad
-  one keeps them away.
+- **The critic**: built (PRD 2), see section 1.
 - **Co-op: local, same screen first;** online later. Input is now per player (done
   13 November 2026): `Controls` seats each device to a player index, keeps a
   `PlayerInput` per player (device in use, stick, held actions, touch erase) and calls

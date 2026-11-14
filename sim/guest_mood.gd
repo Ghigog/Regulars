@@ -208,5 +208,15 @@ func satisfaction() -> float:
 	return clampf(0.35 * savour + 0.3 * joy + 0.2 * patience - 0.5 * felt_disgust(), -1.0, 1.0)
 
 
+## The parts of satisfaction() that belong to a topic (Town.TOPICS), for filing the
+## visit's change in opinion. `tray_quality` is the tray's own quality: savour above
+## it came from liked things on the menu, so it counts as variety. Joy is left out
+## (it is `other`).
+func satisfaction_terms(tray_quality := -1.0) -> Dictionary:
+	var food := savour if tray_quality < 0.0 else minf(savour, tray_quality)
+	return {"speed": 0.2 * patience, "clean": -0.5 * felt_disgust(),
+		"quality": 0.35 * food, "variety": 0.35 * (savour - food)}
+
+
 func tip_for(bill: int, bonus := 1.0) -> int:
 	return roundi(bill * clampf(satisfaction(), 0.0, 1.0) * 0.6 * bonus)

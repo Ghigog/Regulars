@@ -36,6 +36,11 @@ const TASTE_HATE_TAG := 0.4      # tunable: chance someone dislikes a whole tag
 const MAX_DISLIKED_SHARE := 1.0 / 3.0   # nobody dislikes more than this share of the theme
 const MAX_DISLIKERS_SHARE := 0.2        # no ingredient is disliked by more than this share of the town
 const NOTHING_LIKED_DROP := 0.05        # tunable: opinion lost finding nothing on the menu
+## Opinions by topic (PRD 2). Affinity is the sum of these five parts; the four the
+## critic rates are kept apart so a review can replace them. Bookkeeping only until
+## a review lands: every change is filed under one, after the usual clamp.
+const TOPICS: Array[String] = ["speed", "clean", "quality", "variety"]
+const TOPIC_MAX := 0.25   # tunable: the most one topic can hold either way; the rest goes to `other`
 
 var people: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
@@ -52,6 +57,7 @@ func _init(seed_value := 1) -> void:
 			"streak": 0, "away_until": 0, "sore": false, "grudges": 0, "gone": false, "deals": 0,
 			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
 			"likes": [], "dislikes": [], "liked_tags": [], "orders": {},
+			"opinion": {"speed": 0.0, "clean": 0.0, "quality": 0.0, "variety": 0.0, "other": 0.0},
 		})
 	# A ring of friendships plus a few long-distance ones, so gossip travels.
 	for i in NAMES.size():
@@ -164,9 +170,9 @@ func order_summary(i: int, menu: Menu) -> String:
 ## Guest `i` read the menu and found no main they would eat. Not a walkout and no
 ## strike, but they think a little less of the place and their friends hear it.
 func record_found_nothing(i: int) -> float:
-	_nudge(i, -NOTHING_LIKED_DROP)
+	_nudge(i, -NOTHING_LIKED_DROP, {"variety": 1.0})
 	for f: int in people[i].friends:
-		_nudge(f, -NOTHING_LIKED_DROP * FRIEND_SHARE)
+		_nudge(f, -NOTHING_LIKED_DROP * FRIEND_SHARE, {"variety": 1.0})
 	return -NOTHING_LIKED_DROP
 
 
@@ -230,10 +236,67 @@ func make_groups(coming: Array[int], max_size: int) -> Array[Array]:
 	return groups
 
 
-func _nudge(i: int, amount: float) -> void:
+## Moves someone's affinity by `amount`, clamped as always, and files the change that
+## landed under the topics in `split` (topic -> share of the change, summing to 1).
+func _nudge(i: int, amount: float, split := {"other": 1.0}) -> void:
 	var affinity: float = people[i].affinity
 	people[i].affinity = clampf(affinity + amount, -1.0, 1.0)
-	people[i].today += people[i].affinity - affinity
+	var moved: float = people[i].affinity - affinity
+	people[i].today += moved
+	var op: Dictionary = people[i].opinion
+	for t: String in split:
+		op[t] = float(op[t]) + moved * float(split[t])
+		if t != "other" and absf(op[t]) > TOPIC_MAX:   # a topic holds so much; the rest is just liking the place
+			op.other = float(op.other) + op[t] - signf(op[t]) * TOPIC_MAX
+			op[t] = signf(op[t]) * TOPIC_MAX
+
+
+## Someone's opinion on one topic ("speed", "clean", "quality", "variety" or "other").
+func opinion(i: int, topic: String) -> float:
+	return float(people[i].opinion[topic])
+
+
+## What the town thinks of a topic, on average.
+func topic_average(topic: String) -> float:
+	var sum := 0.0
+	for i in people.size():
+		sum += opinion(i, topic)
+	return sum / people.size()
+
+
+## A review replaces everyone's opinion on the topics it rated (topic -> value) and
+## leaves the rest alone. Affinity is the clamped sum again; anything past the clamp
+## comes out of `other`, so the parts always add up. Grudges and "never coming back"
+## stay as they are.
+func reset_topics(values: Dictionary) -> void:
+	for p in people:
+		var op: Dictionary = p.opinion
+		for t: String in values:
+			op[t] = float(values[t])
+		var sum := 0.0
+		for t: String in op:
+			sum += float(op[t])
+		var a := clampf(sum, -1.0, 1.0)
+		op.other = float(op.other) + a - sum
+		p.today += a - float(p.affinity)
+		p.affinity = a
+
+
+## The topic split of a visit's change in affinity, from the satisfaction terms
+## (GuestMood.satisfaction_terms): each topic takes its share of the change, and the
+## rest (joy, the baseline) is `other`. Shares sum to 1.
+static func visit_split(terms: Dictionary, satisfaction: float) -> Dictionary:
+	var delta := (satisfaction - 0.3) * 0.5
+	if terms.is_empty() or absf(delta) < 0.000001:
+		return {"other": 1.0}
+	var split := {}
+	var rest := 1.0
+	for t in TOPICS:
+		if terms.has(t):
+			split[t] = 0.5 * float(terms[t]) / delta
+			rest -= split[t]
+	split.other = rest
+	return split
 
 
 ## Forgets yesterday's changes. Call when a new day opens.
@@ -339,19 +402,29 @@ func record_walkout(i: int, day: int) -> float:
 
 ## Records how a visit went. The guest's friends hear about it too. A good visit
 ## builds their streak and forgives a grudge; a poor one breaks the streak.
-func record_visit(i: int, satisfaction: float) -> float:
+## `terms` (GuestMood.satisfaction_terms) say which topics the change is filed under;
+## without them it all goes to `other`.
+func record_visit(i: int, satisfaction: float, terms := {}) -> float:
 	var delta := (satisfaction - 0.3) * 0.5
+	var split := visit_split(terms, satisfaction)
+	var sore_bonus := 0.0
 	if satisfaction > GOOD_VISIT:
 		people[i].streak += 1
 		if people[i].sore:
 			people[i].sore = false
-			delta += 0.1
+			sore_bonus = 0.1
 	else:
 		people[i].streak = 0
-	_nudge(i, delta)
+	if sore_bonus > 0.0:   # forgiving is `other`: re-weigh the split for the whole change
+		var whole := delta + sore_bonus
+		for t: String in split:
+			split[t] = float(split[t]) * delta / whole
+		split.other = float(split.other) + sore_bonus / whole
+		delta = whole
+	_nudge(i, delta, split)
 	people[i].visits += 1
 	for f: int in people[i].friends:
-		_nudge(f, delta * FRIEND_SHARE)
+		_nudge(f, delta * FRIEND_SHARE, split)
 	return delta
 
 
@@ -362,9 +435,9 @@ func record_disgust(i: int, level: int) -> String:
 	if level < 2:
 		return ""
 	var revolted := level >= 3
-	_nudge(i, -0.3 if revolted else -0.1)
+	_nudge(i, -0.3 if revolted else -0.1, {"clean": 1.0})
 	for f: int in people[i].friends:
-		_nudge(f, -0.15 if revolted else -0.08)
+		_nudge(f, -0.15 if revolted else -0.08, {"clean": 1.0})
 	if revolted:
 		people[i].gone = true
 		people[i].streak = 0

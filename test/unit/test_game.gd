@@ -2579,3 +2579,83 @@ func test_a_second_sink_and_bin_each_have_their_own_mess():
 	assert_true(game.pick_up(Grid.center(game.find_station("sink").cell)))
 	assert_eq(game.sell_block(), "Your last sink")
 	game.cancel_hand()
+
+
+# ---------- The critic (PRD 2) ----------
+
+func _card_says(text: String) -> bool:
+	if game.hud.guest_card == null:
+		return false
+	for n in game.hud.guest_card.find_children("*", "Label", true, false):
+		if (n as Label).text == text:
+			return true
+	return false
+
+
+## Starts `day` and leaves only the critic's arrival (if any), due at once.
+func _start_day_with_only_the_critic(day: int) -> bool:
+	game.ledger.day = day
+	game.start_day()
+	var booked: Array = game.arrivals.filter(func(a: Dictionary) -> bool: return a.get("critic", false))
+	for a in booked:
+		a.time = 0.2
+	game.arrivals.assign(booked)
+	return not booked.is_empty()
+
+
+func _run_to_summary() -> void:
+	for i in 600:
+		if game.phase == game.Phase.SUMMARY:
+			return
+		game.step(0.1)
+
+
+func test_the_receipt_on_day_5_carries_a_clipping_and_day_4_does_not():
+	assert_false(_start_day_with_only_the_critic(4), "no critic on day 4")
+	_run_to_summary()
+	assert_false(game.last_day.has("review"))
+	assert_true(_start_day_with_only_the_critic(5), "the critic comes on day 5")
+	_run(1.0)
+	var c: Guest = game.critic_guest
+	assert_not_null(c)
+	assert_eq(c.idx, game.critic.critic_idx)
+	assert_eq(c.party.size(), 1, "they come alone")
+	game.walk_out(c)
+	_run_to_summary()
+	assert_true(game.last_day.has("review"), "the review comes with the receipt")
+	assert_lte(int(game.last_day.review.stars), Critic.WALKOUT_CAP, "a walkout caps the stars")
+	assert_eq(int(game.last_day.review.ratings.speed), 1)
+	assert_true(game.critic.known)
+
+
+func test_the_critic_is_unmarked_until_the_first_review():
+	game.ledger.day = 4
+	var g: Guest = game.spawn_guest(game.critic.critic_idx)
+	game.inspect(g)
+	assert_false(_card_says("Critic"), "nothing marks them before the reveal")
+	game.inspect(null)
+	game.critic.publish({"speed": 4, "clean": 4, "quality": 4, "variety": 4}, false, game.town, 5)
+	game.ledger.day = 6
+	game.inspect(g)
+	assert_true(_card_says("Critic"), "marked after the reveal")
+	game.hud.show_town()
+	game.hud.show_review()   # the last clipping can be read again from the town book
+
+
+func test_closing_early_before_the_critic_comes_puts_them_off_a_day():
+	game.ledger.day = 5
+	game.start_day()
+	game.close_early()   # before any step: the critic is still in the arrivals
+	assert_false(game.critic.visits_on(5))
+	assert_true(game.critic.visits_on(6), "they come tomorrow instead")
+
+
+func test_the_critic_orders_even_when_nothing_suits_them():
+	var p: Dictionary = game.town.people[game.critic.critic_idx]
+	p.dislikes = ["patty"]
+	_start_day_with_only_the_critic(5)
+	_run(1.0)
+	var c: Guest = game.critic_guest
+	assert_not_null(c)
+	assert_false(c.planned.main.is_empty(), "never turned away by the menu")
+	assert_ne(c.state, "browse")
