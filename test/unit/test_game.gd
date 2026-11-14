@@ -1400,3 +1400,59 @@ func test_a_tool_in_hand_draws_its_ghost_every_frame_without_errors():
 		game._update_ghost()   # mid-drag: every spot along it
 		game._drag = {}
 		game.cancel_hand()
+
+
+func _closest_pair(list: Array) -> float:
+	var worst := 99.0
+	for i in list.size():
+		for j in range(i + 1, list.size()):
+			var d: Vector3 = list[i].position - list[j].position
+			worst = minf(worst, Vector2(d.x, d.z).length())
+	return worst
+
+
+func test_everyone_in_line_has_their_own_place_and_the_line_moves_up():
+	for i in 14:
+		game.spawn_guest(i)
+	_run(15.0)
+	assert_gt(game.queue.size(), 6, "more guests than tables, so a long line")
+	var spots := {}
+	for i in game.queue.size():
+		var g: Guest = game.queue[i]
+		assert_almost_eq(g.position.distance_to(game.queue_spot(i)), 0.0, 0.01, "%s stands in their place" % g.info.name)
+		spots[g.goal] = true
+	assert_eq(spots.size(), game.queue.size(), "no two share a place")
+	assert_gt(_closest_pair(game.queue), game.QUEUE_GAP - 0.01)
+	var second: Guest = game.queue[1]
+	game.walk_out(game.queue[0])
+	_run(3.0)
+	assert_eq(game.queue[0], second)
+	assert_almost_eq(second.position.distance_to(game.queue_spot(0)), 0.0, 0.01, "the line steps up")
+
+
+func test_a_group_comes_in_single_file_not_stacked():
+	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
+	for i in 6:
+		game.spawn_guest(i)    # the tables fill, so the four have to queue too
+	var four: Array[Guest] = game.spawn_group([6, 7, 8, 9])
+	var worst := 99.0
+	for i in 120:
+		game.step(0.1)
+		worst = minf(worst, _closest_pair(four))
+	assert_gt(worst, 0.5, "friends keep a little apart all the way to the line")
+
+
+func test_a_rush_never_walks_guests_through_one_another():
+	game.arrivals.assign([{"time": 0.3, "group": [0, 1]}, {"time": 0.6, "idx": 2},
+		{"time": 0.9, "group": [3, 4, 5]}, {"time": 1.2, "idx": 6}, {"time": 1.5, "group": [7, 8]},
+		{"time": 1.8, "group": [9, 10, 11, 12]}, {"time": 2.1, "idx": 13}])
+	var worst := 99.0
+	for i in 900:
+		game.step(0.1)
+		if i % 50 == 0:
+			for g: Guest in game.guests.duplicate():
+				if g.state == "waiting":
+					game.serve(g, 1.0)
+		worst = minf(worst, _closest_pair(game.guests))
+	assert_gt(worst, 0.3, "people step round or wait, never pass through")
+	assert_eq(game.guests.size(), 0, "nobody is left stuck on the pavement")
