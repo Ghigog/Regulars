@@ -300,6 +300,27 @@ func _apply_demo(demo: String) -> void:
 		ledger.xp = 250
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_build.bind(demo))
+	elif demo == "night_clean":  # a messy day carried into the night, the chef with a plate; shoot at 4 and 6
+		ledger.record_sale(BILL, 5)
+		arrivals.clear()
+		for c: Vector2i in [Vector2i(6, 5), Vector2i(8, 3)]:
+			stations[c].dirty = 2
+			stations[c].refresh()
+		var sink := find_station("sink")
+		sink.dirty = Station.SINK_PILED
+		sink.refresh()
+		var bin := find_station("bin")
+		bin.count = Station.BIN_HOLDS
+		bin.refresh()
+		get_tree().create_timer(1.0).timeout.connect(func() -> void:
+			open_build()
+			player.position = Grid.center(Vector2i(6, 4))
+			player.look(Vector2i(0, 1))   # at the table by the door: "Clear table"
+			hud.show_build())
+		get_tree().create_timer(5.0).timeout.connect(func() -> void:
+			build_interact()              # a plate in hand, carried to the sink
+			player.position = Grid.center(Vector2i(3, 3))
+			player.look(Vector2i(0, -1)))
 	elif demo == "newday":  # the receipt, then building, then the next day turning over
 		ledger.record_sale(BILL, 5)
 		arrivals.clear()
@@ -959,6 +980,10 @@ static func shop_items(query := "", category := "") -> Array[Dictionary]:
 func open_shop() -> void:
 	if phase != Phase.BUILD or shopping:
 		return
+	if Cleaning.carrying_mess(player.held):
+		sfx("fail")
+		hud.say(Cleaning.HANDS_FULL)
+		return
 	shopping = true
 	sfx("slide")
 	hud.show_shop()
@@ -988,7 +1013,7 @@ func buy(bp: Dictionary) -> bool:
 
 ## Picks a piece from the catalog to place. Nothing is paid until it is placed.
 func pick_catalog(id: String, tier := 1) -> bool:
-	if phase != Phase.BUILD or not catalog.can_buy(id, ledger.money, ledger.level(), tier):
+	if phase != Phase.BUILD or Cleaning.carrying_mess(player.held) or not catalog.can_buy(id, ledger.money, ledger.level(), tier):
 		return false
 	if hand.get("moving", false):
 		cancel_hand()
@@ -1013,10 +1038,14 @@ static func piece_name(bp: Dictionary) -> String:
 
 ## Picks up the piece standing at a point on the floor, to move, turn or sell it.
 func pick_up(p: Vector3) -> bool:
-	if phase != Phase.BUILD or not hand.is_empty():
+	if phase != Phase.BUILD or not hand.is_empty() or Cleaning.carrying_mess(player.held):
 		return false
 	var c := Grid.to_cell(p)
 	var edge := snap_edge(p)
+	if stations.has(c) and needs_cleaning(stations[c]):
+		sfx("fail")   # a messy piece is not moved or sold until it is clean
+		hud.say(Cleaning.CLEAN_FIRST)
+		return false
 	if stations.has(c):
 		var st: Station = stations[c]
 		_unregister(st)
@@ -1468,15 +1497,47 @@ func build_action() -> String:
 			"arch":
 				return "Add archway"
 		return "Put down"
-	if _piece_in_front() != Vector3.INF:
+	var clean := night_clean_action(stations.get(player.target_cell()))
+	if clean != "":
+		return clean
+	if not Cleaning.carrying_mess(player.held) and _piece_in_front() != Vector3.INF:
 		return "Pick up"
 	return door_action()
+
+
+## The cleaning Use would do on this station at night, by its night name
+## ("Clear table", "Wash up", "Take the bag out"); "" when there is none.
+func night_clean_action(st: Station) -> String:
+	if st == null or phase != Phase.BUILD or shopping or not hand.is_empty():
+		return ""
+	return Cleaning.night_action(use_station(st, true))
+
+
+func needs_cleaning(st: Station) -> bool:
+	return Cleaning.needs_cleaning("table" if Station.is_table(st.type) else st.type, st.dirty, st.count)
+
+
+## The build-phase note on what is still dirty; "" when everything is clean.
+func dirty_note() -> String:
+	var tables := 0
+	var sink := false
+	var bin := false
+	for st: Station in stations.values():
+		if needs_cleaning(st):
+			tables += 1 if Station.is_table(st.type) else 0
+			sink = sink or st.type == "sink"
+			bin = bin or st.type == "bin"
+	return Cleaning.dirty_note(tables, sink, bin)
 
 
 func build_interact() -> void:
 	var action := build_action()
 	if not hand.is_empty():
 		action = "Put down"
+	if action in Cleaning.NIGHT_ACTIONS.values():
+		use_station(stations[player.target_cell()])
+		hud.show_build()   # the dirty note counts down
+		return
 	match action:
 		"Put down":
 			_last_paint = snap(_hover_point())
@@ -1486,6 +1547,7 @@ func build_interact() -> void:
 			pick_up(_piece_in_front())
 		"Open up", "Take out rubbish":
 			use_door()
+			hud.show_build()
 
 
 ## The piece in hand is held over the spot in front of the chef; a cross marks
@@ -2325,6 +2387,8 @@ func _tick_stoves(delta: float) -> void:
 
 
 func step(delta: float) -> void:
+	for st: Station in stations.values():
+		st.dirty_age = Cleaning.aged(st.dirty_age, delta, st.messy(), phase == Phase.SERVICE)
 	if phase != Phase.SERVICE:
 		return
 	clock += delta
@@ -2332,8 +2396,6 @@ func step(delta: float) -> void:
 		var a: Dictionary = arrivals.pop_front()
 		spawn_group(a.get("group", [a.get("idx", 0)]))
 	_tick_stoves(delta)
-	for st: Station in stations.values():
-		st.dirty_age = st.dirty_age + delta if st.messy() else 0.0
 	_collect_gross()
 	_seat_waiting_guests()
 	for g in guests.duplicate():
@@ -2384,7 +2446,14 @@ func _update_camera(delta: float) -> void:
 
 func _update_cursor() -> void:
 	var st: Station = stations.get(player.target_cell())
-	var action := prompt_for(st) if st != null and phase == Phase.SERVICE else ""
+	var action := ""
+	if st != null:
+		action = prompt_for(st) if phase == Phase.SERVICE else night_clean_action(st)
+	var messy := _messy_at_mouse()
+	if messy != null and messy != st:   # the mouse cannot clean: that is the chef's job
+		_cursor.visible = false
+		hud.show_prompt(cam.unproject_position(messy.position + Vector3(0, 1.6, 0)), Cleaning.WALK_OVER)
+		return
 	_cursor.visible = action != ""
 	var at := Vector2.ZERO
 	if st != null:
@@ -2400,6 +2469,14 @@ func _update_cursor() -> void:
 			p = _piece_in_front() + Vector3(0, 2.0, 0)
 		at = cam.unproject_position(p)
 	hud.show_prompt(at, action)
+
+
+## The messy piece under the mouse at night, when the mouse is aiming with empty hands.
+func _messy_at_mouse() -> Station:
+	if phase != Phase.BUILD or shopping or not _aim_mouse or not hand.is_empty() or _mouse_point == Vector3.INF:
+		return null
+	var st: Station = stations.get(Grid.to_cell(_mouse_point))
+	return st if st != null and needs_cleaning(st) else null
 
 
 ## One action while the shop is open. Returns whether it was used.
