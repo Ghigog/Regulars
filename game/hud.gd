@@ -11,6 +11,8 @@ const CORAL := Color("#ee7560")
 const WOOD := Color("#b9824e")
 const SHADOW := Color("#5a423a", 0.38)   # plum-brown, never black
 const KRAFT := Color("#e6cfa6")
+const NEWSPRINT := Color("#ede5d0")   # the critic's clipping
+const RATING_ICONS := {"speed": "hourglass", "clean": "sparkle", "quality": "cloche", "variety": "menu_card"}
 
 
 ## The hand-lettered face of the interface sheets (Patrick Hand, open licence).
@@ -241,6 +243,44 @@ class Pips extends Control:
 			var d := -float(trend)   # up is negative y
 			draw_colored_polygon(PackedVector2Array([
 				Vector2(x, y + d * 7), Vector2(x - 6, y - d * 3), Vector2(x + 6, y - d * 3)]), Hud.INK)
+
+
+## A rating out of five read by shape: earned slots are solid ink-rimmed discs, the
+## rest thin open rings. Stars: solid gold stars, the rest hollow outlines.
+class Rating extends Control:
+	var value := 0
+	var stars := false
+
+	func _init(value_: int, stars_ := false) -> void:
+		value = value_
+		stars = stars_
+		custom_minimum_size = Vector2(5 * (34 if stars else 18), 34 if stars else 18)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var step := size.x / 5.0
+		var y := size.y / 2.0
+		for i in 5:
+			var c := Vector2(step * (i + 0.5), y)
+			var on := i < value
+			if stars:
+				var r := step * 0.46
+				var pts := Icons.star(0, 0, 1.0, 5, 0.5)
+				var shape := PackedVector2Array()
+				for p in pts:
+					shape.append(c + Vector2(p.x, -p.y) * r)
+				if on:
+					var shadow := PackedVector2Array()
+					for p in shape:
+						shadow.append(p + Vector2(0, 2))
+					draw_colored_polygon(shadow, Hud.INK)
+					draw_colored_polygon(shape, Color(Icons.GOLD))
+				draw_polyline(shape + PackedVector2Array([shape[0]]), Hud.INK, 2.5 if on else 1.6, true)
+			elif on:
+				draw_circle(c, 7.0, Hud.INK)
+				draw_circle(c, 4.6, Hud.CORAL)
+			else:
+				draw_arc(c, 4.5, 0, TAU, 16, Color(Hud.INK, 0.6), 1.5, true)
 
 
 ## A meter read by its length: an ink-rimmed trough with a filled bar.
@@ -564,6 +604,20 @@ class ModelView extends TextureRect:
 		if not live:
 			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
+	## A townsperson's peg, head and shoulders (the critic's byline). Call once in the tree.
+	func show_peg(person: String) -> void:
+		var peg := Peg.guest(person)
+		peg.set_face("content")
+		peg.rotation.y = PI / 4   # facing the camera
+		var rig := Peg.rigged(peg)
+		rig.position.y = -0.2
+		spin.add_child(rig)
+		tilt.basis = Basis(LEAN, -0.6)   # leaned back, so the face shows under a hat brim
+		for c in vp.get_children():
+			if c is Camera3D:
+				c.size = 1.5
+		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS   # the peg settles its hands first
+
 	## 0 is flat on the floor; 1 is lifted and tipped toward the camera, as on show.
 	func lift(t: float) -> void:
 		tilt.basis = Basis(LEAN, 0.2 * t) * Basis(Vector3(0.7071, 0, 0.7071), 0.1 * t)
@@ -709,6 +763,17 @@ class Sheet extends MarginContainer:
 					draw_set_transform(Vector2(x + 26, 4), -0.5 if x < 0 else 0.5)
 					draw_rect(Rect2(-26, -9, 52, 18), Color(1, 1, 1, 0.55))
 				draw_set_transform(Vector2.ZERO)
+			"news":  # a newspaper cutting: grey-cream newsprint, scissor-cut a little crooked
+				var w := size.x
+				var h := size.y
+				var shape := PackedVector2Array([Vector2(3, 0), Vector2(w * 0.55, 4), Vector2(w - 2, 1),
+					Vector2(w, h * 0.5), Vector2(w - 4, h), Vector2(w * 0.4, h - 3), Vector2(0, h - 1), Vector2(2, h * 0.45)])
+				var shadow := PackedVector2Array()
+				for p in shape:
+					shadow.append(p + Vector2(2, 6))
+				draw_colored_polygon(shadow, Hud.SHADOW)
+				draw_colored_polygon(shape, Hud.NEWSPRINT)
+				draw_polyline(shape + PackedVector2Array([shape[0]]), Color(Hud.INK, 0.35), 1.5, true)
 			"ribbon":
 				var n := 14.0
 				draw_colored_polygon(PackedVector2Array([Vector2(0, 0), Vector2(size.x, 0), Vector2(size.x - n, size.y / 2), Vector2(size.x, size.y), Vector2(0, size.y), Vector2(n, size.y / 2)]), tint)
@@ -929,7 +994,15 @@ func show_guest(g: Guest) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 5)
 	card.add_child(box)
-	_label(box, 24, g.info.name)
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 6)
+	box.add_child(name_row)
+	_label(name_row, 24, g.info.name)
+	if game.critic.known and game.is_critic(g):   # only once a review has named them
+		var mark := Icon.new("quill", 26, false)
+		mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		name_row.add_child(mark)
+		_label(name_row, 13, "Critic").modulate.a = 0.7
 	var town: Town = game.town
 	var who := "Back after a grudge" if g.info.sore else town.status_word(g.idx, game.ledger.day)
 	var standing := _label(box, 13, "%s  ·  visit %d" % [who, int(g.info.visits) + 1])
@@ -1688,7 +1761,16 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	clip.add_child(stack)
 	var receipt := Sheet.new("receipt").pad(30, 22, 30, 34)
 	receipt.custom_minimum_size = Vector2(430, 0)
-	stack.add_child(receipt)
+	if rec.has("review"):   # the critic's review, cut from tonight's paper, beside the receipt
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 22)
+		stack.add_child(row)
+		row.add_child(receipt)
+		var cutting := clipping(rec.review)
+		cutting.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		row.add_child(cutting)
+	else:
+		stack.add_child(receipt)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	receipt.add_child(box)
@@ -1720,6 +1802,77 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_button(stack, ("Set up for day %d" % game.ledger.day) + _key_note("confirm"), game.open_build)
 	if animate:
 		_pop_in(clip)
+
+
+## The critic's review as a newspaper cutting: masthead, a headline by stars, the
+## stars, the four ratings (each with its icon and a row of pips), the line that
+## confirms or contradicts the town, and the byline with the critic's peg.
+func clipping(review: Dictionary) -> Control:
+	var cut := Sheet.new("news").pad(24, 18, 24, 20)
+	cut.custom_minimum_size = Vector2(350, 0)
+	cut.rotation = 0.025
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	cut.add_child(box)
+	var mast := _centred(box, "THE TOWN CRIER  ·  DAY %d" % int(review.day), 14)
+	mast.modulate.a = 0.65
+	for k in 2:   # the masthead's double rule
+		var line := ColorRect.new()
+		line.color = Color(INK, 0.7 if k == 0 else 0.4)
+		line.custom_minimum_size = Vector2(0, 3 if k == 0 else 1)
+		box.add_child(line)
+	var head := _centred(box, review.headline, 27)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	head.custom_minimum_size = Vector2(300, 0)
+	var stars := Rating.new(int(review.stars), true)
+	stars.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(stars)
+	for t: String in Critic.TOPICS:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		box.add_child(row)
+		row.add_child(Icon.new(RATING_ICONS[t], 30))
+		var l := _label(row, 18, Critic.TOPIC_WORDS[t])
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var pips := Rating.new(int(review.ratings[t]))
+		pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(pips)
+	_rule(box)
+	var said := _label(box, 17, "\"%s\"" % review.line)
+	said.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	said.custom_minimum_size = Vector2(300, 0)
+	var by := HBoxContainer.new()
+	by.add_theme_constant_override("separation", 8)
+	box.add_child(by)
+	var face := ModelView.new(84, false)
+	by.add_child(face)
+	face.show_peg(review.name)
+	var words := VBoxContainer.new()
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	by.add_child(words)
+	var sign := HBoxContainer.new()
+	sign.add_theme_constant_override("separation", 6)
+	words.add_child(sign)
+	sign.add_child(Icon.new("quill", 22, false))
+	_label(sign, 19, "%s, our critic" % review.name)
+	if review.get("first", false):   # the reveal
+		var aside := _label(words, 13, "Yes, that %s. You served them on day %d." % [review.name, int(review.day)])
+		aside.modulate.a = 0.7
+	return cut
+
+
+## The last review on its own, from the town book.
+func show_review() -> void:
+	hide_card()
+	var clip := Sheet.new("clip").pad(26, 46, 26, 26)
+	center.add_child(clip)
+	_summary_clip = clip
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 14)
+	clip.add_child(stack)
+	stack.add_child(clipping(game.critic.last_review))
+	_button(stack, "Back", show_town)
+	_pop_in(clip)
 
 
 const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
@@ -2256,6 +2409,10 @@ func show_town() -> void:
 		cols.add_child(row)
 		var name_label := _label(row, 18, town.people[i].name)
 		name_label.custom_minimum_size = Vector2(86, 0)
+		if game.critic.known and i == game.critic.critic_idx:   # after the first review only
+			var quill := Icon.new("quill", 20, false)   # inside the name's column, so the pips stay in line
+			quill.position = Vector2(name_label.get_minimum_size().x + 4, 2)
+			name_label.add_child(quill)
 		row.add_child(Pips.new(town.standing(i) + 1, town.trend(i)))
 		var word := _label(row, 13, town.status_word(i, game.ledger.day))
 		word.custom_minimum_size = Vector2(150, 0)
@@ -2263,6 +2420,9 @@ func show_town() -> void:
 	_rule(box)
 	var key := _label(box, 13, "Arrows show who changed their mind today. Friends talk to each other.")
 	key.modulate.a = 0.7
+	if not game.critic.last_review.is_empty():
+		_button(stack, "Last review: %d %s" % [int(game.critic.last_review.stars),
+			"star" if int(game.critic.last_review.stars) == 1 else "stars"], show_review)
 	_button(stack, "Back   (T)", toggle_town)
 	_pop_in(clip)
 

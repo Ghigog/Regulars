@@ -134,6 +134,11 @@ critic is unmarked on day 4 and marked on day 6.
 
 ## Open, with defaults
 
+Taken as built, 13 November 2026: all three defaults below (no, no, no effect). Two
+more calls the build needed, neither a gameplay rule elsewhere: a critic who walks out
+before eating rates food 1; and a critic put off by an early close comes the next day,
+after which visits return to the fives (a day-6 visit is followed by day 10).
+
 - **Should a clean review bring back people who swore never to return?** Default: no.
 - **Should a critic day get its own music cue or door bell after the reveal?** Default:
   no; the mark on the guest is the only signal.

@@ -1165,3 +1165,194 @@ func test_results_set_quality():
 	t.add("prep:bun", Prep.PLAIN)
 	t.add("prep:patty", Prep.GOOD)
 	assert_almost_eq(t.quality(), (Prep.PLAIN + Prep.GOOD) / 2.0, 0.001, "a tray's quality is the average")
+
+
+# ---------- The critic (PRD 2) ----------
+
+func _sum_parts(t: Town, i: int) -> float:
+	var sum := 0.0
+	for k: String in t.people[i].opinion:
+		sum += float(t.people[i].opinion[k])
+	return sum
+
+
+## The same visits, with and without the topic split, end in the same affinities, and
+## everyone's five parts add up to their affinity, clamps included.
+func test_topic_split_changes_no_affinity():
+	var a := Town.new(3)
+	var b := Town.new(3)
+	var m := GuestMood.new()
+	m.patience = 0.8
+	m.savour = 0.9
+	m.joy = 0.7
+	m.disgust = 0.3
+	var script := func(t: Town, with_terms: bool) -> void:
+		for k in 12:   # enough to hit the top clamp
+			t.record_visit(0, m.satisfaction(), m.satisfaction_terms(0.75) if with_terms else {})
+		t.record_disgust(0, 2)
+		t.record_kindness(2, "comp")
+		t.record_walkout(4, 1)
+		t.record_visit(4, 0.8, m.satisfaction_terms() if with_terms else {})   # comes back sore and forgives
+		t.record_found_nothing(5)
+		for k in 8:
+			t.record_visit(7, -0.9, {"speed": 0.0, "clean": -0.5, "quality": 0.0, "variety": 0.0} if with_terms else {})
+	script.call(a, true)
+	script.call(b, false)
+	for i in a.people.size():
+		assert_eq(float(a.people[i].affinity), float(b.people[i].affinity), "affinity of %d" % i)
+		assert_almost_eq(_sum_parts(a, i), float(a.people[i].affinity), 0.00001, "parts add up for %d" % i)
+	assert_almost_eq(float(a.people[0].affinity), 0.88, 0.00001, "held at 1, then disgust took 0.1 and a friend 0.02")
+	assert_almost_eq(float(Town.new(3).record_visit(0, 0.9)), 0.3, 0.00001, "a visit moves affinity as it always did")
+
+
+func test_changes_are_filed_by_topic_and_friends_keep_it():
+	var t := Town.new(3)
+	var f: int = t.people[0].friends[0]
+	t.record_disgust(0, 2)
+	assert_almost_eq(t.opinion(0, "clean"), -0.1, 0.0001, "disgust is about cleanliness")
+	assert_almost_eq(t.opinion(f, "clean"), -0.08, 0.0001, "and friends hear it as that")
+	t.record_found_nothing(1)
+	assert_lt(t.opinion(1, "variety"), 0.0, "nothing on the menu is variety")
+	t.record_kindness(2, "half")
+	assert_almost_eq(t.opinion(2, "other"), Town.KIND_HALF, 0.0001)
+	var m := GuestMood.new()
+	m.patience = 1.0
+	m.savour = 1.0
+	t.record_visit(3, m.satisfaction(), m.satisfaction_terms(0.8))
+	assert_gt(t.opinion(3, "speed"), 0.0)
+	assert_gt(t.opinion(3, "quality"), 0.0)
+	assert_gt(t.opinion(3, "variety"), 0.0, "liked things on the menu count as variety")
+	for k in 20:
+		t.record_visit(3, m.satisfaction(), m.satisfaction_terms(0.8))
+	assert_almost_eq(t.opinion(3, "quality"), Town.TOPIC_MAX, 0.0001, "a topic holds only so much")
+
+
+func test_critic_is_fixed_by_seed_and_comes_every_fifth_day():
+	assert_eq(Critic.new(42).critic_idx, Critic.new(42).critic_idx)
+	var seen := {}
+	for s in 30:
+		seen[Critic.new(s).critic_idx] = true
+	assert_gt(seen.size(), 3, "different runs, different critics")
+	var c := Critic.new(42)
+	assert_true(c.visits_on(5))
+	assert_false(c.visits_on(4))
+	assert_false(c.visits_on(6))
+	var t := Town.new(42)
+	c.publish({"speed": 3, "clean": 3, "quality": 3, "variety": 3}, false, t, 5)
+	assert_true(c.visits_on(10))
+	assert_false(c.visits_on(6))
+	for k in 20:
+		var at := c.arrival_time(100.0)
+		assert_true(at >= 25.0 and at <= 75.0, "the middle half of the day")
+
+
+func test_closing_early_puts_the_critic_off_a_day():
+	var c := Critic.new(1)
+	c.postpone(5)
+	assert_false(c.visits_on(5))
+	assert_true(c.visits_on(6))
+	c.publish({"speed": 3, "clean": 3, "quality": 3, "variety": 3}, false, Town.new(1), 6)
+	assert_true(c.visits_on(10), "and the next visit is back on the fives")
+
+
+func test_critic_ratings_at_their_thresholds():
+	assert_eq(Critic.speed_rating(0.85), 5)
+	assert_eq(Critic.speed_rating(0.84), 4)
+	assert_eq(Critic.speed_rating(0.7), 4)
+	assert_eq(Critic.speed_rating(0.5), 3)
+	assert_eq(Critic.speed_rating(0.3), 2)
+	assert_eq(Critic.speed_rating(0.29), 1)
+	assert_eq(Critic.clean_rating(0.0, 0), 5, "noticed nothing")
+	assert_eq(Critic.clean_rating(0.1, 0), 4, "below Ick")
+	assert_eq(Critic.clean_rating(0.3, 1), 3)
+	assert_eq(Critic.clean_rating(0.5, 2), 2)
+	assert_eq(Critic.clean_rating(0.8, 3), 1)
+	assert_eq(Critic.quality_rating(1.0), 5)
+	assert_eq(Critic.quality_rating(Prep.PLAIN), 4)
+	assert_eq(Critic.quality_rating(0.0), 1)
+	assert_eq(Critic.quality_rating(0.5), 3)
+	var one := [{"course": "main", "ingredients": ["patty", "bun"]}]
+	assert_eq(Critic.variety_rating([]), 1, "at least 1")
+	assert_eq(Critic.variety_rating(one), 1)
+	var wide := [
+		{"course": "main", "ingredients": ["a", "b"]}, {"course": "main", "ingredients": ["c", "d"]},
+		{"course": "main", "ingredients": ["e", "f"]}, {"course": "side", "ingredients": ["g"]},
+		{"course": "drink", "ingredients": ["h"]}]
+	assert_eq(Critic.variety_rating(wide), 5, "three courses, a wide one, eight ingredients")
+	wide.pop_back()
+	assert_eq(Critic.variety_rating(wide), 3, "two courses and a wide one; seven ingredients")
+
+
+func test_stars_are_the_rounded_mean_and_a_walkout_caps_them():
+	assert_eq(Critic.stars({"speed": 5, "clean": 5, "quality": 4, "variety": 4}), 5, "4.5 rounds up")
+	assert_eq(Critic.stars({"speed": 4, "clean": 4, "quality": 3, "variety": 4}), 4)
+	assert_eq(Critic.stars({"speed": 1, "clean": 2, "quality": 1, "variety": 1}), 1)
+	assert_eq(Critic.stars({"speed": 5, "clean": 5, "quality": 5, "variety": 5}, true), 2)
+	var r := Critic.rate(0.9, -1.0, 0.0, 0, [], true)
+	assert_eq(int(r.speed), 1, "a walkout rates speed 1")
+	assert_eq(int(r.clean), 5, "the rest from what they saw")
+
+
+func test_a_review_resets_the_four_topics_only():
+	var t := Town.new(5)
+	t.record_disgust(3, 2)
+	t.record_kindness(3, "comp")
+	var other := t.opinion(3, "other")
+	assert_lt(t.opinion(3, "clean"), 0.0)
+	var c := Critic.new(5)
+	var review := c.publish({"speed": 2, "clean": 5, "quality": 4, "variety": 3}, false, t, 5)
+	assert_almost_eq(t.opinion(3, "clean"), 0.2, 0.0001, "the critic found it clean")
+	assert_almost_eq(t.opinion(3, "speed"), -0.1, 0.0001)
+	assert_almost_eq(t.opinion(3, "other"), other, 0.0001, "other is untouched")
+	assert_almost_eq(float(t.people[3].affinity), _sum_parts(t, 3), 0.0001)
+	assert_eq(int(review.stars), 4)
+	assert_true(review.first, "the first review names them")
+	assert_eq(review.name, t.people[c.critic_idx].name)
+	assert_true(c.known)
+
+
+func test_the_review_line_confirms_or_contradicts():
+	var t := Town.new(5)
+	for i in t.people.size():
+		t.record_disgust(i, 2)   # everyone thinks it is dirty
+	var line := Critic.verdict_line({"speed": 3, "clean": 5, "quality": 3, "variety": 3},
+		{"clean": t.topic_average("clean")})
+	assert_eq(line, "Whatever you have heard about the washing-up, we found it spotless.")
+	var agree := Critic.verdict_line({"speed": 1, "clean": 3, "quality": 3, "variety": 3}, {"speed": -0.2})
+	assert_eq(agree, "As the town already says, you will wait for your supper.")
+
+
+func test_review_boost_lasts_four_days_and_stacks_with_flyers():
+	var c := Critic.new(1)
+	assert_eq(c.visit_boost(6), 0.0)
+	c.publish({"speed": 5, "clean": 5, "quality": 5, "variety": 5}, false, Town.new(1), 5)
+	assert_eq(c.visit_boost(5), 0.0, "not on the day itself")
+	for d in [6, 7, 8, 9]:
+		assert_eq(c.visit_boost(d), 0.25)
+	assert_eq(c.visit_boost(10), 0.0)
+	var plain := 0
+	var both := 0
+	for s in 40:
+		plain += Town.new(s).roll_guests(1, Town.FLYER_BOOST).size()
+		both += Town.new(s).roll_guests(1, Town.FLYER_BOOST + c.visit_boost(6)).size()
+	assert_gt(both, plain, "a good review on top of flyers brings more")
+	c.publish({"speed": 1, "clean": 1, "quality": 1, "variety": 1}, false, Town.new(1), 10)
+	assert_eq(c.visit_boost(11), -0.25, "the next review replaces it")
+
+
+func test_a_clean_review_does_not_bring_back_the_revolted():
+	var t := Town.new(2)
+	t.record_disgust(0, 3)
+	Critic.new(2).publish({"speed": 5, "clean": 5, "quality": 5, "variety": 5}, false, t, 5)
+	assert_true(t.people[0].gone)
+	for day in range(6, 12):
+		assert_false(t.roll_guests(day, 1.0).has(0), "still never coming back")
+
+
+func test_the_critic_always_finds_something_to_order():
+	var avail := [{"course": "main", "ingredients": ["patty", "bun"], "id": 1},
+		{"course": "main", "ingredients": ["patty", "onion"], "id": 2}]
+	var rng := RandomNumberGenerator.new()
+	assert_true(Menu.order(avail, [], ["patty"], rng).main.is_empty(), "anyone else walks on")
+	var o := Critic.order(avail, ["bun"], ["patty"], rng)
+	assert_eq(int(o.main.id), 1, "the critic takes the best match")

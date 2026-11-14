@@ -275,6 +275,38 @@ static func icon(id: String) -> Array:
 			o.append([ell(0, -0.1, 0.36), "#ffd76a"])
 			o.append([rect(0, -0.52, 1.36, 0.82), CREAM])
 			o.append([rect(0, -0.14, 1.0, 0.07), GOLD_DARK])
+		"quill":  # the critic's mark: a cream feather with an ink nib
+			var vane := PackedVector2Array()
+			for k in 11:   # up the left edge of the feather, then down the right
+				var t := k / 10.0
+				vane.append(Vector2(lerpf(-0.42, 0.62, t) - 0.3 * sin(t * PI), lerpf(-0.5, 0.92, t) + 0.12 * sin(t * PI)))
+			for k in range(10, -1, -1):
+				var t := k / 10.0
+				vane.append(Vector2(lerpf(-0.42, 0.62, t) + 0.24 * sin(t * PI), lerpf(-0.5, 0.92, t) - 0.26 * sin(t * PI)))
+			o.append([_grown(vane, 0.09), INK])
+			o.append([vane, CREAM])
+			o.append([PackedVector2Array([Vector2(-0.4, -0.48), Vector2(0.62, 0.9), Vector2(0.58, 0.93), Vector2(-0.44, -0.45)]), "#b9a88a"])
+			o.append([PackedVector2Array([Vector2(-0.36, -0.42), Vector2(-0.5, -0.56), Vector2(-0.82, -0.98), Vector2(-0.56, -0.5)]), INK])
+		"sparkle":  # cleanliness: a big four-point glint and two small ones
+			for g: Array in [[-0.15, -0.05, 0.86], [0.6, 0.58, 0.34], [0.58, -0.6, 0.26]]:
+				o.append([star(g[0], g[1] - 0.05, g[2] + 0.12, 4, 0.34), INK])
+				o.append([star(g[0], g[1], g[2], 4, 0.3), TEAL])
+				o.append([ell(g[0], g[1], g[2] * 0.18), CREAM])
+		"cloche":  # food: a silver serving dome on its plate, with a knob
+			o.append([rect(0, -0.62, 2.0, 0.3), INK])
+			o.append([rect(0, -0.6, 1.84, 0.16), CREAM])
+			o.append([ell(0, -0.44, 0.92, 0.94, 0, 180), INK])
+			o.append([ell(0, -0.44, 0.8, 0.82, 0, 180), "#c9c2b6"])
+			o.append([ell(-0.3, -0.12, 0.16, 0.34, 90, 180), "#f1ece3"])
+			o.append([ell(0, 0.56, 0.2), INK])
+			o.append([ell(0, 0.57, 0.11), "#c9c2b6"])
+		"menu_card":  # variety: a menu card, coral band, three lines of dishes
+			o.append([rect(0, 0, 1.5, 1.96, 0.06), INK])
+			o.append([rect(0, 0, 1.3, 1.76, 0.06), CREAM])
+			o.append([rect(0.02, 0.6, 1.3, 0.34, 0.06), CORAL])
+			for i in 3:
+				o.append([ell(-0.4 - i * 0.02, 0.12 - i * 0.38, 0.09), INK])
+				o.append([rect(0.12 - i * 0.02, 0.12 - i * 0.38, 0.7, 0.1, 0.06), INK])
 		"sun":
 			o.append([star(0, 0, 0.98, 8, 0.62), GOLD])
 			o.append([ell(0, 0, 0.56), "#ffd76a"])

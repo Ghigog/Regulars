@@ -79,6 +79,10 @@ const CLOSE_FOCUS := Vector3(W / 2.0 + 0.3, 0, H / 2.0 - 0.2)
 
 var grid: Grid
 var town: Town
+var critic: Critic                     # PRD 2: who eats as the critic, and the last review
+var critic_guest: Guest                # the critic, while they are here on a critic day
+var _critic_seen := {}                 # what the critic saw as their tray arrived: {patience, quality}
+var _critic_rated := {}                # their ratings once they leave, printed at the end of the day
 var ledger: Ledger
 var phase: int = Phase.SERVICE
 var stations := {}               # Vector2i -> Station
@@ -157,6 +161,7 @@ func _ready() -> void:
 	var seed_value := int(Time.get_unix_time_from_system())
 	grid = Grid.new(W + 2 - LOT.position.x, LOT.size.y, LOT.position)   # columns W and W + 1 are the pavement outside
 	town = Town.new(seed_value)
+	critic = Critic.new(seed_value, town.people.size())
 	ledger = Ledger.new()
 	catalog = Catalog.new(seed_value)
 	_build_scenery()
@@ -349,6 +354,8 @@ func _apply_demo(demo: String) -> void:
 		best_path = "user://regulars_best_demo.json"
 		for i in Ledger.MAX_STRIKES:
 			ledger.record_walkout()
+	elif demo in ["critic", "critic_bad", "critic_known", "critic_town"]:
+		_demo_critic(demo)
 	elif demo == "summary" or demo == "town":
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.record_sale(DEMO_BILL, 3)
@@ -429,6 +436,40 @@ func _apply_demo(demo: String) -> void:
 			open_shop()
 			hud._set_category("Extras")
 			buy(FLYERS))
+
+
+## critic: the receipt of day 5 with a good review that contradicts the town;
+## critic_bad: a walkout's review; critic_known: the named critic seated, card open
+## (shoot at 10); critic_town: the town book with the critic marked.
+func _demo_critic(demo: String) -> void:
+	ledger.day = 5
+	ledger.record_sale(DEMO_BILL, 5)
+	ledger.record_sale(DEMO_BILL, 3)
+	for i in town.people.size():   # the town thinks the place is dirty and slow
+		if i % 3 == 0:
+			town.record_disgust(i, 2)
+		town.record_visit(i, 0.5, {"speed": -0.1, "clean": 0.0, "quality": 0.25, "variety": 0.0})
+	if demo in ["critic", "critic_bad"]:
+		arrivals.clear()
+		var walked := demo == "critic_bad"
+		_critic_rated = {"walked": walked, "ratings": {"speed": 5, "clean": 5, "quality": 4, "variety": 3}
+			if not walked else {"speed": 1, "clean": 2, "quality": 1, "variety": 2}}
+		if walked:
+			ledger.record_walkout()
+		return
+	critic.publish({"speed": 4, "clean": 5, "quality": 4, "variety": 3}, false, town, 5)
+	ledger.end_day()
+	if demo == "critic_town":
+		arrivals.clear()
+		get_tree().create_timer(1.5).timeout.connect(hud.show_town)
+		return
+	arrivals.assign([{"time": 0.2, "group": [critic.critic_idx]}])
+	get_tree().create_timer(9.0).timeout.connect(func() -> void:
+		for g in guests:
+			if is_critic(g):
+				g.mood.think(Critic.thought("gross"))
+				inspect(g)
+				return)
 
 
 func _demo_build(demo: String) -> void:
@@ -1096,18 +1137,50 @@ func start_day() -> void:
 	ledger.pay_stock(night_cost())   # the door checked it can be paid (tests may skip the door)
 	menu_board.refresh(tonight_menu())
 	town.new_day()
-	var coming := town.roll_guests(ledger.day, Town.FLYER_BOOST if flyers_out else 0.0)
+	var coming := town.roll_guests(ledger.day, (Town.FLYER_BOOST if flyers_out else 0.0) + critic.visit_boost(ledger.day))
+	var critic_day := critic.visits_on(ledger.day)
+	if critic_day:   # they come alone, whatever the dice or a grudge say
+		coming.erase(critic.critic_idx)
 	var groups := town.make_groups(coming, max_party())
 	var flyered := flyers_out
 	flyers_out = false
 	arrivals.clear()
+	critic_guest = null
+	_critic_seen = {}
+	_critic_rated = {}
 	for i in groups.size():
 		var t := 2.0 + (i + town.rng.randf() * 0.6) * (day_length() - 2.0) / groups.size()
 		arrivals.append({"time": t, "group": groups[i]})
+	if critic_day:
+		_book_critic(critic.arrival_time(day_length()))
 	play_music("day")
 	hud.show_banner("Day %d" % ledger.day)
 	hud.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
 	sfx("day")
+
+
+## Puts the critic in today's arrivals at `time`, in order. Nothing shows it.
+func _book_critic(time: float) -> void:
+	var k := 0
+	while k < arrivals.size() and float(arrivals[k].time) <= time:
+		k += 1
+	arrivals.insert(k, {"time": time, "group": [critic.critic_idx], "critic": true})
+
+
+## Whether `g` is the critic (on any day; the interface marks them only once known).
+func is_critic(g: Guest) -> bool:
+	return g != null and g.idx == critic.critic_idx
+
+
+## The critic is leaving: rates the visit from what they saw. Printed at the end of the day.
+func _critic_leaves(g: Guest, walked: bool) -> void:
+	if g != critic_guest or not _critic_rated.is_empty():
+		return
+	walked = walked or g.mood.disgust_level() >= 3
+	_critic_rated = {"walked": walked, "ratings": Critic.rate(float(_critic_seen.get("patience", 0.0)),
+		float(_critic_seen.get("quality", -1.0)), g.mood.disgust, g.mood.disgust_level(), tonight_menu(), walked)}
+	g.mood.think(Critic.thought("leave"))
+	critic_guest = null
 
 
 ## Opens the guest card for `g`, or closes it with null.
@@ -1953,6 +2026,8 @@ func use_door() -> bool:
 func close_early() -> void:
 	if phase != Phase.SERVICE or not door_open:
 		return
+	if arrivals.any(func(a: Dictionary) -> bool: return a.get("critic", false)):
+		critic.postpone(ledger.day)   # they come tomorrow instead
 	arrivals.clear()
 	set_door(false)
 	hud.say("Closed. Guests already here can stay.")
@@ -1966,6 +2041,9 @@ func _end_day() -> void:
 	play_music("night")
 	inspect(null)
 	last_day = ledger.end_day()
+	if not _critic_rated.is_empty():   # the paper prints the review with tonight's receipt
+		last_day["review"] = critic.publish(_critic_rated.ratings, _critic_rated.walked, town, int(last_day.day))
+		_critic_rated = {}
 	hud.show_summary(last_day)
 	sfx("coin")
 
@@ -2015,7 +2093,7 @@ func spawn_guest(idx: int) -> Guest:
 
 
 ## Guests who arrive together, queue together and share a table with nobody else.
-func spawn_group(ids: Array) -> Array[Guest]:
+func spawn_group(ids: Array, as_critic := false) -> Array[Guest]:
 	var party: Array[Guest] = []
 	for idx: int in ids:
 		var g := Guest.new()
@@ -2032,6 +2110,8 @@ func spawn_group(ids: Array) -> Array[Guest]:
 		party.append(g)
 		guests.append(g)
 		queue.append(g)
+	if as_critic:
+		critic_guest = party[0]
 	var plan := _plan_orders(party)
 	if plan.walk:   # nobody has a main: they read the menu at the door and walk on
 		for k in party.size():
@@ -2053,6 +2133,10 @@ func _plan_orders(party: Array[Guest]) -> Dictionary:
 		tastes.append(town.tastes_of(g.idx))
 	var available := tonight_menu()
 	var plan := Menu.group_order(available, tastes, order_rng)
+	if party.size() == 1 and party[0] == critic_guest:   # never turned away by the menu
+		plan = {"walk": false, "found_nothing": [],
+			"orders": [Critic.order(available, tastes[0].likes, tastes[0].dislikes, order_rng)]}
+		party[0].mood.think(Critic.thought("menu"))
 	for k in party.size():
 		var g := party[k]
 		g.planned = plan.orders[k]
@@ -2182,6 +2266,8 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 			var curve: Array = GROSS[s.kind]
 			var rate := GuestMood.gross_rate(curve[0], age, curve[1], curve[2])
 			g.mood.see_gross(rate, delta, s.thought)
+			if g == critic_guest and rate >= GuestMood.NOTICE:
+				g.mood.think(Critic.thought("gross"))
 			saw_gross = saw_gross or rate >= GuestMood.NOTICE
 	for st: Station in stations.values():
 		if st.type == "stove" and not saw_gross and st.is_cooking() \
@@ -2785,6 +2871,11 @@ func savour_for(g: Guest, t: Tray) -> float:
 
 
 func serve(g: Guest, t: Tray) -> void:
+	if g == critic_guest:
+		_critic_seen = {"patience": g.mood.patience, "quality": t.quality()}
+		if Critic.speed_rating(g.mood.patience) <= 3:
+			g.mood.think(Critic.thought("wait"))
+		g.mood.think(Critic.thought("good" if Critic.quality_rating(t.quality()) >= 4 else "bad"))
 	if g.mood.patience > 0.65:
 		g.mood.delight(0.15, "That was quick!")
 	var q := savour_for(g, t)
@@ -2855,7 +2946,8 @@ func finish_meal(g: Guest) -> void:
 	var was_sore: bool = g.info.sore
 	var was_regular := town.is_regular(g.idx)
 	ledger.record_sale(bill, tip)
-	var delta := town.record_visit(g.idx, g.mood.satisfaction())
+	var delta := town.record_visit(g.idx, g.mood.satisfaction(),
+		g.mood.satisfaction_terms(g._meal_tray.quality() if g._meal_tray else -1.0))
 	var talk := town.gossip_line(g.idx, delta, Town.praise_about(g.liked_meal, g.hint_tag) if delta > 0.0 else "")
 	if was_sore and not g.info.sore:
 		talk = "%s has forgiven you." % g.info.name
@@ -2867,6 +2959,7 @@ func finish_meal(g: Guest) -> void:
 		talk = news
 	if talk != "":
 		hud.say(talk)
+	_critic_leaves(g, false)
 	g.table.dirty += 1
 	g.table.refresh()
 	popup("+$%d" % (bill + tip), g.position + Vector3(0, 1.9, 0), Color(Build.TRIM))
@@ -2896,6 +2989,7 @@ func walk_out(g: Guest) -> void:
 		m.mood.think("I'm never coming back")
 		m.stormed = true
 		talk = town.gossip_line(m.idx, town.record_walkout(m.idx, ledger.day))
+		_critic_leaves(m, true)
 		names.append(m.info.name)
 		var mark := Fx.play(m, "anger", Vector3(0, 1.75, 0), 0.3, true)
 		mark.fps = 6.0
@@ -3343,7 +3437,7 @@ func step(delta: float) -> void:
 	clock += delta
 	while not arrivals.is_empty() and float(arrivals[0].time) <= clock:
 		var a: Dictionary = arrivals.pop_front()
-		spawn_group(a.get("group", [a.get("idx", 0)]))
+		spawn_group(a.get("group", [a.get("idx", 0)]), a.get("critic", false))
 	_tick_stoves(delta)
 	_tick_preps(delta)
 	for c in chefs:
