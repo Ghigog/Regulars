@@ -14,7 +14,10 @@ var game
 var idx := 0
 var info: Dictionary
 var mood := GuestMood.new()
-var state := "queue"  # queue, to_seat, waiting, eating, leaving
+var state := "queue"  # queue, to_seat, ordering, waiting (for food), eating, leaving
+## What they asked for once the chef took their order: {"dish": id}. Empty until then.
+## The menu system (DESIGN.md section 9) will fill it from a player-named menu.
+var order := {}
 var path: Array[Vector2i] = []
 var goal := Vector3.ZERO  # the exact spot to stop on once the path is walked
 var heading := Vector3.ZERO   # which way they stepped last frame; zero when standing
@@ -148,12 +151,23 @@ func _stand() -> void:
 		cell = c
 
 
+## Sat down and waiting: to order, or for the food they ordered.
+func seated_waiting() -> bool:
+	return state == "ordering" or state == "waiting"
+
+
 func _sit() -> void:
-	state = "waiting"
+	state = "ordering"
 	mood.patience = minf(1.0, mood.patience + 0.3)
 	_body.create_tween().tween_property(_body, "position:y", SEAT_HEIGHT, 0.2) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	game.on_seated(self)
+
+
+## The chef has written down what they want. Now they wait for the food.
+func take_order(what: Dictionary) -> void:
+	order = what
+	state = "waiting"
 
 
 func start_eating(quality: float) -> void:
@@ -196,9 +210,9 @@ func tick(delta: float) -> void:
 		"to_seat":
 			if _advance(delta):
 				_sit()
-		"waiting":
+		"ordering", "waiting":
 			_face(Grid.center(table.cell) - position, delta)
-			mood.wait(delta, game.table_patience())
+			mood.wait(delta, game.table_patience() * (game.ORDER_PATIENCE_SCALE if state == "ordering" else 1.0))
 			game.apply_surroundings(self, delta)
 			if mood.walked_out():
 				game.walk_out(self)
@@ -220,7 +234,7 @@ func tick(delta: float) -> void:
 
 func _refresh(delta: float) -> void:
 	var p := mood.patience
-	_bar.visible = state == "queue" or state == "waiting" or state == "to_seat"
+	_bar.visible = state == "queue" or seated_waiting() or state == "to_seat"
 	_fill.scale.x = maxf(p, 0.001)
 	_fill.position.x = (p - 1.0) * BAR_WIDTH / 2.0
 	var shade := snappedf(p, 0.1)  # few distinct colours, so materials stay cached
@@ -229,10 +243,10 @@ func _refresh(delta: float) -> void:
 	# Impatient guests shake a little.
 	_body.position.x = sin(_age * 40.0) * 0.02 if (_bar.visible and p < 0.25) else 0.0
 	_body.set_face(mood.expression(state == "eating", stormed))
-	_body.pose = "eat" if state == "eating" else ("tap" if state == "waiting" and p < 0.35 else "idle")
+	_body.pose = "eat" if state == "eating" else ("tap" if seated_waiting() and p < 0.35 else "idle")
 	# Bored guests slump; guests about to snap lean in; disgust pitches them back.
 	var lean := 0.0
-	if state == "waiting":
+	if seated_waiting():
 		lean = -0.2 if mood.disgust_level() >= 2 else (0.14 if p < 0.25 else (0.07 if p < 0.5 else 0.0))
 	elif state == "leaving" and stormed:
 		lean = 0.3
@@ -248,10 +262,12 @@ func _refresh(delta: float) -> void:
 	_gross_time -= delta
 	_heart_time -= delta
 	var want := ""
-	if stage > 0 and (state == "waiting" or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
+	if stage > 0 and (seated_waiting() or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
 		want = GuestMood.DISGUST_ICONS[stage]
+	elif state == "ordering":
+		want = "order"   # a notepad: come and take my order
 	elif state == "waiting":
-		want = "burger"
+		want = order.get("dish", "food")
 	elif state == "queue" and p < 0.6:
 		want = "zzz"
 	elif _heart_time > 0.0:

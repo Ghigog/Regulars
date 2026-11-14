@@ -838,7 +838,7 @@ func _label(parent: Node, font_size: int, text := "") -> Label:
 	return l
 
 
-const STATE_WORDS := {"queue": "Queueing outside", "to_seat": "Finding a seat", "waiting": "Waiting for food",
+const STATE_WORDS := {"queue": "Queueing outside", "to_seat": "Finding a seat", "ordering": "Waiting to order", "waiting": "Waiting for food",
 	"eating": "Eating", "leaving": "Leaving"}
 
 

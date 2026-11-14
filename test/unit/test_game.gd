@@ -46,9 +46,17 @@ func test_patty_left_on_stove_burns():
 	assert_true(game.player.carrying_something_gross())
 
 
+## The chef takes the order at the guest's table.
+func _order(g: Guest) -> void:
+	assert_string_contains(game.prompt_for(g.table), "Take")
+	game.use_station(g.table)
+
+
 func test_guest_is_seated_served_and_pays():
 	var g: Guest = game.spawn_guest(0)
 	_run(12.0)
+	assert_eq(g.state, "ordering")
+	_order(g)
 	assert_eq(g.state, "waiting")
 	_cook_burger()
 	game.use_station(g.table)
@@ -64,6 +72,7 @@ func test_guest_is_seated_served_and_pays():
 func test_half_price_calms_an_impatient_guest_and_costs_half_the_bill():
 	var g: Guest = game.spawn_guest(0)
 	_run(12.0)
+	_order(g)
 	assert_eq(game.prompt_for(g.table), "", "no discount for a guest who is still happy to wait")
 	g.mood.patience = 0.3
 	assert_string_contains(game.prompt_for(g.table), "Half price")
@@ -80,6 +89,7 @@ func test_half_price_calms_an_impatient_guest_and_costs_half_the_bill():
 func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
 	var g: Guest = game.spawn_guest(0)
 	_run(12.0)
+	_order(g)
 	g.mood.patience = 0.2
 	assert_string_contains(game.prompt_for(g.table), "Half price", "the smaller apology comes first")
 	game.use_station(g.table)
@@ -99,6 +109,7 @@ func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
 func test_a_disgusted_guest_can_be_offered_a_free_meal_straight_away():
 	var g: Guest = game.spawn_guest(0)
 	_run(12.0)
+	_order(g)
 	g.mood.disgust = 0.5
 	assert_string_contains(game.prompt_for(g.table), "Free meal")
 
@@ -108,6 +119,7 @@ func test_a_guest_who_expects_a_deal_is_let_down_by_full_price():
 	var g: Guest = game.spawn_guest(0)
 	assert_true(g.mood.thoughts.has("They usually knock something off"))
 	_run(12.0)
+	_order(g)
 	_cook_burger()
 	game.use_station(g.table)
 	_run(Guest.EAT_TIME + 0.5)
@@ -503,14 +515,14 @@ func test_ignored_guest_walks_out_and_counts_as_a_strike():
 	_run(80.0)
 	assert_eq(game.ledger.strikes(), 1)
 	assert_lt(float(game.town.people[1].affinity), 0.0)
-	assert_false(is_instance_valid(g) and g.state == "waiting")
+	assert_false(is_instance_valid(g) and g.seated_waiting())
 
 
 func test_dirty_table_disgusts_guests_unless_a_wall_hides_it():
 	game.stations.erase(Vector2i(0, 5))   # no bin, so only the plate is in question
 	var g: Guest = game.spawn_guest(2)
 	_run(12.0)
-	assert_eq(g.state, "waiting")
+	assert_eq(g.state, "ordering")
 	var other: Station = game.stations[Vector2i(6, 5)] if g.table.cell != Vector2i(6, 5) else game.stations[Vector2i(6, 1)]
 	other.dirty = 1
 	_run(2.0)
@@ -536,7 +548,7 @@ func _seat_at(table_cell: Vector2i, left: bool) -> Guest:
 		var pair: Array[Guest] = game.spawn_group([i * 2, i * 2 + 1])
 		_run(12.0)
 		for g in pair:
-			if g.cell == want and g.state == "waiting":
+			if g.cell == want and g.seated_waiting():
 				return g
 	return null
 
@@ -593,7 +605,7 @@ func test_guest_card_opens_on_the_nearest_guest_and_closes_when_they_go():
 	g.mood.think("A test thought")
 	game.hud.update_status()
 	assert_string_contains(game.hud._guest_thoughts.text, "A test thought")
-	assert_eq(game.hud._guest_state.text, "Waiting for food")
+	assert_eq(game.hud._guest_state.text, "Waiting to order")
 	g.mood.patience = 0.0
 	_run(30.0)
 	assert_null(game.inspected, "the card closes when the guest has gone")
@@ -624,6 +636,7 @@ func test_overcooked_meat_is_worth_less():
 	assert_lt(game.player.held_quality, 0.7)
 	var g: Guest = game.spawn_guest(4)
 	_run(12.0)
+	game.take_orders(g.table)   # hands are full, so straight to the order
 	game.use_station(g.table)
 	assert_lt(g.mood.savour, 0.7)
 	assert_eq(g.mood.latest_thought(), "A bit dry, this")
@@ -720,6 +733,7 @@ func test_a_group_walking_out_is_one_strike():
 func test_chef_can_serve_from_beside_the_guest_without_facing_the_table():
 	var g: Guest = game.spawn_guest(0)
 	_run(12.0)
+	_order(g)
 	_cook_burger()
 	# Diagonally off the table, right next to the seated guest, looking away.
 	game.player.position = Grid.center(g.seat + Vector2i(0, 1)) + Vector3(0, 0, -0.1)
@@ -1451,8 +1465,78 @@ func test_a_rush_never_walks_guests_through_one_another():
 		game.step(0.1)
 		if i % 50 == 0:
 			for g: Guest in game.guests.duplicate():
+				if g.state == "ordering":
+					game.take_orders(g.table)
 				if g.state == "waiting":
 					game.serve(g, 1.0)
 		worst = minf(worst, _closest_pair(game.guests))
 	assert_gt(worst, 0.3, "people step round or wait, never pass through")
 	assert_eq(game.guests.size(), 0, "nobody is left stuck on the pavement")
+
+
+func test_a_seated_guest_waits_to_order_with_a_notepad_bubble():
+	var g: Guest = game.spawn_guest(0)
+	_run(12.0)
+	assert_eq(g.state, "ordering")
+	assert_true(g.order.is_empty())
+	assert_eq(g._order.get_meta("icon"), "order", "the bubble asks for the chef")
+	assert_eq(game.prompt_for(g.table), "Take order")
+	_order(g)
+	assert_eq(g.state, "waiting")
+	assert_eq(g.order, {"dish": "burger"}, "an order is data on the guest")
+	_run(0.2)
+	assert_eq(g._order.get_meta("icon"), "burger", "the bubble shows what they ordered")
+
+
+func test_waiting_to_order_drains_patience_faster_than_waiting_for_food():
+	var g: Guest = game.spawn_guest(0)
+	_run(12.0)
+	g.mood.patience = 0.9
+	_run(2.0)
+	var ordering_drop: float = 0.9 - g.mood.patience
+	assert_gt(ordering_drop, 0.0)
+	_order(g)
+	g.mood.patience = 0.9
+	_run(2.0)
+	var food_drop: float = 0.9 - g.mood.patience
+	assert_gt(ordering_drop, food_drop * 1.1, "being ignored at the table wears thin quicker")
+
+
+func test_an_ignored_guest_walks_out_before_ordering():
+	var g: Guest = game.spawn_guest(1)
+	_run(12.0)
+	assert_eq(g.state, "ordering")
+	g.mood.patience = 0.01
+	_run(1.0)
+	assert_eq(game.ledger.strikes(), 1)
+
+
+func test_a_group_orders_together_in_one_go():
+	var pair: Array[Guest] = game.spawn_group([0, 1])
+	_run(14.0)
+	assert_eq(pair[0].state, "ordering")
+	assert_eq(pair[1].state, "ordering")
+	assert_eq(game.prompt_for(pair[0].table), "Take 2 orders")
+	game.use_station(pair[0].table)
+	for g in pair:
+		assert_eq(g.state, "waiting")
+		assert_eq(g.order.dish, "burger")
+	assert_eq(game.prompt_for(pair[0].table), "", "nothing left to take")
+
+
+func test_serving_a_guest_who_has_not_ordered_is_refused():
+	var g: Guest = game.spawn_guest(0)
+	_run(12.0)
+	_cook_burger()
+	assert_eq(game.prompt_for(g.table), "Take order first")
+	game.use_station(g.table)
+	assert_eq(g.state, "ordering", "still waiting to order")
+	assert_eq(game.player.held, "burger", "the chef keeps the plate")
+	game.take_orders(g.table)
+	assert_string_contains(game.prompt_for(g.table), "Serve")
+	game.use_station(g.table)
+	assert_eq(g.state, "eating")
+
+
+func test_guest_card_says_waiting_to_order():
+	assert_eq(Hud.STATE_WORDS.ordering, "Waiting to order")
