@@ -99,6 +99,9 @@ var _drag := {}                        # a mouse drag with a build tool: {"from"
 var _tool_ghost: Node3D
 var _tool_key := ""
 var _last_paint := Vector3i(-999, -999, -1)   # the spot E last built on while held
+const NIGHT_ZERO_BLOCK := "Buy an ingredient, a tool, and write a menu."
+const NIGHT_HINTS: Array[String] = ["Buy an ingredient and a tool in the shop.", "Write a menu.", "Flip the door card to open."]
+var menu_board: MenuBoard               # the chalkboard by the door: tonight's names
 const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "trays": "Tray stack", "pass": "Pass counter"}
 var _ghost: Node3D
 var _ghost_key := ""
@@ -148,7 +151,6 @@ func _ready() -> void:
 	_build_scenery()
 	town.make_tastes(Scenery.theme_id)
 	order_rng.seed = seed_value
-	menu.add("main", ["bun", "patty"], "Burger")   # the fixed menu until the menu screen is built
 	_build_layout()
 	_start_plan()
 	_load_sounds()
@@ -191,12 +193,18 @@ func _ready() -> void:
 		arm.material_override = m
 	_shot_path = OS.get_environment("REGULARS_SHOT")
 	_build_door_card()
+	menu_board = MenuBoard.new()
+	add_child(menu_board)
+	menu_board.position = Vector3(W + 0.455, 0.39, 5.3)   # the slate of the A-frame Scenery._outside stands by the door
+	menu_board.refresh([])
 	_range_marks = Node3D.new()
 	add_child(_range_marks)
 	var demo := OS.get_environment("REGULARS_DEMO")
+	if demo != "" and not demo in ["title", "night0"]:
+		test_kitchen()   # the demos show a working kitchen
 	if demo == "title" or (first_night and demo == "" and not _title_seen):
 		open_title()
-	elif first_night and demo == "":
+	elif first_night and (demo == "" or demo == "night0"):   # night0: the empty kitchen and the first hint
 		_open_first_night()
 	else:
 		start_day()
@@ -297,6 +305,10 @@ func _apply_demo(demo: String) -> void:
 		hud.toggle_options()
 		hud.options_action("down")   # the highlight on the first slider (keys and pad)
 		get_tree().paused = false   # so the screenshot timer still runs
+	elif demo in ["menu", "menu_name", "restock"]:  # the menu screen; naming an item; the restock note open
+		ledger.record_sale(DEMO_BILL, 5)
+		arrivals.clear()
+		get_tree().create_timer(1.0).timeout.connect(_demo_menu.bind(demo))
 	elif demo == "closed":
 		best_path = "user://regulars_best_demo.json"
 		for i in Ledger.MAX_STRIKES:
@@ -475,6 +487,31 @@ func _demo_build(demo: String) -> void:
 	else:   # a stove from the shop, held over a good spot or (build_no) a refused one
 		pick_catalog("stove", 2)
 		_demo_hover = Vector3(6.5, 0, 5.5) if demo == "build_no" else Vector3(3.5, 0, 5.5)
+
+
+## A fuller kitchen and menu: mains, sides (one with no onion to make it, greyed)
+## and a drink, then the screen, an item being named, or the restock note.
+func _demo_menu(demo: String) -> void:
+	open_build()
+	for spot: Array in [["ready_cheese", 1, 6], ["crate_potato", 2, 6], ["fryer", 3, 6], ["crate_soda", 1, 2]]:
+		add_station(spot[0], Vector2i(spot[1], spot[2]))
+	var cheese := menu.add("main", ["bun", "patty", "cheese"], "Cheeseburger", "dear")
+	menu.add("main", ["bun", "patty", "cheese", "patty", "cheese"], "Double Stack", "dear")
+	menu.add("side", ["potato"], "Fries", "cheap")
+	menu.add("side", ["potato", "cheese"], "Cheesy Fries")
+	menu.add("side", ["onion"], "Onion Rings")
+	menu.add("drink", ["soda"], "Soda", "cheap")
+	menu_changed()
+	if demo == "restock":
+		hud.menu_notes.open = true
+		player.position = Grid.center(Vector2i(1, 5))
+		player.look(Vector2i(0, 1))
+		hud.show_build()
+		return
+	open_menu()
+	if demo == "menu_name":
+		hud.menu.open_item(cheese)
+		hud.menu.start_naming()
 
 
 func _demo_order(take: bool) -> void:
@@ -720,8 +757,9 @@ func _build_layout() -> void:
 	for spot: Array in [
 		# The cooking line runs down the left wall under the hood, as in sheet 1.
 		# The cell in front of the back doorway stays clear, so the patties can be reached.
-		["crate_patty", 0, 2], ["trays", 2, 2], ["sink", 3, 2],
-		["stove", 0, 3, 1], ["stove", 0, 4, 1], ["bin", 0, 5, 1], ["crate_bun", 0, 6, 1],
+		# The kitchen starts empty but for the sink, the bin, the tray stack and the
+		# counters: the player buys the first stations and writes the menu on night zero.
+		["trays", 2, 2], ["sink", 3, 2], ["bin", 0, 5, 1],
 		["pass", 4, 2], ["pass", 4, 3], ["pass", 4, 4], ["pass", 4, 5],
 		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], ["plant", 9, 0],
 	]:
@@ -1010,8 +1048,11 @@ func start_day() -> void:
 	hand = {}
 	shopping = false
 	set_door(true)
+	hud.close_menu()
 	hud.hide_card()
 	hud.hide_build()
+	ledger.pay_stock(night_cost())   # the door checked it can be paid (tests may skip the door)
+	menu_board.refresh(tonight_menu())
 	town.new_day()
 	var coming := town.roll_guests(ledger.day, Town.FLYER_BOOST if flyers_out else 0.0)
 	var groups := town.make_groups(coming, max_party())
@@ -1054,7 +1095,7 @@ func _open_first_night() -> void:
 	_door_turn.rotation.y = PI
 	play_music("night")
 	hud.show_build()
-	hud.say("The night before day 1. Set the room up, then flip the door card.")
+	hud.say("The night before day 1. Set up the kitchen, then flip the door card.")
 
 
 ## The title screen over the room, before the night before day 1.
@@ -1847,6 +1888,12 @@ func door_action() -> String:
 func use_door() -> bool:
 	match door_action():
 		"Open up":
+			var why := open_block()
+			if why != "":
+				sfx("fail")
+				hud.say(why)
+				hud.show_build()
+				return false
 			start_day()
 		"Close early":
 			close_early()
@@ -2398,6 +2445,122 @@ func tonight_menu() -> Array[Dictionary]:
 	return menu.tonight(kitchen_stock(), kitchen_tools())
 
 
+## The kitchen the tests and most demos start from: the old burger line (a patty
+## fridge, two stoves, a bun crate) and a menu of one Burger.
+func test_kitchen() -> void:
+	for spot: Array in [["crate_patty", 0, 2, 0], ["stove", 0, 3, 1], ["stove", 0, 4, 1], ["crate_bun", 0, 6, 1]]:
+		if not stations.has(Vector2i(spot[1], spot[2])):
+			add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3])
+	write_test_menu()
+	menu_board.refresh(tonight_menu())
+
+
+## A one-item menu for tests: a Burger (bun, patty).
+func write_test_menu() -> void:
+	menu.items.clear()
+	menu.add("main", ["bun", "patty"], "Burger")
+
+
+## What tomorrow's stock costs: every stocked ingredient station's fee.
+func night_cost() -> int:
+	return Menu.night_cost(kitchen_stock())
+
+
+## The restock note's lines, one per kind of stocked ingredient station:
+## {name, fee} in the order they were placed, cheapest last.
+func stock_lines() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for s: Dictionary in kitchen_stock():
+		if s.stocked:
+			out.append({"name": Pantry.name_of(s.ingredient) + (" (ready)" if s.ready else ""),
+				"fee": Pantry.fee_of(s.ingredient, s.ready)})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.fee) > int(b.fee))
+	return out
+
+
+## The ingredient stations of one catalog type, for the menu screen's stock switches.
+func stations_of(type: String) -> Array[Station]:
+	var out: Array[Station] = []
+	for st: Station in stations.values():
+		if st.type == type:
+			out.append(st)
+	return out
+
+
+## Switches an ingredient station's stock for tomorrow (night only). Every station
+## of the same type follows, so the menu screen's switch and the room agree.
+func set_stocked(type: String, on: bool) -> bool:
+	if phase != Phase.BUILD or Catalog.ingredient_of(type) == "":
+		return false
+	for st in stations_of(type):
+		st.stocked = on
+		st.refresh()
+	sfx("flip" if on else "putdown")
+	menu_changed()
+	return true
+
+
+## The station in front of the chef, if it is an ingredient station.
+func stock_station_in_front() -> Station:
+	var st: Station = stations.get(player.target_cell())
+	return st if st != null and Catalog.ingredient_of(st.type) != "" else null
+
+
+## Something about tonight's menu changed: the board by the door and the notes follow.
+func menu_changed() -> void:
+	menu_board.refresh(tonight_menu())
+	if phase == Phase.BUILD and not shopping:
+		hud.show_build()
+
+
+## Why the door card will not flip to open, or "" if it will.
+func open_block() -> String:
+	if not Menu.has_main(tonight_menu()):
+		if ledger.history.is_empty():
+			return NIGHT_ZERO_BLOCK
+		return "No main on the menu can be made. Check the menu (%s)." % controls.glyph("menu")
+	if night_cost() > ledger.money:
+		return "Tomorrow's stock costs $%d. You have $%d." % [night_cost(), ledger.money]
+	return ""
+
+
+## Night zero's three hints, one at a time as the player goes; "" once they are done
+## or on any later night.
+func night_hint() -> String:
+	if not ledger.history.is_empty() or phase != Phase.BUILD:
+		return ""
+	if kitchen_stock().is_empty() or kitchen_tools().is_empty():
+		return NIGHT_HINTS[0]
+	if not Menu.has_main(tonight_menu()):
+		return NIGHT_HINTS[1]
+	return NIGHT_HINTS[2]
+
+
+## The menu screen, at night only: it cannot change during service.
+func open_menu() -> bool:
+	if phase != Phase.BUILD:
+		if phase == Phase.SERVICE:
+			hud.say("The menu can't change during service.")
+			sfx("fail")
+		return false
+	if Cleaning.carrying_mess(player.held) or hud.menu_open():
+		return false
+	if shopping:
+		close_shop()
+	if not hand.is_empty():
+		cancel_hand()
+	hud.open_menu()
+	sfx("slide")
+	return true
+
+
+func close_menu() -> void:
+	if hud.menu_open():
+		hud.close_menu()
+		sfx("slide", 0.0, 0.8)
+		menu_changed()
+
+
 ## What this guest orders: {main, side, drink}. Chosen at the door with their group
 ## (`planned`); a guest who came in some other way chooses now.
 func order_for(g: Guest) -> Dictionary:
@@ -2711,7 +2874,10 @@ func use_station(st: Station, dry_run := false) -> String:
 	var act := ""
 	var why := ""
 	var ing := Catalog.ingredient_of(st.type)
-	if ing != "":
+	if ing != "" and not st.stocked:
+		if held == "" or Tray.parse(held).get("id", "") == ing:
+			why = "Not stocked today"
+	elif ing != "":
 		var ready: bool = Catalog.ITEMS[st.type].get("ready", false)
 		if held == "" and Pantry.tool_of(ing) == "pour":
 			act = "Pour %s" % Pantry.name_of(ing).to_lower()
@@ -3118,7 +3284,7 @@ func _process(delta: float) -> void:
 	var input := Vector2.ZERO
 	if hud.options_open():
 		pass   # paused anyway; the arrows belong to the options screen
-	elif phase == Phase.SERVICE or (phase == Phase.BUILD and not shopping and not hud.typing()):
+	elif phase == Phase.SERVICE or (phase == Phase.BUILD and not shopping and not hud.typing() and not hud.menu_open()):
 		input = controls.move(0)
 	if preps.has(0):
 		input = Vector2.ZERO   # the chef stands at the tool while a minigame runs
@@ -3249,6 +3415,13 @@ func _build_mouse(event: InputEvent) -> void:
 		return
 	var tool := not hand.is_empty() and Catalog.is_build_tool(hand.id)
 	var right := mb.button_index == MOUSE_BUTTON_RIGHT
+	if mb.pressed and hand.is_empty() and not right and menu_board.under(cam, mb.position):
+		open_menu()   # a click on the board by the door
+		return
+	var crate: Station = stations.get(Grid.to_cell(p))
+	if mb.pressed and right and hand.is_empty() and crate != null and Catalog.ingredient_of(crate.type) != "":
+		set_stocked(crate.type, not crate.stocked)   # right click switches a crate's stock
+		return
 	if mb.pressed:
 		if tool:
 			_drag = {"from": p, "remove": right or erase}
@@ -3290,6 +3463,9 @@ func act(p: int, action: String, echo := false) -> void:
 		else:
 			hud.title.action(action, echo)
 		return
+	if hud.menu_open():
+		hud.menu.action(action, echo)
+		return
 	if echo:
 		return
 	if action == "options":
@@ -3309,6 +3485,8 @@ func act(p: int, action: String, echo := false) -> void:
 					cancel_prep(p)
 			elif action == "turn":
 				turn_tray(stations.get(player.target_cell()))
+			elif action == "menu":
+				open_menu()   # refused: it says why
 			elif action == "use":
 				var st: Station = stations.get(player.target_cell())
 				if st != null and prompt_for(st) != "":
@@ -3337,9 +3515,15 @@ func _build_act(action: String) -> void:
 		"back":
 			cancel_hand()
 		"turn":
-			rotate_hand()
+			if hand.is_empty() and stock_station_in_front() != null:
+				var st := stock_station_in_front()
+				set_stocked(st.type, not st.stocked)
+			else:
+				rotate_hand()
 		"shop":
 			open_shop()
+		"menu":
+			open_menu()
 		"sell":
 			if not hand.is_empty() and Catalog.is_build_tool(hand.id):
 				if _hover_point() != Vector3.INF and remove_at(snap(_hover_point())):

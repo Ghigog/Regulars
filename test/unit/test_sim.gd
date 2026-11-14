@@ -348,7 +348,7 @@ func test_friendships_are_mutual():
 func test_sale_adds_money_and_xp():
 	var l := Ledger.new()
 	l.record_sale(12, 4)
-	assert_eq(l.money, 66)
+	assert_eq(l.money, 166)
 	assert_eq(l.xp, 14)
 	assert_eq(l.today.served, 1)
 
@@ -362,8 +362,8 @@ func test_level_up_every_hundred_xp():
 
 func test_cannot_overspend():
 	var l := Ledger.new()
-	assert_false(l.spend(51))
-	assert_true(l.spend(50))
+	assert_false(l.spend(151))
+	assert_true(l.spend(150))
 	assert_eq(l.money, 0)
 
 

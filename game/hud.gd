@@ -64,6 +64,8 @@ var _cards: Control
 var _tip: Label
 var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, over the slip
 var _dirty_label: Label
+var menu: MenuScreen           # the menu screen, while it is open
+var menu_notes: MenuScreen.BuildNotes   # night zero's hint and the restock note, over the slip
 var _shop: Control             # the shop's sliding tray; null while the shop is shut
 var _info: Label
 var _info_blurb: Label
@@ -1689,6 +1691,7 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_row(box, "", "SALES:", "$%d" % rec.sales)
 	_row(box, "", "TIPS:", "$%d" % rec.tips)
 	_row(box, "", "WALKOUTS:", str(rec.walkouts))
+	_row(box, "", "STOCK:", "-$%d" % int(rec.get("stock", 0)))
 	_rule(box)
 	var earned: int = rec.sales + rec.tips
 	var total := _row(box, "", "TOTAL EARNED:", "$%d" % earned, 32)
@@ -1711,6 +1714,24 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 
 const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
 const TRAY_DROP := 260.0   # how far below its place the shop tray waits
+
+
+func menu_open() -> bool:
+	return menu != null
+
+
+func open_menu() -> void:
+	if menu != null:
+		return
+	menu = MenuScreen.new()
+	root.add_child(menu)
+	menu.setup(game, self)
+
+
+func close_menu() -> void:
+	if menu != null:
+		menu.queue_free()
+		menu = null
 
 
 func hide_build() -> void:
@@ -1798,8 +1819,9 @@ func _build_tip(hand: Dictionary) -> String:
 		return "Carrying a dirty plate.      Put it in the sink before building or shopping"
 	if hand.is_empty():
 		if m == "touch":
-			return "Joystick walk      Tap a piece to pick it up      Shop      Flip the door card to open for day %d" % game.ledger.day
-		return "%s walk      %s pick up      %s shop      Flip the door card to open for day %d" % [_g("move"), use, _g("shop"), game.ledger.day]
+			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % game.ledger.day
+		var stock := "%s stock a crate or not      " % _g("turn")
+		return "%s walk      %s pick up      %s%s shop      %s menu      Flip the door card to open for day %d" % [_g("move"), use, stock, _g("shop"), _g("menu"), game.ledger.day]
 	if Catalog.is_build_tool(hand.id):
 		var floor: bool = game.floor_kind(hand.id) != ""
 		var what := "%s, $%d each." % [Catalog.label(hand), int(hand.price)]
@@ -1874,6 +1896,9 @@ func show_build() -> void:
 		_dirty_label = _label(row, 20)
 		_dirty_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_dirty_note = note
+		menu_notes = MenuScreen.BuildNotes.new(game, self)
+		stack.add_child(menu_notes)
+		stack.move_child(menu_notes, 0)
 		var slip := Sheet.new("paper", 22, 10)
 		slip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		stack.add_child(slip)
@@ -1886,6 +1911,7 @@ func show_build() -> void:
 	_tip.text = _build_tip(hand)
 	_dirty_label.text = game.dirty_note()
 	_dirty_note.visible = _dirty_label.text != ""
+	menu_notes.refresh()
 	_refresh_catalog()
 
 

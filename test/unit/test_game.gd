@@ -12,6 +12,7 @@ func before_each():
 	game.best_path = "user://regulars_best_test.json"
 	# One guest far in the future keeps the day open while a test works.
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
+	game.test_kitchen()   # the old burger line and a one-Burger menu; a run starts empty
 	_neutral_tastes()
 
 
@@ -169,7 +170,7 @@ func test_flyers_cost_money_once_a_night_and_are_used_up_next_day():
 	assert_false(game.buy_flyers(), "not on the receipt: they are in the shop")
 	game.open_build()
 	assert_true(game.buy_flyers())
-	assert_eq(game.ledger.money, 50 - Town.FLYER_PRICE)
+	assert_eq(game.ledger.money, 150 - Town.FLYER_PRICE)
 	assert_false(game.buy_flyers(), "one batch a night")
 	game.start_day()
 	assert_false(game.flyers_out)
@@ -299,8 +300,16 @@ func test_game_opens_on_the_title_then_the_night_before_day_one():
 	assert_true(fresh.pick_catalog("counter"), "the room can be changed before anyone comes")
 	fresh.cancel_hand()
 	fresh.player.position = Grid.center(Vector2i(9, 4))
+	assert_eq(fresh.night_hint(), fresh.NIGHT_HINTS[0], "the kitchen starts empty")
+	assert_null(fresh.find_station("stove"))
+	fresh.build_interact()
+	assert_eq(fresh.phase, fresh.Phase.BUILD, "no menu yet: the door card stays shut")
+	assert_eq(fresh.hud.toast.text, fresh.NIGHT_ZERO_BLOCK)
+	fresh.test_kitchen()
+	assert_eq(fresh.night_hint(), fresh.NIGHT_HINTS[2])
 	fresh.build_interact()
 	assert_eq(fresh.phase, fresh.Phase.SERVICE)
+	assert_eq(fresh.ledger.money, 150 - fresh.night_cost(), "the stock was paid")
 	assert_eq(fresh.ledger.day, 1)
 	assert_false(fresh.arrivals.is_empty())
 
@@ -338,11 +347,11 @@ func test_catalog_piece_is_paid_for_when_placed_and_gated_by_level():
 	_to_build()
 	assert_false(game.pick_catalog("table4"), "level 3 and $90")
 	assert_true(game.pick_catalog("counter"))
-	assert_eq(game.ledger.money, 50, "picking is free")
+	assert_eq(game.ledger.money, 150, "picking is free")
 	assert_false(game.place(Vector3i(9, 4, 0)), "that would block the doorway")
 	assert_false(game.place(Vector3i(0, 2, 0)), "a stove is already there")
 	assert_true(game.place(Vector3i(2, 4, 0)))
-	assert_eq(game.ledger.money, 35)
+	assert_eq(game.ledger.money, 135)
 	assert_eq(game.stations[Vector2i(2, 4)].type, "counter")
 	game.start_day()
 	assert_eq(game.phase, game.Phase.SERVICE)
@@ -357,7 +366,7 @@ func test_partition_snaps_to_the_nearest_edge_and_hides_a_dirty_table():
 	assert_eq(game.snap(Vector3(5.5, 0, 3.1)), Vector3i(5, 3, 0))
 	assert_true(game.place(Vector3i(6, 3, 1)))
 	assert_false(game.grid.has_los(Vector2i(5, 3), Vector2i(6, 3)))
-	assert_eq(game.ledger.money, 40)
+	assert_eq(game.ledger.money, 140)
 
 
 func test_moving_a_piece_is_free_and_cancel_puts_it_back():
@@ -370,7 +379,7 @@ func test_moving_a_piece_is_free_and_cancel_puts_it_back():
 	assert_true(game.place(Vector3i(2, 5, 0)))
 	assert_eq(bin.cell, Vector2i(2, 5))
 	assert_eq(game.stations[Vector2i(2, 5)], bin)
-	assert_eq(game.ledger.money, 50)
+	assert_eq(game.ledger.money, 150)
 	assert_true(game.pick_up(Vector3(2.5, 0, 5.5)))
 	game.cancel_hand()
 	assert_eq(bin.cell, Vector2i(2, 5), "back where it was picked up")
@@ -412,14 +421,14 @@ func test_selling_refunds_half_but_not_the_last_stove_or_fixtures():
 	assert_true(game.pick_up(Vector3(9.5, 0, 0.5)))        # the fern
 	assert_eq(game.sell_value(), 10)
 	assert_true(game.sell_hand())
-	assert_eq(game.ledger.money, 60)
+	assert_eq(game.ledger.money, 160)
 	assert_false(game.stations.has(Vector2i(9, 0)))
 	assert_true(game.pick_up(Vector3(2.5, 0, 2.5)))        # the tray stack
 	assert_false(game.sell_hand(), "fixtures are not for sale")
 	game.cancel_hand()
 	assert_true(game.pick_up(Vector3(0.5, 0, 3.5)))        # one of two stoves
 	assert_true(game.sell_hand())
-	assert_eq(game.ledger.money, 60 + Catalog.price_of("stove") / 2)
+	assert_eq(game.ledger.money, 160 + Catalog.price_of("stove") / 2)
 	assert_true(game.pick_up(Vector3(0.5, 0, 4.5)))
 	assert_true(game.sell_hand(), "every station can be sold, even the last stove")
 	assert_null(game.find_station("stove"))
@@ -436,7 +445,7 @@ func test_partition_can_be_picked_up_moved_and_sold():
 	assert_true(game.grid.walls.has(Vector3i(6, 4, 1)))
 	assert_true(game.pick_up(Vector3(6.05, 0, 4.5)))
 	assert_true(game.sell_hand())
-	assert_eq(game.ledger.money, 45)
+	assert_eq(game.ledger.money, 145)
 	assert_false(game.pick_up(Vector3(9.95, 0, 2.5)), "the entrance wall is not yours to move")
 
 
@@ -2111,3 +2120,196 @@ func test_a_good_grill_gives_a_burst():
 	_use("stove")
 	assert_eq(game.player.held_quality, Prep.GOOD)
 	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.BURST_SPEED, 0.01)
+
+
+# ---------- The menu screen, stock and the door card (PRD 1, milestone 4) ----------
+
+func _at_door() -> void:
+	game.player.position = Grid.center(Vector2i(9, 4))
+	game.player.look(Vector2i(1, 0))
+
+
+func test_door_card_will_not_flip_with_no_makeable_main():
+	_to_build()
+	game.menu.items.clear()
+	_at_door()
+	assert_false(game.use_door())
+	assert_eq(game.phase, game.Phase.BUILD)
+	assert_string_contains(game.hud.toast.text, "No main")
+	game.menu.add("side", ["bun"], "Bread")
+	assert_false(game.use_door(), "a side alone is not enough")
+	game.write_test_menu()
+	game.find_station("crate_patty").stocked = false
+	assert_false(game.use_door(), "the Burger is off: no patty stocked")
+	game.find_station("crate_patty").stocked = true
+	assert_true(game.use_door())
+	assert_eq(game.phase, game.Phase.SERVICE)
+
+
+func test_door_card_will_not_flip_when_the_stock_cannot_be_paid():
+	_to_build()
+	game.ledger.money = game.night_cost() - 1
+	_at_door()
+	assert_false(game.use_door())
+	assert_eq(game.phase, game.Phase.BUILD)
+	assert_string_contains(game.hud.toast.text, "stock costs $%d" % game.night_cost())
+	assert_string_contains(game.hud.menu_notes._box.get_child(game.hud.menu_notes._box.get_child_count() - 1).text, "can't pay")
+	game.ledger.money = game.night_cost()
+	assert_true(game.use_door())
+	assert_eq(game.ledger.money, 0, "the stock took it all")
+
+
+func test_opening_charges_the_night_cost_as_a_stock_line():
+	assert_eq(game.night_cost(), Pantry.fee_of("patty") + Pantry.fee_of("bun"))
+	game.add_station("ready_cheese", Vector2i(1, 6))
+	assert_eq(game.night_cost(), Pantry.fee_of("patty") + Pantry.fee_of("bun") + roundi(Pantry.fee_of("cheese") * 1.5),
+		"ready-made at half as much again")
+	_to_build()
+	var before: int = game.ledger.money
+	var cost: int = game.night_cost()
+	_at_door()
+	assert_true(game.use_door())
+	assert_eq(game.ledger.money, before - cost)
+	assert_eq(game.ledger.today.stock, cost)
+	game.arrivals.clear()
+	_run(0.2)
+	assert_eq(game.last_day.stock, cost, "the receipt has a Stock line")
+
+
+func test_using_a_crate_at_night_switches_its_stock_and_takes_it_off_the_menu():
+	_to_build()
+	game.player.position = Grid.center(Vector2i(1, 2))
+	game.player.look(Vector2i(-1, 0))
+	var crate: Station = game.find_station("crate_patty")
+	assert_eq(game.stock_station_in_front(), crate)
+	var full: int = game.night_cost()
+	game.act(0, "turn")
+	assert_false(crate.stocked)
+	assert_eq(game.night_cost(), full - Pantry.fee_of("patty"), "an unstocked station costs nothing")
+	assert_true(game.tonight_menu().is_empty(), "the Burger is not offered")
+	assert_eq(Menu.off_reason(game.menu.items[0], game.kitchen_stock(), game.kitchen_tools()), "Patty not stocked")
+	assert_true(game.menu_board.names.is_empty(), "the board by the door follows")
+	game.act(0, "turn")
+	assert_true(crate.stocked)
+	assert_eq(game.menu_board.names, ["Burger"])
+
+
+func test_an_item_with_no_tool_is_off_the_menu():
+	for c in [Vector2i(0, 3), Vector2i(0, 4)]:
+		var st: Station = game.stations[c]
+		game._unregister(st)
+		st.queue_free()
+	assert_eq(Menu.off_reason(game.menu.items[0], game.kitchen_stock(), game.kitchen_tools()), "No grill")
+	assert_true(game.tonight_menu().is_empty())
+	var g: Guest = game.spawn_guest(0)
+	assert_true(game.order_for(g).main.is_empty(), "nothing is offered")
+
+
+func test_an_unstocked_crate_gives_nothing_in_service():
+	game.find_station("crate_patty").stocked = false
+	_use("crate_patty")
+	assert_eq(game.player.held, "")
+	assert_eq(game.prompt_for(game.find_station("crate_patty")), "Not stocked today")
+
+
+func test_the_menu_screen_opens_at_night_only():
+	assert_false(game.open_menu(), "locked during service")
+	assert_false(game.hud.menu_open())
+	_to_build()
+	game.act(0, "menu")
+	assert_true(game.hud.menu_open())
+	game.act(0, "menu")
+	assert_false(game.hud.menu_open())
+
+
+func test_writing_an_item_on_the_menu_screen():
+	_to_build()
+	game.add_station("crate_cheese", Vector2i(1, 6))
+	game.add_station("slicer", Vector2i(2, 6))
+	assert_true(game.open_menu())
+	var ms: MenuScreen = game.hud.menu
+	ms.new_item("main")
+	assert_eq(ms.selected(), "add:bun", "the highlight starts on the kitchen's first ingredient")
+	game.act(0, "use")
+	ms.put_in("patty")
+	ms.put_in("cheese")
+	var it: Dictionary = ms.editing()
+	assert_eq(it.ingredients, ["bun", "patty", "cheese"])
+	assert_eq(it.name, "Cheese Patty Bun", "a made-up name until it is named")
+	assert_true(game.menu.items.has(it))
+	ms._shift(2, -1)   # cheese down under the patty
+	assert_eq(it.ingredients, ["bun", "cheese", "patty"])
+	assert_eq(it.name, "Patty Cheese Bun")
+	ms._set_level("dear")
+	assert_eq(Menu.price_of(it), roundi(10 * 1.25))
+	ms.set_name_text("The Big One Burger Deluxe")
+	assert_eq(it.name, "The Big One Burger", "18 characters at most")
+	ms._take_out(0)
+	assert_eq(it.name, "The Big One Burger", "a name of the player's stays")
+	ms._toggle_off()
+	assert_eq(Menu.off_reason(it, game.kitchen_stock(), game.kitchen_tools()), "Off tonight")
+	assert_false(game.menu_board.names.has(it.name))
+	ms._toggle_off()
+	assert_true(game.menu_board.names.has(it.name))
+	ms._delete()
+	assert_false(game.menu.items.has(it))
+	assert_true(ms.editing().is_empty(), "back to the list")
+
+
+func test_naming_with_the_pad_letter_grid():
+	_to_build()
+	game.open_menu()
+	var ms: MenuScreen = game.hud.menu
+	ms.open_item(game.menu.items[0])
+	ms.start_naming("grid")
+	assert_eq(ms.naming(), "grid")
+	for k in 7:
+		ms._rub_out()
+	assert_true(ms.select("L:%d" % MenuScreen.LETTERS.find("D")))
+	game.act(0, "use")
+	ms._type_letter("I")
+	ms._type_letter("N")
+	ms._type_letter("E")
+	ms._type_letter("R")
+	game.act(0, "back")
+	assert_eq(ms.naming(), "")
+	assert_eq(game.menu.items[0].name, "Diner")
+
+
+func test_keys_move_the_highlight_on_the_menu_screen():
+	_to_build()
+	game.open_menu()
+	var ms: MenuScreen = game.hud.menu
+	await get_tree().process_frame   # laid out
+	assert_true(ms.select("add:main"))
+	game.act(0, "right")
+	assert_eq(ms.selected(), "add:side")
+	game.act(0, "left")
+	assert_eq(ms.selected(), "add:main")
+	game.act(0, "up")
+	assert_eq(ms.selected(), "item:%d" % game.menu.items[0].id, "the Burger is above Add")
+	game.act(0, "use")
+	assert_eq(ms.editing(), game.menu.items[0])
+	game.act(0, "back")
+	assert_true(ms.editing().is_empty())
+	game.act(0, "back")
+	assert_false(game.hud.menu_open())
+
+
+func test_night_zero_hints_come_one_at_a_time():
+	game.menu.items.clear()
+	for c in [Vector2i(0, 2), Vector2i(0, 3), Vector2i(0, 4), Vector2i(0, 6)]:
+		var st: Station = game.stations[c]
+		game._unregister(st)
+		st.queue_free()
+	_to_build()
+	game.ledger.history.clear()   # as on the night before day 1
+	assert_eq(game.night_hint(), game.NIGHT_HINTS[0])
+	game.add_station("crate_bun", Vector2i(0, 6), 1, 1)
+	assert_eq(game.night_hint(), game.NIGHT_HINTS[0], "a tool too")
+	game.add_station("board", Vector2i(0, 3), 1, 1)
+	assert_eq(game.night_hint(), game.NIGHT_HINTS[1])
+	game.menu.add("main", ["bun"], "Bread")
+	assert_eq(game.night_hint(), game.NIGHT_HINTS[2])
+	game.ledger.history.append({})
+	assert_eq(game.night_hint(), "", "only on night zero")

@@ -15,10 +15,11 @@ extends CanvasLayer
 ## for the screen at any moment. Co-op seats a pad to a new player index.
 ##
 ## Keys: WASD or arrows walk (and browse), E/Space use, Enter confirm, Esc back,
-## R turn, X sell, Tab shop, T town, O options, F search, M mute.
+## R turn, X sell, Tab shop, T town, O options, F search, M mute, N the menu screen
+## (R on an ingredient station at night switches its stock).
 ## Controller: left stick or d-pad walk (the d-pad also browses), A use (confirm
 ## on the receipt and the end screen), B back, X sell, Y shop (town on the
-## receipt), LB/RB turn, Start options.
+## receipt), LB/RB turn, Start options, Back the menu screen.
 ## Touch: a joystick bottom left, a column of round buttons on the right; taps on
 ## the room still pick guests and place pieces, as a mouse click would.
 
@@ -32,23 +33,24 @@ const USE_R := 66.0
 ## What each action is called on screen, per mode.
 const GLYPHS := {
 	"keys": {"move": "WASD", "use": "E", "back": "Esc", "turn": "R", "sell": "X", "shop": "Tab",
-		"confirm": "Enter", "town": "T", "options": "O", "search": "F", "browse": "Arrows"},
+		"confirm": "Enter", "town": "T", "options": "O", "search": "F", "browse": "Arrows", "menu": "N"},
 	"pad": {"move": "Stick", "use": "A", "back": "B", "turn": "RB", "sell": "X", "shop": "Y",
-		"confirm": "A", "town": "Y", "options": "Start", "search": "", "browse": "D-pad"},
+		"confirm": "A", "town": "Y", "options": "Start", "search": "", "browse": "D-pad", "menu": "Back"},
 	"touch": {"move": "Joystick", "use": "Use", "back": "Back", "turn": "Turn", "sell": "Sell", "shop": "Shop",
-		"confirm": "Tap", "town": "Tap", "options": "Menu", "search": "", "browse": "Swipe"},
+		"confirm": "Tap", "town": "Tap", "options": "Menu", "search": "", "browse": "Swipe", "menu": "Dishes"},
 }
 ## The keyboard's actions. WASD and the arrows also walk (read in move()).
 const KEY_ACTIONS := {
 	KEY_E: "use", KEY_SPACE: "use", KEY_ENTER: "confirm", KEY_KP_ENTER: "confirm",
 	KEY_ESCAPE: "back", KEY_R: "turn", KEY_X: "sell", KEY_TAB: "shop", KEY_T: "town",
-	KEY_O: "options", KEY_F: "search", KEY_SLASH: "search", KEY_M: "mute",
+	KEY_O: "options", KEY_F: "search", KEY_SLASH: "search", KEY_M: "mute", KEY_N: "menu",
 	KEY_UP: "up", KEY_W: "up", KEY_DOWN: "down", KEY_S: "down",
 	KEY_LEFT: "left", KEY_A: "left", KEY_RIGHT: "right", KEY_D: "right",
 }
 const PAD_ACTIONS := {
 	JOY_BUTTON_A: "use", JOY_BUTTON_B: "back", JOY_BUTTON_X: "sell", JOY_BUTTON_Y: "shop",
 	JOY_BUTTON_LEFT_SHOULDER: "turn", JOY_BUTTON_RIGHT_SHOULDER: "turn", JOY_BUTTON_START: "options",
+	JOY_BUTTON_BACK: "menu",
 	JOY_BUTTON_DPAD_UP: "up", JOY_BUTTON_DPAD_DOWN: "down",
 	JOY_BUTTON_DPAD_LEFT: "left", JOY_BUTTON_DPAD_RIGHT: "right",
 }
@@ -296,13 +298,13 @@ func buttons() -> Array:
 	var y := r.size.y - 112.0
 	var hand: Dictionary = game.hand
 	var build: bool = game.phase == game.Phase.BUILD
-	if _options():   # the card's own buttons are big enough to tap
+	if _options() or game.hud.menu_open():   # the card's own buttons are big enough to tap
 		pass
 	elif game.phase == game.Phase.SERVICE or (build and not game.shopping):
 		var word: String = game.hud.last_action if game.hud.last_action != "" else "Use"
 		out.append(["use", word, Vector2(x, y), USE_R])
 		y -= USE_R + BTN_R + 16.0
-	if build and not game.shopping:
+	if build and not game.shopping and not game.hud.menu_open():
 		if not hand.is_empty():
 			out.append(["back", "Done" if Catalog.is_build_tool(hand.id) else "Drop", Vector2(x, y), BTN_R])
 			y -= BTN_R * 2 + 14.0
@@ -316,6 +318,13 @@ func buttons() -> Array:
 					out.append(["sell", "Sell", Vector2(x, y), BTN_R])
 					y -= BTN_R * 2 + 14.0
 		out.append(["shop", "Shop", Vector2(x, y), BTN_R])
+		y -= BTN_R * 2 + 14.0
+		if hand.is_empty():
+			out.append(["menu", "Dishes", Vector2(x, y), BTN_R])
+			y -= BTN_R * 2 + 14.0
+			var crate: Station = game.stock_station_in_front()
+			if crate != null:
+				out.append(["turn", "Unstock" if crate.stocked else "Stock", Vector2(x, y), BTN_R])
 	elif build and game.shopping:
 		out.append(["back", "Close", Vector2(x, 70.0), BTN_R])
 	out.append(["options", "Menu", Vector2(r.size.x - 60.0, 196.0), 30.0])
@@ -336,7 +345,8 @@ func _options() -> bool:
 
 
 func _stick_shown() -> bool:
-	return _touch_who().mode == "touch" and not _options() and (game.phase == game.Phase.SERVICE or (game.phase == game.Phase.BUILD and not game.shopping))
+	return _touch_who().mode == "touch" and not _options() and (game.phase == game.Phase.SERVICE \
+		or (game.phase == game.Phase.BUILD and not game.shopping and not game.hud.menu_open()))
 
 
 ## What a touch at this point would press: "stick", a button id, or "".

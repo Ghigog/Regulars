@@ -5,7 +5,7 @@ extends RefCounted
 const MAX_STRIKES := 3
 const XP_PER_LEVEL := 100
 
-var money := 50
+var money := 150   # tunable: buys one simple main with change for a second ingredient
 var xp := 0
 var day := 1
 var today := _blank()
