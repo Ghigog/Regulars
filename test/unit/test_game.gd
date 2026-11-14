@@ -1224,6 +1224,102 @@ func test_decor_cheers_a_guest_once_by_how_close_it_is():
 	assert_almost_eq(g.mood.joy, 0.2 + game.decor_bonus(on_rug).joy, 0.0001, "the rug went, and its cheer with it")
 
 
+## The share of `id` a seat really gets, from decor_near once a piece is placed.
+func _placed_share(seat: Vector2i, id: String) -> float:
+	var best := 0.0
+	for n: Dictionary in game.decor_near(seat):
+		if n.id == id:
+			best = maxf(best, Decor.share(id, int(n.dist), int(n.get("tier", 1))))
+	return best
+
+
+## Checks every seat's mark against what it gets once placed; returns the marks seen.
+func _marks_tell_the_truth(marks: Dictionary, id: String) -> Dictionary:
+	var seen := {}
+	for s: Vector2i in marks:
+		assert_eq(marks[s].share, _placed_share(s, id), "%s at %s" % [id, s])
+		seen[marks[s].mark] = true
+	return seen
+
+
+func test_a_marble_drag_shows_every_seat_it_would_cheer():
+	_to_build()
+	game.ledger.xp = 500
+	game.ledger.money = 1000
+	assert_true(game.pick_catalog("floor_marble"))
+	var drag := {"from": Vector3(6.5, 0, 2.5), "remove": false}
+	var pr: Dictionary = game.piece_reach(game.hand, Vector3(9.5, 0, 4.5), drag)
+	assert_eq(pr.area, Rect2i(), "no pale square for a floor")
+	var marks: Dictionary = game.reach_marks(pr)
+	for s: Vector2i in [Vector2i(7, 3), Vector2i(9, 3)]:
+		assert_eq(marks[s].mark, Decor.MARK_ON, "every seat on the rectangle")
+	assert_eq(marks[Vector2i(7, 1)].mark, Decor.MARK_BESIDE)
+	assert_eq(game.piece_reach(game.hand, Vector3(9.5, 0, 4.5), {"from": drag.from, "remove": true}), {},
+		"nothing for a removing drag")
+	# A narrower strip, really laid: on, in view and out of reach all match.
+	drag = {"from": Vector3(9.5, 0, 3.5), "remove": false}
+	marks = game.reach_marks(game.piece_reach(game.hand, Vector3(9.5, 0, 4.5), drag))
+	assert_gt(game.finish_drag(drag.from, Vector3(9.5, 0, 4.5), false), 0)
+	var seen := _marks_tell_the_truth(marks, "floor_marble")
+	for m in [Decor.MARK_ON, Decor.MARK_VIEW, Decor.MARK_NONE]:
+		assert_true(seen.has(m), "the strip reaches seats %s (seen %s)" % [m, seen.keys()])
+	game.cancel_hand()
+	assert_true(game.pick_catalog("floor_tile"))
+	assert_eq(game.piece_reach(game.hand, Vector3(6.5, 0, 2.5), {}), {}, "plain tile shows nothing")
+
+
+func test_a_carried_rug_shows_its_reach_truly():
+	_to_build()
+	assert_true(game.pick_up(Vector3(8.5, 0, 4.5)))   # the old rug goes, so only the new one counts
+	assert_true(game.sell_hand())
+	game.ledger.money = 100
+	assert_true(game.pick_catalog("rug"))
+	var pr: Dictionary = game.piece_reach(game.hand, Vector3(6.5, 0, 1.5), {})
+	assert_true(pr.area.has_point(Vector2i(9, 3)), "the rug keeps a square, VIEW_RANGE round it")
+	var marks: Dictionary = game.reach_marks(pr)
+	assert_true(game.place(Vector3i(6, 1, 0)))
+	var seen := _marks_tell_the_truth(marks, "rug")
+	for m in [Decor.MARK_ON, Decor.MARK_BESIDE, Decor.MARK_VIEW]:
+		assert_true(seen.has(m), "the rug reaches seats %s (seen %s)" % [m, seen.keys()])
+	game.cancel_hand()
+	game._update_range()
+	assert_eq(game._range_key, "", "nothing in hand, no marks")
+
+
+func test_paint_marks_the_seats_against_the_wall_and_in_view():
+	_to_build()
+	game.ledger.xp = 500
+	game.ledger.money = 1000
+	assert_true(game.pick_catalog("paper_rose"))
+	var drag := {"from": Vector3(4, 0, 0), "remove": false}
+	var pr: Dictionary = game.piece_reach(game.hand, Vector3(10, 0, 0), drag)
+	assert_eq(pr.area, Rect2i(), "no pale square for a wall")
+	var marks: Dictionary = game.reach_marks(pr)
+	assert_eq(marks[Vector2i(5, 1)].mark, Decor.MARK_BESIDE, "against the wall")
+	assert_gt(game.finish_drag(drag.from, Vector3(10, 0, 0), false), 0)
+	var seen := _marks_tell_the_truth(marks, "paper_rose")
+	assert_true(seen.has(Decor.MARK_VIEW) and seen.has(Decor.MARK_NONE), "seen %s" % [seen.keys()])
+	assert_false(seen.has(Decor.MARK_ON), "nobody sits on a wall")
+	game._drag = drag
+	game._demo_hover = Vector3(10, 0, 0)
+	game._update_range()
+	assert_gt(game._range_marks.get_child_count(), 5, "a mark for every seat")
+
+
+func test_a_seat_at_the_decor_cap_is_marked_full():
+	_to_build()
+	game.ledger.xp = 500
+	game.ledger.money = 1000
+	assert_true(game.pick_catalog("floor_marble"))
+	assert_eq(game.finish_drag(Vector3(9.5, 0, 3.5), Vector3(9.5, 0, 3.5), false), 1)
+	assert_true(Decor.is_full(game.decor_near(Vector2i(9, 3))), "on the rug and on marble")
+	assert_true(game.pick_catalog("paint"))
+	var marks: Dictionary = game.reach_marks(game.piece_reach(game.hand, Vector3(10, 0, 3.5), {}))
+	assert_gt(marks[Vector2i(9, 3)].share, 0.0)
+	assert_true(marks[Vector2i(9, 3)].full, "more decor adds nothing there")
+	assert_false(marks[Vector2i(5, 1)].full)
+
+
 func test_seated_guests_get_the_decor_bonus_as_they_sit():
 	var g := _seat_at(Vector2i(8, 3), true)     # seat (7, 3), on the rug
 	assert_not_null(g)

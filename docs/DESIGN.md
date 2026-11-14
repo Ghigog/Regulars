@@ -141,11 +141,20 @@ many days as you can; three walkouts in one day ends the run.
   On touch the frame and key line go, buttons and slider grabbers grow to thumb size, and
   only the Menu button stays over the card. The chef cannot walk while it is open.
 - **Reach marks.** While a piece with a reach is carried (a fern: 2 + tier cells; the bin:
-  5), a pale square on the floor shows how far it goes from the spot in front and a
-  brighter 3 x 3 the cells beside it. Every seat has a disc: big and green beside it (a
-  fern gives half its joy), small and pale green in view (a fifth), red if not reached
-  (out of range or behind a partition). Green means "reached", so for the bin green is
-  the bad news.
+  5; a fine floor, paint, wallpaper or a rug: `Decor.VIEW_RANGE`, 3), every seat gets a
+  mark for the share of the piece's joy it would get, worked out by the same sight rule
+  the decor bonus uses (`Decor.nearest` and `Decor.share`), so the marks are always true:
+  a white-rimmed green square on it (all its joy: the seat is on this floor or rug), a
+  big green disc beside it (half), a small pale green disc in view (a fifth), red if not
+  reached (out of range or behind a partition). A seat whose decor joy is already at
+  `Decor.CAP` gets a white "full" tick: more decor adds nothing there. The fern and the
+  bin wash the floor with a pale square for their reach and a brighter 3 x 3 for the
+  cells beside; a rug washes `VIEW_RANGE` round its six cells. Floors and finishes have
+  no square, only the seat marks. A floor drag marks the whole rectangle; a paint or
+  paper drag the whole wall run, each face cheering only its own side. Green means
+  "reached", so for the bin green is the bad news. One gap: a floor dragged out past the
+  room's edge takes that outer wall down once laid, but the marks are worked out with the
+  wall still up, so a seat that would then see the new floor shows red.
   Stoves (seen from 7 cells) are not marked.
 - **The door card.** An OPEN / CLOSED card hangs on a string in the doorway. In the build
   phase, E at the doorway flips it to OPEN and starts the day (there is no button). From
@@ -267,9 +276,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Two currencies**: money (earned per day) and XP (10 per meal plus the tip; 100 per level).
 - **Built**: moving, selling and rotating furniture (section 1).
 - **Built**: floor and wall finishes that cheer seated guests, and movable rugs (section 1).
-- **To add**: buying more lot, themes that change the catalog. A reach display for
-  finishes and rugs, like the fern's, is not built: their effect only shows in guests'
-  thoughts.
+- **To add**: buying more lot, themes that change the catalog.
 
 ## 5. Characters (Sims layer)
 

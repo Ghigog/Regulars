@@ -628,6 +628,48 @@ func test_decor_gives_most_on_it_less_beside_and_least_in_view():
 	assert_eq(Decor.bonus([]).best, "")
 
 
+func test_decor_sight_is_the_nearest_cell_in_reach_and_view():
+	var g := Grid.new(6, 3)
+	var seat := Vector2i(0, 1)
+	assert_eq(Decor.nearest(g, seat, [Vector2i(3, 1), Vector2i(2, 2)], 3), 2, "the nearest cell counts")
+	assert_eq(Decor.nearest(g, seat, [Vector2i(4, 1)], 3), -1, "out of reach")
+	assert_eq(Decor.nearest(g, seat, [seat], 3), 0, "under the seat")
+	g.walls[Vector3i(1, 0, 1)] = true
+	g.walls[Vector3i(1, 1, 1)] = true
+	g.walls[Vector3i(1, 2, 1)] = true
+	assert_eq(Decor.nearest(g, seat, [Vector2i(2, 1)], 3), -1, "a partition blocks it")
+	assert_eq(Decor.share("floor_marble", 0), Decor.ON)
+	assert_eq(Decor.share("paint", 0), Decor.BESIDE, "nobody sits on a wall")
+	assert_eq(Decor.share("rug", 2), Decor.IN_VIEW)
+	assert_eq(Decor.share("rug", -1), 0.0)
+	assert_eq(Decor.share("plant", 4, 2), Decor.IN_VIEW, "a better fern is seen further")
+
+
+func test_decor_marks_have_four_levels_and_a_full_flag():
+	assert_eq(Decor.mark(Decor.ON), Decor.MARK_ON)
+	assert_eq(Decor.mark(Decor.BESIDE), Decor.MARK_BESIDE)
+	assert_eq(Decor.mark(Decor.IN_VIEW), Decor.MARK_VIEW)
+	assert_eq(Decor.mark(0.0), Decor.MARK_NONE)
+	assert_true(Decor.is_full([{"id": "rug", "dist": 0}, {"id": "floor_marble", "dist": 0}]), "0.15 + 0.2 is the cap")
+	assert_false(Decor.is_full([{"id": "rug", "dist": 0}]))
+
+
+func test_a_wall_finish_only_cheers_its_own_side():
+	var p := Floorplan.new(Rect2i(0, 0, 5, 5))
+	p.fill(Rect2i(0, 0, 5, 2), "tile")
+	var outer := Vector3i(2, 0, 0)            # the north wall of (2, 0): only floor on one side
+	assert_eq(Decor.finish_cells(p, [outer]), [Vector2i(2, 0)] as Array[Vector2i])
+	var inner := Vector3i(2, 1, 0)            # between (2, 1) and (2, 0)
+	assert_eq(Decor.finish_cells(p, [inner]).size(), 2)
+	var g := Grid.new(5, 2)
+	var seat := Vector2i(2, 1)
+	assert_eq(Decor.share_from(g, seat, "paint", Decor.finish_cells(p, [outer])), Decor.BESIDE)
+	for x in 5:
+		g.walls[Vector3i(x, 1, 0)] = true      # a wall between the rows
+	assert_eq(Decor.share_from(g, seat, "paint", Decor.finish_cells(p, [outer])), 0.0,
+		"the far room's painted wall is not seen through the wall")
+
+
 func test_decor_counts_each_kind_once_and_kinds_stack_to_a_cap():
 	var two_rugs: float = Decor.bonus([{"id": "rug", "dist": 0}, {"id": "rug", "dist": 1}, {"id": "rug", "dist": 2}]).joy
 	assert_almost_eq(two_rugs, Catalog.joy_of("rug"), 0.0001, "the best of a kind, not the sum")
