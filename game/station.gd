@@ -2,10 +2,11 @@ class_name Station
 extends Node3D
 ## One piece of furniture occupying a grid cell.
 
-const COOK_TIME := 4.0     # raw until here
-const PERFECT_END := 7.5   # juicy until here, then it dries out
-const BURN_TIME := 12.0
-const NEARLY_TIME := 2.4   # the raw patty starts to colour
+const COOK_TIME := Prep.GRILL_DONE       # raw until here
+const PERFECT_END := Prep.GRILL_PERFECT  # juicy until here, then it dries out
+const BURN_TIME := Prep.GRILL_BURN
+const NEARLY_TIME := Prep.GRILL_NEARLY   # the raw patty starts to colour
+const TRAYS := 4           # trays in a new tray stack
 const DIAL_SWEEP := 150.0  # degrees either side of straight up
 const SINK_PILED := 3      # this many plates soaking and the washing-up shows (and bothers guests)
 const BIN_HOLDS := 4       # scraps a bin takes before it overflows
@@ -15,11 +16,14 @@ var cell := Vector2i.ZERO
 var tier := 1
 var facing := 0       # quarter turns; 0 puts the front toward +z
 var lamp: OmniLight3D # a table's lamp light, owned by the game
-var item := ""        # what is sitting on a counter or stove
-var quality := 1.0    # how well cooked that item is (0..1)
-var cook := 0.0       # seconds the stove's patty has been on the heat
-var count := 0        # clean plates in a plate stack; scraps in a bin
-var dirty := 0        # dirty plates left on a table, or soaking in a sink
+var item := ""        # what is sitting on a counter or stove: an ingredient kind ("raw:patty") or "tray"
+var quality := 1.0    # how well prepped that item is (0..1)
+var tray: Tray        # the tray on a counter or the pass, when item is "tray"
+var tray_tag := ""    # the colour of that tray's ticket slip ("" for none)
+var stocked := true   # an ingredient station: stocked for tomorrow (switched at night)
+var cook := 0.0       # seconds the stove's piece has been on the heat
+var count := 0        # clean trays in a tray stack; scraps in a bin
+var dirty := 0        # dirty trays left on a table, or soaking in a sink
 var dirty_age := 0.0  # seconds this piece has been messy (see `messy`)
 var seats: Array[Vector2i] = []
 var _item_node: Node3D
@@ -33,17 +37,20 @@ var _fx := {}
 
 
 static func quality_at(t: float) -> float:
-	if t < COOK_TIME or t >= BURN_TIME:
-		return 0.0
-	if t <= PERFECT_END:
-		return 1.0
-	return lerpf(1.0, 0.4, (t - PERFECT_END) / (BURN_TIME - PERFECT_END))
+	return float(Prep.grill(t).quality)
 
 
+## How a piece on the heat shows after `t` seconds: raw, prepped or burnt.
 static func stage_at(t: float) -> String:
 	if t < COOK_TIME:
-		return "raw_patty"
-	return "cooked_patty" if t < BURN_TIME else "burnt_patty"
+		return "raw"
+	return "prep" if t < BURN_TIME else "burnt"
+
+
+## The ingredient sitting here ("" if none or a tray).
+func ingredient() -> String:
+	var p := Tray.parse(item)
+	return p.id if not p.is_empty() else ""
 
 
 ## Which of the five patty looks a patty has after `t` seconds on the heat.
@@ -66,8 +73,8 @@ func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0) -> void:
 	add_child(_vis)
 	Build.station(_vis, type, tier)
 	place_at(cell_, facing)
-	if type == "plates":
-		count = 4
+	if type == "trays":
+		count = TRAYS
 	if type == "stove":
 		_ring = _vis.get_node_or_null("ring")
 		_make_cook_bar()
@@ -80,8 +87,12 @@ func _show_item(kind: String) -> void:
 		_item_node.queue_free()
 		_item_node = null
 	_shown_look = ""
-	if kind != "":
-		var on_heat := type == "stove" and kind.ends_with("patty")
+	if kind == "tray" and tray != null:
+		_item_node = Build.tray(tray, tray_tag)
+		_item_node.position = Vector3(0, 0.9, 0)
+		add_child(_item_node)
+	elif kind != "":
+		var on_heat := type == "stove"
 		_shown_look = patty_look(cook) if on_heat else Build.look_for(kind, quality)
 		_item_node = Build.item(kind, quality, _shown_look)
 		_item_node.position = Vector3(Build.PAN.x, 0.93, Build.PAN.z) if type == "stove" else Vector3(0, 0.9, 0)
@@ -94,11 +105,27 @@ func _show_item(kind: String) -> void:
 func set_item(kind: String, q := 1.0) -> void:
 	item = kind
 	quality = q
+	if kind != "tray":
+		tray = null
 	if type == "stove":
-		cook = {"cooked_patty": PERFECT_END, "burnt_patty": BURN_TIME}.get(kind, 0.0)
+		cook = {"prep": PERFECT_END, "burnt": BURN_TIME}.get(Tray.parse(kind).get("state", ""), 0.0)
 	_show_item(kind)
 	if type == "stove":
 		_update_cooking_visuals()
+
+
+## Puts a tray down here (a counter or the pass).
+func set_tray(t: Tray, tag := "") -> void:
+	tray = t
+	tray_tag = tag
+	item = "tray"
+	_show_item("tray")
+
+
+## Redraws the tray after something was added or it changed ticket.
+func show_tray() -> void:
+	if item == "tray":
+		_show_item("tray")
 
 
 ## Quality of whatever is here right now; a stove reads it off the timer.
@@ -106,20 +133,21 @@ func current_quality() -> float:
 	return quality_at(cook) if type == "stove" else quality
 
 
-## Advances cooking. Returns the new stage name when the meat changes, else "".
+## Advances cooking. Returns the new stage ("prep" or "burnt") when it changes, else "".
 func tick_cooking(delta: float) -> String:
-	if type != "stove" or (item != "raw_patty" and item != "cooked_patty"):
+	if not is_cooking():
 		return ""
 	cook += delta * tier
 	_update_cooking_visuals()
+	var p := Tray.parse(item)
 	var stage := stage_at(cook)
-	if stage == item:
+	if stage == p.state:
 		if patty_look(cook) != _shown_look:
 			_show_item(item)
 			_update_cooking_visuals()
 		return ""
-	item = stage
-	_show_item(stage)
+	item = Tray.kind(stage, p.id)
+	_show_item(item)
 	_update_cooking_visuals()
 	return stage
 
@@ -168,7 +196,7 @@ func _make_smoke() -> void:
 
 
 func is_cooking() -> bool:
-	return type == "stove" and (item == "raw_patty" or item == "cooked_patty")
+	return type == "stove" and item != "" and not item.begins_with("burnt")
 
 
 func _update_cooking_visuals() -> void:
@@ -176,7 +204,7 @@ func _update_cooking_visuals() -> void:
 	_needle.rotation.z = -deg_to_rad(_dial_angle(cook))
 	if _ring:
 		_ring.material_override = Build.mat(Color("#ff8a3c") if is_cooking() else Color(Build.STEEL_DARK), 1.6 if is_cooking() else 0.0)
-	var look := _shown_look if item.ends_with("patty") else ""
+	var look := _shown_look if item != "" else ""
 	_fx.steam.visible = look == "raw" or look == "nearly" or look == "perfect"
 	_fx.spatter.visible = look == "nearly" or look == "perfect"
 	_fx.smoke.visible = look == "dry"
@@ -237,14 +265,16 @@ func refresh() -> void:
 		_stack.queue_free()
 	_stack = Node3D.new()
 	add_child(_stack)
-	if type == "plates":
+	if type == "trays":
 		for i in count:
-			var plate := Build.item("plate")
-			plate.position = Vector3(0, 0.916 + i * 0.032, 0)
-			_stack.add_child(plate)
+			var t := Build.item("tray")
+			t.position = Vector3(0, 0.916 + i * 0.04, 0)
+			_stack.add_child(t)
+	elif Catalog.ingredient_of(type) != "" and not stocked:
+		Build.unstocked(_stack)
 	elif is_table(type):
 		for i in dirty:
-			var d := Build.item("dirty_plate")
+			var d := Build.item("dirty_tray")
 			d.position = Vector3(-0.25 + (i % 2) * 0.5, 0.74, 0.3 - (i / 2) * 0.6)
 			_stack.add_child(d)
 	elif type == "sink":
@@ -259,7 +289,7 @@ func refresh() -> void:
 			_fx.erase("wisps")
 
 
-## A little show when the chef uses the station: the fridge door swings open.
+## A little show when the chef uses the station: a door swings open.
 func used() -> void:
 	var door := _vis.get_node_or_null("door") as Node3D
 	if door:

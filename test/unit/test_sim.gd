@@ -410,13 +410,14 @@ func test_catalog_is_gated_by_money_and_level():
 	var c := Catalog.new()
 	assert_true(c.can_buy("plant", 20, 1))
 	assert_false(c.can_buy("plant", 19, 1))
-	assert_false(c.can_buy("stove", 999, 2))
-	assert_true(c.can_buy("stove", 80, 3))
+	assert_false(c.can_buy("stove", 49, 1))
+	assert_true(c.can_buy("stove", 50, 1), "a first kitchen can buy a stove at level 1")
+	assert_false(c.can_buy("ready_cheese", 999, 1), "ready-made needs level 2")
 
 
 func test_higher_tiers_cost_more_and_need_more_levels():
 	var c := Catalog.new(1)
-	assert_eq(Catalog.price_of("stove", 2), 160)
+	assert_eq(Catalog.price_of("stove", 2), 100)
 	assert_eq(Catalog.price_of("plant", 3), 80)
 	assert_eq(Catalog.level_of("table", 3), 4)
 	assert_true(c.can_buy("plant", 40, 2, 2))
@@ -427,13 +428,15 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 28, "three single-tier pieces, five with three tiers and ten build tools")
+	assert_eq(Catalog.search().size(), 64, "25 room pieces, five tools of three tiers, 18 ingredient stations and 6 ready-made")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 3)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
-	var kitchen := Catalog.search("", "Kitchen")
-	assert_eq(kitchen.size(), 4)
-	assert_eq(kitchen[0].id, "counter")
+	var kitchen := Catalog.search("", "Kitchen", "diner")
+	assert_eq(kitchen.size(), 29, "the counter, five tools, nine diner stations and four ready-made")
+	assert_eq(kitchen[0].id, "crate_bun", "cheapest first, then by name")
+	assert_eq(Catalog.search("", "Kitchen", "seaside").filter(func(bp: Dictionary) -> bool:
+		return Catalog.ITEMS[bp.id].get("theme", "seaside") != "seaside").size(), 0, "only the run's theme")
 	assert_eq(Catalog.search("two more seats").size(), 1, "matches what a piece does")
 	assert_eq(Catalog.search("stove ++").size(), 1)
 	assert_eq(Catalog.search("fern", "Kitchen").size(), 0)
@@ -792,7 +795,7 @@ func test_cleaning_knows_what_is_still_dirty():
 
 
 func test_cleaning_names_the_night_actions_and_nothing_else():
-	assert_eq(Cleaning.night_action("Clear plate"), "Clear table")
+	assert_eq(Cleaning.night_action("Clear tray"), "Clear table")
 	assert_eq(Cleaning.night_action("Wash"), "Wash up")
 	assert_eq(Cleaning.night_action("Empty bin"), "Take the bag out")
 	assert_eq(Cleaning.night_action("Put in sink"), "Put in sink")
@@ -801,7 +804,7 @@ func test_cleaning_names_the_night_actions_and_nothing_else():
 
 
 func test_cleaning_carried_mess_is_a_plate_or_the_bag():
-	assert_true(Cleaning.carrying_mess("dirty_plate"))
+	assert_true(Cleaning.carrying_mess("dirty_tray"))
 	assert_true(Cleaning.carrying_mess("rubbish_bag"))
 	assert_false(Cleaning.carrying_mess(""))
 	assert_false(Cleaning.carrying_mess("plate"))

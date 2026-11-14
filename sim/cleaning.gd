@@ -10,12 +10,12 @@ const AGES_AT_NIGHT := false   # tunable: whether mess grows older in the build 
 
 ## What the chef can be holding that is mess: while carried, the shop stays shut
 ## and no piece can be picked up.
-const CARRIED_MESS: Array[String] = ["dirty_plate", "rubbish_bag"]
+const CARRIED_MESS: Array[String] = ["dirty_tray", "rubbish_bag"]
 
 ## The service actions that are cleaning, and what the prompt calls each at night.
 ## Any other action a station offers is not available in the build phase.
 const NIGHT_ACTIONS := {
-	"Clear plate": "Clear table",
+	"Clear tray": "Clear table",
 	"Put in sink": "Put in sink",
 	"Wash": "Wash up",
 	"Empty bin": "Take the bag out",

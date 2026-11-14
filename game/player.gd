@@ -5,11 +5,13 @@ extends Node3D
 const SPEED := 4.4
 const RADIUS := 0.28
 const REACH := 1.3   # how far from a station's centre (or a seated guest) the chef can use it
-const GROSS_ITEMS: Array[String] = ["dirty_plate", "burnt_patty", "rubbish_bag"]
+const GROSS_ITEMS: Array[String] = ["dirty_tray", "rubbish_bag"]   # and anything burnt
 
 var game
 var held := ""
 var held_quality := 1.0
+var tray: Tray                    # the tray in hand, when held is "tray"
+var tray_tag := ""                # the colour of its ticket slip
 var facing := Vector2i(0, 1)      # nearest grid direction to `aim`
 var aim := Vector3(0, 0, 1)       # the way the chef is really looking (any of 8 ways)
 var _velocity := Vector3.ZERO
@@ -26,15 +28,17 @@ func setup(game_, start: Vector2i) -> void:
 	add_child(Peg.rigged(_body))
 
 
-func set_held(kind: String, quality := 1.0) -> void:
+func set_held(kind: String, quality := 1.0, tray_: Tray = null, tag := "") -> void:
 	held = kind
 	held_quality = quality
+	tray = tray_ if kind == "tray" else null
+	tray_tag = tag if kind == "tray" else ""
 	if _held_node:
 		_held_node.queue_free()
 		_held_node = null
 	_body.pose = "carry" if kind != "" else "idle"
 	if kind != "":
-		_held_node = Build.item(kind, quality)
+		_held_node = Build.tray(tray, tray_tag) if kind == "tray" else Build.item(kind, quality)
 		_held_node.position = Vector3(0, 0.42, 0.34)
 		_body.add_child(_held_node)
 		_held_size = 0.4
@@ -56,7 +60,7 @@ func carry(on: bool) -> void:
 
 
 func carrying_something_gross() -> bool:
-	return GROSS_ITEMS.has(held)
+	return GROSS_ITEMS.has(held) or held.begins_with("burnt:")
 
 
 func cell() -> Vector2i:

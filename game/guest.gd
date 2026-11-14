@@ -14,10 +14,14 @@ var game
 var idx := 0
 var info: Dictionary
 var mood := GuestMood.new()
-var state := "queue"  # queue, to_seat, ordering, waiting (for food), eating, leaving
-## What they asked for once the chef took their order: {"dish": id}. Empty until then.
-## The menu system (DESIGN.md section 9) will fill it from a player-named menu.
+var state := "queue"  # queue, to_seat, ordering, waiting (for food), eating, company, leaving
+## What they asked for once the chef took their order: {main, side, drink} (menu
+## items, any of them {}) and "ticket", the ticket id (-1 if they ordered nothing).
+## Empty until then. `planned` is what they will order, chosen at the door.
 var order := {}
+var planned := {}
+var bill_base := 0       # the tray's price: what the bill is before mood and deals
+var _meal_tray: Tray
 var path: Array[Vector2i] = []
 var goal := Vector3.ZERO  # the exact spot to stop on once the path is walked
 var heading := Vector3.ZERO   # which way they stepped last frame; zero when standing
@@ -164,10 +168,26 @@ func _sit() -> void:
 	game.on_seated(self)
 
 
-## The chef has written down what they want. Now they wait for the food.
+## The chef has written down what they want. Now they wait for the food, or,
+## having found nothing they would eat, keep their friends company.
 func take_order(what: Dictionary) -> void:
 	order = what
-	state = "waiting"
+	state = "company" if int(what.get("ticket", -1)) < 0 else "waiting"
+
+
+## The menu items they ordered, main first.
+func ordered_items() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for c in Menu.COURSES:
+		if order.has(c) and not (order[c] as Dictionary).is_empty():
+			out.append(order[c])
+	return out
+
+
+## What the bubble shows while they wait: the main, or the drink if that is all.
+func want_icon() -> String:
+	var items := ordered_items()
+	return "food" if items.is_empty() else Icons.dish_id(items[0])
 
 
 ## How long this guest eats, once served: longer when they are comfortable.
@@ -176,7 +196,7 @@ var eat_time := EAT_TIME
 
 ## Comfort is read here, as the food arrives and before they taste it. Returns the
 ## thought it prompts ("" for none).
-func start_eating(quality: float) -> String:
+func start_eating(quality: float, tray: Tray = null) -> String:
 	var said := mood.settle_comfort(idx)
 	eat_time = EAT_TIME * GuestMood.stay_scale(mood.served_comfort)
 	mood.taste(quality)
@@ -184,7 +204,8 @@ func start_eating(quality: float) -> String:
 		_heart_time = 2.5
 	state = "eating"
 	timer = eat_time
-	_set_meal("burger", quality)
+	_meal_tray = tray
+	_set_meal("tray", quality)
 	var tw := _body.create_tween()
 	tw.tween_property(_body, "position:y", SEAT_HEIGHT + 0.3, 0.12).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_body, "position:y", SEAT_HEIGHT, 0.25).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
@@ -196,8 +217,9 @@ func _set_meal(kind: String, quality: float) -> void:
 		_meal.queue_free()
 	_meal_kind = kind
 	var to_table := (Grid.center(table.cell) - position).normalized()
-	_meal = Build.item(kind, quality)
-	_meal.position = to_table * 0.62 + Vector3(0, 0.74, 0)
+	_meal = Build.tray(_meal_tray, "", kind == "tray_bitten") if kind.begins_with("tray") else Build.item(kind, quality)
+	_meal.position = to_table * 0.5 + Vector3(0, 0.74, 0)
+	_meal.rotation.y = atan2(to_table.x, to_table.z)
 	add_child(_meal)
 
 
@@ -229,11 +251,17 @@ func tick(delta: float) -> void:
 			timer -= delta
 			# Lean in for a bite, and the burger shrinks as it is eaten.
 			_body.rotation.x = maxf(0.0, sin(_age * 7.0)) * 0.22
-			if timer < eat_time * 0.55 and _meal_kind == "burger":
-				_set_meal("burger_bitten", mood.savour)
+			if timer < eat_time * 0.55 and _meal_kind == "tray":
+				_set_meal("tray_bitten", mood.savour)
 			game.apply_surroundings(self, delta)
 			if timer <= 0.0:
 				game.finish_meal(self)
+		"company":   # nothing to eat: they sit with friends and go when the friends go
+			_face(Grid.center(table.cell) - position, delta)
+			var staying := party.any(func(m) -> bool:
+				return is_instance_valid(m) and m != self and m.state != "leaving" and m.state != "company")
+			if not staying:
+				game.leave_with_friends(self)
 		"leaving":
 			if _advance(delta):
 				game.remove_guest(self)
@@ -276,7 +304,7 @@ func _refresh(delta: float) -> void:
 	elif state == "ordering":
 		want = "order"   # a notepad: come and take my order
 	elif state == "waiting":
-		want = order.get("dish", "food")
+		want = want_icon()
 	elif state == "queue" and p < 0.6:
 		want = "zzz"
 	elif _heart_time > 0.0:

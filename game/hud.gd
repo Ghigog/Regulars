@@ -35,6 +35,8 @@ var money: Label
 var money_tag: Sheet
 var stamps: Array[Punch] = []
 var hint: Label
+var ticket_rail: HBoxContainer
+const RAIL_MAX := 5   # tickets shown on the rail; more are counted on a last tab
 var banner: Sheet
 var banner_label: Label
 var center: CenterContainer
@@ -167,6 +169,55 @@ class Punch extends Icon:
 
 ## Five pips for where a townsperson stands, with an arrow when it moved today.
 ## Read by count and arrow shape, not by colour.
+## A ticket's ingredient marks: a ring per ingredient, filled with a tick once it is
+## on the ticket's tray. Read live from the game, so they tick off as the chef works.
+class Marks extends Control:
+	var game
+	var ticket := -1
+	var line := 0
+	var count := 0
+
+	func _init(game_, ticket_: int, line_: int, count_: int) -> void:
+		game = game_
+		ticket = ticket_
+		line = line_
+		count = count_
+		custom_minimum_size = Vector2(count * 15, 16)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(_d: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		var t: Tray = game.tray_for_ticket(ticket)
+		for k in count:
+			var c := Vector2(7 + k * 15, 8)
+			var have := t != null and line < t.lines.size() and float(t.lines[line].have[k]) >= 0.0
+			draw_circle(c, 6.5, Hud.INK)
+			draw_circle(c, 4.5, Color("#6fcf97") if have else Hud.PAPER)
+			if have:   # a tick, so a done mark differs by shape as well as colour
+				draw_polyline(PackedVector2Array([c + Vector2(-3, 0), c + Vector2(-1, 2.5), c + Vector2(3.5, -3)]), Hud.INK, 2.0)
+
+
+## The face on a ticket: a token in the guest's shirt colour with their initial.
+class Face extends Control:
+	var col := Color.WHITE
+	var letter := ""
+
+	func _init(col_: Color, letter_: String) -> void:
+		col = col_
+		letter = letter_
+		custom_minimum_size = Vector2(28, 28)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		draw_circle(Vector2(14, 15), 13, Hud.SHADOW)
+		draw_circle(Vector2(14, 14), 13, Hud.INK)
+		draw_circle(Vector2(14, 14), 10.5, col)
+		var f := Hud.lettering()
+		draw_string(f, Vector2(14 - f.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x / 2, 20), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Hud.CREAM)
+
+
 class Pips extends Control:
 	var filled := 0
 	var trend := 0
@@ -735,6 +786,17 @@ func setup(game_) -> void:
 		slots.add_child(stamp)
 		stamps.append(stamp)
 
+	# Top middle: the rail of open tickets, oldest on the left.
+	ticket_rail = HBoxContainer.new()
+	ticket_rail.anchor_left = 0.5
+	ticket_rail.anchor_right = 0.5
+	ticket_rail.offset_top = 14
+	ticket_rail.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	ticket_rail.alignment = BoxContainer.ALIGNMENT_CENTER
+	ticket_rail.add_theme_constant_override("separation", 8)
+	ticket_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(ticket_rail)
+
 	hint = _label(root, 15)
 	hint.anchor_top = 1.0
 	hint.anchor_bottom = 1.0
@@ -842,7 +904,7 @@ func _label(parent: Node, font_size: int, text := "") -> Label:
 
 
 const STATE_WORDS := {"queue": "Queueing outside", "to_seat": "Finding a seat", "ordering": "Waiting to order", "waiting": "Waiting for food",
-	"eating": "Eating", "leaving": "Leaving"}
+	"eating": "Eating", "company": "Found nothing they liked", "leaving": "Leaving"}
 
 
 ## The guest card (click a guest): who they are, how they feel and what they have
@@ -898,7 +960,7 @@ func _update_guest() -> void:
 	_guest_state.text = STATE_WORDS.get(_guest.state, "")
 	_guest_bill.visible = m.served_comfort >= 0.0
 	if _guest_bill.visible:
-		_guest_bill.text = _bill_words(m, game.BILL)
+		_guest_bill.text = _bill_words(m, _guest.bill_base)
 	for id: String in _guest_meters:
 		_guest_meters[id].value = float(m.get(id))
 		_guest_meters[id].queue_redraw()
@@ -1168,6 +1230,52 @@ func show_prompt(at: Vector2, text: String) -> void:
 		prompt.reset_size()
 		prompt.position = (at - Vector2(prompt.size.x / 2.0, prompt.size.y)).round()
 		prompt.position.y = maxf(prompt.position.y, 6.0)  # never off the top of the screen
+
+
+## Rebuilds the ticket rail from the game's open tickets.
+func refresh_tickets() -> void:
+	if ticket_rail == null:
+		return
+	for c in ticket_rail.get_children():
+		c.queue_free()
+	var shown := 0
+	for tk: Dictionary in game.tickets:
+		if shown >= RAIL_MAX:
+			break
+		shown += 1
+		var card := Sheet.new("paper", 10, 6)
+		ticket_rail.add_child(card)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 2)
+		card.add_child(col)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 6)
+		col.add_child(head)
+		var g: Guest = tk.guest
+		head.add_child(Face.new(Color(g.info.shirt), str(g.info.name).left(1)))
+		_label(head, 18, g.info.name)
+		var tray: Tray = game.tray_for_ticket(int(tk.id))
+		if tray != null:   # a tray is being built for it: a little tray mark
+			head.add_child(Icon.new("tray", 22, false))
+		var line := 0
+		for course in Menu.COURSES:
+			for it: Dictionary in tk.items:
+				if it.course != course:
+					continue
+				var row := HBoxContainer.new()
+				row.add_theme_constant_override("separation", 4)
+				col.add_child(row)
+				row.add_child(Icon.new(Icons.dish_id(it), 22, false))
+				var box := VBoxContainer.new()
+				box.add_theme_constant_override("separation", 0)
+				row.add_child(box)
+				_label(box, 14, it.name)
+				box.add_child(Marks.new(game, int(tk.id), line, it.ingredients.size()))
+				line += 1
+	if game.tickets.size() > shown:
+		var more := Sheet.new("paper", 8, 6)
+		ticket_rail.add_child(more)
+		_label(more, 18, "+%d" % (game.tickets.size() - shown))
 
 
 func say(s: String) -> void:
