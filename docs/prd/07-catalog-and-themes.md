@@ -115,6 +115,13 @@ follows the palette roles, and is noted in the style guide.
 
 ## Open
 
-- **The piece list above** is a proposal, not a decision.
-- **Should the theme picker also choose a location** (town size and tastes, as section 7
-  of the design notes describes)? Default: no, theme only.
+Decided by Dylan, 13 November 2026:
+
+- **The piece list in section 2 is approved as written** (12 pieces). More will be
+  added after playtesting.
+- **Two lines are out of date since PRD 1** and go with these defaults: the **dish
+  rack** lets the sink hold two more dirty *trays* (plates are gone); the **second
+  bin** stays as listed, but no bin is a fixture any more (PRD 1 made every station
+  sellable), so it is simply another bin, and the nearest one is used. The same goes
+  for the second sink.
+- **The theme picker chooses the theme only**, not a location.

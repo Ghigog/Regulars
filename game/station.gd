@@ -8,7 +8,8 @@ const BURN_TIME := Prep.GRILL_BURN
 const NEARLY_TIME := Prep.GRILL_NEARLY   # the raw patty starts to colour
 const TRAYS := 4           # trays in a new tray stack
 const DIAL_SWEEP := 150.0  # degrees either side of straight up
-const SINK_PILED := 3      # this many plates soaking and the washing-up shows (and bothers guests)
+const SINK_PILED := 3      # this many trays soaking and the washing-up shows (and bothers guests)
+const RACK_HOLDS := 2      # a dish rack beside a sink: this many more trays before it looks piled
 const BIN_HOLDS := 4       # scraps a bin takes before it overflows
 
 var type := ""
@@ -30,6 +31,7 @@ var count := 0        # clean trays in a tray stack; scraps in a bin
 var dirty := 0        # dirty trays left on a table, or soaking in a sink
 var dirty_age := 0.0  # seconds this piece has been messy (see `messy`)
 var seats: Array[Vector2i] = []
+var racked := false   # a sink: a dish rack stands beside it (see piled_at)
 var _item_node: Node3D
 var _stack: Node3D
 var _bar: Node3D
@@ -320,7 +322,7 @@ func _update_cooking_visuals() -> void:
 
 ## Redraws plate stacks and dirty dishes.
 ## Pieces guests sit at: each has seats around it and takes dirty plates.
-const TABLES: Array[String] = ["table", "booth", "table4"]
+const TABLES: Array[String] = ["table", "booth", "table4", "stool"]
 
 
 static func is_table(type_: String) -> bool:
@@ -328,12 +330,15 @@ static func is_table(type_: String) -> bool:
 
 
 ## Where a piece's seats are: either side of a table or booth, turning with it,
-## or all four sides of a table for four.
+## all four sides of a table for four, or the one stool at a counter stool's
+## little table (on its +x side, turning with it as the model does).
 static func seats_for(type_: String, cell_: Vector2i, facing_: int) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	if type_ == "table" or type_ == "booth":
 		var side := Vector2i(1, 0) if facing_ % 2 == 0 else Vector2i(0, 1)
 		out = [cell_ - side, cell_ + side]
+	elif type_ == "stool":
+		out = [cell_ + [Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 1)][posmod(facing_, 4)]]
 	elif type_ == "table4":
 		out = [cell_ + Vector2i(-1, 0), cell_ + Vector2i(1, 0), cell_ + Vector2i(0, -1), cell_ + Vector2i(0, 1)]
 	return out
@@ -356,10 +361,15 @@ func messy() -> bool:
 		"table":
 			return dirty > 0
 		"sink":
-			return dirty >= SINK_PILED
+			return dirty >= piled_at(racked)
 		"bin":
 			return overflowing()
 	return false
+
+
+## How many trays soak in a sink before it looks piled: more with a dish rack beside it.
+static func piled_at(rack: bool) -> int:
+	return SINK_PILED + (RACK_HOLDS if rack else 0)
 
 
 func overflowing() -> bool:
@@ -384,7 +394,7 @@ func refresh() -> void:
 			d.position = Vector3(-0.25 + (i % 2) * 0.5, 0.74, 0.3 - (i / 2) * 0.6)
 			_stack.add_child(d)
 	elif type == "sink":
-		Build.sink_load(_stack, dirty, dirty >= SINK_PILED)
+		Build.sink_load(_stack, dirty, messy())
 	elif type == "bin":
 		Build.bin_load(_stack, count, BIN_HOLDS)
 		if overflowing() and not _fx.has("wisps"):

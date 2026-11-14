@@ -428,12 +428,12 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 64, "25 room pieces, five tools of three tiers, 18 ingredient stations and 6 ready-made")
+	assert_eq(Catalog.search().size(), 84, "45 room pieces, five tools of three tiers, 18 ingredient stations and 6 ready-made")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 3)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen", "diner")
-	assert_eq(kitchen.size(), 29, "the counter, five tools, nine diner stations and four ready-made")
+	assert_eq(kitchen.size(), 32, "the counter, a bin, a dish rack, a sink, five tools, nine diner stations and four ready-made")
 	assert_eq(kitchen[0].id, "crate_bun", "cheapest first, then by name")
 	assert_eq(Catalog.search("", "Kitchen", "seaside").filter(func(bp: Dictionary) -> bool:
 		return Catalog.ITEMS[bp.id].get("theme", "seaside") != "seaside").size(), 0, "only the run's theme")
@@ -818,10 +818,11 @@ func test_mess_ages_in_service_only():
 
 
 func test_dirty_note_lists_what_is_left():
-	assert_eq(Cleaning.dirty_note(2, true, true), "Still dirty: 2 tables, the sink, the bin.")
-	assert_eq(Cleaning.dirty_note(1, false, true), "Still dirty: a table, the bin.")
-	assert_eq(Cleaning.dirty_note(0, true, false), "Still dirty: the sink.")
-	assert_eq(Cleaning.dirty_note(0, false, false), "")
+	assert_eq(Cleaning.dirty_note(2, 1, 1), "Still dirty: 2 tables, the sink, the bin.")
+	assert_eq(Cleaning.dirty_note(1, 0, 1), "Still dirty: a table, the bin.")
+	assert_eq(Cleaning.dirty_note(0, 1, 0), "Still dirty: the sink.")
+	assert_eq(Cleaning.dirty_note(0, 2, 2), "Still dirty: 2 sinks, 2 bins.", "a second sink and bin each count")
+	assert_eq(Cleaning.dirty_note(0, 0, 0), "")
 
 
 # ---------- Pantry and Menu (PRD 1) ----------
@@ -1165,3 +1166,55 @@ func test_results_set_quality():
 	t.add("prep:bun", Prep.PLAIN)
 	t.add("prep:patty", Prep.GOOD)
 	assert_almost_eq(t.quality(), (Prep.PLAIN + Prep.GOOD) / 2.0, 0.001, "a tray's quality is the average")
+
+
+# ---------------------------------------------------------------- PRD 7: catalog and themes
+
+const PRD7_PIECES := ["floor_lamp", "flower_stand", "coat_stand", "jukebox", "gumball", "aquarium",
+	"palm", "lantern", "stool", "bin", "dish_rack", "sink"]
+
+
+func test_a_themed_search_lists_untagged_pieces_and_that_themes_own():
+	for theme: String in ["diner", "seaside"]:
+		var other := "seaside" if theme == "diner" else "diner"
+		var ids := {}
+		for bp in Catalog.search("", "", theme):
+			ids[bp.id] = true
+			assert_ne(str(Catalog.ITEMS[bp.id].get("theme", theme)), other, "%s is not sold in the %s" % [bp.id, theme])
+		for id: String in Catalog.ITEMS:
+			if not Catalog.ITEMS[id].has("theme"):
+				assert_true(ids.has(id), "%s is sold everywhere" % id)
+	assert_true(Catalog.sold_in("jukebox", "diner"))
+	assert_false(Catalog.sold_in("jukebox", "seaside"))
+	assert_true(Catalog.sold_in("aquarium", "seaside"))
+	assert_false(Catalog.sold_in("plant", "seaside"), "the fern is the diner's; the seaside has the palm")
+	assert_true(Catalog.sold_in("floor_lamp", "seaside"))
+	assert_true(Catalog.sold_in("floor_lamp", ""), "no theme: everything")
+
+
+func test_decor_reach_comes_from_the_entry_and_the_fern_is_unchanged():
+	assert_eq(Decor.reach("plant", 1), 3)
+	assert_eq(Decor.reach("plant", 2), 4)
+	assert_eq(Decor.reach("plant", 3), 5)
+	assert_eq(Decor.reach("palm", 2), Decor.reach("plant", 2), "the palm is the seaside's fern")
+	assert_eq(Decor.reach("flower_stand"), 1)
+	assert_eq(Decor.reach("gumball"), 2)
+	assert_eq(Decor.reach("jukebox", 1), 4)
+	assert_eq(Decor.reach("aquarium", 3), 6)
+	assert_eq(Decor.reach("rug"), Decor.VIEW_RANGE, "floors, rugs and finishes keep the view range")
+	assert_eq(Decor.share("flower_stand", 2), 0.0, "a short reach: beside only")
+	assert_eq(Decor.share("jukebox", 4), Decor.IN_VIEW)
+	assert_eq(Decor.share("lantern", 0), Decor.BESIDE, "nobody sits on a decor piece")
+
+
+func test_every_new_piece_has_its_entry_and_every_decor_piece_a_thought():
+	for id: String in PRD7_PIECES:
+		var e: Dictionary = Catalog.ITEMS[id]
+		for key in ["name", "price", "level", "category", "blurb", "tiers"]:
+			assert_true(e.has(key), "%s has a %s" % [id, key])
+		if int(e.tiers) > 1:
+			assert_true(e.has("up"), "%s says what a tier does" % id)
+	for id: String in Catalog.ITEMS:
+		if Catalog.is_decor_piece(id):
+			assert_ne(Decor.thought(id), "", "%s has a thought line" % id)
+			assert_gt(Catalog.joy_of(id), 0.0)

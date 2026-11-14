@@ -7,11 +7,11 @@ project can build it. Read `CLAUDE.md` first, then the PRD, then only the code i
 | --- | --- | --- | --- | --- |
 | 1 | [Recipes, ingredients and the menu](01-recipes-and-menu.md) | Very large, seven milestones | nothing | Built (13 November 2026, all seven milestones) |
 | 2 | [The critic](02-critic.md) | Medium | 1 (quality and variety ratings) | Ready (1 is built) |
-| 3 | [Mood drives pay and stay](03-mood-pay-and-stay.md) | Small | nothing | Ready |
+| 3 | [Mood drives pay and stay](03-mood-pay-and-stay.md) | Small | nothing | Built (merged) |
 | 4 | [Local co-op, chef 2](04-coop-chef-2.md) | Large | best after 1 | Ready |
-| 5 | [Night cleaning](05-night-cleaning.md) | Small | nothing | Ready |
-| 6 | [Reach display for finishes and rugs](06-reach-display.md) | Small | nothing | Ready |
-| 7 | [More catalog pieces and themed shops](07-catalog-and-themes.md) | Medium | piece list signed off | Ready once the list is agreed |
+| 5 | [Night cleaning](05-night-cleaning.md) | Small | nothing | Built (merged) |
+| 6 | [Reach display for finishes and rugs](06-reach-display.md) | Small | nothing | Built (merged) |
+| 7 | [More catalog pieces and themed shops](07-catalog-and-themes.md) | Medium | piece list signed off | Built (13 November 2026) |
 
 ## Suggested order
 
@@ -29,7 +29,7 @@ sequence.
 
 - `sim/` stays pure: no scene or node dependencies, every rule unit-tested there. `game/`
   only draws and wires it up.
-- All existing tests pass before and after (224 after PRD 1, 13 November 2026; update the count in
+- All existing tests pass before and after (237 after PRD 7, 13 November 2026; update the count in
   `CLAUDE.md` when it changes). Each PRD lists the new tests it needs.
 - Every visible feature gets a `REGULARS_DEMO` hook in `_apply_demo` (`game/main.gd`), is
   listed in `CLAUDE.md`, and is checked with a screenshot at the times given.

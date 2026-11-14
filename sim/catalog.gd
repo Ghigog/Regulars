@@ -13,7 +13,9 @@ const TIER_JOY := 0.1   # joy a decor piece gains for each tier above the first
 ## A "tool" builds the room itself and is priced per tile or per wall; a "finish"
 ## tool paints or papers walls. "joy" is the flat joy a guest gets on sitting down
 ## with this piece under their seat; beside it or only in view they get less (see Decor).
-## A tiered piece gains TIER_JOY a tier.
+## A tiered piece gains TIER_JOY a tier. "reach" (decor that stands on a cell) is how
+## many cells off it is seen at its first tier; each tier above sees one further.
+## "theme" limits a piece to one theme's shop (none: sold in every theme).
 const ITEMS := {
 	"floor_tile": {"name": "Tiled floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "Grows the room  $5 a tile"},
@@ -39,8 +41,27 @@ const ITEMS := {
 		"blurb": "Blocks guests' view"},
 	"counter": {"name": "Counter", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Extra worktop"},
-	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3,
-		"joy": 0.2, "blurb": "Cheers guests seated beside it, a little those who see it",
+	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3, "theme": "diner",
+		"joy": 0.2, "reach": 3, "blurb": "Cheers guests seated beside it, a little those who see it",
+		"up": "Cheers guests more, and further away"},
+	"flower_stand": {"name": "Flower stand", "price": 15, "level": 1, "category": "Decor", "tiers": 1,
+		"joy": 0.1, "reach": 1, "blurb": "Cheers guests seated right beside it"},
+	"coat_stand": {"name": "Coat stand", "price": 20, "level": 1, "category": "Decor", "tiers": 1,
+		"joy": 0.06, "reach": 1, "blurb": "Somewhere for the coats of guests beside it"},
+	"floor_lamp": {"name": "Floor lamp", "price": 30, "level": 2, "category": "Decor", "tiers": 1,
+		"joy": 0.12, "reach": 1, "blurb": "A warm light at night. Cheers guests beside it"},
+	"gumball": {"name": "Gumball machine", "price": 45, "level": 2, "category": "Decor", "tiers": 1, "theme": "diner",
+		"joy": 0.15, "reach": 2, "blurb": "Cheers guests beside it, a little those near"},
+	"jukebox": {"name": "Jukebox", "price": 120, "level": 4, "category": "Decor", "tiers": 3, "theme": "diner",
+		"joy": 0.25, "reach": 4, "blurb": "The diner's showpiece. Cheers guests across the room",
+		"up": "Cheers guests more, and further away"},
+	"palm": {"name": "Potted palm", "price": 20, "level": 1, "category": "Decor", "tiers": 3, "theme": "seaside",
+		"joy": 0.2, "reach": 3, "blurb": "Cheers guests seated beside it, a little those who see it",
+		"up": "Cheers guests more, and further away"},
+	"lantern": {"name": "Ship's lantern", "price": 45, "level": 2, "category": "Decor", "tiers": 1, "theme": "seaside",
+		"joy": 0.15, "reach": 2, "blurb": "Cheers guests beside it, a little those near"},
+	"aquarium": {"name": "Aquarium", "price": 120, "level": 4, "category": "Decor", "tiers": 3, "theme": "seaside",
+		"joy": 0.25, "reach": 4, "blurb": "The seaside's showpiece. Cheers guests across the room",
 		"up": "Cheers guests more, and further away"},
 	"rug": {"name": "Woven rug", "price": 25, "level": 1, "category": "Decor", "tiers": 1,
 		"joy": 0.15, "blurb": "Cheers guests seated on it, a little those near"},
@@ -50,6 +71,14 @@ const ITEMS := {
 		"blurb": "Two cosy bench seats", "up": "Two cosier bench seats"},
 	"table4": {"name": "Table for four", "price": 90, "level": 3, "category": "Dining", "tiers": 3,
 		"blurb": "Seats a group of four", "up": "Four comfier seats"},
+	"stool": {"name": "Counter stool", "price": 25, "level": 1, "category": "Dining", "tiers": 3,
+		"blurb": "One seat, for guests who come alone", "up": "A comfier seat"},
+	"bin": {"name": "Bin", "price": 30, "level": 2, "category": "Kitchen", "tiers": 1,
+		"blurb": "Another bin. The chef uses the nearest"},
+	"dish_rack": {"name": "Dish rack", "price": 50, "level": 3, "category": "Kitchen", "tiers": 1,
+		"blurb": "Beside a sink: it takes two more trays before it looks piled"},
+	"sink": {"name": "Sink", "price": 70, "level": 3, "category": "Kitchen", "tiers": 1,
+		"blurb": "Another place to wash up"},
 	"stove": {"name": "Stove", "price": 50, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "grill",
 		"blurb": "Grills patties and fish", "up": "Grills faster  burns faster"},
 	"fryer": {"name": "Fryer", "price": 50, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "fry",
@@ -159,6 +188,20 @@ static func is_finish(id: String) -> bool:
 	return ITEMS.has(id) and ITEMS[id].get("finish", false)
 
 
+## Whether a theme sells this piece: an entry with no "theme" is sold in every theme,
+## and an empty theme matches everything. The theme id is passed in, never looked up.
+static func sold_in(id: String, theme: String) -> bool:
+	if not ITEMS.has(id):
+		return false
+	return theme == "" or not ITEMS[id].has("theme") or ITEMS[id].theme == theme
+
+
+## A decor piece that stands on one cell and is seen from "reach" cells (a fern,
+## a jukebox); not a floor, finish or rug.
+static func is_decor_piece(id: String) -> bool:
+	return ITEMS.has(id) and ITEMS[id].has("reach")
+
+
 ## The flat joy this piece gives a guest with it under their seat; a finish or fern
 ## is at best beside them, so gives half (see Decor). 0 for none.
 static func joy_of(id: String, tier := 1) -> float:
@@ -189,7 +232,7 @@ static func search(query := "", category := "", theme := "") -> Array[Dictionary
 		var item: Dictionary = ITEMS[id]
 		if category != "" and item.category != category:
 			continue
-		if theme != "" and item.has("theme") and item.theme != theme:
+		if not sold_in(id, theme):
 			continue
 		for tier in range(1, int(item.tiers) + 1):
 			var bp := {"id": id, "tier": tier}

@@ -20,10 +20,12 @@ static var X0 := 3.0  # the near end of the street as drawn; set in _ground
 ## bevels never change; walls, windows, floors and wall art do.
 const THEMES := {
 	"diner": {
+		"name": "The diner", "line": "Burgers, fries and soda",
 		"backdrop": "#d9cfc1", "wall": "#f6eedd", "wall_low": "#eadfcb", "cut": "#f07a63",
 		"tile_a": "#236a74", "tile_b": "#f1e8cc", "planks": ["#b47d50", "#ad764a", "#ba8456"],
 	},
 	"seaside": {
+		"name": "The seaside", "line": "Fish, vegetables and white wine",
 		"backdrop": "#e4ebe0", "wall": "#f3f5ee", "wall_low": "#dde5dc", "cut": "#bfe0d2",
 		"tile_a": "#a8dccb", "tile_b": "#f4efe0", "planks": ["#b9b1a4", "#aaa295", "#c6bfb2"],
 	},

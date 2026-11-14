@@ -1092,6 +1092,173 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 				var frond := ball(n, Vector3(cos(a) * size * 0.8, 0.56 + size * 0.7, sin(a) * size * 0.8), size * 0.62, LEAF_2 if i % 2 else LEAF)
 				frond.scale = Vector3(1, 0.7, 1)
 			ball(n, Vector3(0.05, 0.62 + size * 1.75, 0.03), size * 0.55, LEAF_2)
+		"palm":
+			# The seaside's fern (PRD 7): a sand-coloured pot, a ringed trunk leaning a
+			# little, and long fronds that droop from the crown. Taller each tier.
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.17, 0.0], [0.19, 0.02], [0.25, 0.34], [0.28, 0.36], [0.28, 0.42], [0.24, 0.44], [0.0, 0.44]], "#d8c3a0")
+			lathe(n, Vector3(0, 0.18, 0), [[0.215, 0.0], [0.226, 0.006], [0.24, 0.07], [0.23, 0.076]], Scenery.SEAFOAM)
+			var tall := 0.75 + 0.15 * tier
+			var segs := 4 + tier
+			for i in segs:
+				var f := float(i) / segs
+				cyl(n, Vector3(0.06 * f, 0.42 + tall * f, 0.0), 0.075 - 0.02 * f, tall / segs + 0.01, "#9a7350" if i % 2 else "#86603f", 0.0, R_WOOD)
+			var crown := Vector3(0.06, 0.45 + tall, 0)
+			for i in 7:
+				var a := TAU * i / 7.0 + 0.3
+				var leaf := Node3D.new()
+				leaf.position = crown
+				leaf.rotation = Vector3(0, -a, 0)
+				n.add_child(leaf)
+				for k in 4:   # each frond a row of flattened balls, drooping toward its tip
+					var b := ball(leaf, Vector3(0.14 + k * 0.16, 0.05 - k * k * 0.045, 0), 0.13 - k * 0.02, LEAF if (i + k) % 2 else LEAF_2)
+					b.scale = Vector3(1.6, 0.3, 0.75)
+			ball(n, crown + Vector3(0, 0.04, 0), 0.09, LEAF_2)
+		"flower_stand":
+			# A three-legged wooden stand with a coral pot of flowers: the cheap starter.
+			for i in 3:
+				var a := TAU * i / 3.0
+				box(n, Vector3(cos(a) * 0.2, 0, sin(a) * 0.2), Vector3(0.06, 0.62, 0.06), WOOD_DARK, 0.0, R_WOOD)
+			lathe(n, Vector3(0, 0.28, 0), [[0.0, 0.0], [0.24, 0.0], [0.24, 0.035], [0.0, 0.035]], WOOD, 0.0, R_WOOD)
+			lathe(n, Vector3(0, 0.6, 0), [[0.0, 0.0], [0.28, 0.0], [0.28, 0.05], [0.0, 0.05]], WOOD, 0.0, R_WOOD)
+			lathe(n, Vector3(0, 0.65, 0), [[0.0, 0.0], [0.13, 0.0], [0.18, 0.24], [0.2, 0.26], [0.0, 0.26]], CORAL)
+			for b: Array in [[0.0, 0.0, 0.17, LEAF], [-0.12, 0.05, 0.12, LEAF_2], [0.12, -0.04, 0.12, LEAF_2]]:
+				ball(n, Vector3(b[0], 0.98, b[1]), b[2], b[3])
+			for f: Array in [[0.0, 0.1, PAPER], [-0.14, 0.0, WARN], [0.14, 0.04, CORAL_DARK], [0.05, -0.13, WARN], [-0.06, 0.14, CORAL], [0.1, 0.15, PAPER]]:
+				ball(n, Vector3(f[0], 1.1 + absf(f[1]) * 0.3, f[1]), 0.075, f[2], 0.0, R_GLOSS)
+				ball(n, Vector3(f[0], 1.13 + absf(f[1]) * 0.3, f[1]), 0.03, "#f6c445")
+		"coat_stand":
+			# A dark wooden coat stand on a cross foot, a coral coat and a hat hung on it.
+			for turn: float in [0.0, PI / 2]:
+				box(n, Vector3.ZERO, Vector3(0.62, 0.06, 0.08), WOOD_DARK, 0.0, R_WOOD).rotation.y = turn
+			cyl(n, Vector3(0, 0.04, 0), 0.04, 1.62, WOOD_DARK, 0.0, R_WOOD)
+			ball(n, Vector3(0, 1.69, 0), 0.07, WOOD, 0.0, R_WOOD)
+			for i in 4:
+				var a := TAU * i / 4.0 + PI / 4
+				var hook := box(n, Vector3(cos(a) * 0.1, 1.48, sin(a) * 0.1), Vector3(0.2, 0.04, 0.04), WOOD, 0.0, R_WOOD)
+				hook.rotation = Vector3(0, -a, 0.5)
+			# The coat: a soft hanging body with a collar, on the front hooks.
+			lathe(n, Vector3(0, 0.62, 0.13), [[0.0, 0.0], [0.2, 0.0], [0.22, 0.04], [0.17, 0.66], [0.1, 0.8], [0.0, 0.82]], CORAL).scale = Vector3(1, 1, 0.55)
+			box(n, Vector3(0, 1.32, 0.15), Vector3(0.24, 0.07, 0.12), CORAL_DARK)
+			for by: float in [0.95, 1.1]:
+				ball(n, Vector3(0, by, 0.25), 0.022, PAPER)
+			# The hat on the top.
+			cyl(n, Vector3(0.02, 1.72, 0), 0.17, 0.03, CABINET)
+			cyl(n, Vector3(0.02, 1.74, 0), 0.1, 0.13, CABINET)
+			cyl(n, Vector3(0.02, 1.76, 0), 0.105, 0.03, CORAL)
+		"floor_lamp":
+			# A slim brass lamp with a warm drum shade: lit, it glows at night (the game
+			# hangs a light over it, as over a table's candle).
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.2, 0.0], [0.22, 0.02], [0.2, 0.06], [0.05, 0.08], [0.0, 0.08]], STEEL_DARK, 0.0, R_WOOD)
+			cyl(n, Vector3(0, 0.06, 0), 0.025, 1.3, Scenery.BRASS, 0.0, R_WOOD)
+			ball(n, Vector3(0, 0.7, 0), 0.04, Scenery.BRASS, 0.0, R_WOOD)
+			ball(n, Vector3(0, 1.36, 0), 0.06, "#fff1c4", 3.0)
+			lathe(n, Vector3(0, 1.22, 0), [[0.25, 0.0], [0.27, 0.01], [0.2, 0.36], [0.18, 0.37], [0.16, 0.35], [0.23, 0.01]], "#ffe3a8", 0.9)
+			lathe(n, Vector3(0, 1.21, 0), [[0.26, 0.0], [0.28, 0.0], [0.28, 0.03], [0.26, 0.03]], CORAL)
+		"gumball":
+			# A coral gumball machine: a fluted foot, a box with the coin slot and a
+			# chrome dial, a glass globe of coloured gumballs and a cap.
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.2, 0.0], [0.22, 0.02], [0.2, 0.05], [0.07, 0.1], [0.06, 0.56], [0.12, 0.6], [0.0, 0.6]], CORAL_DARK, 0.0, R_WOOD)
+			_add(n, bevel_mesh(Vector3(0.34, 0.26, 0.34), 0.05), Vector3(0, 0.73, 0), Color(DANGER), 0.0, R_GLOSS)
+			cyl(n, Vector3(0, 0.74, 0.17), 0.06, 0.03, "#c9d0d1", 0.0, R_WOOD).rotation.x = PI / 2
+			box(n, Vector3(0, 0.66, 0.17), Vector3(0.1, 0.05, 0.03), "#2b2f31")
+			for i in 14:
+				var a := i * 2.4
+				var h := 0.06 + (i % 5) * 0.06
+				var rr := 0.17 * sqrt(1.0 - pow((h - 0.13) / 0.22, 2)) if absf(h - 0.13) < 0.22 else 0.05
+				ball(n, Vector3(cos(a) * rr * 0.75, 0.9 + h, sin(a) * rr * 0.75), 0.05,
+					[WARN, CORAL, GOOD, PAPER, "#6aa7dc"][i % 5], 0.0, R_GLOSS)
+			ball(n, Vector3(0, 1.06, 0), 0.22, "#eaf6f866", 0.0, R_GLOSS)
+			cyl(n, Vector3(0, 1.24, 0), 0.1, 0.06, DANGER, 0.0, R_GLOSS)
+			ball(n, Vector3(0, 1.31, 0), 0.045, "#c9d0d1", 0.0, R_WOOD)
+		"jukebox":
+			# The diner's showpiece: a wide coral and teal cabinet under a glowing arch,
+			# a record window, a speaker grille and bubble tubes up the sides. Each tier
+			# lights another band across the arch.
+			_add(n, bevel_mesh(Vector3(0.86, 0.1, 0.56), 0.03), Vector3(0, 0.05, 0), Color(WOOD_DARK), 0.0, R_WOOD)
+			_add(n, bevel_mesh(Vector3(0.8, 0.9, 0.5), 0.05), Vector3(0, 0.55, 0), Color(CABINET), 0.0)
+			var arch := _add(n, lathe_mesh([[0.0, 0.0], [0.4, 0.0], [0.4, 0.5], [0.0, 0.5]], 32), Vector3(0, 1.0, -0.25), Color(CORAL), 0.0)
+			arch.rotation.x = PI / 2
+			arch.scale = Vector3(1, 1, 0.85)
+			for k in tier + 1:   # glowing bands across the arch, one more a tier
+				var band := _add(n, lathe_mesh([[0.3 - k * 0.07, 0.0], [0.34 - k * 0.07, 0.0], [0.34 - k * 0.07, 0.52], [0.3 - k * 0.07, 0.52]], 32), Vector3(0, 1.0, -0.26), Color(["#ffd98a", "#fff1c4", "#ffb38a", "#ffd98a"][k]), 1.6)
+				band.rotation.x = PI / 2
+				band.scale = Vector3(1, 1, 0.85)
+			box(n, Vector3(0, 0.98, 0.0), Vector3(0.82, 0.04, 0.52), WARN, 0.5)
+			# The record window and the grille below it.
+			_add(n, bevel_mesh(Vector3(0.5, 0.26, 0.04), 0.02), Vector3(0, 0.8, 0.26), Color("#2b2f31"), 0.0, R_GLOSS)
+			cyl(n, Vector3(0, 0.8, 0.27), 0.1, 0.02, "#1b1b1f", 0.0, R_GLOSS).rotation.x = PI / 2
+			cyl(n, Vector3(0, 0.8, 0.29), 0.035, 0.01, CORAL).rotation.x = PI / 2
+			_add(n, bevel_mesh(Vector3(0.52, 0.3, 0.03), 0.02), Vector3(0, 0.38, 0.255), Color(WORKTOP), 0.0, R_WOOD)
+			for gx in 5:
+				box(n, Vector3(-0.2 + gx * 0.1, 0.24, 0.27), Vector3(0.035, 0.28, 0.02), WOOD_DARK)
+			for sx: float in [-0.36, 0.36]:
+				cyl(n, Vector3(sx, 0.12, 0.2), 0.04, 0.84, "#ffb38a", 1.2)
+		"lantern":
+			# A ship's lantern on a small barrel: a brass cage round a glowing glass, a
+			# ring to hang it by, and a coil of rope on the lid.
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.22, 0.0], [0.27, 0.27], [0.22, 0.54], [0.0, 0.54]], WOOD, 0.0, R_WOOD)
+			for hy: float in [0.08, 0.44]:
+				lathe(n, Vector3(0, hy, 0), [[0.235 + (0.02 if hy < 0.2 else 0.0), 0.0], [0.255 + (0.02 if hy < 0.2 else 0.0), 0.0], [0.255 + (0.02 if hy < 0.2 else 0.0), 0.04], [0.235 + (0.02 if hy < 0.2 else 0.0), 0.04]], STEEL_DARK, 0.0, R_WOOD)
+			lathe(n, Vector3(0.0, 0.54, 0.0), [[0.12, 0.0], [0.2, 0.0], [0.2, 0.05], [0.12, 0.05]], "#d8c3a0")
+			cyl(n, Vector3(0, 0.56, 0), 0.13, 0.04, Scenery.BRASS, 0.0, R_WOOD)
+			cyl(n, Vector3(0, 0.6, 0), 0.1, 0.28, "#ffd98a", 1.4, R_GLOSS)
+			for i in 4:
+				var a := TAU * i / 4.0 + PI / 4
+				box(n, Vector3(cos(a) * 0.11, 0.6, sin(a) * 0.11), Vector3(0.025, 0.28, 0.025), Scenery.BRASS, 0.0, R_WOOD)
+			lathe(n, Vector3(0, 0.88, 0), [[0.0, 0.0], [0.14, 0.0], [0.08, 0.1], [0.0, 0.1]], Scenery.BRASS, 0.0, R_WOOD)
+			var ring := lathe(n, Vector3(0, 1.04, 0), [[0.05, -0.012], [0.07, -0.012], [0.07, 0.012], [0.05, 0.012]], Scenery.BRASS, 0.0, R_WOOD)
+			ring.rotation.x = PI / 2
+		"aquarium":
+			# The seaside's showpiece: a tank of blue water on a wooden cabinet,
+			# with sand, weed and a lid lamp. A fish more each tier.
+			_counter(n, WOOD, WOOD_DARK, true)
+			box(n, Vector3(0, 0.9, 0), Vector3(0.84, 0.05, 0.62), "#e8d9b0")
+			# Opaque blue water inside steel corner posts (glass would wash out from the
+			# fixed camera); the fish swim at the two faces the camera sees, +z and +x.
+			box(n, Vector3(0, 0.92, 0), Vector3(0.76, 0.48, 0.54), "#5fb3cf", 0.0, R_GLOSS)
+			box(n, Vector3(0, 1.36, 0), Vector3(0.76, 0.03, 0.54), "#9fd8e8", 0.0, R_GLOSS)
+			for cx: float in [-0.4, 0.4]:
+				for cz: float in [-0.29, 0.29]:
+					box(n, Vector3(cx, 0.9, cz), Vector3(0.05, 0.54, 0.05), STEEL_DARK, 0.0, R_WOOD)
+			for w: Array in [[-0.22, 0.3], [-0.12, 0.22], [0.2, 0.26]]:
+				box(n, Vector3(w[0], 0.94, 0.27), Vector3(0.05, w[1], 0.03), LEAF)
+			var fish_at: Array = [Vector3(-0.2, 1.1, 0.28), Vector3(0.1, 1.22, 0.28), Vector3(0.39, 1.08, 0.05),
+				Vector3(0.39, 1.24, -0.15), Vector3(0.12, 1.02, 0.28)]
+			for i in tier + 2:
+				var col: String = [CORAL, WARN, "#ffb38a", CORAL_DARK, WARN][i]
+				var holder := Node3D.new()
+				holder.position = fish_at[i]
+				holder.rotation.y = 0.0 if fish_at[i].z > 0.2 else PI / 2
+				n.add_child(holder)
+				ball(holder, Vector3.ZERO, 0.06, col, 0.0, R_GLOSS).scale = Vector3(1.5, 1.0, 0.5)
+				box(holder, Vector3(-0.1, -0.035, 0), Vector3(0.05, 0.07, 0.025), col).rotation.z = 0.4
+				ball(holder, Vector3(0.05, 0.015, 0.03), 0.012, TRIM)
+			_add(n, bevel_mesh(Vector3(0.88, 0.06, 0.66), 0.02), Vector3(0, 1.45, 0), Color(CABINET), 0.0, R_WOOD)
+			box(n, Vector3(0, 1.42, 0.0), Vector3(0.5, 0.02, 0.3), "#fff1c4", 1.0)
+		"stool":
+			# A counter stool (PRD 7): a small round high table on a pedestal, and one
+			# chrome stool with a coral cushion on its seat cell (+x, like a chair).
+			lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.2, 0.0], [0.22, 0.02], [0.22, 0.06], [0.2, 0.08], [0.06, 0.08], [0.06, 0.66], [0.0, 0.66]], STEEL_DARK, 0.0, R_WOOD)
+			lathe(n, Vector3(0, 0.66, 0), [[0.0, 0.0], [0.38, 0.0], [0.4, 0.02], [0.4, 0.07], [0.38, 0.08], [0.0, 0.08]], "#ecc88f", 0.0, R_WOOD)
+			var stool := Node3D.new()
+			stool.position = Vector3(1, 0, 0)
+			n.add_child(stool)
+			lathe(stool, Vector3.ZERO, [[0.0, 0.0], [0.18, 0.0], [0.2, 0.02], [0.18, 0.04], [0.04, 0.05], [0.0, 0.05]], "#c9d0d1", 0.0, R_WOOD)
+			cyl(stool, Vector3(0, 0.04, 0), 0.035, 0.32, "#c9d0d1", 0.0, R_WOOD)
+			lathe(stool, Vector3(0, 0.16, 0), [[0.15, 0.0], [0.17, 0.0], [0.17, 0.02], [0.15, 0.02]], "#c9d0d1", 0.0, R_WOOD)
+			lathe(stool, Vector3(0, 0.33, 0), [[0.0, 0.0], [0.23, 0.0], [0.26, 0.03], [0.26, 0.08], [0.22, 0.11], [0.0, 0.11]], CORAL)
+			cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
+			ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
+		"dish_rack":
+			# A worktop with a wooden rack of clean trays standing on end to dry.
+			_counter(n, CABINET, WORKTOP)
+			box(n, Vector3(0, 0.87, 0), Vector3(0.72, 0.03, 0.5), WOOD_DARK, 0.0, R_WOOD)
+			for i in 5:
+				box(n, Vector3(-0.28 + i * 0.14, 0.9, 0.2), Vector3(0.03, 0.2, 0.03), WOOD, 0.0, R_WOOD)
+				box(n, Vector3(-0.28 + i * 0.14, 0.9, -0.2), Vector3(0.03, 0.3, 0.03), WOOD, 0.0, R_WOOD)
+			for i in 4:
+				var tray := box(n, Vector3(-0.21 + i * 0.14, 0.9, 0.0), Vector3(0.025, 0.36, 0.46), CORAL if i % 2 == 0 else PAPER, 0.0, R_GLOSS)
+				tray.rotation.z = 0.12
 		"table":
 			# Two-seat table (sheet 1): a slab top with a small bevel on a slim pedestal and
 			# disc foot; coral chairs on dark wooden legs (`_chair`).

@@ -122,6 +122,8 @@ var inspected: Guest                 # the guest whose card is open, if any
 var flyers_out := false          # bought tonight, spent on tomorrow's crowd
 var first_night := true          # open on the night before day 1, in the build phase (tests and demos skip it)
 static var _title_seen := false  # the title shows once a launch; starting over skips it
+static var _theme_picked := false  # this run's theme is chosen; starting over asks again
+var theme_path := "user://regulars_theme.cfg"   # the last theme picked, preselected next time
 var allow_quit := true           # tests turn this off to check Quit without leaving
 var quit_asked := false
 var shopping := false            # the shop is open over the build phase; the chef stands still
@@ -211,10 +213,13 @@ func _ready() -> void:
 	_range_marks = Node3D.new()
 	add_child(_range_marks)
 	var demo := OS.get_environment("REGULARS_DEMO")
-	if demo != "" and not demo in ["title", "night0"]:
+	if demo != "" and not demo in ["title", "night0", "picker"]:
 		test_kitchen()   # the demos show a working kitchen
 	if demo == "title" or (first_night and demo == "" and not _title_seen):
 		open_title()
+	elif demo == "picker" or (first_night and demo == "" and not _theme_picked and not theme_forced()):
+		open_title()   # starting over: the theme card again, the title skipped
+		hud.title.show_themes()
 	elif first_night and (demo == "" or demo == "night0"):   # night0: the empty kitchen and the first hint
 		_open_first_night()
 	else:
@@ -433,7 +438,15 @@ func _apply_demo(demo: String) -> void:
 
 func _demo_build(demo: String) -> void:
 	open_build()
-	for step: Array in [["counter", 2, 4, 0], ["screen", 8, 5, 0], ["screen", 9, 5, 0], ["table", 8, 6, 0], ["plant", 9, 2, 0]]:
+	if demo == "build_new":   # every PRD 7 piece placed for this theme (run once per theme)
+		var show := "jukebox" if not Scenery.seaside() else "aquarium"
+		var small := "gumball" if not Scenery.seaside() else "lantern"
+		for spot: Array in [["dish_rack", 3, 3, 0], ["sink", 3, 6, 0], ["bin", 1, 6, 0],
+				["floor_lamp", 5, 0, 0], [show, 7, 0, 0], [small, 8, 0, 0], ["flower_stand", 9, 2, 0],
+				["coat_stand", 5, 6, 0], ["stool", 5, 3, 0]]:
+			add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3])
+		return
+	for step: Array in [["counter", 2, 4, 0], ["screen", 8, 5, 0], ["screen", 9, 5, 0], ["table", 8, 6, 0], [fern(), 9, 2, 0]]:
 		pick_catalog(step[0])
 		place(Vector3i(step[1], step[2], step[3]))
 	cancel_hand()
@@ -502,7 +515,7 @@ func _demo_build(demo: String) -> void:
 		pick_up(Vector3(8.5, 0, 4.5))
 		place(Vector3i(6, 1, 0))
 	elif demo == "build_range":  # a fern carried past the tables: its reach and the seats it touches
-		pick_catalog("plant", 1)
+		pick_catalog(fern(), 1)
 		_demo_hover = Vector3(6.5, 0, 3.5)
 	elif demo == "build_range_floor":  # marble being dragged out under the tables: who sits on it
 		ledger.xp = 500
@@ -707,7 +720,7 @@ func _demo_fx() -> void:
 # ---------------------------------------------------------------- world
 
 func _build_scenery() -> void:
-	if OS.get_environment("REGULARS_THEME") != "":  # dev switch until themes are selectable in game
+	if theme_forced():  # a developer's switch: skips the theme card (see choose_theme)
 		Scenery.theme_id = OS.get_environment("REGULARS_THEME")
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -791,6 +804,11 @@ func _add_lamp(over: Vector3) -> OmniLight3D:
 	return light
 
 
+## The theme's potted plant: the diner's fern or the seaside's palm.
+static func fern() -> String:
+	return "palm" if Scenery.seaside() else "plant"
+
+
 static func fixed_main() -> Dictionary:
 	return FIXED_MAIN.get(Scenery.theme_id, FIXED_MAIN.diner)
 
@@ -803,7 +821,7 @@ func _build_layout() -> void:
 		# counters: the player buys the first stations and writes the menu on night zero.
 		["trays", 2, 2], ["sink", 3, 2], ["bin", 0, 5, 1],
 		["pass", 4, 2], ["pass", 4, 3], ["pass", 4, 4], ["pass", 4, 5],
-		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], ["plant", 9, 0],
+		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], [fern(), 9, 0],
 	]:
 		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
 	Build.register(stations[Vector2i(4, 2)])  # the till lives on the pass and moves with it
@@ -884,7 +902,7 @@ func add_station(type: String, cell: Vector2i, tier := 1, facing := 0) -> Statio
 	var st := Station.new()
 	add_child(st)
 	st.setup(type, cell, tier, facing)
-	if Station.is_table(type):
+	if Station.is_table(type) or type == "floor_lamp":
 		st.lamp = _add_lamp(st.position)
 	_register(st)
 	return st
@@ -895,6 +913,7 @@ func _register(st: Station) -> void:
 	grid.blocked[st.cell] = true
 	for s in st.seats:
 		grid.reserved[s] = true
+	_update_racks()
 
 
 func _unregister(st: Station) -> void:
@@ -902,6 +921,20 @@ func _unregister(st: Station) -> void:
 	grid.blocked.erase(st.cell)
 	for s in st.seats:
 		grid.reserved.erase(s)
+	_update_racks()
+
+
+## Marks each sink that has a dish rack standing beside it (one cell, diagonals too).
+func _update_racks() -> void:
+	for st: Station in stations.values():
+		if st.type != "sink":
+			continue
+		var racked := false
+		for o: Station in stations.values():
+			racked = racked or (o.type == "dish_rack" and Decor.dist(o.cell, st.cell) == 1)
+		if racked != st.racked:
+			st.racked = racked
+			st.refresh()
 
 
 ## A low partition (sheet 11): teal panelled base, tan cap, thin coral line.
@@ -1150,9 +1183,47 @@ func open_title() -> void:
 	hud.show_title()
 
 
-## Play on the title screen.
+## Play on the title screen: the theme card, unless REGULARS_THEME already chose.
 func play() -> void:
 	if phase != Phase.TITLE:
+		return
+	if theme_forced():
+		_theme_picked = true
+		hud.hide_title()
+		_open_first_night()
+		return
+	hud.title.show_themes()
+
+
+## REGULARS_THEME is set: a developer's switch that skips the theme card.
+static func theme_forced() -> bool:
+	return OS.get_environment("REGULARS_THEME") != ""
+
+
+## The theme picked last time (to preselect on the card), or the current one.
+func remembered_theme() -> String:
+	var cfg := ConfigFile.new()
+	if cfg.load(theme_path) == OK:
+		var id := str(cfg.get_value("run", "theme", ""))
+		if Scenery.THEMES.has(id):
+			return id
+	return Scenery.theme_id
+
+
+## A theme picked on the card: it holds for the run. The room is built for a theme,
+## so a different one reloads the scene, which then opens straight on the night
+## before day 1; the same one carries on in place.
+func choose_theme(id: String) -> void:
+	if phase != Phase.TITLE or not Scenery.THEMES.has(id):
+		return
+	var cfg := ConfigFile.new()
+	cfg.set_value("run", "theme", id)
+	cfg.save(theme_path)
+	_theme_picked = true
+	var rebuild := id != Scenery.theme_id
+	Scenery.theme_id = id
+	if rebuild and is_inside_tree() and get_tree().current_scene == self:
+		get_tree().call_deferred("reload_current_scene")
 		return
 	hud.hide_title()
 	_open_first_night()
@@ -1226,7 +1297,8 @@ func buy(bp: Dictionary) -> bool:
 
 ## Picks a piece from the catalog to place. Nothing is paid until it is placed.
 func pick_catalog(id: String, tier := 1) -> bool:
-	if phase != Phase.BUILD or Cleaning.carrying_mess(player.held) or not catalog.can_buy(id, ledger.money, ledger.level(), tier):
+	if phase != Phase.BUILD or Cleaning.carrying_mess(player.held) or not catalog.can_buy(id, ledger.money, ledger.level(), tier) \
+			or not Catalog.sold_in(id, Scenery.theme_id):
 		return false
 	if hand.get("moving", false):
 		cancel_hand()
@@ -1322,7 +1394,7 @@ func sell_block() -> String:
 		return "Nothing picked up"
 	if not Catalog.ITEMS.has(hand.id):
 		return "The %s is not for sale" % piece_name(hand).to_lower()
-	if hand.id == "table" and find_station(hand.id) == null:
+	if hand.id in ["table", "sink", "bin"] and find_station(hand.id) == null:
 		return "Your last %s" % hand.id
 	return ""
 
@@ -1733,14 +1805,14 @@ func needs_cleaning(st: Station) -> bool:
 ## The build-phase note on what is still dirty; "" when everything is clean.
 func dirty_note() -> String:
 	var tables := 0
-	var sink := false
-	var bin := false
+	var sinks := 0
+	var bins := 0
 	for st: Station in stations.values():
 		if needs_cleaning(st):
 			tables += 1 if Station.is_table(st.type) else 0
-			sink = sink or st.type == "sink"
-			bin = bin or st.type == "bin"
-	return Cleaning.dirty_note(tables, sink, bin)
+			sinks += 1 if st.type == "sink" else 0
+			bins += 1 if st.type == "bin" else 0
+	return Cleaning.dirty_note(tables, sinks, bins)
 
 
 func build_interact() -> void:
@@ -1996,6 +2068,7 @@ func load_best() -> Dictionary:
 
 
 func restart() -> void:
+	_theme_picked = false   # a new run: the theme card comes up again
 	get_tree().reload_current_scene()
 
 
@@ -2243,8 +2316,8 @@ func decor_near(cell: Vector2i) -> Array:
 	for id: String in walls:
 		add.call(id, Decor.finish_cells(plan, walls[id]), r, 1)
 	for st: Station in stations.values():
-		if st.type == "plant":
-			add.call("plant", [st.cell], Decor.reach("plant", st.tier), st.tier)
+		if Catalog.is_decor_piece(st.type):
+			add.call(st.type, [st.cell], Decor.reach(st.type, st.tier), st.tier)
 	return out
 
 
@@ -2254,7 +2327,7 @@ static func _dist(a: Vector2i, b: Vector2i) -> int:
 
 ## How far a piece's effect on guests reaches, in cells. 0 for a piece with none.
 static func range_of(id: String, tier := 1) -> int:
-	if id == "plant":
+	if Catalog.is_decor_piece(id):
 		return Decor.reach(id, tier)
 	return BIN_RANGE if id == "bin" else 0
 
@@ -2285,7 +2358,7 @@ func piece_reach(h: Dictionary, at: Vector3, drag: Dictionary) -> Dictionary:
 	var none := Rect2i()
 	if range_of(id, tier) > 0:
 		var r := range_of(id, tier)
-		return {"id": id, "tier": tier, "cells": [cell], "reach": r, "decor": id == "plant",
+		return {"id": id, "tier": tier, "cells": [cell], "reach": r, "decor": Catalog.is_decor_piece(id),
 			"area": Rect2i(cell - Vector2i(r, r), Vector2i(r, r) * 2 + Vector2i.ONE),
 			"close": Rect2i(cell - Vector2i.ONE, Vector2i(3, 3))}
 	if Catalog.joy_of(id, tier) <= 0.0:
@@ -2451,7 +2524,7 @@ func _collect_gross() -> void:
 		elif st.type == "bin" and st.overflowing():
 			_gross.append({"cell": st.cell, "kind": "overflow", "age": st.dirty_age, "thought": "The bin is overflowing"})
 		elif st.type == "bin":
-			_gross.append({"cell": st.cell, "kind": "bin", "key": "bin", "range": BIN_RANGE, "thought": "I can see the bin from my seat"})
+			_gross.append({"cell": st.cell, "kind": "bin", "key": "bin:%s" % st.cell, "range": BIN_RANGE, "thought": "I can see the bin from my seat"})
 		elif st.type == "sink" and st.messy():
 			_gross.append({"cell": st.cell, "kind": "sink", "age": st.dirty_age, "thought": "Look at that washing-up"})
 		elif (st.type == "stove" or st.type == "fryer") and st.item.begins_with("burnt:"):
