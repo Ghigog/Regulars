@@ -8,7 +8,7 @@ project can build it. Read `CLAUDE.md` first, then the PRD, then only the code i
 | 1 | [Recipes, ingredients and the menu](01-recipes-and-menu.md) | Very large, seven milestones | nothing | Built (13 November 2026, all seven milestones) |
 | 2 | [The critic](02-critic.md) | Medium | 1 (quality and variety ratings) | Built (13 November 2026) |
 | 3 | [Mood drives pay and stay](03-mood-pay-and-stay.md) | Small | nothing | Built (merged) |
-| 4 | [Local co-op, chef 2](04-coop-chef-2.md) | Large | best after 1 | Ready |
+| 4 | [Local co-op, chef 2](04-coop-chef-2.md) | Large | best after 1 | Built (13 November 2026) |
 | 5 | [Night cleaning](05-night-cleaning.md) | Small | nothing | Built (merged) |
 | 6 | [Reach display for finishes and rugs](06-reach-display.md) | Small | nothing | Built (merged) |
 | 7 | [More catalog pieces and themed shops](07-catalog-and-themes.md) | Medium | piece list signed off | Built (13 November 2026) |

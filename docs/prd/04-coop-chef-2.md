@@ -142,6 +142,10 @@ clean, and build at night. Two players, one restaurant, one wallet.
 
 ## Open, with defaults
 
+Built 13 November 2026 with each default below: chefs pass through each other, the
+day is the same with two chefs, and the other chef keeps building while the shop is
+open (the shop tray covers only the bottom of the room, so building stays usable).
+
 - **Do chefs block each other?** Default: no.
 - **Does the day get harder with two chefs?** Default: no change. Revisit after
   playtesting.

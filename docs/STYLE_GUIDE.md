@@ -170,7 +170,11 @@ or a later sheet, they win. What changed:
 | Second bin and sink (PRD 7) | The same models as the first; both are now ordinary catalog pieces. | |
 | Theme card (PRD 7) | After Play, the title card turns over: "Which restaurant?", a row a theme with a swatch of its room (back wall with the cutaway stripe and a window, the kitchen's chequered tiles, the dining planks, ink-edged) beside a coral button with the name and a line on what it serves, then Back. The same ink frame and pointer tab as the title. | Not on a sheet; built from the title card. |
 
-**Not yet done:** Blender kit, hired staff, co-op chefs 2 to 4 (trim colours exist in
+| Player tag (PRD 4) | A disc in the player's trim colour, inked rim, the player's number in cream; a ticked cream disc beside it when that player is ready, an empty ring while waiting. On prompt bubbles, hint lines, build-slip rows, the receipt and under the door card. | The number makes two players differ by shape, not only trim colour. |
+| Co-op station cursor (PRD 4) | The amber frame becomes each chef's trim colour, with one small tab on its near corner per player number. | Amber stays with one chef. |
+| Door card, half turned (PRD 4) | With two chefs, the first to use the card turns it half way (edge-on to the street); the second turns it the rest. | |
+
+**Not yet done:** Blender kit, hired staff, co-op chefs 3 and 4 (trim colours exist in
 `Peg.PLAYER_TRIM`), sheet 9's future dishes (steak, eggs, pasta), title screen, colour-blind
 support.
 

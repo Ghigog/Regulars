@@ -143,6 +143,9 @@ var _drag: Dictionary:            # chef 1's mouse drag, for tests and demos
 var _door_turn: Node3D
 var best_path := "user://regulars_best.json"
 var player: Player               # chef 1; `chefs` holds every chef, by player index
+const MAX_CHEFS := 2             # trims exist for four; two are shipped and tested (PRD 4)
+var ready_chefs: Array[Player] = []   # co-op: who has confirmed the receipt, or used the door card
+static var _kept_seats := {}     # devices seated past player one, kept over a restart
 var chefs: Array[Player] = []
 ## Press- or hold-based prep minigames being played (chop, slice, pour), by player
 ## index: {tool, st, ing, t, hits, presses, fill, last}. Each chef has their own, so
@@ -190,6 +193,7 @@ func _ready() -> void:
 		hud.refresh_input())
 	if OS.get_environment("REGULARS_INPUT") != "":   # dev switch for screenshots: touch or pad
 		controls.set_mode(OS.get_environment("REGULARS_INPUT"))
+	_restore_seats()
 	_shot_path = OS.get_environment("REGULARS_SHOT")
 	_build_door_card()
 	menu_board = MenuBoard.new()
@@ -264,6 +268,24 @@ func _recolour_cursors() -> void:
 		if chefs.size() > 1:   # the number, by shape: n little tabs on the near corner
 			for k in ch.trim + 1:
 				Build.box(ch.cursor, Vector3(0.5 - 0.17 * k, 0.04, 0.5) , Vector3(0.1, 0.09, 0.14), col, 0.8)
+
+
+## After a restart, the players who were seated are seated again, each with a chef.
+## The number of chefs is not saved between runs: only within one launch.
+func _restore_seats() -> void:
+	var kept := _kept_seats
+	_kept_seats = {}
+	for p in range(0, MAX_CHEFS):
+		for source: String in kept:
+			if kept[source] != p:
+				continue
+			controls.seat(source, p)
+			controls.used_any = true
+			if p > 0 and chefs.size() == p:
+				controls.set_mode(source.get_slice(":", 0), p)
+				controls.input_of(p).source = source
+				add_chef(Vector2i(3, 3))
+	_recolour_cursors()
 
 
 ## The chef a call is for: chef 1 when none is named (tests and demos).
@@ -416,6 +438,39 @@ func _apply_demo(demo: String) -> void:
 				if i % 2 == 0:
 					town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
 			get_tree().create_timer(1.5).timeout.connect(hud.show_town)
+	elif demo.begins_with("coop"):  # PRD 4: coop (service), coop_build (two ghosts at night), coop_ready (the receipt, one ready)
+		var two := chefs[join("pad:1")]
+		hud.coop_hint_time = 9999.0
+		if demo == "coop":   # two chefs, two bubbles, two hint lines; shoot at about 8
+			find_station("stove").set_item("raw:" + fixed_main().grill)
+			find_station("stove").cook = -8.2
+			player.position = Grid.center(Vector2i(1, 2))
+			player.look(Vector2i(-1, 0))   # at the patty crate, hands free
+			two.position = Grid.center(Vector2i(3, 3))
+			two.look(Vector2i(1, 0))
+			two.set_held(Tray.kind("raw", fixed_main().bread))
+			for a in arrivals:
+				a.time = 1.0
+		elif demo == "coop_build":   # shoot at about 3
+			ledger.money = 300
+			ledger.xp = 250
+			arrivals.clear()
+			get_tree().create_timer(1.0).timeout.connect(_demo_coop_build.bind(two))
+		elif demo == "coop_door":   # night: chef 1 has used the door card, chef 2 has not; shoot at about 3
+			ledger.money = 300
+			arrivals.clear()
+			get_tree().create_timer(1.0).timeout.connect(func() -> void:
+				open_build()
+				player.position = DOORWAY + Vector3(-0.6, 0, -0.3)
+				player.look(Vector2i(1, 0))
+				two.position = DOORWAY + Vector3(-1.2, 0, 0.6)
+				two.look(Vector2i(1, 0))
+				use_door(player))
+		else:   # coop_ready: the receipt, player one ready; shoot at about 4
+			ledger.record_sale(DEMO_BILL, 5)
+			ledger.record_sale(DEMO_BILL, 3)
+			arrivals.clear()
+			get_tree().create_timer(1.5).timeout.connect(confirm_receipt.bind(0))
 	elif demo.begins_with("build") or demo == "door":  # build (the shop), build_find (a search), build_no (refused spot), build_move, door
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.money = 300
@@ -514,6 +569,19 @@ func _demo_critic(demo: String) -> void:
 				g.mood.think(Critic.thought("gross"))
 				inspect(g)
 				return)
+
+
+## Two chefs at night, each with a piece: chef 1's fits, chef 2's (over a table) does not.
+func _demo_coop_build(two: Player) -> void:
+	open_build()
+	player.position = Grid.center(Vector2i(5, 3))
+	player.look(Vector2i(1, 0))
+	pick_catalog(fern(), 1, player)
+	player.demo_hover = Vector3(6.5, 0, 3.5)
+	two.position = Grid.center(Vector2i(7, 2))
+	two.look(Vector2i(-1, 0))
+	pick_catalog("counter", 1, two)
+	two.demo_hover = Vector3(6.5, 0, 1.5)
 
 
 func _demo_build(demo: String) -> void:
@@ -1196,6 +1264,7 @@ func day_progress() -> float:
 func start_day() -> void:
 	if phase == Phase.CLOSED:
 		return
+	ready_chefs.clear()
 	for ch in chefs:
 		if ch.hand.get("moving", false):
 			cancel_hand(ch)   # a piece still being carried goes back where it was
@@ -1336,6 +1405,7 @@ func choose_theme(id: String) -> void:
 	var rebuild := id != Scenery.theme_id
 	Scenery.theme_id = id
 	if rebuild and is_inside_tree() and get_tree().current_scene == self:
+		_kept_seats = controls.seats.duplicate()
 		get_tree().call_deferred("reload_current_scene")
 		return
 	hud.hide_title()
@@ -1355,6 +1425,7 @@ func open_build() -> void:
 	if phase != Phase.SUMMARY:
 		return
 	phase = Phase.BUILD
+	ready_chefs.clear()
 	hud.hide_card()
 	hud.show_build()
 
@@ -2156,9 +2227,11 @@ func use_door(ch: Player = null) -> bool:
 				hud.say(why)
 				hud.show_build()
 				return false
-			start_day()
+			if _agree_at_door(ch):
+				start_day()
 		"Close early":
-			close_early()
+			if _agree_at_door(ch):
+				close_early()
 		"Take out rubbish":
 			ch.set_held("")
 			sfx("putdown")
@@ -2184,6 +2257,7 @@ func _end_day() -> void:
 	_cancel_all_preps()
 	set_door(false)
 	shopper = null
+	ready_chefs.clear()
 	phase = Phase.SUMMARY
 	play_music("night")
 	inspect(null)
@@ -2222,6 +2296,7 @@ func load_best() -> Dictionary:
 
 func restart() -> void:
 	_theme_picked = false   # a new run: the theme card comes up again
+	_kept_seats = controls.seats.duplicate()   # whoever is seated stays seated
 	get_tree().reload_current_scene()
 
 
@@ -3640,6 +3715,7 @@ func _process(delta: float) -> void:
 		_update_range(ch)
 	_update_daylight()
 	hud.update_status()
+	hud.place_door_ready(cam.unproject_position(DOORWAY + Vector3(0.3, 1.3, 0)))   # just under the card
 	if _shot_path != "":
 		_shot_time += delta
 		if _shot_time > float(OS.get_environment("REGULARS_SHOT_AT")):
@@ -3676,6 +3752,8 @@ func _update_cursor(ch: Player = null) -> void:
 		at = cam.unproject_position(st.position + Vector3(0, over, 0))
 	if action == "":   # nothing to cook or serve: the build phase and the door card
 		action = build_action(ch) if phase == Phase.BUILD else door_action(ch)
+		if action in ["Open up", "Close early"] and ready_chefs.has(ch):
+			action = "Not ready"   # co-op: using the card again takes their ready back
 		var p := DOORWAY + Vector3(0, 2.9, 0)
 		if not ch.hand.is_empty() and _hover_point(ch) != Vector3.INF:
 			p = _hover_point(ch) + Vector3(0, 2.0, 0)
@@ -3798,6 +3876,180 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Keys, controller buttons and touch buttons arrive as act() from Controls.
 
 
+# ---------------------------------------------------------------- co-op (PRD 4)
+
+## A device that is not seated pressed Start (Enter on the keyboard): it becomes
+## the next player and their chef walks in at the door. Returns the new player
+## index, or -1 when every chef's place is taken.
+func join(source: String) -> int:
+	if chefs.size() >= MAX_CHEFS or source == "touch":
+		return -1
+	var p := chefs.size()
+	controls.seat(controls.input_of(0).source, 0)   # player one keeps the device they are using
+	controls.seat(source, p)
+	controls.set_mode(source.get_slice(":", 0), p)
+	controls.input_of(p).source = source
+	var ch := add_chef(ENTRANCE_CELL)
+	ch.look(Vector2i(-1, 0))
+	burst(ch.position + Vector3(0, 1.0, 0), "stars", 0.5)
+	sfx("bell")
+	ch.punch()
+	hud.say("Chef %d joined." % (p + 1))
+	hud.coop_hint_time = 25.0
+	hud.refresh_input()
+	if phase == Phase.BUILD:
+		hud.show_build()
+	_refresh_ready()
+	return p
+
+
+## Player p leaves (held Start, or their controller was unplugged). Their chef
+## puts down what they carry and walks out of the door; the players after them
+## move up one, so if player one leaves the other becomes player one. The last
+## chef never leaves.
+func leave(p: int) -> bool:
+	if p < 0 or p >= chefs.size() or chefs.size() <= 1:
+		return false
+	var ch := chefs[p]
+	if preps.has(p):
+		cancel_prep(p)   # the ingredient comes back to their hands, and then goes down
+	if shopper == ch:
+		close_shop()
+	if ch.hand.get("moving", false):
+		cancel_hand(ch)   # a moved piece goes back where it was
+	ch.hand = {}          # a new piece is only paid for when placed: nothing to refund
+	ch.drag = {}
+	if ch.held != "":
+		set_down(ch)
+	ready_chefs.erase(ch)
+	chefs.remove_at(p)
+	var moved := {}
+	for q: int in preps:   # the minigames of later players move up one with them
+		var nq := q - 1 if q > p else q
+		moved[nq] = preps[q]
+		(preps[q].st as Station).prep_by = nq
+	preps = moved
+	controls.unseat(p)
+	player = chefs[0]
+	for k in chefs.size():
+		if chefs[k].trim != k:
+			chefs[k].set_trim(k)
+	for n: Node3D in [ch.cursor, ch.no_mark, ch.range_marks, ch.ghost, ch.tool_ghost]:
+		if n:
+			n.queue_free()
+	_recolour_cursors()
+	hud.trim_prompts(chefs.size())
+	_walk_out(ch)
+	hud.say("Chef %d left." % (p + 1))
+	hud.refresh_input()
+	if phase == Phase.BUILD:
+		hud.show_build()
+	_refresh_ready()
+	if phase == Phase.SUMMARY and ready_chefs.size() >= chefs.size() and not ready_chefs.is_empty():
+		open_build()
+	return true
+
+
+## What a leaving chef carries goes on the nearest free counter, or is lost.
+func set_down(ch: Player) -> void:
+	var best: Station = null
+	var best_d := INF
+	for st: Station in stations.values():
+		if st.type in ["counter", "pass"] and st.item == "":
+			var d := st.position.distance_to(ch.position)
+			if d < best_d:
+				best_d = d
+				best = st
+	if best != null:
+		if ch.held == "tray" and ch.tray != null:
+			best.set_tray(ch.tray, tray_tag(ch.tray))
+		else:
+			best.set_item(ch.held, ch.held_quality)
+		sfx("putdown")
+	ch.set_held("")
+	hud.refresh_tickets()
+
+
+## A chef who left walks out of the door and down the street, then is gone.
+func _walk_out(ch: Player) -> void:
+	ch.set_process(false)
+	var tw := ch.create_tween()
+	var path: Array[Vector3] = [Grid.center(ENTRANCE_CELL), DOORWAY, Grid.center(DOOR), Grid.center(EXIT)]
+	var from := ch.position
+	for at: Vector3 in path:
+		var t := from.distance_to(at) / Player.SPEED
+		from = at
+		tw.tween_callback(func() -> void:
+			var d := at - ch.position
+			if d.length() > 0.01:
+				ch.aim = Vector3(d.x, 0, d.z).normalized())
+		tw.tween_property(ch, "position", at, t)
+	tw.tween_callback(ch.queue_free)
+
+
+## The receipt needs every player's Confirm. With one chef, one is enough.
+func confirm_receipt(p: int) -> void:
+	if phase != Phase.SUMMARY or p >= chefs.size():
+		return
+	if not ready_chefs.has(chefs[p]):
+		ready_chefs.append(chefs[p])
+		sfx("tick")
+	if ready_chefs.size() >= chefs.size():
+		open_build()
+	else:
+		_refresh_ready()
+
+
+## Back on the receipt takes a player's ready back, until everyone has confirmed.
+func unconfirm_receipt(p: int) -> void:
+	if phase != Phase.SUMMARY or p >= chefs.size() or not ready_chefs.has(chefs[p]):
+		return
+	ready_chefs.erase(chefs[p])
+	sfx("tick", 0.0, 0.8)
+	_refresh_ready()
+
+
+## The door card (opening up, or closing early) needs every chef. The first to use
+## it turns it half way and shows their ready marker; using it again takes that
+## back; the last one turns it. With one chef it turns at once, as before.
+func _agree_at_door(ch: Player) -> bool:
+	if chefs.size() <= 1:
+		return true
+	if ready_chefs.has(ch):
+		ready_chefs.erase(ch)
+		sfx("flip", 0.0, 0.8)
+	else:
+		ready_chefs.append(ch)
+	if ready_chefs.size() >= chefs.size():
+		ready_chefs.clear()   # the card turns all the way (set_door), not part way
+		hud.refresh_ready()
+		return true
+	sfx("flip")
+	hud.say("Chef %d is ready. Everyone uses the door card to %s." % [chefs.find(ch) + 1, "open" if phase == Phase.BUILD else "close"]
+		if ready_chefs.has(ch) else "Chef %d is not ready." % (chefs.find(ch) + 1))
+	_refresh_ready()
+	return false
+
+
+## Each player's state for the ready markers: "ready" or "waiting", by index.
+func ready_states() -> Array[String]:
+	var out: Array[String] = []
+	for ch in chefs:
+		out.append("ready" if ready_chefs.has(ch) else "waiting")
+	return out
+
+
+## The door card turns part way for each chef who is ready; the receipt and the
+## card show the ready markers.
+func _refresh_ready() -> void:
+	if _door_turn != null and phase in [Phase.BUILD, Phase.SERVICE]:
+		var shut := PI if phase == Phase.BUILD else 0.0   # the side showing now
+		var share := float(ready_chefs.size()) / maxf(chefs.size(), 1)
+		_door_turn.create_tween().tween_property(_door_turn, "rotation:y", lerpf(shut, PI - shut, share * 0.5), 0.35) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	hud.refresh_ready()
+
+
 ## Player p pressed an action, on whatever device is theirs (see Controls).
 ## The options screen and the shop are shared; the rest is done by that
 ## player's chef.
@@ -3844,7 +4096,9 @@ func act(p: int, action: String, echo := false) -> void:
 					use_station(st, false, ch)
 		Phase.SUMMARY:
 			if action == "confirm":
-				open_build()
+				confirm_receipt(p)
+			elif action == "back":
+				unconfirm_receipt(p)
 			elif action == "town":
 				hud.toggle_town()
 		Phase.CLOSED:

@@ -10,9 +10,11 @@ extends CanvasLayer
 ## `game.act(player, action)`, so all three devices share one set of rules.
 ## Movement is read with move(player).
 ##
-## One chef today, so every source is seated to player 0 and whichever device
-## was used last is that player's `mode`: a player can pick up a pad or reach
-## for the screen at any moment. Co-op seats a pad to a new player index.
+## Every device nobody has been seated to is player one's, and whichever of
+## them was used last is their `mode`: player one can pick up a pad or reach for
+## the screen at any moment. Co-op (PRD 4): Start on another pad (Enter on the
+## keyboard while player one is on a pad) seats it to the next player
+## (`game.join`); holding Start a second, or unplugging, leaves (`game.leave`).
 ##
 ## Keys: WASD or arrows walk (and browse), E/Space use, Enter confirm, Esc back,
 ## R turn, X sell, Tab shop, T town, O options, F search, M mute, N the menu screen
@@ -64,6 +66,9 @@ var mode: String:
 ## Player 0's touch erase switch (kept for the build phase's mouse code).
 var erase: bool:
 	get: return players[0].erase
+var used_any := false           # a device has been used: it is player one's, and others can join
+const LEAVE_HOLD := 1.0          # seconds Start is held to leave
+var _start_held := {}           # pad source -> seconds Start has been held (-1 once it left)
 var _fingers := {}              # touch index -> what it holds: "stick" or [button id, action]
 var _stick_at := Vector2.ZERO   # where the joystick's base sits
 var _mouse_held := false        # the emulated mouse press landed on a control
@@ -79,6 +84,7 @@ func setup(game_) -> void:
 	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_view.draw.connect(_draw_touch)
 	add_child(_view)
+	Input.joy_connection_changed.connect(_on_joy_connection)
 
 
 # ---------------------------------------------------------------- players
@@ -99,6 +105,32 @@ func seat(source: String, p: int) -> void:
 	for q: PlayerInput in players:
 		q.let_go(source)
 	seats[source] = p
+
+
+## Player p has left: their devices are let go, and later players move up one.
+func unseat(p: int) -> void:
+	if p >= players.size():
+		return
+	for s: String in seats.keys():
+		if seats[s] == p:
+			seats.erase(s)
+			if _start_held.has(s):
+				_start_held[s] = -1.0   # a Start still held lets go without opening the options
+		elif seats[s] > p:
+			seats[s] -= 1
+	players.remove_at(p)
+	if players.is_empty():
+		players.append(PlayerInput.new(0))
+	for k in players.size():
+		players[k].index = k
+
+
+## Would a press of Start (Enter on the keyboard) on this device add a player?
+## Only a device that is not seated and is not the one player one is using, once
+## some device has been used (the first device used is player one's). Never touch.
+func joins(source: String) -> bool:
+	return used_any and source != "touch" and not seats.has(source) and source != players[0].source \
+		and game.chefs.size() < game.MAX_CHEFS
 
 
 func glyph(action: String, p := 0) -> String:
@@ -129,6 +161,7 @@ func _any_pad(p: int) -> String:
 
 ## A device was used: it becomes its player's current device.
 func _use(source: String) -> PlayerInput:
+	used_any = true
 	var who := players[owner_of(source)]
 	set_mode(source.get_slice(":", 0), who.index)
 	who.source = source
@@ -211,6 +244,10 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
 		_emulated_mouse(event)
 	elif event is InputEventKey:
+		if event.pressed and not event.echo and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER] and joins("keys"):
+			game.join("keys")
+			get_viewport().set_input_as_handled()
+			return
 		_use("keys")
 		# Tab is taken here, before the interface can use it to move focus.
 		if event.physical_keycode == KEY_TAB and event.pressed and not event.echo \
@@ -232,6 +269,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _pad_button(e: InputEventJoypadButton) -> void:
+	var source := "pad:%d" % e.device
+	if e.button_index == JOY_BUTTON_START:
+		_start_button(source, e.pressed)
+		return
 	var action: String = PAD_ACTIONS.get(e.button_index, "")
 	# A confirms the receipt and the end screen; Y opens the town book on the receipt.
 	if action == "use" and game.phase in [game.Phase.SUMMARY, game.Phase.CLOSED]:
@@ -239,6 +280,35 @@ func _pad_button(e: InputEventJoypadButton) -> void:
 	elif action == "shop" and game.phase == game.Phase.SUMMARY:
 		action = "town"
 	press("pad:%d" % e.device, action, e.pressed, e.button_index)
+
+
+## Start: on a device nobody has, a new player joins. On a seated one, a tap
+## opens the options (on release) and holding it for a second leaves.
+func _start_button(source: String, pressed: bool) -> void:
+	if pressed:
+		if joins(source):
+			if game.join(source) >= 0:
+				_start_held[source] = -1.0   # its release does nothing
+				return
+		_use(source)
+		_start_held[source] = 0.0
+		return
+	var held: float = _start_held.get(source, 0.0)
+	_start_held.erase(source)
+	if held >= 0.0:
+		press(source, "options")
+
+
+## A controller was unplugged: its player leaves (unless they are the only one).
+func _on_joy_connection(device: int, connected: bool) -> void:
+	var source := "pad:%d" % device
+	if connected or not seats.has(source):
+		return
+	var p := owner_of(source)
+	for q: PlayerInput in players:
+		q.let_go(source)
+	if game.chefs.size() > 1:
+		game.leave(p)
 
 
 func _pad_axis(e: InputEventJoypadMotion) -> void:
@@ -261,6 +331,13 @@ func _process(delta: float) -> void:
 		return
 	for who: PlayerInput in players:
 		_browse(who, delta)
+	for source: String in _start_held.keys():
+		if not _start_held.has(source) or _start_held[source] < 0.0:
+			continue
+		_start_held[source] += delta
+		if _start_held[source] >= LEAVE_HOLD and game.chefs.size() > 1:
+			_start_held[source] = -1.0
+			game.leave(owner_of(source))
 	if _touch_who().mode == "touch":
 		_view.queue_redraw()
 

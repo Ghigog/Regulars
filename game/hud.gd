@@ -65,6 +65,13 @@ var _search_box: LineEdit
 var _tabs: Array[Button] = []
 var _cards: Control
 var _tip: Label
+var _tip_rows: Array[Dictionary] = []   # the build slip, one row per chef: {row, tag, label}; 0 holds `_tip`
+var _hints: Array[Dictionary] = []      # the corner hint lines, one per player: {box, tag, label}; 0 holds `hint`
+var coop_hint_time := 0.0              # seconds the co-op hint lines stay up after someone joins
+var _ready_row: HBoxContainer           # the receipt's ready markers, in co-op
+var _door_ready: Control                # the ready markers over the door card
+var _door_ready_row: HBoxContainer
+var _shop_tag: Control                  # "Chef 1 is shopping", over the shop in co-op
 var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, over the slip
 var _dirty_label: Label
 var menu: MenuScreen           # the menu screen, while it is open
@@ -909,13 +916,16 @@ func setup(game_) -> void:
 	ticket_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(ticket_rail)
 
-	hint = _label(root, 15)
-	hint.anchor_top = 1.0
-	hint.anchor_bottom = 1.0
-	hint.offset_left = 24
-	hint.offset_top = -40
-	hint.modulate.a = 0.75
+	hint = _make_hint(0).label
 	hint.text = _hint_text()
+
+	# Over the door card in co-op: who is ready to flip it.
+	_door_ready = Sheet.new("note").pad(10, 6, 10, 6)
+	_door_ready.visible = false
+	root.add_child(_door_ready)
+	_door_ready_row = HBoxContainer.new()
+	_door_ready_row.add_theme_constant_override("separation", 4)
+	_door_ready.add_child(_door_ready_row)
 
 	# The keycap prompt that floats over the station the chef faces.
 	var first := _make_prompt()
@@ -1136,7 +1146,7 @@ func update_status() -> void:
 	if not _turning:
 		clock.night = game.phase != P.SERVICE
 	clock.progress = game.day_progress()
-	hint.visible = l.day <= 1 and game.phase == P.SERVICE   # the controls reminder is for the first day
+	_update_hints(l.day <= 1 and game.phase == P.SERVICE)   # the controls reminder is for the first day
 	if l.money != _shown_money:
 		if _shown_money >= 0 and l.money > _shown_money:
 			money_tag.pivot_offset = money_tag.size * Vector2(0.5, 0.0)
@@ -1339,6 +1349,19 @@ func _stamp(slot: Punch, delay: float) -> void:
 	tw.tween_property(st, "hover", 70.0, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tw.tween_property(st, "hover", 520.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_callback(st.queue_free)
+
+
+## One row of the build slip: a player's tag and their words.
+func _add_tip_row(rows: Node) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rows.add_child(row)
+	var tag := ChefTag.new(_tip_rows.size(), 26)
+	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tag.visible = false
+	row.add_child(tag)
+	_tip_rows.append({"row": row, "tag": tag, "label": _label(row, 20 if _tip_rows.is_empty() else 18)})
 
 
 ## One chef's prompt bubble: their number tag (shown in co-op), a keycap and a word.
@@ -1884,7 +1907,14 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	gossip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	gossip.custom_minimum_size = Vector2(380, 0)
 	_button(stack, "Town book" + _key_note("town"), show_town)
-	_button(stack, ("Set up for day %d" % game.ledger.day) + _key_note("confirm"), game.open_build)
+	_button(stack, ("Set up for day %d" % game.ledger.day) + _key_note("confirm"),
+		func() -> void: game.confirm_receipt(game.controls.owner_of("keys") if game.controls else 0))
+	# Co-op: everyone confirms. A tag per player, ticked once they have.
+	_ready_row = HBoxContainer.new()
+	_ready_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_ready_row.add_theme_constant_override("separation", 14)
+	stack.add_child(_ready_row)
+	refresh_ready()
 	if animate:
 		_pop_in(clip)
 
@@ -2025,13 +2055,122 @@ func stop_typing() -> void:
 		_search_box.release_focus()
 
 
-## What a control is called for the device in use ("E", "A", "Use").
-func _g(action: String) -> String:
-	return game.controls.glyph(action) if game.controls else str(Controls.GLYPHS.keys[action])
+## What a control is called for player p's device ("E", "A", "Use").
+func _g(action: String, p := 0) -> String:
+	if game.controls == null or p >= game.controls.players.size():
+		return str(Controls.GLYPHS.keys[action])
+	return game.controls.glyph(action, p)
 
 
-func _mode() -> String:
-	return game.controls.mode if game.controls else "keys"
+func _mode(p := 0) -> String:
+	if game.controls == null or p >= game.controls.players.size():
+		return "keys"
+	return game.controls.input_of(p).mode
+
+
+# ---------------------------------------------------------------- co-op (PRD 4)
+
+## Player p's corner hint line: their numbered tag and the words. Player one's sits
+## bottom left, player two's bottom right (three and four would go a row above).
+func _make_hint(p: int) -> Dictionary:
+	var right := p % 2 == 1
+	var box := HBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.anchor_top = 1.0
+	box.anchor_bottom = 1.0
+	box.anchor_left = 1.0 if right else 0.0
+	box.anchor_right = box.anchor_left
+	box.grow_horizontal = Control.GROW_DIRECTION_BEGIN if right else Control.GROW_DIRECTION_END
+	box.offset_top = -44 - 34 * (p / 2)
+	box.offset_bottom = -14 - 34 * (p / 2)
+	if right:
+		box.offset_left = -24
+		box.offset_right = -24
+	else:
+		box.offset_left = 24
+		box.offset_right = 24
+	box.modulate.a = 0.85
+	root.add_child(box)
+	var tag := ChefTag.new(p, 24)
+	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tag.visible = false
+	box.add_child(tag)
+	var label := _label(box, 15)
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var d := {"box": box, "tag": tag, "label": label}
+	_hints.append(d)
+	return d
+
+
+## One line per player, worded for their own device. With one chef it is the
+## first-day reminder, as before; in co-op both lines also show for a while after
+## someone joins. On a narrow screen a line drops to its buttons alone rather
+## than wrap or run into the other.
+func _update_hints(first_day: bool) -> void:
+	var n: int = game.chefs.size()
+	while _hints.size() < n:
+		_make_hint(_hints.size())
+	coop_hint_time = maxf(coop_hint_time - get_process_delta_time(), 0.0)
+	var room := root.size.x / 2.0 - 48.0 if n > 1 else root.size.x - 48.0
+	for p in _hints.size():
+		var d: Dictionary = _hints[p]
+		var show: bool = p < n and (first_day or (n > 1 and coop_hint_time > 0.0 and game.phase == game.Phase.SERVICE)) \
+			and _hint_text(p) != "" and game.phase != game.Phase.BUILD
+		d.box.visible = show
+		if not show:
+			continue
+		(d.tag as ChefTag).visible = n > 1
+		(d.tag as ChefTag).set_player(p)
+		var font := (d.label as Label).get_theme_font("font")
+		var text := _hint_text(p)
+		var tag_w := 32.0 if n > 1 else 0.0
+		if font and font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + tag_w > room:
+			text = _hint_short(p)
+		d.label.text = text
+		d.box.reset_size()
+		if p % 2 == 1:   # right-aligned: grow leftward from the right edge
+			d.box.position.x = root.size.x - 24.0 - d.box.size.x
+
+
+## The hint line cut to buttons alone, for narrow screens.
+func _hint_short(p: int) -> String:
+	match _mode(p):
+		"pad":
+			return "Stick  A  B  Start"
+		"touch":
+			return ""
+	return "WASD  E  O"
+
+
+## The receipt's and the door card's ready markers, from the game's ready list.
+func refresh_ready() -> void:
+	var states: Array[String] = game.ready_states()
+	var coop: bool = game.chefs.size() > 1
+	if _ready_row and is_instance_valid(_ready_row):
+		_fill_ready(_ready_row, states, 30)
+		_ready_row.visible = coop
+	for c in _door_ready_row.get_children():
+		c.queue_free()
+	var any: bool = coop and game.ready_chefs.size() > 0 and game.phase in [game.Phase.BUILD, game.Phase.SERVICE]
+	_door_ready.visible = any
+	if any:
+		_fill_ready(_door_ready_row, states, 24)
+		_door_ready.reset_size()
+
+
+func _fill_ready(row: HBoxContainer, states: Array[String], px: float) -> void:
+	for c in row.get_children():
+		row.remove_child(c)
+		c.queue_free()
+	for p in states.size():
+		row.add_child(ChefTag.new(p, px, states[p]))
+
+
+## Keeps the door card's ready markers over the card (a point on screen).
+func place_door_ready(at: Vector2) -> void:
+	if _door_ready.visible:
+		_door_ready.position = (at - Vector2(_door_ready.size.x / 2.0, 0.0)).round()
 
 
 ## "   (Enter)" after a button's words; nothing on touch, where it is tapped.
@@ -2039,12 +2178,14 @@ func _key_note(action: String) -> String:
 	return "" if _mode() == "touch" or _g(action) == "" else "   (%s)" % _g(action)
 
 
-func _hint_text() -> String:
-	match _mode():
+func _hint_text(p := 0) -> String:
+	match _mode(p):
 		"pad":
 			return "Stick move     A use     B back     Start options"
 		"touch":
 			return ""   # the joystick sits there; the Use button names the action
+	if game.chefs.size() > 1:   # shorter in co-op: two lines share the bottom edge
+		return "WASD move     E use     Click a guest     O options"
 	return "WASD move     E or Space use     Click a guest     O options     M mute"
 
 
@@ -2057,19 +2198,21 @@ func _shop_keys_text() -> String:
 	return "E buy      Tab close"
 
 
-## The build slip's words for what is in hand, for the device in use.
-func _build_tip(hand: Dictionary) -> String:
-	var m := _mode()
-	var use := _g("use")
-	if hand.is_empty() and Cleaning.carrying_mess(game.player.held):
-		if game.player.held == "rubbish_bag":
+## The build slip's words for what player p's chef has in hand, for their device.
+func _build_tip(p := 0) -> String:
+	var ch: Player = game.chefs[p]
+	var hand: Dictionary = ch.hand
+	var m := _mode(p)
+	var use := _g("use", p)
+	if hand.is_empty() and Cleaning.carrying_mess(ch.held):
+		if ch.held == "rubbish_bag":
 			return "Carrying the rubbish bag.      Take it out the front door before building or shopping"
 		return "Carrying a dirty plate.      Put it in the sink before building or shopping"
 	if hand.is_empty():
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % game.ledger.day
-		var stock := "%s stock a crate or not      " % _g("turn")
-		return "%s walk      %s pick up      %s%s shop      %s menu      Flip the door card to open for day %d" % [_g("move"), use, stock, _g("shop"), _g("menu"), game.ledger.day]
+		var stock := "%s stock a crate or not      " % _g("turn", p)
+		return "%s walk      %s pick up      %s%s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, stock, _g("shop", p), _g("menu", p), game.ledger.day]
 	if Catalog.is_build_tool(hand.id):
 		var floor: bool = game.floor_kind(hand.id) != ""
 		var what := "%s, $%d each." % [Catalog.label(hand), int(hand.price)]
@@ -2082,18 +2225,18 @@ func _build_tip(hand: Dictionary) -> String:
 		var how := "Hold E and walk to keep laying" if floor else "E build"
 		var drag := "drag for a row" if hand.id == "wall" or Catalog.is_finish(hand.id) else ("drag for a rectangle" if floor else "click to add")
 		return "%s      %s      Mouse: %s, right-drag removes      X remove      Esc done" % [what, how, drag]
-	var turn := _g("turn")
+	var turn := _g("turn", p)
 	if hand.get("moving", false):
-		var why: String = game.sell_block()
-		var sell := ("%s for $%d" % ["Sell" if m == "touch" else _g("sell") + " sell", game.sell_value()]) if why == "" else why
+		var why: String = game.sell_block(ch)
+		var sell := ("%s for $%d" % ["Sell" if m == "touch" else _g("sell", p) + " sell", game.sell_value(ch)]) if why == "" else why
 		if m == "touch":
 			return "Carrying the %s.      Tap the floor to put it down      Turn      %s      Drop puts it back" % [game.piece_name(hand).to_lower(), sell]
 		return "Carrying the %s.      %s put down      %s turn      %s      %s put back" % [
-			game.piece_name(hand).to_lower(), use, turn, sell, _g("back")]
+			game.piece_name(hand).to_lower(), use, turn, sell, _g("back", p)]
 	if m == "touch":
 		return "%s, $%d when it is put down.      Tap the floor to put it down      Turn      Drop" % [Catalog.label(hand), int(hand.price)]
 	return "%s, $%d when it is put down.      %s put down      %s turn      %s drop" % [
-		Catalog.label(hand), int(hand.price), use, turn, _g("back")]
+		Catalog.label(hand), int(hand.price), use, turn, _g("back", p)]
 
 
 ## Redraws every hint for a new device: the corner hint, the prompt's keycap,
@@ -2150,13 +2293,26 @@ func show_build() -> void:
 		var slip := Sheet.new("paper", 22, 10)
 		slip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		stack.add_child(slip)
-		_tip = _label(slip, 20)
+		var rows := VBoxContainer.new()
+		rows.add_theme_constant_override("separation", 4)
+		slip.add_child(rows)
+		_tip_rows.clear()
+		_add_tip_row(rows)
+		_tip = _tip_rows[0].label
 		holder.modulate.a = 0.0
 		holder.create_tween().tween_property(holder, "modulate:a", 1.0, 0.3)
 		game.sfx("rustle")
 	build_bar.visible = _shop == null
-	var hand: Dictionary = game.hand
-	_tip.text = _build_tip(hand)
+	# One row per chef, each worded for that player's device; tagged in co-op.
+	var n: int = game.chefs.size()
+	while _tip_rows.size() < n:
+		_add_tip_row(_tip_rows[0].row.get_parent())
+	for p in _tip_rows.size():
+		var d: Dictionary = _tip_rows[p]
+		d.row.visible = p < n
+		if p < n:
+			(d.tag as ChefTag).visible = n > 1
+			d.label.text = _build_tip(p)
 	_dirty_label.text = game.dirty_note()
 	_dirty_note.visible = _dirty_label.text != ""
 	menu_notes.refresh()
@@ -2193,6 +2349,23 @@ func show_shop() -> void:
 	_shop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_shop)
 	root.move_child(_shop, center.get_index())
+	if game.chefs.size() > 1 and game.shopper != null:   # co-op: whose shop this is
+		var tag := Sheet.new("note").pad(12, 6, 16, 6)
+		tag.anchor_left = 0.5
+		tag.anchor_right = 0.5
+		tag.offset_top = 96
+		tag.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		tag.rotation = -0.02
+		_shop.add_child(tag)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		tag.add_child(row)
+		var who: int = game.chefs.find(game.shopper)
+		var chip := ChefTag.new(who, 26)
+		chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(chip)
+		_label(row, 18, "Chef %d is shopping" % (who + 1))
+		_shop_tag = tag
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_bottom", 14)

@@ -362,6 +362,40 @@ Survive as many days as you can; three walkouts in one day ends the run.
   guest card. Written lines, picked by the simulation. `REGULARS_DEMO=critic`,
   `critic_bad`, `critic_known`, `critic_town`.
 - End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
+- **Local co-op, chef 2** (PRD 4): two chefs, one restaurant, one wallet, on one screen.
+  Everything a chef has is theirs (`Player`): position and what they carry, the build
+  hand and its drag, mouse aim (the keyboard-and-mouse player only), the ghost and its
+  no-go cross, the reach marks, the station cursor and prompt bubble. Every function that
+  read `player` or `hand` takes a chef (chef 1 when none is named, for tests and demos).
+  *Joining*: the first device used is player one's; Start on another controller (Enter
+  on the keyboard while player one is on a pad) seats it as the next player and a chef
+  walks in at the door with a bell, stars and "Chef 2 joined." Day, night or title;
+  touch never joins. *Leaving*: hold Start a second, or unplug the controller. What
+  they carry goes on the nearest free counter (or is lost), a moved piece goes back, a
+  piece picked from the shop costs nothing since it was never paid for; if player one
+  leaves, the other becomes player one and is dressed in coral. Seats last over a
+  restart within a launch, not between runs. *Together*: `act(1, ...)` is chef 2 only;
+  two chefs at one station, the first Use wins. Chefs pass through each other. Two
+  build hands and ghosts; a spot taken by one shows the other's cross; nobody can wall
+  the other chef in (every chef's cell must stay reachable). *Shared*: the shop is
+  whoever opened it (their chef stands still and what is bought goes into their hands;
+  the other keeps moving and building, and their Shop says "Chef 1 is shopping"; a
+  "Chef N is shopping" tag sits over the shop); Options, the guest card, the town book
+  and flyers are anyone's. The receipt waits for every player's Confirm (Back takes it
+  back), with a numbered tag per player ticked when ready; the door card, opening up or
+  closing early, turns half way for the first chef (their tag ticked under the card,
+  their bubble now says "Not ready") and all the way for the second. With one chef all
+  of this is one press, as before. *Look*: each chef wears their trim; in co-op each
+  station cursor is in its chef's trim with one corner tab per player number, and each
+  prompt bubble starts with the player's numbered disc and shows their own device's
+  button (a second bubble that would cover the first sits above it). *Hints*: one corner
+  line per player (player one bottom left, two bottom right), numbered, in their own
+  device's words, up through the first day and for 25 seconds after a join; a line too
+  long for half the screen drops to its buttons. At night the build slip has a numbered
+  row per chef. Answers to the PRD's open questions: chefs do not block each other; the
+  day does not get harder with two; the other chef keeps building while the shop is
+  open (the shop tray covers only the bottom of the room). `REGULARS_DEMO=coop`,
+  `coop_build`, `coop_door`, `coop_ready`; add `REGULARS_INPUT=pad`.
 
 Code map: `sim/` is pure logic with no scene dependencies (unit-tested with GUT).
 `game/` is the scene layer. `tools/make_sfx.py` regenerates the placeholder sounds.
@@ -467,7 +501,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   is picked on the theme card at the start of a run (PRD 7).
 - **Night zero**: *built*: the run opens on an empty kitchen and $150; the first
   ingredient, tool and menu are the player's.
-- **Local co-op**: input is already per player (see section 9); a second chef is the next step.
+- **Local co-op**: *built* for two chefs (PRD 4, section 1); chefs 3 and 4 and online play are later.
 - **Lose condition** today is three walkouts in a day. Alternatives to test: reputation
   stars, rent you must make each week.
 
@@ -496,7 +530,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
     works; swap pieces in where a sculpted model would beat the generated one (hair, hats,
     the fridge, the tree are the best candidates).
   - *Built* (PRD 7): a theme picker in the game, after Play on the title.
-  - Hired staff (server, dishwasher, host), co-op chefs 2 to 4 (trim colours exist),
+  - Hired staff (server, dishwasher, host), co-op chefs 3 and 4 (trim colours exist),
     future dishes, awning and photo view (the floor lamp is built, PRD 7).
   - A bundled hand-lettered font (the HUD uses a rounded system font).
   - The open items: the real title screen composition, colour-blind support, the "Town
@@ -541,24 +575,9 @@ Not built yet, except where marked; this is the agreed direction for future sess
     takes the oldest ticket without one; boiling never gives the burst; a group walks
     on only if nobody has a main; every station can be sold, the last stove included.
 - **The critic**: built (PRD 2), see section 1.
-- **Co-op: local, same screen first;** online later. Input is now per player (done
-  13 November 2026): `Controls` seats each device to a player index, keeps a
-  `PlayerInput` per player (device in use, stick, held actions, touch erase) and calls
-  `game.act(player, action)`. Adding chef 2 means `controls.seat("pad:1", 1)`, a second
-  `Player` in `chefs`, and moving the per-chef state below out of `main.gd`.
-  - *Per player*: the chef (position, facing, what they carry), the build hand (the
-    piece or tool held, its facing, the moving flag), the drag, the ghost and its
-    no-go cross, the reach marks, the station cursor and prompt bubble, the paint-held
-    spot, mouse aim (the mouse and keyboard player only), touch erase, the hint wording
-    (each player's device). Already split: device mode, stick, held actions, erase.
-    Still in `main.gd` as one: `hand`, `_drag`, `_aim_mouse`, `_mouse_point`,
-    `_last_paint`, the ghost, the cursor and prompt (they read `player`).
-  - *Shared*: the phase and the day, money and the ledger, the shop (one open at a time;
-    whoever opens it browses), the options screen (pauses everyone), the receipt and
-    town book, the door, the plan and the room, guests, music and camera.
-  - *Open*: who may open the shop or confirm the receipt (anyone, today); hints on one
-    screen for players on different devices (today they follow player one); how a pad
-    joins (press Start?).
+- **Co-op: built (PRD 4), see section 1.** Three answers recorded there: chefs do not
+  block each other; the day does not get harder with two chefs; the other chef keeps
+  building while the shop is open.
 - **Title screen: a placeholder** with Play, Settings and Quit. Accessibility comes
   later; meanwhile new interface should say things by shape as well as colour.
   *Built* (`game/title.gd`): shown once a launch, before the night before day 1 (starting
