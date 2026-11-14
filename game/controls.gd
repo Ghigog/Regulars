@@ -23,7 +23,7 @@ extends CanvasLayer
 ## Touch: a joystick bottom left, a column of round buttons on the right; taps on
 ## the room still pick guests and place pieces, as a mouse click would.
 
-signal mode_changed(mode: String)   # player 0's device kind, which the hints follow
+signal mode_changed(mode: String, p: int)   # a player's device kind, which their hints follow
 
 const DEAD := 0.22             # stick dead zone
 const STICK_R := 92.0          # touch joystick: base radius on screen
@@ -117,8 +117,7 @@ func set_mode(m: String, p := 0) -> void:
 		who.let_go("touch")
 		_fingers.clear()
 	_view.queue_redraw()
-	if p == 0:
-		mode_changed.emit(m)
+	mode_changed.emit(m, p)
 
 
 func _any_pad(p: int) -> String:
@@ -269,11 +268,12 @@ func _process(delta: float) -> void:
 ## In the shop, on the options screen and on the title the stick browses: a flick steps once,
 ## holding it repeats.
 func _browse(who: PlayerInput, delta: float) -> void:
-	if who.erase and (game.hand.is_empty() or not Catalog.is_build_tool(game.hand.id)):
+	var hand := _hand_of(who.index)
+	if who.erase and (hand.is_empty() or not Catalog.is_build_tool(hand.id)):
 		who.erase = false
 	var dir := Vector2i.ZERO
 	var s := who._sticks.get(who.source, Vector2.ZERO) as Vector2
-	if (game.shopping or _options() or game.hud.title_open()) and s.length() > 0.6:
+	if ((game.shopping and game.shopper == _chef_of(who.index)) or _options() or game.hud.title_open()) and s.length() > 0.6:
 		dir = Vector2i(signi(roundi(s.x)), 0) if absf(s.x) > absf(s.y) else Vector2i(0, -signi(roundi(s.y)))
 	if dir != who.browse_dir:
 		who.browse_dir = dir
@@ -296,15 +296,15 @@ func buttons() -> Array:
 		return out
 	var x := r.size.x - 92.0
 	var y := r.size.y - 112.0
-	var hand: Dictionary = game.hand
+	var hand := _hand_of(owner_of("touch"))
 	var build: bool = game.phase == game.Phase.BUILD
 	if _options() or game.hud.menu_open():   # the card's own buttons are big enough to tap
 		pass
-	elif game.phase == game.Phase.SERVICE or (build and not game.shopping):
+	elif game.phase == game.Phase.SERVICE or (build and not _touch_shops()):
 		var word: String = game.hud.last_action if game.hud.last_action != "" else "Use"
 		out.append(["use", word, Vector2(x, y), USE_R])
 		y -= USE_R + BTN_R + 16.0
-	if build and not game.shopping and not game.hud.menu_open():
+	if build and not _touch_shops() and not game.hud.menu_open():
 		if not hand.is_empty():
 			out.append(["back", "Done" if Catalog.is_build_tool(hand.id) else "Drop", Vector2(x, y), BTN_R])
 			y -= BTN_R * 2 + 14.0
@@ -322,13 +322,29 @@ func buttons() -> Array:
 		if hand.is_empty():
 			out.append(["menu", "Dishes", Vector2(x, y), BTN_R])
 			y -= BTN_R * 2 + 14.0
-			var crate: Station = game.stock_station_in_front()
+			var crate: Station = game.stock_station_in_front(_chef_of(owner_of("touch")))
 			if crate != null:
 				out.append(["turn", "Unstock" if crate.stocked else "Stock", Vector2(x, y), BTN_R])
-	elif build and game.shopping:
+	elif build and _touch_shops():
 		out.append(["back", "Close", Vector2(x, 70.0), BTN_R])
 	out.append(["options", "Menu", Vector2(r.size.x - 60.0, 196.0), 30.0])
 	return out
+
+
+## Player p's chef, or null while they have none.
+func _chef_of(p: int) -> Player:
+	return game.chefs[p] if p < game.chefs.size() else null
+
+
+## The screen's player has the shop open.
+func _touch_shops() -> bool:
+	return game.shopping and game.shopper == _chef_of(owner_of("touch"))
+
+
+## What player p's chef holds in the build phase ({} with no chef).
+func _hand_of(p: int) -> Dictionary:
+	var ch := _chef_of(p)
+	return ch.hand if ch != null else {}
 
 
 ## The player the screen belongs to: its joystick and buttons are theirs.
@@ -346,7 +362,7 @@ func _options() -> bool:
 
 func _stick_shown() -> bool:
 	return _touch_who().mode == "touch" and not _options() and (game.phase == game.Phase.SERVICE \
-		or (game.phase == game.Phase.BUILD and not game.shopping and not game.hud.menu_open()))
+		or (game.phase == game.Phase.BUILD and not _touch_shops() and not game.hud.menu_open()))
 
 
 ## What a touch at this point would press: "stick", a button id, or "".
@@ -371,7 +387,7 @@ func _touch_event(e: InputEvent) -> void:
 			if what == "stick":
 				_stick_at = _stick_home()
 				steer("touch", _stick_vec(e.position))
-			elif what == "sell" and not game.hand.is_empty() and Catalog.is_build_tool(game.hand.id):
+			elif what == "sell" and not _hand_of(owner_of("touch")).is_empty() and Catalog.is_build_tool(_hand_of(owner_of("touch")).id):
 				_touch_who().erase = not _touch_who().erase
 			else:
 				_fingers[e.index] = [what]

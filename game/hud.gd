@@ -47,6 +47,7 @@ var prompt_label: Label
 var last_action := ""      # the word on the prompt, for the touch Use button
 var _prompt_key: Control
 var _prompt_key_label: Label
+var _prompts: Array[Dictionary] = []   # one bubble per chef: {sheet, key, key_label, label, tag}; 0 is `prompt`
 var _shop_keys: Label
 var _shown_money := -1
 var _shown_strikes := 0
@@ -220,6 +221,50 @@ class Face extends Control:
 		draw_circle(Vector2(14, 14), 10.5, col)
 		var f := Hud.lettering()
 		draw_string(f, Vector2(14 - f.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x / 2, 20), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Hud.CREAM)
+
+
+## A player's tag (PRD 4): a disc in their trim colour with their number on it,
+## so two players' marks differ by shape (the digit) as well as colour. With
+## `ready`, a ticked note hangs off it; `waiting` shows a hollow ring instead.
+class ChefTag extends Control:
+	var p := 0
+	var px := 28.0
+	var state := ""   # "", "ready" or "waiting"
+
+	func _init(p_: int, px_ := 28.0, state_ := "") -> void:
+		p = p_
+		px = px_
+		state = state_
+		custom_minimum_size = Vector2(px * (1.7 if state != "" else 1.0), px)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func set_player(p_: int, state_ := "") -> void:
+		if p_ == p and state_ == state:
+			return
+		p = p_
+		state = state_
+		custom_minimum_size = Vector2(px * (1.7 if state != "" else 1.0), px)
+		queue_redraw()
+
+	func _draw() -> void:
+		var r := px / 2.0 - 1.0
+		var c := Vector2(px / 2.0, px / 2.0)
+		draw_circle(c + Vector2(0, 1.5), r, Hud.SHADOW)
+		draw_circle(c, r, Hud.INK)
+		draw_circle(c, r - 2.5, Color(Peg.PLAYER_TRIM[p % 4]))
+		var f := Hud.lettering()
+		var n := str(p + 1)
+		var fs := int(px * 0.62)
+		draw_string(f, c + Vector2(-f.get_string_size(n, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x / 2.0, fs * 0.36), n, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Hud.CREAM)
+		var b := Vector2(px * 1.32, px / 2.0)
+		var br := px * 0.3
+		if state == "ready":   # a cream disc with an inked tick
+			draw_circle(b + Vector2(0, 1.5), br, Hud.SHADOW)
+			draw_circle(b, br, Hud.INK)
+			draw_circle(b, br - 2.0, Hud.CREAM)
+			draw_polyline(PackedVector2Array([b + Vector2(-br * 0.5, 0), b + Vector2(-br * 0.12, br * 0.42), b + Vector2(br * 0.55, -br * 0.45)]), Hud.INK, 3.0, true)
+		elif state == "waiting":   # an empty ring: not yet
+			draw_arc(b, br - 1.0, 0, TAU, 24, Color(Hud.INK, 0.55), 2.5, true)
 
 
 class Pips extends Control:
@@ -873,17 +918,11 @@ func setup(game_) -> void:
 	hint.text = _hint_text()
 
 	# The keycap prompt that floats over the station the chef faces.
-	prompt = Sheet.new("tab").pad(10, 8, 16, 12)
-	prompt.visible = false
-	root.add_child(prompt)
-	var prow := HBoxContainer.new()
-	prow.add_theme_constant_override("separation", 10)
-	prompt.add_child(prow)
-	var key := Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
-	prow.add_child(key)
-	_prompt_key = key
-	_prompt_key_label = _label(key, 24, "E")
-	prompt_label = _label(prow, 26)
+	var first := _make_prompt()
+	prompt = first.sheet
+	_prompt_key = first.key
+	_prompt_key_label = first.key_label
+	prompt_label = first.label
 
 	var banner_box := CenterContainer.new()
 	banner_box.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1302,15 +1341,61 @@ func _stamp(slot: Punch, delay: float) -> void:
 	tw.tween_callback(st.queue_free)
 
 
-## Shows "[E] COOK" over a point on screen, or hides it when `text` is empty.
-func show_prompt(at: Vector2, text: String) -> void:
-	last_action = text
-	prompt.visible = text != "" and title == null
-	if text != "":
-		prompt_label.text = text.to_upper()
-		prompt.reset_size()
-		prompt.position = (at - Vector2(prompt.size.x / 2.0, prompt.size.y)).round()
-		prompt.position.y = maxf(prompt.position.y, 6.0)  # never off the top of the screen
+## One chef's prompt bubble: their number tag (shown in co-op), a keycap and a word.
+func _make_prompt() -> Dictionary:
+	var sheet := Sheet.new("tab").pad(10, 8, 16, 12)
+	sheet.visible = false
+	root.add_child(sheet)
+	if _prompts.size() > 0:
+		root.move_child(sheet, _prompts[0].sheet.get_index() + _prompts.size())
+	var prow := HBoxContainer.new()
+	prow.add_theme_constant_override("separation", 10)
+	sheet.add_child(prow)
+	var tag := ChefTag.new(_prompts.size(), 30)
+	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tag.visible = false
+	prow.add_child(tag)
+	var key := Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
+	prow.add_child(key)
+	var key_label := _label(key, 24, "E")
+	var d := {"sheet": sheet, "key": key, "key_label": key_label, "label": _label(prow, 26), "tag": tag}
+	_prompts.append(d)
+	return d
+
+
+## Shows "[E] COOK" over a point on screen for player p's chef, or hides it when
+## `text` is empty. In co-op each bubble carries its player's numbered tag and
+## their own device's button; a second bubble that would cover the first sits above it.
+func show_prompt(at: Vector2, text: String, p := 0) -> void:
+	while _prompts.size() <= p:
+		_make_prompt()
+	var d: Dictionary = _prompts[p]
+	var sheet: Control = d.sheet
+	if game.controls == null or game.controls.owner_of("touch") == p:
+		last_action = text
+	sheet.visible = text != "" and title == null
+	if text == "":
+		return
+	var coop: bool = game.chefs.size() > 1
+	(d.tag as ChefTag).visible = coop
+	(d.tag as ChefTag).set_player(p)
+	var m: String = game.controls.input_of(p).mode if game.controls and p < game.controls.players.size() else "keys"
+	d.key.visible = m != "touch"
+	d.key_label.text = game.controls.glyph("use", p) if game.controls and p < game.controls.players.size() else "E"
+	d.label.text = text.to_upper()
+	sheet.reset_size()
+	sheet.position = (at - Vector2(sheet.size.x / 2.0, sheet.size.y)).round()
+	for q in p:   # never on top of an earlier player's bubble
+		var o: Control = _prompts[q].sheet
+		if o.visible and Rect2(o.position, o.size).grow(-2).intersects(Rect2(sheet.position, sheet.size)):
+			sheet.position.y = o.position.y - sheet.size.y + 4.0
+	sheet.position.y = maxf(sheet.position.y, 6.0)  # never off the top of the screen
+
+
+## Hides the bubbles of players with no chef (one left).
+func trim_prompts(count: int) -> void:
+	for p in range(count, _prompts.size()):
+		_prompts[p].sheet.visible = false
 
 
 ## Rebuilds the ticket rail from the game's open tickets.

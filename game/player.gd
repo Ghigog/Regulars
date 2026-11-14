@@ -23,13 +23,49 @@ var boost_speed := 1.0   # times SPEED: a prep minigame's burst (1.5) or penalty
 var boost_left := 0.0    # seconds of it left
 var _boost_fx: Node3D    # speed lines and a star, or a sweat drop
 var _boost_age := 0.0
+## What belongs to this chef's player rather than to the game (PRD 4): the build
+## hand and its drag, where they aim, and the marks drawn for them in the room.
+var trim := 0                     # which PLAYER_TRIM colour the chef wears
+var hand := {}                    # build phase: the piece or tool in hand ({} for none)
+var drag := {}                    # a mouse drag with a build tool: {"from": Vector3, "remove": bool}
+var aim_mouse := false            # build phase: the mouse, not the chef, says where things go
+var mouse_point := Vector3.INF
+var last_paint := Vector3i(-999, -999, -1)   # the spot Use last built on while held
+var demo_hover := Vector3.INF     # demos and tests: where the hand is held
+var ghost: Node3D                 # the piece in hand, held over its spot
+var ghost_key := ""
+var tool_ghost: Node3D            # a build tool's tiles or bars
+var tool_key := ""
+var no_mark: Node3D               # the cross where the piece in hand cannot go
+var range_marks: Node3D           # floor marks for the reach of the piece being carried
+var range_key := ""
+var cursor: Node3D                # the frame on the station this chef would use
+var cursor_key := ""
 
 
-func setup(game_, start: Vector2i) -> void:
+func setup(game_, start: Vector2i, trim_ := 0) -> void:
 	game = game_
 	position = Grid.center(start)
-	_body = Peg.chef(0)
-	add_child(Peg.rigged(_body))
+	set_trim(trim_)
+
+
+## Dresses the chef in a player's trim colour (a new body; what is carried stays).
+func set_trim(t: int) -> void:
+	trim = t
+	var rig: Node3D = _body.get_parent() if _body else null
+	_body = Peg.chef(t)
+	if rig:
+		var at := get_children().find(rig)
+		_held_node = null   # it goes with the old body
+		rig.queue_free()
+		remove_child(rig)
+		var fresh := Peg.rigged(_body)
+		add_child(fresh)
+		move_child(fresh, at)
+		if held != "":
+			set_held(held, held_quality, tray, tray_tag)
+	else:
+		add_child(Peg.rigged(_body))
 
 
 func set_held(kind: String, quality := 1.0, tray_: Tray = null, tag := "") -> void:
@@ -162,7 +198,7 @@ func target_cell() -> Vector2i:
 			for s in st.seats:
 				if game.seat_taken.has(s):
 					dist = minf(dist, (Grid.center(s) - position).length())
-			var action: String = game.prompt_for(st)
+			var action: String = game.prompt_for(st, self)
 			if dist > REACH or action == "":
 				continue
 			var score := -dist + 0.4 * to.normalized().dot(aim)

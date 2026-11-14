@@ -99,7 +99,10 @@ var _next_ticket := 1
 var order_rng := RandomNumberGenerator.new()   # what guests order; apart from the town's own dice
 ## The piece being placed: {id, tier, price, facing} for a new one from the catalog;
 ## a piece picked up from the room also has {moving, node, from, from_facing}.
-var hand := {}
+## Chef 1's build hand, for tests and demos; each chef holds their own (Player.hand).
+var hand: Dictionary:
+	get: return player.hand
+	set(v): player.hand = v
 var wall_nodes := {}                   # Vector3i edge -> Node3D, player-built partitions only
 var rugs := {}                         # Vector2i anchor cell -> Node3D (meta "facing"); see rug_cells
 var plan: Floorplan                    # floors, walls, doors and archways
@@ -108,20 +111,13 @@ var _room_lights: Array[OmniLight3D] = []
 var _openings := {}                    # Vector3i edge -> Scenery opening info
 var _opening_ok := {}                  # Vector3i edge -> whether it was last drawn usable
 var _frame := [WIDE_FOCUS, WIDE_SIZE, CLOSE_FOCUS, CLOSE_SIZE]   # the camera, fitted to the floor
-var _aim_mouse := false                # build phase: the mouse, not the chef, says where things go
-var _mouse_point := Vector3.INF
-var _drag := {}                        # a mouse drag with a build tool: {"from": Vector3, "remove": bool}
-var _tool_ghost: Node3D
-var _tool_key := ""
-var _last_paint := Vector3i(-999, -999, -1)   # the spot E last built on while held
 const NIGHT_ZERO_BLOCK := "Buy an ingredient, a tool, and write a menu."
 const NIGHT_HINTS: Array[String] = ["Buy an ingredient and a tool in the shop.", "Write a menu.", "Flip the door card to open."]
 var menu_board: MenuBoard               # the chalkboard by the door: tonight's names
 const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "trays": "Tray stack", "pass": "Pass counter"}
-var _ghost: Node3D
-var _ghost_key := ""
-var _no_mark: Node3D
-var _demo_hover := Vector3.INF
+var _demo_hover: Vector3:            # chef 1's held spot, for tests and demos
+	get: return player.demo_hover
+	set(v): player.demo_hover = v
 var inspected: Guest                 # the guest whose card is open, if any
 var flyers_out := false          # bought tonight, spent on tomorrow's crowd
 var first_night := true          # open on the night before day 1, in the build phase (tests and demos skip it)
@@ -130,11 +126,20 @@ static var _theme_picked := false  # this run's theme is chosen; starting over a
 var theme_path := "user://regulars_theme.cfg"   # the last theme picked, preselected next time
 var allow_quit := true           # tests turn this off to check Quit without leaving
 var quit_asked := false
-var shopping := false            # the shop is open over the build phase; the chef stands still
+var shopper: Player              # the chef whose player opened the shop; they stand still while it is open
+var shopping: bool:              # the shop is open over the build phase
+	get: return shopper != null
 var door_open := true            # which side of the door card faces the street
 var _door_hang: Node3D
-var _range_marks: Node3D          # floor marks for the reach of the piece being carried
-var _range_key := ""
+var _range_marks: Node3D:         # chef 1's reach marks, for tests
+	get: return player.range_marks
+var _range_key: String:
+	get: return player.range_key
+var _tool_ghost: Node3D:          # chef 1's build-tool ghost, for tests
+	get: return player.tool_ghost
+var _drag: Dictionary:            # chef 1's mouse drag, for tests and demos
+	get: return player.drag
+	set(v): player.drag = v
 var _door_turn: Node3D
 var best_path := "user://regulars_best.json"
 var player: Player               # chef 1; `chefs` holds every chef, by player index
@@ -146,7 +151,6 @@ var preps := {}
 var hud: Hud
 var controls: Controls           # input per player: devices, touch buttons, presses sent to act()
 var cam: Camera3D
-var _cursor: Node3D
 var _gross: Array[Dictionary] = []
 var _sfx := {}
 var music_id := ""               # which MUSIC track is playing
@@ -172,51 +176,26 @@ func _ready() -> void:
 	_build_layout()
 	_start_plan()
 	_load_sounds()
-	player = Player.new()
-	add_child(player)
-	player.setup(self, Vector2i(2, 3))
-	chefs = [player]
+	add_chef()
 	controls = Controls.new()
 	add_child(controls)
 	controls.setup(self)
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(self)
-	controls.mode_changed.connect(func(_m: String) -> void:   # player 0's device: the hints follow it
-		_aim_mouse = false
-		_drag = {}
+	controls.mode_changed.connect(func(_m: String, p: int) -> void:   # a player's device: their hints follow it
+		if p < chefs.size():
+			chefs[p].aim_mouse = false
+			chefs[p].drag = {}
 		hud.refresh_input())
 	if OS.get_environment("REGULARS_INPUT") != "":   # dev switch for screenshots: touch or pad
 		controls.set_mode(OS.get_environment("REGULARS_INPUT"))
-	# A warm frame around the top of the station the chef is facing.
-	_cursor = Node3D.new()
-	add_child(_cursor)
-	for i in 4:
-		var bar := Build.box(_cursor, Vector3(0, 0, 0.5).rotated(Vector3.UP, i * PI / 2), Vector3(1.06, 0.05, 0.07), Build.WARN, 0.8)
-		bar.rotation.y = i * PI / 2
-	# Build phase: a coral cross on the floor where the piece in hand cannot go.
-	_no_mark = Node3D.new()
-	_no_mark.visible = false
-	add_child(_no_mark)
-	for turn: float in [PI / 4, -PI / 4]:
-		var arm := Build.box(_no_mark, Vector3(0, 0.02, 0), Vector3(1.2, 0.05, 0.2), Build.DANGER, 0.6)
-		arm.rotation.y = turn
-		var m := StandardMaterial3D.new()
-		m.albedo_color = Color(Build.DANGER)
-		m.emission_enabled = true
-		m.emission = Color(Build.DANGER)
-		m.emission_energy_multiplier = 0.6
-		m.no_depth_test = true          # shows through whatever is already standing there
-		m.render_priority = 5
-		arm.material_override = m
 	_shot_path = OS.get_environment("REGULARS_SHOT")
 	_build_door_card()
 	menu_board = MenuBoard.new()
 	add_child(menu_board)
 	menu_board.position = Vector3(W + 0.455, 0.39, 5.3)   # the slate of the A-frame Scenery._outside stands by the door
 	menu_board.refresh([])
-	_range_marks = Node3D.new()
-	add_child(_range_marks)
 	var demo := OS.get_environment("REGULARS_DEMO")
 	if demo != "" and not demo in ["title", "night0", "picker"]:
 		test_kitchen()   # the demos show a working kitchen
@@ -230,6 +209,66 @@ func _ready() -> void:
 	else:
 		start_day()
 	_apply_demo(OS.get_environment("REGULARS_DEMO"))
+
+
+## A new chef for the next player index, with their marks in the room: the frame
+## on the station they would use, the cross where their piece cannot go and the
+## reach marks of what they carry. Returns the chef.
+func add_chef(at := Vector2i(2, 3)) -> Player:
+	var ch := Player.new()
+	add_child(ch)
+	ch.setup(self, at, chefs.size())
+	chefs.append(ch)
+	player = chefs[0]
+	ch.no_mark = Node3D.new()
+	ch.no_mark.visible = false
+	add_child(ch.no_mark)
+	for turn: float in [PI / 4, -PI / 4]:
+		var arm := Build.box(ch.no_mark, Vector3(0, 0.02, 0), Vector3(1.2, 0.05, 0.2), Build.DANGER, 0.6)
+		arm.rotation.y = turn
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(Build.DANGER)
+		m.emission_enabled = true
+		m.emission = Color(Build.DANGER)
+		m.emission_energy_multiplier = 0.6
+		m.no_depth_test = true          # shows through whatever is already standing there
+		m.render_priority = 5
+		arm.material_override = m
+	ch.range_marks = Node3D.new()
+	add_child(ch.range_marks)
+	_recolour_cursors()
+	return ch
+
+
+## A warm frame around the top of the station each chef is facing: the usual
+## amber with one chef; each chef's trim colour, with a corner tab per player
+## number (one tab for chef 1, two for chef 2), when there are more.
+func _recolour_cursors() -> void:
+	for ch in chefs:
+		var key := "%d:%d" % [ch.trim, chefs.size()]
+		if ch.cursor and ch.cursor_key == key:
+			continue
+		var was_visible := ch.cursor != null and ch.cursor.visible
+		var at := ch.cursor.position if ch.cursor else Vector3.ZERO
+		if ch.cursor:
+			ch.cursor.queue_free()
+		ch.cursor_key = key
+		ch.cursor = Node3D.new()
+		ch.cursor.visible = was_visible
+		ch.cursor.position = at
+		add_child(ch.cursor)
+		var col: String = Build.WARN if chefs.size() == 1 else Peg.PLAYER_TRIM[ch.trim % 4]
+		for i in 4:
+			var bar := Build.box(ch.cursor, Vector3(0, 0, 0.5).rotated(Vector3.UP, i * PI / 2), Vector3(1.06, 0.05, 0.07), col, 0.8)
+			bar.rotation.y = i * PI / 2
+		if chefs.size() > 1:   # the number, by shape: n little tabs on the near corner
+			for k in ch.trim + 1:
+				Build.box(ch.cursor, Vector3(0.5 - 0.17 * k, 0.04, 0.5) , Vector3(0.1, 0.09, 0.14), col, 0.8)
+
+
+## The chef a call is for: chef 1 when none is named (tests and demos).
+func _me(ch: Player) -> Player:
+	return ch if ch != null else player
 
 
 ## Dev aid for screenshots: REGULARS_DEMO=cook or =summary jumps to that moment.
@@ -528,7 +567,7 @@ func _demo_build(demo: String) -> void:
 		cancel_hand()
 		if demo == "build_drag":   # more floor being dragged out, part of it off the lot
 			pick_catalog("floor_planks")
-			_drag = {"from": Vector3(-0.5, 0, -1.5), "remove": false}
+			player.drag = {"from": Vector3(-0.5, 0, -1.5), "remove": false}
 			_demo_hover = Vector3(3.5, 0, 1.5)
 	elif demo == "build_dining" or demo == "build_dining_shop":  # a booth and a table for four, in the room or the shop
 		for spot: Array in [[Vector3(6.5, 0, 1.5), "table4", Vector3i(6, 1, 0)], [Vector3(6.5, 0, 5.5), "booth", Vector3i(6, 5, 0)]]:
@@ -561,7 +600,7 @@ func _demo_build(demo: String) -> void:
 	elif demo == "build_range_floor":  # marble being dragged out under the tables: who sits on it
 		ledger.xp = 500
 		pick_catalog("floor_marble")
-		_drag = {"from": Vector3(6.5, 0, 2.5), "remove": false}
+		player.drag = {"from": Vector3(6.5, 0, 2.5), "remove": false}
 		_demo_hover = Vector3(9.5, 0, 4.5)
 	elif demo == "build_range_rug":   # a new rug under the back table; one seat in view is full already
 		ledger.xp = 500
@@ -573,7 +612,7 @@ func _demo_build(demo: String) -> void:
 	elif demo == "build_range_paint":  # paint dragged along the back wall: the seats against it
 		ledger.xp = 500
 		pick_catalog("paint")
-		_drag = {"from": Vector3(4, 0, 0), "remove": false}
+		player.drag = {"from": Vector3(4, 0, 0), "remove": false}
 		_demo_hover = Vector3(10, 0, 0)
 	else:   # a stove from the shop, held over a good spot or (build_no) a refused one
 		pick_catalog("stove", 2)
@@ -1157,12 +1196,13 @@ func day_progress() -> float:
 func start_day() -> void:
 	if phase == Phase.CLOSED:
 		return
-	if hand.get("moving", false):
-		cancel_hand()   # a piece still being carried goes back where it was
+	for ch in chefs:
+		if ch.hand.get("moving", false):
+			cancel_hand(ch)   # a piece still being carried goes back where it was
+		ch.hand = {}
 	phase = Phase.SERVICE
 	clock = 0.0
-	hand = {}
-	shopping = false
+	shopper = null
 	set_door(true)
 	hud.close_menu()
 	hud.hide_card()
@@ -1334,14 +1374,19 @@ static func shop_items(query := "", category := "") -> Array[Dictionary]:
 	return found
 
 
-func open_shop() -> void:
-	if phase != Phase.BUILD or shopping:
+func open_shop(ch: Player = null) -> void:
+	ch = _me(ch)
+	if phase != Phase.BUILD:
 		return
-	if Cleaning.carrying_mess(player.held):
+	if shopping:   # one shop for everyone: the other player's Shop does nothing
+		if shopper != ch:
+			hud.say("Chef %d is shopping." % (chefs.find(shopper) + 1))
+		return
+	if Cleaning.carrying_mess(ch.held):
 		sfx("fail")
 		hud.say(Cleaning.HANDS_FULL)
 		return
-	shopping = true
+	shopper = ch
 	sfx("slide")
 	hud.show_shop()
 
@@ -1349,18 +1394,19 @@ func open_shop() -> void:
 func close_shop() -> void:
 	if not shopping:
 		return
-	shopping = false
+	shopper = null
 	sfx("slide", 0.0, 0.8)
 	hud.hide_shop()
 
 
 ## Buys what the shop is showing. Flyers are paid for at once; a piece goes into
-## the chef's hands and the shop shuts, so it can be carried to its place.
+## the hands of the chef whose player is shopping, and the shop shuts, so it can
+## be carried to its place.
 func buy(bp: Dictionary) -> bool:
 	if bp.id == FLYERS.id:
 		if buy_flyers():
 			return true
-	elif pick_catalog(bp.id, int(bp.tier)):
+	elif pick_catalog(bp.id, int(bp.tier), shopper):
 		sfx("pickup")
 		close_shop()
 		return true
@@ -1369,23 +1415,25 @@ func buy(bp: Dictionary) -> bool:
 
 
 ## Picks a piece from the catalog to place. Nothing is paid until it is placed.
-func pick_catalog(id: String, tier := 1) -> bool:
-	if phase != Phase.BUILD or Cleaning.carrying_mess(player.held) or not catalog.can_buy(id, ledger.money, ledger.level(), tier) \
+func pick_catalog(id: String, tier := 1, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if phase != Phase.BUILD or Cleaning.carrying_mess(ch.held) or not catalog.can_buy(id, ledger.money, ledger.level(), tier) \
 			or not Catalog.sold_in(id, Scenery.theme_id):
 		return false
-	if hand.get("moving", false):
-		cancel_hand()
-	hand = {"id": id, "tier": tier, "price": Catalog.price_of(id, tier), "facing": 0}
+	if ch.hand.get("moving", false):
+		cancel_hand(ch)
+	ch.hand = {"id": id, "tier": tier, "price": Catalog.price_of(id, tier), "facing": 0}
 	hud.show_build()
 	return true
 
 
 ## Puts down whatever is in hand: a new piece is dropped, a moved one goes back.
-func cancel_hand() -> void:
-	_drag = {}
-	if hand.get("moving", false):
-		_put_down(hand.from, int(hand.from_facing))
-	hand = {}
+func cancel_hand(ch: Player = null) -> void:
+	ch = _me(ch)
+	ch.drag = {}
+	if ch.hand.get("moving", false):
+		_put_down(ch.hand, ch.hand.from, int(ch.hand.from_facing))
+	ch.hand = {}
 	if phase == Phase.BUILD:
 		hud.show_build()
 
@@ -1395,8 +1443,9 @@ static func piece_name(bp: Dictionary) -> String:
 
 
 ## Picks up the piece standing at a point on the floor, to move, turn or sell it.
-func pick_up(p: Vector3) -> bool:
-	if phase != Phase.BUILD or not hand.is_empty() or Cleaning.carrying_mess(player.held):
+func pick_up(p: Vector3, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if phase != Phase.BUILD or not ch.hand.is_empty() or Cleaning.carrying_mess(ch.held):
 		return false
 	var c := Grid.to_cell(p)
 	var edge := snap_edge(p)
@@ -1408,14 +1457,14 @@ func pick_up(p: Vector3) -> bool:
 		var st: Station = stations[c]
 		_unregister(st)
 		st.visible = false
-		hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
+		ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
 			"node": st, "from": Vector3i(c.x, c.y, 0), "from_facing": st.facing}
 	elif wall_nodes.has(edge):
 		var n: Node3D = wall_nodes[edge]
 		wall_nodes.erase(edge)
 		grid.walls.erase(edge)
 		n.visible = false
-		hand = {"id": "screen", "tier": int(n.get_meta("tier", 1)), "price": 0, "facing": 0, "moving": true,
+		ch.hand = {"id": "screen", "tier": int(n.get_meta("tier", 1)), "price": 0, "facing": 0, "moving": true,
 			"node": n, "from": edge, "from_facing": 0}
 	elif rug_at(c) != null:   # a rug is picked up last: whatever stands on it comes first
 		var n := rug_at(c)
@@ -1423,7 +1472,7 @@ func pick_up(p: Vector3) -> bool:
 		rugs.erase(anchor)
 		n.visible = false
 		var f := int(n.get_meta("facing", 0))
-		hand = {"id": "rug", "tier": 1, "price": 0, "facing": f, "moving": true,
+		ch.hand = {"id": "rug", "tier": 1, "price": 0, "facing": f, "moving": true,
 			"node": n, "from": Vector3i(anchor.x, anchor.y, 0), "from_facing": f}
 	else:
 		return false
@@ -1433,14 +1482,14 @@ func pick_up(p: Vector3) -> bool:
 
 
 ## Stands the carried piece on a spot. No checks: callers have made them.
-func _put_down(spot: Vector3i, facing: int) -> void:
-	var n: Node3D = hand.node
+func _put_down(h: Dictionary, spot: Vector3i, facing: int) -> void:
+	var n: Node3D = h.node
 	n.visible = true
-	if hand.id == "screen":
+	if h.id == "screen":
 		grid.walls[spot] = true
 		wall_nodes[spot] = n
 		_place_on_edge(n, spot)
-	elif hand.id == "rug":
+	elif h.id == "rug":
 		_lay_rug(n, Vector2i(spot.x, spot.y), facing)
 	else:
 		(n as Station).place_at(Vector2i(spot.x, spot.y), facing)
@@ -1448,40 +1497,44 @@ func _put_down(spot: Vector3i, facing: int) -> void:
 
 
 ## Turns the piece in hand a quarter turn. Partitions turn by where you point.
-func rotate_hand() -> void:
-	if not hand.is_empty() and not on_edge(hand.id) and not Catalog.is_build_tool(hand.id):
-		hand.facing = (int(hand.facing) + 1) % 4
+func rotate_hand(ch: Player = null) -> void:
+	ch = _me(ch)
+	if not ch.hand.is_empty() and not on_edge(ch.hand.id) and not Catalog.is_build_tool(ch.hand.id):
+		ch.hand.facing = (int(ch.hand.facing) + 1) % 4
 		sfx("pickup")
 
 
 ## What selling the carried piece pays: half its catalog price, or 0 if not for sale.
-func sell_value() -> int:
-	if not hand.get("moving", false) or not Catalog.ITEMS.has(hand.id):
+func sell_value(ch: Player = null) -> int:
+	ch = _me(ch)
+	if not ch.hand.get("moving", false) or not Catalog.ITEMS.has(ch.hand.id):
 		return 0
-	return Catalog.price_of(hand.id, int(hand.tier)) / 2
+	return Catalog.price_of(ch.hand.id, int(ch.hand.tier)) / 2
 
 
 ## Why the carried piece cannot be sold; empty when it can.
-func sell_block() -> String:
-	if not hand.get("moving", false):
+func sell_block(ch: Player = null) -> String:
+	ch = _me(ch)
+	if not ch.hand.get("moving", false):
 		return "Nothing picked up"
-	if not Catalog.ITEMS.has(hand.id):
-		return "The %s is not for sale" % piece_name(hand).to_lower()
-	if hand.id in ["table", "sink", "bin"] and find_station(hand.id) == null:
-		return "Your last %s" % hand.id
+	if not Catalog.ITEMS.has(ch.hand.id):
+		return "The %s is not for sale" % piece_name(ch.hand).to_lower()
+	if ch.hand.id in ["table", "sink", "bin"] and find_station(ch.hand.id) == null:
+		return "Your last %s" % ch.hand.id
 	return ""
 
 
-func sell_hand() -> bool:
-	if phase != Phase.BUILD or sell_block() != "":
+func sell_hand(ch: Player = null) -> bool:
+	ch = _me(ch)
+	if phase != Phase.BUILD or sell_block(ch) != "":
 		return false
-	ledger.refund(sell_value())
-	var n: Node3D = hand.node
+	ledger.refund(sell_value(ch))
+	var n: Node3D = ch.hand.node
 	if n is Station and (n as Station).lamp:
 		_sconces.erase((n as Station).lamp)
 		(n as Station).lamp.queue_free()
 	n.queue_free()
-	hand = {}
+	ch.hand = {}
 	sfx("coin")
 	hud.show_build()
 	return true
@@ -1499,8 +1552,9 @@ static func snap_edge(p: Vector3) -> Vector3i:
 
 ## Where the piece in hand would go for a point on the floor: (x, y, axis).
 ## Furniture snaps to the cell (axis 0); a partition snaps to the nearest cell edge.
-func snap(p: Vector3) -> Vector3i:
-	if on_edge(hand.get("id", "")):
+func snap(p: Vector3, ch: Player = null) -> Vector3i:
+	ch = _me(ch)
+	if on_edge(ch.hand.get("id", "")):
 		return snap_edge(p)
 	var c := Grid.to_cell(p)
 	return Vector3i(c.x, c.y, 0)
@@ -1576,7 +1630,9 @@ static func floor_kind(id: String) -> String:
 ## Everyone who must still be able to get about after a change: the chef, every
 ## seat (must_reach) and a side of every station (must_touch).
 func _reach() -> Array[Vector2i]:
-	var reach: Array[Vector2i] = [player.cell()]
+	var reach: Array[Vector2i] = []
+	for ch in chefs:   # every chef must still be able to get about
+		reach.append(ch.cell())
 	reach.assign(reach + grid.reserved.keys())
 	return reach
 
@@ -1588,68 +1644,71 @@ func _touch() -> Array[Vector2i]:
 
 
 ## Would the piece in hand fit at this spot without cutting anyone off?
-func can_place(spot: Vector3i) -> bool:
-	if hand.is_empty():
+func can_place(spot: Vector3i, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if ch.hand.is_empty():
 		return false
 	var reach := _reach()
 	var touch := _touch()
 	var cell := Vector2i(spot.x, spot.y)
-	match tool_kind(hand.id):
+	match tool_kind(ch.hand.id):
 		"floor":
-			return plan.can_lay(cell, floor_kind(hand.id))
+			return plan.can_lay(cell, floor_kind(ch.hand.id))
 		"finish":
-			return plan.can_finish(spot, hand.id)
+			return plan.can_finish(spot, ch.hand.id)
 		"rug":
-			return can_lay_rug(cell, int(hand.facing))
+			return can_lay_rug(cell, int(ch.hand.facing))
 		"wall":
 			return plan.can_build(spot) and grid.can_place_wall(spot, LOT, DOOR, reach, touch)
 		"door", "arch":
-			return plan.can_open(spot, hand.id)
-	if hand.id == "screen":
+			return plan.can_open(spot, ch.hand.id)
+	if ch.hand.id == "screen":
 		return grid.can_place_wall(spot, LOT, DOOR, reach, touch) and not plan.is_wall(spot)
-	return grid.can_place_block(cell, Station.seats_for(hand.id, cell, int(hand.facing)), LOT, DOOR, reach, touch)
+	return grid.can_place_block(cell, Station.seats_for(ch.hand.id, cell, int(ch.hand.facing)), LOT, DOOR, reach, touch)
 
 
 ## Builds the piece in hand and pays for it, so cancelling before this is free.
 ## A new piece stays in hand for another while there is money for it; a moved
 ## piece is put down for nothing.
-func place(spot: Vector3i) -> bool:
-	if phase != Phase.BUILD or not can_place(spot):
+func place(spot: Vector3i, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if phase != Phase.BUILD or not can_place(spot, ch):
 		return false
-	if Catalog.is_build_tool(hand.id):
-		if not _build_at(spot):
+	if Catalog.is_build_tool(ch.hand.id):
+		if not _build_at(spot, ch):
 			return false
 		_plan_changed()
 		sfx("putdown")
-		_after_building()
+		_after_building(ch)
 		return true
 	var cell := Vector2i(spot.x, spot.y)
-	if hand.get("moving", false):
-		_put_down(spot, int(hand.facing))
-		hand = {}
+	if ch.hand.get("moving", false):
+		_put_down(ch.hand, spot, int(ch.hand.facing))
+		ch.hand = {}
 		sfx("putdown")
 		hud.show_build()
 		return true
-	if not ledger.spend(int(hand.price)):
+	if not ledger.spend(int(ch.hand.price)):
 		return false
-	if hand.id == "screen":
-		var n := add_wall(cell, spot.z, 0.9 + 0.1 * int(hand.tier))
-		n.set_meta("tier", int(hand.tier))
+	if ch.hand.id == "screen":
+		var n := add_wall(cell, spot.z, 0.9 + 0.1 * int(ch.hand.tier))
+		n.set_meta("tier", int(ch.hand.tier))
 		wall_nodes[spot] = n
-	elif hand.id == "rug":
-		add_rug(cell, int(hand.facing))
+	elif ch.hand.id == "rug":
+		add_rug(cell, int(ch.hand.facing))
 	else:
-		add_station(hand.id, cell, int(hand.tier), int(hand.facing))
+		add_station(ch.hand.id, cell, int(ch.hand.tier), int(ch.hand.facing))
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
 	sfx("putdown")
-	_after_building()
+	_after_building(ch)
 	return true
 
 
 ## A new piece or tool stays in hand while there is money for another.
-func _after_building() -> void:
-	if not catalog.can_buy(hand.id, ledger.money, ledger.level(), int(hand.tier)):
-		hand = {}
+func _after_building(ch: Player = null) -> void:
+	ch = _me(ch)
+	if not catalog.can_buy(ch.hand.id, ledger.money, ledger.level(), int(ch.hand.tier)):
+		ch.hand = {}
 	hud.show_build()
 
 
@@ -1657,42 +1716,44 @@ func _after_building() -> void:
 
 ## One tile, wall, door or archway from the tool in hand, if it fits and can be
 ## paid for. Keeps the grid in step; the room is redrawn by the caller.
-func _build_at(spot: Vector3i) -> bool:
-	if not can_place(spot) or not ledger.spend(int(hand.price)):
+func _build_at(spot: Vector3i, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if not can_place(spot, ch) or not ledger.spend(int(ch.hand.price)):
 		return false
 	var cell := Vector2i(spot.x, spot.y)
-	match tool_kind(hand.id):
+	match tool_kind(ch.hand.id):
 		"floor":
 			var was := plan.kind(cell)
 			if was != "":   # laying over another floor: the old one is taken up and paid back
 				ledger.refund(Catalog.price_of("floor_" + was))
-			for what: String in plan.lay(cell, floor_kind(hand.id)).values():
+			for what: String in plan.lay(cell, floor_kind(ch.hand.id)).values():
 				ledger.refund(Catalog.price_of(what))
 		"wall":
 			plan.build(spot)
 		"finish":
-			var was := plan.finish(spot, hand.id)
+			var was := plan.finish(spot, ch.hand.id)
 			if was != "":   # papering over paint: the old finish is paid back
 				ledger.refund(Catalog.price_of(was))
 		"door", "arch":
 			var had := plan.strip(spot)
 			if had != "":
 				ledger.refund(Catalog.price_of(had))
-			plan.openings[spot] = hand.id
+			plan.openings[spot] = ch.hand.id
 	_sync_grid()
 	return true
 
 
 ## Takes away the floor, built wall or opening at a spot, for the tool in hand,
 ## and pays back what it cost. Refused if it would cut anyone off.
-func remove_at(spot: Vector3i) -> bool:
-	if phase != Phase.BUILD or hand.is_empty() or not Catalog.is_build_tool(hand.id):
+func remove_at(spot: Vector3i, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if phase != Phase.BUILD or ch.hand.is_empty() or not Catalog.is_build_tool(ch.hand.id):
 		return false
 	var cell := Vector2i(spot.x, spot.y)
-	match tool_kind(hand.id):
+	match tool_kind(ch.hand.id):
 		"floor":
 			if not plan.has_floor(cell) or cell == ENTRANCE_CELL or stations.has(cell) \
-					or grid.reserved.has(cell) or cell == player.cell() or rug_at(cell) != null:
+					or grid.reserved.has(cell) or chefs.any(func(o: Player) -> bool: return o.cell() == cell) or rug_at(cell) != null:
 				return false
 			for e in Floorplan.cell_edges(cell):
 				if wall_nodes.has(e):
@@ -1745,12 +1806,13 @@ func _plan_changed() -> void:
 
 ## The spots a mouse drag covers, from where it started to `to`: a rectangle of
 ## cells for floors, a straight line of edges for walls, one spot otherwise.
-func drag_spots(from: Vector3, to: Vector3) -> Array[Vector3i]:
+func drag_spots(from: Vector3, to: Vector3, ch: Player = null) -> Array[Vector3i]:
+	ch = _me(ch)
 	var out: Array[Vector3i] = []
-	var id: String = hand.get("id", "")
+	var id: String = ch.hand.get("id", "")
 	if floor_kind(id) != "":
 		var cells := Floorplan.rect_cells(Grid.to_cell(from), Grid.to_cell(to))
-		if not _drag.get("remove", false):
+		if not ch.drag.get("remove", false):
 			cells = plan.lay_order(cells, floor_kind(id))
 		for c in cells:
 			out.append(Vector3i(c.x, c.y, 0))
@@ -1762,59 +1824,63 @@ func drag_spots(from: Vector3, to: Vector3) -> Array[Vector3i]:
 		else:
 			out.assign(Floorplan.line(a, b))
 	elif id != "":
-		out.append(snap(to))
+		out.append(snap(to, ch))
 	return out
 
 
 ## Builds (or removes) along a whole drag, as far as the money goes.
-func finish_drag(from: Vector3, to: Vector3, remove: bool) -> int:
-	_drag = {"from": from, "remove": remove}
+func finish_drag(from: Vector3, to: Vector3, remove: bool, ch: Player = null) -> int:
+	ch = _me(ch)
+	ch.drag = {"from": from, "remove": remove}
 	var done := 0
-	for spot in drag_spots(from, to):
+	for spot in drag_spots(from, to, ch):
 		if remove:
-			done += int(remove_at(spot))
-		elif _build_at(spot):
+			done += int(remove_at(spot, ch))
+		elif _build_at(spot, ch):
 			done += 1
-		elif not ledger.money >= int(hand.price):
+		elif not ledger.money >= int(ch.hand.price):
 			break
-	_drag = {}
+	ch.drag = {}
 	if done > 0:
 		_plan_changed()
 		sfx("coin" if remove else "putdown")
 		if not remove:
-			_after_building()
+			_after_building(ch)
 	else:
 		sfx("fail")
 	return done
 
 
 ## What a drag in progress would do, for the prompt: "Lay 6 tiles  $30".
-func drag_summary() -> String:
-	if _drag.is_empty() or hand.is_empty() or _hover_point() == Vector3.INF:
+func drag_summary(ch: Player = null) -> String:
+	ch = _me(ch)
+	if ch.drag.is_empty() or ch.hand.is_empty() or _hover_point(ch) == Vector3.INF:
 		return ""
-	var spots := drag_spots(_drag.from, _hover_point())
-	if _drag.remove:
+	var spots := drag_spots(ch.drag.from, _hover_point(ch), ch)
+	if ch.drag.remove:
 		return "Remove"
-	var n := spots.size() if floor_kind(hand.id) != "" else spots.filter(can_place).size()
-	var price := int(hand.price)
-	var noun: String = "tile" if floor_kind(hand.id) != "" else ("wall" if hand.id == "wall" or Catalog.is_finish(hand.id) else hand.id)
-	var verb := "Lay" if floor_kind(hand.id) != "" else ("Paint" if hand.id == "paint" else ("Paper" if Catalog.is_finish(hand.id) else "Build"))
+	var n := spots.size() if floor_kind(ch.hand.id) != "" else spots.filter(func(sp: Vector3i) -> bool: return can_place(sp, ch)).size()
+	var price := int(ch.hand.price)
+	var noun: String = "tile" if floor_kind(ch.hand.id) != "" else ("wall" if ch.hand.id == "wall" or Catalog.is_finish(ch.hand.id) else ch.hand.id)
+	var verb := "Lay" if floor_kind(ch.hand.id) != "" else ("Paint" if ch.hand.id == "paint" else ("Paper" if Catalog.is_finish(ch.hand.id) else "Build"))
 	return "%s %d %s%s  $%d" % [verb, n, noun, "s" if n != 1 else "", n * price]
 
 
 ## A point on the floor in front of the chef: the middle of the next cell, or (for
 ## partitions) just inside the edge of the cell the chef stands in.
-func _front_point(edge := false) -> Vector3:
-	return Grid.center(player.cell()) + Vector3(player.facing.x, 0, player.facing.y) * (0.45 if edge else 1.0)
+func _front_point(edge := false, ch: Player = null) -> Vector3:
+	ch = _me(ch)
+	return Grid.center(ch.cell()) + Vector3(ch.facing.x, 0, ch.facing.y) * (0.45 if edge else 1.0)
 
 
 ## Where the piece in hand is held: over the spot in front of the chef.
-func _hover_point() -> Vector3:
-	if _demo_hover != Vector3.INF:
-		return _demo_hover
-	if _aim_mouse:
-		return _mouse_point
-	return _front_point(on_edge(hand.get("id", "")))
+func _hover_point(ch: Player = null) -> Vector3:
+	ch = _me(ch)
+	if ch.demo_hover != Vector3.INF:
+		return ch.demo_hover
+	if ch.aim_mouse:
+		return ch.mouse_point
+	return _front_point(on_edge(ch.hand.get("id", "")), ch)
 
 
 ## Where a point on the screen lands on the floor.
@@ -1828,26 +1894,28 @@ func floor_point(screen: Vector2) -> Vector3:
 
 ## A point on the piece the chef could pick up: the partition on the edge ahead,
 ## or else whatever stands in the next cell. Vector3.INF when there is nothing.
-func _piece_in_front() -> Vector3:
-	if wall_nodes.has(snap_edge(_front_point(true))):
-		return _front_point(true)
-	if stations.has(Grid.to_cell(_front_point())) or rug_at(Grid.to_cell(_front_point())) != null:
-		return _front_point()
+func _piece_in_front(ch: Player = null) -> Vector3:
+	ch = _me(ch)
+	if wall_nodes.has(snap_edge(_front_point(true, ch))):
+		return _front_point(true, ch)
+	if stations.has(Grid.to_cell(_front_point(false, ch))) or rug_at(Grid.to_cell(_front_point(false, ch))) != null:
+		return _front_point(false, ch)
 	return Vector3.INF
 
 
 ## What E would do in the build phase: "Put down", "Pick up", "Open up" or nothing.
-func build_action() -> String:
-	if phase != Phase.BUILD or shopping:
+func build_action(ch: Player = null) -> String:
+	ch = _me(ch)
+	if phase != Phase.BUILD or shopper == ch:
 		return ""
-	if not hand.is_empty():
-		if not _drag.is_empty():
-			return drag_summary()
-		match tool_kind(hand.id):
+	if not ch.hand.is_empty():
+		if not ch.drag.is_empty():
+			return drag_summary(ch)
+		match tool_kind(ch.hand.id):
 			"floor":
 				return "Lay floor"
 			"finish":
-				return "Paint wall" if hand.id == "paint" else "Paper wall"
+				return "Paint wall" if ch.hand.id == "paint" else "Paper wall"
 			"wall":
 				return "Build wall"
 			"door":
@@ -1855,20 +1923,21 @@ func build_action() -> String:
 			"arch":
 				return "Add archway"
 		return "Put down"
-	var clean := night_clean_action(stations.get(player.target_cell()))
+	var clean := night_clean_action(stations.get(ch.target_cell()), ch)
 	if clean != "":
 		return clean
-	if not Cleaning.carrying_mess(player.held) and _piece_in_front() != Vector3.INF:
+	if not Cleaning.carrying_mess(ch.held) and _piece_in_front(ch) != Vector3.INF:
 		return "Pick up"
-	return door_action()
+	return door_action(ch)
 
 
 ## The cleaning Use would do on this station at night, by its night name
 ## ("Clear table", "Wash up", "Take the bag out"); "" when there is none.
-func night_clean_action(st: Station) -> String:
-	if st == null or phase != Phase.BUILD or shopping or not hand.is_empty():
+func night_clean_action(st: Station, ch: Player = null) -> String:
+	ch = _me(ch)
+	if st == null or phase != Phase.BUILD or shopper == ch or not ch.hand.is_empty():
 		return ""
-	return Cleaning.night_action(use_station(st, true))
+	return Cleaning.night_action(use_station(st, true, ch))
 
 
 func needs_cleaning(st: Station) -> bool:
@@ -1888,109 +1957,112 @@ func dirty_note() -> String:
 	return Cleaning.dirty_note(tables, sinks, bins)
 
 
-func build_interact() -> void:
-	var action := build_action()
-	if not hand.is_empty():
+func build_interact(ch: Player = null) -> void:
+	ch = _me(ch)
+	var action := build_action(ch)
+	if not ch.hand.is_empty():
 		action = "Put down"
 	if action in Cleaning.NIGHT_ACTIONS.values():
-		use_station(stations[player.target_cell()])
+		use_station(stations[ch.target_cell()], false, ch)
 		hud.show_build()   # the dirty note counts down
 		return
 	match action:
 		"Put down":
-			_last_paint = snap(_hover_point())
-			if not place(_last_paint):
+			ch.last_paint = snap(_hover_point(ch), ch)
+			if not place(ch.last_paint, ch):
 				sfx("fail")
 		"Pick up":
-			pick_up(_piece_in_front())
+			pick_up(_piece_in_front(ch), ch)
 		"Open up", "Take out rubbish":
-			use_door()
+			use_door(ch)
 			hud.show_build()
 
 
 ## The piece in hand is held over the spot in front of the chef; a cross marks
 ## spots where it cannot go.
-func _update_ghost() -> void:
-	_update_tool_ghost()
-	var key := "%s:%s" % [hand.get("id", ""), hand.get("tier", 0)] if phase == Phase.BUILD and not hand.is_empty() and not Catalog.is_build_tool(hand.id) else ""
-	if key != _ghost_key:
-		_ghost_key = key
-		if _ghost:
-			_ghost.queue_free()
-			_ghost = null
+func _update_ghost(ch: Player = null) -> void:
+	ch = _me(ch)
+	_update_tool_ghost(ch)
+	var key := "%s:%s" % [ch.hand.get("id", ""), ch.hand.get("tier", 0)] if phase == Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) else ""
+	if key != ch.ghost_key:
+		ch.ghost_key = key
+		if ch.ghost:
+			ch.ghost.queue_free()
+			ch.ghost = null
 		if key != "":
-			_ghost = Node3D.new()
-			add_child(_ghost)
-			if hand.id == "screen":
-				_wall_visual(_ghost, 0.9 + 0.1 * int(hand.tier))
-			elif hand.id == "rug":
-				Scenery.rug(_ghost)
+			ch.ghost = Node3D.new()
+			add_child(ch.ghost)
+			if ch.hand.id == "screen":
+				_wall_visual(ch.ghost, 0.9 + 0.1 * int(ch.hand.tier))
+			elif ch.hand.id == "rug":
+				Scenery.rug(ch.ghost)
 			else:
-				Build.station(_ghost, hand.id, int(hand.tier))
-	var p := _hover_point()
-	if _ghost == null or p == Vector3.INF:
-		_no_mark.visible = false
-		if _ghost:
-			_ghost.visible = false
+				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier))
+	var p := _hover_point(ch)
+	if ch.ghost == null or p == Vector3.INF:
+		ch.no_mark.visible = false
+		if ch.ghost:
+			ch.ghost.visible = false
 		return
-	var spot := snap(p)
-	var ok := can_place(spot)
-	if on_edge(hand.id):
-		_place_on_edge(_ghost, spot)
+	var spot := snap(p, ch)
+	var ok := can_place(spot, ch)
+	if on_edge(ch.hand.id):
+		_place_on_edge(ch.ghost, spot)
 	else:
-		_ghost.position = Grid.center(Vector2i(spot.x, spot.y))
-		_ghost.rotation.y = int(hand.facing) * PI / 2
-	_ghost.position.y = 0.12 + 0.04 * sin(Time.get_ticks_msec() / 160.0)   # held just off the floor
-	_ghost.visible = ok
-	_no_mark.visible = not ok
-	_no_mark.position = Vector3(_ghost.position.x, 0, _ghost.position.z)
+		ch.ghost.position = Grid.center(Vector2i(spot.x, spot.y))
+		ch.ghost.rotation.y = int(ch.hand.facing) * PI / 2
+	ch.ghost.position.y = 0.12 + 0.04 * sin(Time.get_ticks_msec() / 160.0)   # held just off the floor
+	ch.ghost.visible = ok
+	ch.no_mark.visible = not ok
+	ch.no_mark.position = Vector3(ch.ghost.position.x, 0, ch.ghost.position.z)
 
 
 ## A build tool shows what it would do: pale squares for floor, bars along the
 ## edges for walls, the door or archway itself; green where it fits, coral
 ## where it does not, and coral everywhere a drag would remove.
-func _update_tool_ghost() -> void:
-	var p := _hover_point()
-	var tool := phase == Phase.BUILD and not hand.is_empty() and Catalog.is_build_tool(hand.id) and not shopping and p != Vector3.INF
+func _update_tool_ghost(ch: Player = null) -> void:
+	ch = _me(ch)
+	var p := _hover_point(ch)
+	var tool := phase == Phase.BUILD and not ch.hand.is_empty() and Catalog.is_build_tool(ch.hand.id) and shopper != ch and p != Vector3.INF
 	var spots: Array[Vector3i] = []
 	if tool:
-		if _drag.is_empty():
-			spots.append(snap(p))
+		if ch.drag.is_empty():
+			spots.append(snap(p, ch))
 		else:   # not a one-line `a if c else b`: that drops the array's type and fails at run time
-			spots = drag_spots(_drag.from, p)
-	var key := "%s|%s|%s|%d" % [hand.get("id", ""), spots, _drag.get("remove", false), ledger.money] if tool else ""
-	if key == _tool_key:
+			spots = drag_spots(ch.drag.from, p, ch)
+	var key := "%s|%s|%s|%d" % [ch.hand.get("id", ""), spots, ch.drag.get("remove", false), ledger.money] if tool else ""
+	if key == ch.tool_key:
 		return
-	_tool_key = key
-	if _tool_ghost:
-		_tool_ghost.queue_free()
-		_tool_ghost = null
+	ch.tool_key = key
+	if ch.tool_ghost:
+		ch.tool_ghost.queue_free()
+		ch.tool_ghost = null
 	if not tool:
 		return
-	_tool_ghost = Node3D.new()
-	add_child(_tool_ghost)
-	var removing: bool = _drag.get("remove", false)
-	var dragging := not _drag.is_empty()
+	ch.tool_ghost = Node3D.new()
+	add_child(ch.tool_ghost)
+	var removing: bool = ch.drag.get("remove", false)
+	var dragging := not ch.drag.is_empty()
 	for spot in spots:
-		var ok := not removing and (dragging and floor_kind(hand.id) != "" or can_place(spot))
+		var ok := not removing and (dragging and floor_kind(ch.hand.id) != "" or can_place(spot, ch))
 		var col := Color(Build.DANGER if removing or not ok else Build.GOOD, 0.55)
-		if floor_kind(hand.id) != "":
-			var tile := Build.box(_tool_ghost, Vector3(spot.x + 0.5, 0.02, spot.y + 0.5), Vector3(0.94, 0.03, 0.94), Build.GOOD)
+		if floor_kind(ch.hand.id) != "":
+			var tile := Build.box(ch.tool_ghost, Vector3(spot.x + 0.5, 0.02, spot.y + 0.5), Vector3(0.94, 0.03, 0.94), Build.GOOD)
 			tile.material_override = Build.overlay_mat(col, 3)
-		elif hand.id == "wall" or Catalog.is_finish(hand.id):
+		elif ch.hand.id == "wall" or Catalog.is_finish(ch.hand.id):
 			var bar := Node3D.new()
-			_tool_ghost.add_child(bar)
+			ch.tool_ghost.add_child(bar)
 			_place_on_edge(bar, spot)
-			var tall := Scenery.CUT_H if hand.id == "wall" else 1.2
-			var thick := Scenery.WALL_T + (0.0 if hand.id == "wall" else 0.08)
+			var tall := Scenery.CUT_H if ch.hand.id == "wall" else 1.2
+			var thick := Scenery.WALL_T + (0.0 if ch.hand.id == "wall" else 0.08)
 			Build.box(bar, Vector3(0, 0, 0), Vector3(1.0, tall, thick), Build.GOOD).material_override = Build.overlay_mat(col, 3)
 		else:
 			var n := Node3D.new()
-			_tool_ghost.add_child(n)
+			ch.tool_ghost.add_child(n)
 			_place_on_edge(n, spot)
 			var inner := Node3D.new()
 			n.add_child(inner)
-			Scenery.dress_opening({"holder": inner, "kind": hand.id, "tall": false}, true)
+			Scenery.dress_opening({"holder": inner, "kind": ch.hand.id, "tall": false}, true)
 			if removing or not ok:
 				Build.box(n, Vector3(0, 0, 0), Vector3(1.0, 0.9, Scenery.WALL_T + 0.1), Build.DANGER).material_override = Build.overlay_mat(col, 3)
 
@@ -2053,27 +2125,30 @@ func set_door(open: bool) -> void:
 		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
-func at_door() -> bool:
-	var d := player.position - DOORWAY
+func at_door(ch: Player = null) -> bool:
+	ch = _me(ch)
+	var d := ch.position - DOORWAY
 	return Vector2(d.x, d.z).length() < DOOR_REACH
 
 
 ## What the chef can do with the door card from here: "Open up" at the end of the
 ## build phase, "Close early" from the middle of the day on, or nothing.
-func door_action() -> String:
-	if not at_door():
+func door_action(ch: Player = null) -> String:
+	ch = _me(ch)
+	if not at_door(ch):
 		return ""
-	if player.held == "rubbish_bag":
+	if ch.held == "rubbish_bag":
 		return "Take out rubbish"
-	if phase == Phase.BUILD and hand.is_empty() and not shopping:
+	if phase == Phase.BUILD and ch.hand.is_empty() and shopper != ch:
 		return "Open up"
 	if phase == Phase.SERVICE and door_open and not arrivals.is_empty() and day_progress() >= CLOSE_EARLY_FROM:
 		return "Close early"
 	return ""
 
 
-func use_door() -> bool:
-	match door_action():
+func use_door(ch: Player = null) -> bool:
+	ch = _me(ch)
+	match door_action(ch):
 		"Open up":
 			var why := open_block()
 			if why != "":
@@ -2085,11 +2160,11 @@ func use_door() -> bool:
 		"Close early":
 			close_early()
 		"Take out rubbish":
-			player.set_held("")
+			ch.set_held("")
 			sfx("putdown")
 		_:
 			return false
-	player.punch()
+	ch.punch()
 	return true
 
 
@@ -2108,7 +2183,7 @@ func close_early() -> void:
 func _end_day() -> void:
 	_cancel_all_preps()
 	set_door(false)
-	shopping = false
+	shopper = null
 	phase = Phase.SUMMARY
 	play_music("night")
 	inspect(null)
@@ -2512,14 +2587,15 @@ func reach_marks(pr: Dictionary) -> Dictionary:
 ## disc beside it (half), a small pale one in view (a fifth), red out of reach, and a
 ## white tick on a seat already as cheered as decor can make it. The fern, bin and
 ## rug also wash the floor they are seen from.
-func _update_range() -> void:
-	var pr := piece_reach(hand if phase == Phase.BUILD else {}, _hover_point(), _drag)
+func _update_range(ch: Player = null) -> void:
+	ch = _me(ch)
+	var pr := piece_reach(ch.hand if phase == Phase.BUILD else {}, _hover_point(ch), ch.drag)
 	var key := "%s:%s:%s:%d:%d:%d" % [pr.get("id", ""), pr.get("cells", []), pr.get("area", Rect2i()),
 		stations.size(), grid.walls.size(), plan.floors.size()] if not pr.is_empty() else ""
-	if key == _range_key:
+	if key == ch.range_key:
 		return
-	_range_key = key
-	for c in _range_marks.get_children():
+	ch.range_key = key
+	for c in ch.range_marks.get_children():
 		c.queue_free()
 	if key == "":
 		return
@@ -2538,11 +2614,11 @@ func _update_range() -> void:
 		wash.mesh = plane
 		wash.material_override = m
 		wash.position = Vector3(area.position.x + area.size.x / 2.0, y, area.position.y + area.size.y / 2.0)
-		_range_marks.add_child(wash)
+		ch.range_marks.add_child(wash)
 		y += 0.005
 	var marks := reach_marks(pr)
 	for s: Vector2i in marks:
-		_range_marks.add_child(_seat_mark(s, marks[s]))
+		ch.range_marks.add_child(_seat_mark(s, marks[s]))
 
 
 ## One seat's reach mark, as reach_marks describes it. Each level differs in shape:
@@ -2615,8 +2691,9 @@ func _collect_gross() -> void:
 			_gross.append({"cell": st.cell, "kind": "sink", "age": st.dirty_age, "thought": "Look at that washing-up"})
 		elif (st.type == "stove" or st.type == "fryer") and st.item.begins_with("burnt:"):
 			_gross.append({"cell": st.cell, "kind": "burning", "age": st.cook - Station.BURN_TIME, "thought": "Something is burning in there"})
-	if player.carrying_something_gross():
-		_gross.append({"cell": player.cell(), "kind": "rubbish", "key": "rubbish", "thought": "I just watched the chef carry rubbish past me"})
+	for ch in chefs:
+		if ch.carrying_something_gross():
+			_gross.append({"cell": ch.cell(), "kind": "rubbish", "key": "rubbish", "thought": "I just watched the chef carry rubbish past me"})
 
 
 ## The most impatient guest sat at this table, waiting to order or for food.
@@ -2736,8 +2813,9 @@ func set_stocked(type: String, on: bool) -> bool:
 
 
 ## The station in front of the chef, if it is an ingredient station.
-func stock_station_in_front() -> Station:
-	var st: Station = stations.get(player.target_cell())
+func stock_station_in_front(ch: Player = null) -> Station:
+	ch = _me(ch)
+	var st: Station = stations.get(ch.target_cell())
 	return st if st != null and Catalog.ingredient_of(st.type) != "" else null
 
 
@@ -2772,18 +2850,19 @@ func night_hint() -> String:
 
 
 ## The menu screen, at night only: it cannot change during service.
-func open_menu() -> bool:
+func open_menu(ch: Player = null) -> bool:
+	ch = _me(ch)
 	if phase != Phase.BUILD:
 		if phase == Phase.SERVICE:
 			hud.say("The menu can't change during service.")
 			sfx("fail")
 		return false
-	if Cleaning.carrying_mess(player.held) or hud.menu_open():
+	if Cleaning.carrying_mess(ch.held) or hud.menu_open():
 		return false
 	if shopping:
 		close_shop()
-	if not hand.is_empty():
-		cancel_hand()
+	if not ch.hand.is_empty():
+		cancel_hand(ch)
 	hud.open_menu()
 	sfx("slide")
 	return true
@@ -2840,8 +2919,9 @@ func all_trays() -> Array[Tray]:
 	for st: Station in stations.values():
 		if st.item == "tray" and st.tray != null:
 			out.append(st.tray)
-	if player.held == "tray" and player.tray != null:
-		out.append(player.tray)
+	for ch in chefs:
+		if ch.held == "tray" and ch.tray != null:
+			out.append(ch.tray)
 	return out
 
 
@@ -2887,8 +2967,10 @@ func _show_tray(t: Tray) -> void:
 	if st != null:
 		st.tray_tag = tray_tag(t)
 		st.show_tray()
-	elif player.tray == t:
-		player.set_held("tray", 1.0, t, tray_tag(t))
+	else:
+		for ch in chefs:
+			if ch.tray == t:
+				ch.set_held("tray", 1.0, t, tray_tag(t))
 
 
 ## A new ticket goes to an empty tray already put down with none.
@@ -3102,21 +3184,23 @@ func remove_guest(g: Guest) -> void:
 # ---------------------------------------------------------------- cooking & carrying
 
 ## What using this station would do right now, e.g. "Cook". Empty when nothing.
-func prompt_for(st: Station) -> String:
-	var s := prep_of(chefs.find(player))
+func prompt_for(st: Station, ch: Player = null) -> String:
+	ch = _me(ch)
+	var s := prep_of(chefs.find(ch))
 	if not s.is_empty():
 		return {"chop": "Chop on the notch", "slice": "Slice %d times" % Prep.SLICE_COUNT,
 			"pour": "Let go to stop"}.get(s.tool, "")
-	return use_station(st, true)
+	return use_station(st, true, ch)
 
 
 ## The player uses the station they are facing. Returns the name of the action taken.
 ## With dry_run, nothing changes and only the name is returned. A refusal (a tray
 ## that is not finished, an ingredient its ticket does not need) is returned as its
 ## reason, and on a real use it is said and nothing changes.
-func use_station(st: Station, dry_run := false) -> String:
-	var held := player.held
-	var q := player.held_quality
+func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
+	ch = _me(ch)
+	var held := ch.held
+	var q := ch.held_quality
 	var held_ing := Tray.parse(held)
 	var act := ""
 	var why := ""
@@ -3129,34 +3213,34 @@ func use_station(st: Station, dry_run := false) -> String:
 		if held == "" and Pantry.tool_of(ing) == "pour":
 			act = "Pour %s" % Pantry.name_of(ing).to_lower()
 			if not dry_run:
-				start_prep(chefs.find(player), st, "pour", ing)
+				start_prep(chefs.find(ch), st, "pour", ing)
 				return act
 		elif held == "":
 			act = "Take %s" % Pantry.name_of(ing).to_lower()
 			if not dry_run:
 				if ready or not Pantry.needs_prep(ing):
-					player.set_held(Tray.kind("prep", ing), Prep.PLAIN)
+					ch.set_held(Tray.kind("prep", ing), Prep.PLAIN)
 				else:
-					player.set_held(Tray.kind("raw", ing))
+					ch.set_held(Tray.kind("raw", ing))
 		elif held == Tray.kind("raw", ing) or (held == Tray.kind("prep", ing) and (ready or not Pantry.needs_prep(ing))):
 			act = "Put back"
 			if not dry_run:
-				player.set_held("")
+				ch.set_held("")
 	match st.type:
 		"stove":
 			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "grill":
 				act = "Grill"
 				if not dry_run:
 					st.set_item(held)
-					player.set_held("")
+					ch.set_held("")
 			elif held == "" and st.item != "":
 				act = "Take off the heat"
 				if not dry_run:
 					var p := Tray.parse(st.item)
 					var res := Prep.grill(st.cook)
-					player.set_held(Tray.kind(res.state, p.id), res.quality)
+					ch.set_held(Tray.kind(res.state, p.id), res.quality)
 					st.set_item("")
-					_prep_done(chefs.find(player), st, "grill", res.result)
+					_prep_done(chefs.find(ch), st, "grill", res.result)
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go on the grill" % Pantry.name_of(held_ing.id)
 		"fryer":
@@ -3164,14 +3248,14 @@ func use_station(st: Station, dry_run := false) -> String:
 				act = "Fry"
 				if not dry_run:
 					st.set_item(held)
-					player.set_held("")
+					ch.set_held("")
 			elif held == "" and st.on_rack():
 				if st.draining():
 					why = "Still draining"
 				else:
 					act = "Pick up"
 					if not dry_run:
-						player.set_held(st.item, st.quality)
+						ch.set_held(st.item, st.quality)
 						st.set_item("")
 			elif held == "" and st.item != "":
 				act = "Lift basket"
@@ -3181,9 +3265,9 @@ func use_station(st: Station, dry_run := false) -> String:
 					if res.state == "prep":
 						st.lift_to_rack(Tray.kind("prep", p.id), res.quality, res.result)
 					else:
-						player.set_held(Tray.kind(res.state, p.id), res.quality)
+						ch.set_held(Tray.kind(res.state, p.id), res.quality)
 						st.set_item("")
-					_prep_done(chefs.find(player), st, "fry", res.result)
+					_prep_done(chefs.find(ch), st, "fry", res.result)
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go in the fryer" % Pantry.name_of(held_ing.id)
 		"pot":
@@ -3191,13 +3275,13 @@ func use_station(st: Station, dry_run := false) -> String:
 				act = "Boil"
 				if not dry_run:
 					st.set_item(held)
-					player.set_held("")
+					ch.set_held("")
 			elif held == "" and st.item.begins_with("raw"):
 				why = "Still boiling"
 			elif held == "" and st.item != "":
 				act = "Take out"
 				if not dry_run:
-					player.set_held(st.item, Prep.PLAIN)
+					ch.set_held(st.item, Prep.PLAIN)
 					st.set_item("")
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go in the pot" % Pantry.name_of(held_ing.id)
@@ -3208,7 +3292,7 @@ func use_station(st: Station, dry_run := false) -> String:
 			elif not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == tool:
 				act = "Chop" if tool == "chop" else "Slice"
 				if not dry_run:
-					start_prep(chefs.find(player), st, tool, held_ing.id)
+					start_prep(chefs.find(ch), st, tool, held_ing.id)
 					return act
 			elif not held_ing.is_empty() and held_ing.state == "prep" and Pantry.tool_of(held_ing.id) == tool:
 				why = "%s is already %s" % [Pantry.name_of(held_ing.id), "chopped" if tool == "chop" else "sliced"]
@@ -3218,8 +3302,8 @@ func use_station(st: Station, dry_run := false) -> String:
 			if held == "tray" and st.item == "":
 				act = "Put tray down"
 				if not dry_run:
-					var t := player.tray
-					player.set_held("")
+					var t := ch.tray
+					ch.set_held("")
 					if t.ticket < 0 and t.is_empty():
 						var tk := _free_ticket()
 						if not tk.is_empty():
@@ -3232,39 +3316,39 @@ func use_station(st: Station, dry_run := false) -> String:
 					act = "Add %s" % Pantry.name_of(held_ing.id).to_lower()
 					if not dry_run:
 						st.tray.add(held, q)
-						player.set_held("")
+						ch.set_held("")
 						st.show_tray()
 						hud.refresh_tickets()
 			elif not held_ing.is_empty() and held_ing.state != "burnt" and st.item == "":
 				act = "Put down"
 				if not dry_run:
 					st.set_item(held, q)
-					player.set_held("")
+					ch.set_held("")
 			elif held == "" and st.item == "tray":
 				var t := st.tray
 				if t.is_complete() or t.ticket < 0 or t.is_empty():
 					act = "Pick up tray"
 					if not dry_run:
-						player.set_held("tray", 1.0, t, tray_tag(t))
+						ch.set_held("tray", 1.0, t, tray_tag(t))
 						st.set_item("")
 				else:
 					why = t.missing()
 			elif held == "" and st.item != "":
 				act = "Pick up"
 				if not dry_run:
-					player.set_held(st.item, st.current_quality())
+					ch.set_held(st.item, st.current_quality())
 					st.set_item("")
 		"trays":
 			if held == "" and st.count > 0:
 				act = "Take tray"
 				if not dry_run:
 					st.count -= 1
-					player.set_held("tray", 1.0, Tray.new())
-			elif held == "tray" and player.tray.is_empty():
+					ch.set_held("tray", 1.0, Tray.new())
+			elif held == "tray" and ch.tray.is_empty():
 				act = "Put back"
 				if not dry_run:
 					st.count += 1
-					player.set_held("")
+					ch.set_held("")
 					hud.refresh_tickets()
 			if not dry_run:
 				st.refresh()
@@ -3273,7 +3357,7 @@ func use_station(st: Station, dry_run := false) -> String:
 			if held == "dirty_tray":
 				act = "Put in sink"
 				if not dry_run:
-					player.set_held("")
+					ch.set_held("")
 					st.dirty += 1
 					st.refresh()
 			elif held == "" and st.dirty > 0:
@@ -3286,34 +3370,34 @@ func use_station(st: Station, dry_run := false) -> String:
 					stack.refresh()
 		"bin":
 			# Every scrap fills it; full, it overflows until the bag goes out the front.
-			if held == "tray" and not player.tray.is_empty():
+			if held == "tray" and not ch.tray.is_empty():
 				act = "Scrape off"
 				if not dry_run:
-					player.tray.scrape()
-					_show_tray(player.tray)
+					ch.tray.scrape()
+					_show_tray(ch.tray)
 					hud.refresh_tickets()
 			elif not held_ing.is_empty():
 				act = "Throw away"
 				if not dry_run:
-					player.set_held("")
+					ch.set_held("")
 			elif held == "" and st.count > 0:
 				act = "Empty bin"
 				if not dry_run:
 					st.count = 0
 					st.refresh()
-					player.set_held("rubbish_bag")
+					ch.set_held("rubbish_bag")
 			if not dry_run and act in ["Scrape off", "Throw away"]:
 				st.count += 1
 				st.refresh()
 		"table", "booth", "table4":
 			var g := _waiting_guest_at(st)
-			var fed := _guest_for_tray(st, player.tray) if held == "tray" else null
+			var fed := _guest_for_tray(st, ch.tray) if held == "tray" else null
 			var to_order := _guests_to_order(st)
-			if fed != null and player.tray.is_complete():
+			if fed != null and ch.tray.is_complete():
 				act = "Serve %s" % fed.info.name
 				if not dry_run:
-					var t := player.tray
-					player.set_held("")
+					var t := ch.tray
+					ch.set_held("")
 					serve(fed, t)
 			elif not to_order.is_empty() and (held == "" or not ORDER_HANDS_FREE):
 				act = "Take order" if to_order.size() == 1 else "Take %d orders" % to_order.size()
@@ -3325,15 +3409,15 @@ func use_station(st: Station, dry_run := false) -> String:
 					hud.say("%s hasn't ordered yet. Free your hands and take the order." % to_order[0].info.name)
 					sfx("fail")
 					return why
-			elif held == "tray" and player.tray.ticket >= 0 and g != null:
-				var tk := find_ticket(player.tray.ticket)
+			elif held == "tray" and ch.tray.ticket >= 0 and g != null:
+				var tk := find_ticket(ch.tray.ticket)
 				why = "That's for %s" % tk.guest.info.name if not tk.is_empty() else "No ticket"
 			elif held == "" and st.dirty > 0:
 				act = "Clear tray"
 				if not dry_run:
 					st.dirty -= 1
 					st.refresh()
-					player.set_held("dirty_tray")
+					ch.set_held("dirty_tray")
 			elif held == "" and g != null and not g.mood.discounted and g.mood.patience < DISCOUNT_BELOW:
 				act = "Half price for %s" % g.info.name
 				if not dry_run:
@@ -3348,13 +3432,13 @@ func use_station(st: Station, dry_run := false) -> String:
 			sfx("fail")
 		return why
 	if act != "" and not dry_run:
-		player.punch()
+		ch.punch()
 		st.used()
 		if act == "Wash":
 			sfx("wash")
 			burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
 		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free") or act.begins_with("Take order") or act.ends_with(" orders")):
-			sfx("pickup" if player.held != "" else "putdown")
+			sfx("pickup" if ch.held != "" else "putdown")
 	return act
 
 
@@ -3528,27 +3612,32 @@ func step(delta: float) -> void:
 # ---------------------------------------------------------------- input & frame
 
 func _process(delta: float) -> void:
-	var input := Vector2.ZERO
-	if hud.options_open():
-		pass   # paused anyway; the arrows belong to the options screen
-	elif phase == Phase.SERVICE or (phase == Phase.BUILD and not shopping and not hud.typing() and not hud.menu_open()):
-		input = controls.move(0)
-	if preps.has(0):
-		input = Vector2.ZERO   # the chef stands at the tool while a minigame runs
-	player.move(input, delta)
-	player.carry(not hand.is_empty())
+	for p in chefs.size():
+		var ch := chefs[p]
+		var input := Vector2.ZERO
+		if hud.options_open():
+			pass   # paused anyway; the arrows belong to the options screen
+		elif phase == Phase.SERVICE or (phase == Phase.BUILD and shopper != ch and not hud.menu_open() \
+				and not (hud.typing() and controls.owner_of("keys") == p)):
+			input = controls.move(p)
+		if preps.has(p):
+			input = Vector2.ZERO   # the chef stands at the tool while a minigame runs
+		ch.move(input, delta)
+		ch.carry(not ch.hand.is_empty())
+		if phase == Phase.BUILD:
+			if input != Vector2.ZERO:
+				ch.aim_mouse = false   # walking hands aim back to the chef
+			if ch.aim_mouse:
+				ch.mouse_point = floor_point(get_viewport().get_mouse_position())
+			_paint_held(p)
 	if phase == Phase.BUILD:
-		if input != Vector2.ZERO:
-			_aim_mouse = false   # walking hands aim back to the chef
-		if _aim_mouse:
-			_mouse_point = floor_point(get_viewport().get_mouse_position())
-		_paint_held(0)
 		_refresh_openings()
 	step(delta)
 	_update_camera(delta)
-	_update_cursor()
-	_update_ghost()
-	_update_range()
+	for ch in chefs:
+		_update_cursor(ch)
+		_update_ghost(ch)
+		_update_range(ch)
 	_update_daylight()
 	hud.update_status()
 	if _shot_path != "":
@@ -3565,41 +3654,43 @@ func _update_camera(delta: float) -> void:
 	cam.position = cam.position.lerp((_frame[2] if close else _frame[0]) + CAM_OFFSET, k)
 
 
-func _update_cursor() -> void:
-	var st: Station = stations.get(player.target_cell())
+func _update_cursor(ch: Player = null) -> void:
+	ch = _me(ch)
+	var st: Station = stations.get(ch.target_cell())
 	var action := ""
 	if st != null:
-		action = prompt_for(st) if phase == Phase.SERVICE else night_clean_action(st)
-	var messy := _messy_at_mouse()
+		action = prompt_for(st, ch) if phase == Phase.SERVICE else night_clean_action(st, ch)
+	var messy := _messy_at_mouse(ch)
 	if messy != null and messy != st:   # the mouse cannot clean: that is the chef's job
-		_cursor.visible = false
-		hud.show_prompt(cam.unproject_position(messy.position + Vector3(0, 1.6, 0)), Cleaning.WALK_OVER)
+		ch.cursor.visible = false
+		hud.show_prompt(cam.unproject_position(messy.position + Vector3(0, 1.6, 0)), Cleaning.WALK_OVER, chefs.find(ch))
 		return
-	_cursor.visible = action != ""
+	ch.cursor.visible = action != ""
 	var at := Vector2.ZERO
 	if st != null:
 		var top := 0.9
-		_cursor.position = st.position + Vector3(0, top, 0)
+		ch.cursor.position = st.position + Vector3(0, top, 0)
 		var over := 2.25 if st.type in ["stove", "fryer"] else top + 0.7
 		if st.widget != null and st.widget.visible:
 			over = 2.6   # above a minigame gauge
 		at = cam.unproject_position(st.position + Vector3(0, over, 0))
 	if action == "":   # nothing to cook or serve: the build phase and the door card
-		action = build_action() if phase == Phase.BUILD else door_action()
+		action = build_action(ch) if phase == Phase.BUILD else door_action(ch)
 		var p := DOORWAY + Vector3(0, 2.9, 0)
-		if not hand.is_empty() and _hover_point() != Vector3.INF:
-			p = _hover_point() + Vector3(0, 2.0, 0)
+		if not ch.hand.is_empty() and _hover_point(ch) != Vector3.INF:
+			p = _hover_point(ch) + Vector3(0, 2.0, 0)
 		elif action == "Pick up":
-			p = _piece_in_front() + Vector3(0, 2.0, 0)
+			p = _piece_in_front(ch) + Vector3(0, 2.0, 0)
 		at = cam.unproject_position(p)
-	hud.show_prompt(at, action)
+	hud.show_prompt(at, action, chefs.find(ch))
 
 
 ## The messy piece under the mouse at night, when the mouse is aiming with empty hands.
-func _messy_at_mouse() -> Station:
-	if phase != Phase.BUILD or shopping or not _aim_mouse or not hand.is_empty() or _mouse_point == Vector3.INF:
+func _messy_at_mouse(ch: Player = null) -> Station:
+	ch = _me(ch)
+	if phase != Phase.BUILD or shopper == ch or not ch.aim_mouse or not ch.hand.is_empty() or ch.mouse_point == Vector3.INF:
 		return null
-	var st: Station = stations.get(Grid.to_cell(_mouse_point))
+	var st: Station = stations.get(Grid.to_cell(ch.mouse_point))
 	return st if st != null and needs_cleaning(st) else null
 
 
@@ -3632,23 +3723,32 @@ func shop_key(key: int) -> bool:
 ## front of them is floored as they reach it, so they can pave their way out.
 ## (Not walls: the chef faces the way they walk, so walls would go across it.)
 func _paint_held(p: int) -> void:
+	var ch := chefs[p]
 	var held := controls.holding(p, "use")
-	if not held or shopping or hud.typing() or hand.is_empty() or floor_kind(hand.id) == "" or _aim_mouse:
-		_last_paint = Vector3i(-999, -999, -1)
+	if not held or shopper == ch or (hud.typing() and controls.owner_of("keys") == p) or ch.hand.is_empty() \
+			or floor_kind(ch.hand.id) == "" or ch.aim_mouse:
+		ch.last_paint = Vector3i(-999, -999, -1)
 		return
-	var spot := snap(_hover_point())
-	if spot != _last_paint:
-		_last_paint = spot
-		if can_place(spot):
-			place(spot)
+	var spot := snap(_hover_point(ch), ch)
+	if spot != ch.last_paint:
+		ch.last_paint = spot
+		if can_place(spot, ch):
+			place(spot, ch)
 
 
 ## The mouse in the build phase: it aims whatever is in hand. Left click puts a
 ## piece down or picks one up; with a build tool, a left drag lays a rectangle of
 ## floor or a line of wall and a right drag takes them away. Right click drops a piece.
-func _build_mouse(event: InputEvent) -> void:
+## The mouse (and a touch on the room) is the keyboard-and-mouse player's, or the
+## screen's: it aims that player's chef only. Null when that player has no chef.
+func _mouse_chef(event: InputEvent) -> Player:
+	var p := controls.owner_of("touch" if event.device == InputEvent.DEVICE_ID_EMULATION else "keys")
+	return chefs[p] if p < chefs.size() else null
+
+
+func _build_mouse(event: InputEvent, ch: Player) -> void:
 	if event is InputEventMouseMotion:
-		_aim_mouse = true
+		ch.aim_mouse = true
 		return
 	# A touch on the room arrives as the mouse: the erase switch is the screen's player's.
 	var erase := controls.input_of(controls.owner_of("touch" if event.device == InputEvent.DEVICE_ID_EMULATION else "keys")).erase
@@ -3656,39 +3756,40 @@ func _build_mouse(event: InputEvent) -> void:
 	if mb == null or (mb.button_index != MOUSE_BUTTON_LEFT and mb.button_index != MOUSE_BUTTON_RIGHT):
 		return
 	var p := floor_point(mb.position)
-	_aim_mouse = true
-	_mouse_point = p
+	ch.aim_mouse = true
+	ch.mouse_point = p
 	if p == Vector3.INF:
 		return
-	var tool := not hand.is_empty() and Catalog.is_build_tool(hand.id)
+	var tool := not ch.hand.is_empty() and Catalog.is_build_tool(ch.hand.id)
 	var right := mb.button_index == MOUSE_BUTTON_RIGHT
-	if mb.pressed and hand.is_empty() and not right and menu_board.under(cam, mb.position):
-		open_menu()   # a click on the board by the door
+	if mb.pressed and ch.hand.is_empty() and not right and menu_board.under(cam, mb.position):
+		open_menu(ch)   # a click on the board by the door
 		return
 	var crate: Station = stations.get(Grid.to_cell(p))
-	if mb.pressed and right and hand.is_empty() and crate != null and Catalog.ingredient_of(crate.type) != "":
+	if mb.pressed and right and ch.hand.is_empty() and crate != null and Catalog.ingredient_of(crate.type) != "":
 		set_stocked(crate.type, not crate.stocked)   # right click switches a crate's stock
 		return
 	if mb.pressed:
 		if tool:
-			_drag = {"from": p, "remove": right or erase}
+			ch.drag = {"from": p, "remove": right or erase}
 		elif right:
-			cancel_hand()
-		elif not hand.is_empty():
-			if not place(snap(p)):
+			cancel_hand(ch)
+		elif not ch.hand.is_empty():
+			if not place(snap(p, ch), ch):
 				sfx("fail")
 		else:
-			pick_up(p)
-	elif not _drag.is_empty() and (right == bool(_drag.remove) or erase):
-		finish_drag(_drag.from, p, _drag.remove)
+			pick_up(p, ch)
+	elif not ch.drag.is_empty() and (right == bool(ch.drag.remove) or erase):
+		finish_drag(ch.drag.from, p, ch.drag.remove, ch)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if phase == Phase.BUILD and (event is InputEventMouseButton or event is InputEventMouseMotion):
 		if event is InputEventMouseButton and event.pressed:
 			hud.stop_typing()   # a click on the room leaves the search box
-		if not shopping:
-			_build_mouse(event)
+		var ch := _mouse_chef(event)
+		if ch != null and shopper != ch:
+			_build_mouse(event, ch)
 		return
 	if phase == Phase.SERVICE and event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -3722,7 +3823,8 @@ func act(p: int, action: String, echo := false) -> void:
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
 		return
 	if p >= chefs.size():
-		return   # a seated player with no chef yet (co-op is not built)
+		return   # a seated player with no chef yet
+	var ch := chefs[p]
 	match phase:
 		Phase.SERVICE:
 			if preps.has(p):
@@ -3731,15 +3833,15 @@ func act(p: int, action: String, echo := false) -> void:
 				elif action == "back":
 					cancel_prep(p)
 			elif action == "turn":
-				turn_tray(stations.get(player.target_cell()))
+				turn_tray(stations.get(ch.target_cell()))
 			elif action == "menu":
-				open_menu()   # refused: it says why
+				open_menu(ch)   # refused: it says why
 			elif action == "use":
-				var st: Station = stations.get(player.target_cell())
-				if st != null and prompt_for(st) != "":
-					use_station(st)
-				elif not use_door() and st != null:
-					use_station(st)
+				var st: Station = stations.get(ch.target_cell())
+				if st != null and prompt_for(st, ch) != "":
+					use_station(st, false, ch)
+				elif not use_door(ch) and st != null:
+					use_station(st, false, ch)
 		Phase.SUMMARY:
 			if action == "confirm":
 				open_build()
@@ -3749,34 +3851,35 @@ func act(p: int, action: String, echo := false) -> void:
 			if action == "confirm":
 				restart()
 		Phase.BUILD:
-			if shopping:
+			if shopper == ch:
 				shop_action(action)
 			else:
-				_build_act(action)
+				_build_act(action, ch)
 
 
-func _build_act(action: String) -> void:
+func _build_act(action: String, ch: Player = null) -> void:
+	ch = _me(ch)
 	match action:
 		"use":
-			build_interact()
+			build_interact(ch)
 		"back":
-			cancel_hand()
+			cancel_hand(ch)
 		"turn":
-			if hand.is_empty() and stock_station_in_front() != null:
-				var st := stock_station_in_front()
+			if ch.hand.is_empty() and stock_station_in_front(ch) != null:
+				var st := stock_station_in_front(ch)
 				set_stocked(st.type, not st.stocked)
 			else:
-				rotate_hand()
+				rotate_hand(ch)
 		"shop":
-			open_shop()
+			open_shop(ch)
 		"menu":
-			open_menu()
+			open_menu(ch)
 		"sell":
-			if not hand.is_empty() and Catalog.is_build_tool(hand.id):
-				if _hover_point() != Vector3.INF and remove_at(snap(_hover_point())):
+			if not ch.hand.is_empty() and Catalog.is_build_tool(ch.hand.id):
+				if _hover_point(ch) != Vector3.INF and remove_at(snap(_hover_point(ch), ch), ch):
 					_plan_changed()
 					sfx("coin")
 				else:
 					sfx("fail")
-			elif not sell_hand():
+			elif not sell_hand(ch):
 				sfx("fail")
