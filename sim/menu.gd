@@ -14,6 +14,11 @@ const ORDER_WEIGHT := {"cheap": 1.5, "fair": 1.0, "dear": 0.6}   # tunable: how 
 const LIKED_BONUS := 0.1      # tunable: savour added for each liked ingredient on the tray
 const LIKED_BONUS_MAX := 0.3  # tunable: the most liked ingredients can add
 const HINT_ITEMS := 3         # tunable: items carrying a liked tag before a guest remarks on it
+## What guests think. Tastes are never listed; these lines only hint at them.
+const NOTHING_THOUGHT := "Nothing I liked on the menu"
+const LIKED_THOUGHT := "Just how I like it"
+const TAG_WORDS := {"vegetable": "vegetables", "meat": "meat", "bread": "bread", "dairy": "cheese",
+	"fish": "fish", "fried": "fried food", "fruit": "fruit", "drink": "drinks"}
 
 var items: Array[Dictionary] = []
 var retired := {}   # id -> last name, for items that were deleted
@@ -260,3 +265,14 @@ static func tag_hint(available: Array, liked_tags: Array) -> String:
 		if n >= HINT_ITEMS:
 			return tag
 	return ""
+
+
+## How a guest says a tag: "vegetables", "fried food".
+static func tag_word(tag: String) -> String:
+	return str(TAG_WORDS.get(tag, tag))
+
+
+## What a guest thinks reading a menu with HINT_ITEMS or more items carrying a tag they like.
+static func hint_thought(tag: String) -> String:
+	var w := tag_word(tag)
+	return "So many things with %s. I love %s!" % [w, w]

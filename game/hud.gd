@@ -936,6 +936,12 @@ func show_guest(g: Guest) -> void:
 	standing.modulate.a = 0.7
 	if town.expects_deal(g.idx):   # discounting has a cost: they now expect it
 		_label(box, 13, "Expects a deal").add_theme_color_override("font_color", Color(Build.CORAL_DARK))
+	var orders := town.order_summary(g.idx, game.menu)   # tastes are never listed; what they order is
+	if orders != "":
+		var ol := _label(box, 13, "Orders: " + orders)
+		ol.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ol.custom_minimum_size = Vector2(190, 0)
+		ol.add_theme_color_override("font_color", Color(Build.CABINET))
 	_guest_state = _label(box, 15)
 	_guest_bill = _label(box, 14)
 	_guest_bill.add_theme_color_override("font_color", Color(Build.CABINET))
@@ -1692,6 +1698,10 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_row(box, "", "TIPS:", "$%d" % rec.tips)
 	_row(box, "", "WALKOUTS:", str(rec.walkouts))
 	_row(box, "", "STOCK:", "-$%d" % int(rec.get("stock", 0)))
+	var nothing := int(rec.get("found_nothing", 0))
+	if nothing > 0:
+		var nl := _label(box, 15, "%d %s nothing they liked." % [nothing, "person found" if nothing == 1 else "people found"])
+		nl.modulate.a = 0.75
 	_rule(box)
 	var earned: int = rec.sales + rec.tips
 	var total := _row(box, "", "TOTAL EARNED:", "$%d" % earned, 32)

@@ -1028,6 +1028,17 @@ func test_order_counts_survive_a_rename():
 	assert_eq(t.order_summary(0, m), "Stupid Burger x2, Fries x1", "a deleted item keeps its last name")
 
 
+func test_taste_hints_never_name_an_ingredient():
+	assert_eq(Menu.hint_thought("vegetable"), "So many things with vegetables. I love vegetables!")
+	assert_eq(Town.praise_about(true, "vegetable"), "it was just how they like it")
+	assert_eq(Town.praise_about(false, "vegetable"), "about all the things with vegetables")
+	assert_eq(Town.praise_about(false, ""), "")
+	var t := Town.new(1)
+	var line := t.gossip_line(0, 0.2, Town.praise_about(true, ""))
+	assert_true(line.ends_with("it was just how they like it."), line)
+	assert_true(t.gossip_line(0, t.record_found_nothing(0), "x") != "", "walking on is news")
+
+
 func test_finding_nothing_costs_a_little_and_friends_hear():
 	var t := Town.new(1)
 	var f: int = t.people[0].friends[0]

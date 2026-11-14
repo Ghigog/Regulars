@@ -282,13 +282,25 @@ func friend_names(i: int) -> String:
 
 
 ## What a visit that moved their opinion by `delta` sets going. Empty when nothing much.
-func gossip_line(i: int, delta: float) -> String:
+## `about` is what they will tell, if anything ("it was just how they like it").
+func gossip_line(i: int, delta: float, about := "") -> String:
 	var friends := friend_names(i)
-	if friends == "" or absf(delta) < 0.05:
+	if friends == "" or absf(delta) < 0.05 - 0.0001:
 		return ""
+	var tail := "." if about == "" else " " + about + "."
 	if delta > 0.0:
-		return "%s will tell %s." % [people[i].name, friends]
-	return "%s will warn %s." % [people[i].name, friends]
+		return "%s will tell %s%s" % [people[i].name, friends, tail]
+	return "%s will warn %s%s" % [people[i].name, friends, tail]
+
+
+## What a guest tells friends about the food, hinting at their tastes without naming
+## them: a meal with something they like, or a menu full of a tag they like.
+static func praise_about(liked_meal: bool, hint_tag: String) -> String:
+	if liked_meal:
+		return "it was just how they like it"
+	if hint_tag != "":
+		return "about all the things with " + Menu.tag_word(hint_tag)
+	return ""
 
 
 func is_regular(i: int) -> bool:

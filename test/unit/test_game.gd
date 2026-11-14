@@ -564,6 +564,40 @@ func test_ignored_guest_walks_out_and_counts_as_a_strike():
 	assert_false(is_instance_valid(g) and g.seated_waiting())
 
 
+func test_guest_who_finds_nothing_walks_on_without_a_strike_and_is_counted():
+	game.town.people[1].dislikes = ["patty"]
+	game.town.people[2].dislikes = ["patty"]
+	var party: Array[Guest] = game.spawn_group([1, 2])
+	assert_eq(party[0].state, "browse")
+	assert_false(game.queue.has(party[0]), "they never join the line")
+	_run(30.0)
+	assert_eq(game.ledger.strikes(), 0, "not a walkout")
+	assert_eq(int(game.ledger.today.found_nothing), 2)
+	assert_lt(float(game.town.people[1].affinity), 0.0)
+	assert_eq(game.town.people[1].grudges, 0)
+	assert_false(game.guests.has(party[0]), "gone up the street")
+	assert_eq(int(game.ledger.end_day().found_nothing), 2, "the receipt counts them")
+
+
+func test_one_with_nothing_stays_with_a_group_that_has_a_main():
+	game.town.people[1].dislikes = ["patty"]
+	var party: Array[Guest] = game.spawn_group([1, 2])
+	assert_eq(party[0].state, "queue", "the group goes in")
+	assert_true(party[0].planned.main.is_empty())
+	assert_true(party[0].mood.thoughts.has(Menu.NOTHING_THOUGHT))
+	assert_eq(int(game.ledger.today.found_nothing), 1)
+
+
+func test_a_meal_with_a_liked_ingredient_says_so():
+	game.town.people[2].likes = ["patty"]
+	var g: Guest = game.spawn_guest(2)
+	_run(12.0)
+	game.take_orders(g.table)
+	game.serve(g, game.full_tray_for(g))
+	assert_true(g.mood.thoughts.has(Menu.LIKED_THOUGHT))
+	assert_true(g.liked_meal)
+
+
 func test_dirty_table_disgusts_guests_unless_a_wall_hides_it():
 	game.stations.erase(Vector2i(0, 5))   # no bin, so only the plate is in question
 	var g: Guest = game.spawn_guest(2)
