@@ -25,6 +25,12 @@ const DUTIES := {
 	"board": {"kind": "food", "weight": 2.0},
 	"slicer": {"kind": "food", "weight": 2.0},
 	"tap": {"kind": "food", "weight": 1.0},
+	# PRD 8.6's new jobs, one duty per tool.
+	"grater": {"kind": "food", "weight": 2.0},
+	"bread_knife": {"kind": "food", "weight": 2.0},
+	"juicer": {"kind": "food", "weight": 2.0},
+	"blender": {"kind": "food", "weight": 3.0},
+	"steamer": {"kind": "food", "weight": 3.0},
 	"fetch": {"kind": "food", "weight": 1.0},
 	"assemble": {"kind": "food", "weight": 2.0},
 	# Serving.
@@ -717,16 +723,23 @@ func tolerance(person: int, kind: String) -> float:
 ## What each duty is called on the desk screen.
 const DUTY_WORDS := {
 	"grill": "Grill", "fryer": "Fryer", "pot": "Stock pot", "board": "Chopping board",
-	"slicer": "Slicer", "tap": "Pour drinks", "fetch": "Fetch ingredients", "assemble": "Assemble trays",
+	"slicer": "Slicer", "tap": "Pour drinks",
+	"grater": "Grater", "bread_knife": "Bread knife", "juicer": "Juicer", "blender": "Blender", "steamer": "Steamer", "fetch": "Fetch ingredients", "assemble": "Assemble trays",
 	"take_orders": "Take orders", "carry_trays": "Carry trays to tables", "clear_tables": "Clear tables",
 	"help_up": "Help fallen people up", "mop": "Mop", "sponge": "Sponge", "scraper": "Scraper",
 	"spill_kit": "Spill kit", "wash_up": "Wash up", "empty_bin": "Empty the bin",
 }
 ## A prep tool (as `Catalog.tool_of` names it) and its duty. Tools are listed by kind:
 ## ticking the grill covers every stove.
-const TOOL_DUTIES := {"grill": "grill", "fry": "fryer", "boil": "pot", "chop": "board", "slice": "slicer", "pour": "tap"}
-## Cleaning tools: the piece's id is the duty's (PRD 9.4 adds them to the room).
+## Every job a tool does (`Kitchen.jobs_known`) has a duty here, 8.6's new ones included.
+const TOOL_DUTIES := {"grill": "grill", "fry": "fryer", "boil": "pot", "chop": "board", "slice": "slicer",
+	"pour": "tap", "grate": "grater", "saw": "bread_knife", "juice": "juicer", "blend": "blender", "steam": "steamer"}
+## Cleaning duties: each clears floor dirt with its tool.
 const CLEAN_TOOLS: Array[String] = ["mop", "sponge", "scraper", "spill_kit"]
+## A room piece that brings a cleaning duty (PRD 9.4: the bucket comes with a mop, the sponge
+## is sold on its hook). The robot sweeper works by itself and needs no one.
+const CLEAN_PIECES := {"mop_bucket": "mop", "mop": "mop", "sponge": "sponge", "scraper": "scraper",
+	"spill_kit": "spill_kit"}
 ## Duties listed whatever is in the room.
 const FIXED_DUTIES := {"food": ["fetch", "assemble"], "service": ["take_orders", "carry_trays", "clear_tables", "help_up"],
 	"clean": ["wash_up", "empty_bin"]}
@@ -743,8 +756,8 @@ static func room_duties(tools: Array, pieces: Array) -> Dictionary:
 		if TOOL_DUTIES.has(t):
 			have[TOOL_DUTIES[t]] = true
 	for p in pieces:
-		if CLEAN_TOOLS.has(p):
-			have[p] = true
+		if CLEAN_PIECES.has(p):
+			have[CLEAN_PIECES[p]] = true
 	var out := {}
 	for k in KINDS:
 		var list: Array[String] = []
@@ -765,6 +778,19 @@ static func missing_duties(duties: Array, room: Dictionary) -> Array[String]:
 		if not found:
 			out.append(String(d))
 	return out
+
+
+## The duty for working a tool (a kitchen node): the duty of the job it does best, so a
+## stock pot is the pot's duty even at the grill, and a sharp knife is the board's.
+static func duty_of_tool(node: String) -> String:
+	if not Kitchen.has_node(node):
+		return ""
+	var jobs := Kitchen.jobs_of(node)
+	var best := ""
+	for job: String in jobs:
+		if best == "" or float(jobs[job]) > float(jobs[best]):
+			best = job
+	return str(TOOL_DUTIES.get(best, ""))
 
 
 static func duty_word(id: String) -> String:

@@ -591,3 +591,309 @@ func test_firing_drops_opinion_and_friends_hear_without_severance():
 	assert_eq(float(town.people[f].affinity), 0.5, "with severance their friends hear nothing")
 	town.record_fired(i, Staff.FIRE_DROP_HARSH, Staff.FIRE_DROP_HARSH * Staff.FIRE_FRIEND_SHARE)
 	assert_almost_eq(float(town.people[f].affinity), 0.5 - Staff.FIRE_DROP_HARSH * Staff.FIRE_FRIEND_SHARE, 0.0001)
+
+
+# ---------- New jobs and cleaning tools in the duty lists (PRD 10.5) ----------
+
+func test_every_job_a_tool_does_has_a_duty_with_words_and_a_kind():
+	var s := _staff()
+	for job in Kitchen.jobs_known():
+		assert_true(Staff.TOOL_DUTIES.has(job), "%s has a duty" % job)
+		var d: String = Staff.TOOL_DUTIES.get(job, "")
+		assert_eq(s.duty_kind(d), "food", d)
+		assert_true(Staff.DUTY_WORDS.has(d), "%s has words" % d)
+
+
+func test_the_new_tools_list_their_duties_in_the_room():
+	var room := Staff.room_duties(["grate", "saw", "juice", "blend", "steam"], [])
+	for d in ["grater", "bread_knife", "juicer", "blender", "steamer"]:
+		assert_true((room.food as Array).has(d), d)
+
+
+func test_cleaning_pieces_bring_their_duty():
+	var room := Staff.room_duties([], ["mop_bucket", "sponge", "hook", "robot_dock"])
+	assert_eq(room.clean, ["mop", "sponge", "wash_up", "empty_bin"] as Array[String])
+
+
+func test_a_tool_s_duty_is_the_job_it_does_best():
+	assert_eq(Staff.duty_of_tool("stove"), "grill")
+	assert_eq(Staff.duty_of_tool("pot"), "pot", "a stock pot is the pot's duty, not the grill's")
+	assert_eq(Staff.duty_of_tool("sharp_knife"), "board")
+	assert_eq(Staff.duty_of_tool("rotary_grater"), "grater")
+	assert_eq(Staff.duty_of_tool("blender"), "blender")
+	assert_eq(Staff.duty_of_tool("coffee_machine"), "tap")
+	assert_eq(Staff.duty_of_tool("counter"), "", "no job, no duty")
+
+
+# ---------- The task board (PRD 10.5) ----------
+
+func _board(world: Dictionary) -> JobBoard:
+	var b := JobBoard.new()
+	b.rebuild(world)
+	return b
+
+
+func _types(b: JobBoard) -> Array:
+	var out := []
+	for t: Dictionary in b.tasks.values():
+		out.append(t.type)
+	out.sort()
+	return out
+
+
+func test_an_empty_world_has_no_tasks():
+	assert_eq(_board({}).tasks.size(), 0)
+
+
+func test_every_task_kind_comes_with_its_duty():
+	var b := _board({
+		"stations": [{"id": "g", "cell": Vector2i(1, 0), "tool": "stove"}],
+		"storage": [{"cell": Vector2i(0, 0), "kinds": ["patty"]}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["patty"]},
+			{"id": 2, "cell": Vector2i(3, 1), "lacks": []}],
+		"trays": [{"id": 9, "cell": Vector2i(3, 2), "table": 4}],
+		"tables": [{"id": 4, "cell": Vector2i(8, 8), "state": "order"}, {"id": 5, "cell": Vector2i(9, 8), "state": "clear"}],
+		"dirt": {Vector2i(5, 5): 1, Vector2i(6, 5): 2},
+		"fallen": [{"id": 12, "cell": Vector2i(6, 6)}],
+		"sinks": [{"cell": Vector2i(0, 3), "dishes": 2}, {"cell": Vector2i(0, 4), "dishes": 0}],
+		"bins": [{"cell": Vector2i(0, 5), "full": true}, {"cell": Vector2i(0, 6), "full": false}],
+	})
+	assert_eq(_types(b), ["assemble", "bin", "carry", "clear", "dirt", "fetch", "help_up", "order", "wash"])
+	assert_eq(b.tasks["fetch:1:0"].duties, ["fetch"])
+	assert_eq(b.tasks["fetch:1:0"].dest, Vector2i(1, 0), "fetched to the stove")
+	assert_eq(b.tasks["carry:9"].duties, ["carry_trays"])
+	assert_eq(b.tasks["order:4"].duties, ["take_orders"])
+	assert_eq(b.tasks["clear:5"].duties, ["clear_tables"])
+	assert_eq(b.tasks["help_up:12"].duties, ["help_up"])
+	assert_eq(b.tasks["wash:0,3"].duties, ["wash_up"])
+	assert_eq(b.tasks["bin:0,5"].duties, ["empty_bin"])
+	assert_eq(b.tasks["assemble:2"].duties, ["assemble"])
+	assert_true(b.tasks["dirt:6,5"].duties.has("mop") and b.tasks["dirt:6,5"].duties.has("sponge"))
+	assert_false(b.tasks.has("dirt:5,5"), "dirt under level 2 is left")
+
+
+func test_a_raw_item_at_a_station_is_a_prep_and_items_in_hand_cover_their_lack():
+	var b := _board({
+		"stations": [{"id": "g", "cell": Vector2i(1, 0), "tool": "stove"}],
+		"storage": [{"cell": Vector2i(0, 0), "kinds": ["patty"]}],
+		"items": [{"id": 7, "kind": "patty", "cell": Vector2i(1, 0), "state": "raw", "station": "g"},
+			{"id": 8, "kind": "patty", "cell": Vector2i(1, 0), "state": "cooking", "station": "g"}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["patty", "patty", "patty"]}],
+	})
+	assert_eq(_types(b), ["fetch", "prep"], "one raw, one cooking, one still to fetch")
+	var prep: Dictionary = b.tasks["prep:7"]
+	assert_eq(prep.duties, ["grill"])
+	assert_eq(prep.cell, Vector2i(1, 0))
+
+
+func test_prep_lists_stand_ins_and_their_duties():
+	var b := _board({
+		"stations": [{"id": "pot", "cell": Vector2i(2, 0), "tool": "pot"},
+			{"id": "stove", "cell": Vector2i(1, 0), "tool": "stove"},
+			{"id": "board", "cell": Vector2i(4, 0), "tool": "board"}],
+		"items": [{"id": 3, "kind": "patty", "cell": Vector2i(0, 0), "state": "raw"}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["patty"]}],
+	})
+	var prep: Dictionary = b.tasks["prep:3"]
+	assert_eq(prep.duties, ["grill", "pot"], "the stove, then the stock pot standing in")
+	assert_almost_eq(float(prep.options[1].quality), Kitchen.STAND_IN_FAR, 0.001)
+	var only_pot := b.best_for(["pot"], Vector2i(0, 0))
+	assert_eq(only_pot.station, "pot", "a pot cook grills at the stock pot")
+	assert_eq(b.best_for(["board"], Vector2i(0, 0)), {}, "a board cannot grill")
+
+
+func test_a_drink_is_poured_at_a_dispenser_that_has_it():
+	var b := _board({
+		"stations": [{"id": "f", "cell": Vector2i(1, 0), "tool": "fountain", "drinks": ["soda"]},
+			{"id": "c", "cell": Vector2i(2, 0), "tool": "coffee_machine", "drinks": ["coffee"]}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["soda"]}],
+	})
+	assert_eq(_types(b), ["prep"], "no fetch: a dispenser keeps its own")
+	assert_eq(b.tasks["pour:1:0"].options.size(), 1)
+	assert_eq(b.tasks["pour:1:0"].options[0].station, "f")
+
+
+func test_nothing_to_fetch_or_no_tool_leaves_the_lack_stuck():
+	var b := _board({
+		"stations": [{"id": "b", "cell": Vector2i(1, 0), "tool": "board"}],
+		"storage": [{"cell": Vector2i(0, 0), "kinds": ["patty"]}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["patty", "lettuce"]}],
+	})
+	assert_eq(b.tasks.size(), 0, "no stove for the patty, no lettuce in stock")
+
+
+func test_an_ingredient_with_no_job_is_fetched_to_the_ticket():
+	var b := _board({"storage": [{"cell": Vector2i(0, 0), "kinds": ["bun"]}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["bun"]}]})
+	assert_eq(b.tasks["fetch:1:0"].dest, Vector2i(3, 0))
+
+
+func test_a_new_job_needs_its_new_tool():
+	var b := _board({
+		"stations": [{"id": "gr", "cell": Vector2i(1, 0), "tool": "rotary_grater"}],
+		"items": [{"id": 1, "kind": "shredded_cheese", "cell": Vector2i(1, 0), "state": "raw"}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["shredded_cheese"]}],
+	})
+	assert_eq(b.tasks["prep:1"].duties, ["grater"])
+
+
+func test_dirt_grows_more_urgent_by_level_and_waiting_adds_urgency():
+	var b := _board({"dirt": {Vector2i(0, 0): 2, Vector2i(1, 0): 4},
+		"tables": [{"id": 1, "cell": Vector2i(0, 0), "state": "order", "wait": 0.0},
+			{"id": 2, "cell": Vector2i(0, 0), "state": "order", "wait": 30.0}]})
+	assert_gt(b.tasks["dirt:1,0"].urgency, b.tasks["dirt:0,0"].urgency)
+	assert_gt(b.tasks["order:2"].urgency, b.tasks["order:1"].urgency)
+
+
+## A staff of one hire per entry: person id -> duties.
+func _crew(duties_by_person: Dictionary, tol := EVEN) -> Staff:
+	var s := _staff()
+	for p: int in duties_by_person:
+		_hire(s, p, duties_by_person[p], tol)
+	return s
+
+
+func test_a_helper_takes_the_most_urgent_task_their_duties_allow_and_reserves_it():
+	var s := _crew({1: ["clear_tables", "help_up", "mop"]})
+	var b := _board({
+		"tables": [{"id": 4, "cell": Vector2i(2, 0), "state": "clear"}, {"id": 5, "cell": Vector2i(1, 0), "state": "order"}],
+		"fallen": [{"id": 9, "cell": Vector2i(6, 0)}],
+		"dirt": {Vector2i(1, 1): 3},
+	})
+	var got := b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}], 1, 0.0, 100.0)
+	assert_eq(got[1].key, "help_up:9", "a fallen person first, though further")
+	assert_eq(b.reserved["help_up:9"], 1)
+	assert_eq(b.task_of(1).key, "help_up:9")
+	b.done(1)
+	got = b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}], 1, 0.0, 100.0)
+	assert_eq(got[1].key, "help_up:9", "still open until the world says it is done")
+	b.done(1)
+	b.rebuild({"tables": [{"id": 4, "cell": Vector2i(2, 0), "state": "clear"}], "dirt": {Vector2i(1, 1): 3}})
+	got = b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}], 1, 0.0, 100.0)
+	assert_eq(got[1].key, "clear:4", "no order-taking duty")
+
+
+func test_of_two_like_tasks_the_nearest_is_taken():
+	var s := _crew({1: ["wash_up"]})
+	var b := _board({"sinks": [{"cell": Vector2i(9, 9), "dishes": 1}, {"cell": Vector2i(1, 1), "dishes": 1}]})
+	var got := b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}], 1, 0.0, 100.0)
+	assert_eq(got[1].key, "wash:1,1")
+
+
+func test_two_helpers_never_take_the_same_task_or_station():
+	var s := _crew({1: ["grill"], 2: ["grill"]})
+	var b := _board({
+		"stations": [{"id": "a", "cell": Vector2i(1, 0), "tool": "stove"}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["patty", "patty"]}],
+		"items": [{"id": 1, "kind": "patty", "cell": Vector2i(0, 0), "state": "raw"},
+			{"id": 2, "kind": "patty", "cell": Vector2i(0, 0), "state": "raw"}],
+	})
+	var helpers := [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}, {"id": 2, "cell": Vector2i(0, 0), "idle": 5.0}]
+	var got := b.assign(s, helpers, 1, 0.0, 100.0)
+	assert_eq(got.size(), 1, "one stove, one cook at it")
+	assert_eq(got[1].station, "a")
+	b.done(1)
+	got = b.assign(s, helpers, 1, 0.0, 100.0)
+	assert_true(got.has(1) or got.has(2), "the stove is free again")
+
+
+func test_a_chef_doing_a_task_takes_it_off_the_board():
+	var s := _crew({1: ["carry_trays"]})
+	var b := _board({"trays": [{"id": 3, "cell": Vector2i(1, 0)}]})
+	assert_eq(b.chef_takes("carry:3"), -1, "no helper held it")
+	assert_eq(b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}], 1, 0.0, 100.0), {})
+	b.rebuild({"trays": [{"id": 3, "cell": Vector2i(1, 0)}]})
+	assert_true(b.chef_keys.has("carry:3"), "the claim lasts while the task does")
+	b.rebuild({})
+	assert_false(b.chef_keys.has("carry:3"))
+
+
+func test_a_chef_takes_what_a_helper_holds_and_the_helper_moves_on():
+	var s := _crew({1: ["carry_trays"]})
+	var b := _board({"trays": [{"id": 3, "cell": Vector2i(1, 0)}, {"id": 4, "cell": Vector2i(5, 0)}]})
+	var h := [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}]
+	assert_eq(b.assign(s, h, 1, 0.0, 100.0)[1].key, "carry:3")
+	assert_eq(b.chef_takes("carry:3"), 1)
+	assert_true(b.task_of(1).is_empty())
+	assert_eq(b.assign(s, h, 1, 0.0, 100.0)[1].key, "carry:4")
+
+
+func test_breaks_days_off_and_falls_take_a_helper_off_the_board():
+	var s := _staff()
+	_hire(s, 1, ["carry_trays"], EVEN, 3, 1)
+	var b := _board({"trays": [{"id": 3, "cell": Vector2i(1, 0)}]})
+	var h := [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}]
+	assert_eq(b.assign(s, h, 1, 0.0, 100.0).size(), 1)
+	var brk: float = Staff.break_starts(1, 100.0)[0]
+	assert_eq(b.assign(s, h, 1, brk + 1.0, 100.0), {}, "on a break")
+	assert_false(b.reserved.has("carry:3"), "their task goes back")
+	assert_eq(b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0, "down": true}], 1, 0.0, 100.0), {})
+	var e := s.employee(1)
+	e.week_start = 1
+	e.week_off = [Staff.week_day(2)] as Array[int]
+	assert_eq(b.assign(s, h, 2, 0.0, 100.0), {}, "a day off")
+	assert_eq(b.assign(s, h, 1, 0.0, 100.0).size(), 1)
+
+
+func test_an_unhappy_helper_reacts_slower():
+	var s := _crew({1: ["carry_trays"]})
+	var b := _board({"trays": [{"id": 3, "cell": Vector2i(1, 0)}]})
+	s.employee(1).satisfaction = 0.0
+	assert_almost_eq(JobBoard.reaction(0.0), JobBoard.REACT_BASE * (1.0 + Staff.SLOW_MAX), 0.001)
+	var wait := JobBoard.REACT_BASE * 1.2
+	assert_eq(b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": wait}], 1, 0.0, 100.0), {})
+	s.employee(1).satisfaction = 1.0
+	assert_eq(b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": wait}], 1, 0.0, 100.0).size(), 1)
+
+
+func test_prep_odds_rise_with_skill_and_tool_quality():
+	var low := JobBoard.prep_odds(1.0, Kitchen.STAND_IN)
+	var mid := JobBoard.prep_odds(3.0, Kitchen.BASE)
+	var high := JobBoard.prep_odds(5.0, Kitchen.SPECIALIST)
+	assert_lt(low.good, mid.good)
+	assert_lt(mid.good, high.good)
+	assert_gt(low.bad, mid.bad)
+	assert_eq(high.bad, 0.0)
+	assert_lte(high.good, JobBoard.GOOD_MAX)
+
+
+func test_helper_preps_roll_from_skill_and_satisfaction():
+	var skilled := _crew({1: ["grill"]}, {"food": 1, "service": 3, "clean": 3})
+	skilled.employee(1).satisfaction = 1.0
+	var weak := _crew({1: ["grill"]}, {"food": 5, "service": 3, "clean": 3})
+	weak.employee(1).satisfaction = 1.0
+	var sour := _crew({1: ["grill"]}, {"food": 1, "service": 3, "clean": 3})
+	sour.employee(1).satisfaction = 0.0
+	var bad := {"skilled": 0, "weak": 0, "sour": 0}
+	for i in 400:
+		bad.skilled += int(JobBoard.roll_prep(skilled, 1, Kitchen.BASE).result == "bad")
+		bad.weak += int(JobBoard.roll_prep(weak, 1, Kitchen.BASE).result == "bad")
+		bad.sour += int(JobBoard.roll_prep(sour, 1, Kitchen.BASE).result == "bad")
+	assert_eq(bad.skilled, 0, "a content five-star cook at a base tool never botches")
+	assert_gt(bad.weak, 100)
+	assert_gt(bad.sour, 60, "low satisfaction makes mistakes")
+	var r := JobBoard.roll_prep(skilled, 1, Kitchen.BASE)
+	assert_almost_eq(float(r.quality), Prep.quality_of(r.result), 0.0001)
+
+
+func test_a_bad_helper_prep_drops_grease_by_the_floor_s_rules():
+	var hits := {"bad": 0, "good": 0}
+	for result in hits:
+		var mess := FloorMess.new([Vector2i(0, 0)], 3)
+		for i in 300:
+			if JobBoard.drop_grease(mess, "fry", result, [Vector2i(0, 0)]) != null:
+				hits[result] += 1
+			mess.dirt.clear()
+	assert_gt(hits.bad, hits.good * 2)
+
+
+func test_other_tasks_roll_mistakes_from_satisfaction():
+	var s := _crew({1: ["carry_trays"]})
+	s.employee(1).satisfaction = 1.0
+	for i in 50:
+		assert_true(JobBoard.roll_task(s, 1).ok)
+	s.employee(1).satisfaction = 0.0
+	var slips := 0
+	for i in 400:
+		slips += int(not JobBoard.roll_task(s, 1).ok)
+	assert_gt(slips, 60)
