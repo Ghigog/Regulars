@@ -11,23 +11,32 @@ extends RefCounted
 ##   stations: [{id, cell: Vector2i, tool: kitchen node id, busy: bool, drinks: [kinds]}]
 ##       a tool on a counter. `busy`: someone is using it. `drinks`: a dispenser's own drinks
 ##       (absent: it pours anything).
-##   storage:  [{cell, kinds: [ingredient kinds]}]   boxes of stock to fetch from (PRD 8.4).
-##   items:    [{id, kind, cell, state: "raw" | "cooking" | "held", station: id}]
+##   storage:  [{cell, kinds: [ingredient kinds], ready: [kinds]}]   boxes of stock to fetch
+##       from (PRD 8.4). `ready`: kinds boxed ready-made, which need no prep (PRD 10.7).
+##   items:    [{id, kind, cell, state: "raw" | "cooking" | "held", station: id, form}]
 ##       ingredients out of storage and not yet made: "raw" waiting at a station, "cooking"
-##       on a tool, "held" in someone's hands. Each covers one of a ticket's lacks.
-##   tickets:  [{id, cell, lacks: [kinds], wait: seconds, assembled: bool}]
+##       on a tool, "held" in someone's hands. Each covers one of a ticket's lacks. `kind`
+##       is what it is being made into (a lemon on a juicer is lemonade); `form`, what it
+##       is now ("raw:lemon"), where that differs from `HelperWork.hold_for(kind)`.
+##   tickets:  [{id, cell, lacks: [kinds], wait: seconds, assembled: bool, tray: bool}]
 ##       an order on the rail. `lacks`: ingredients it still needs made (a kind twice for
 ##       two). With nothing lacking and no tray yet, it is a tray to assemble at `cell`.
+##       With no tray at all (`tray` false) a tray is started for it first (PRD 10.7), so
+##       what is made goes straight on it instead of filling the worktops.
 ##   trays:    [{id, cell, table, wait}]   a built tray at the pass, to carry.
 ##   tables:   [{id, cell, state: "order" | "clear", wait}]
 ##   dirt:     {Vector2i: level}           as `FloorMess.dirt`; level `DIRT_FROM` and up is a task.
+##   grease:   {Vector2i: true}            dirt that is kitchen grease (the scraper's, PRD 9.5).
 ##   fallen:   [{id, cell, wait}]          someone down on the floor (PRD 9.3).
 ##   sinks:    [{cell, dishes: int}]       dirty dishes waiting.
 ##   bins:     [{cell, full: bool}]
+##   burnt:    [{cell, duty}]              burnt food on a tool, blocking it: scraped into the
+##       bin by whoever works that tool (`duty`, PRD 10.7).
+##   tray_room: int                        free worktops a tray could be started on.
 
 ## How urgent each kind of task is before it waits, in points. (tunable)
 const URGENCY := {
-	"help_up": 6.0, "carry": 5.0, "assemble": 4.0, "prep": 3.5, "fetch": 3.0, "order": 3.0,
+	"help_up": 6.0, "carry": 5.0, "tray": 4.5, "assemble": 4.0, "scrap": 3.8, "prep": 3.5, "fetch": 3.0, "order": 3.0,
 	"clear": 2.0, "dirt": 1.0, "wash": 1.5, "bin": 1.5,
 }
 const DIRT_FROM := 2           # dirt at this level or more is a task
@@ -43,7 +52,7 @@ const BAD_BASE := 0.4          # bad chance for a one-star cook at a base tool
 
 ## The duties for each task type. Prep is the tool's (`Staff.duty_of_tool`), per station.
 const DUTIES := {
-	"fetch": ["fetch"], "assemble": ["assemble"], "carry": ["carry_trays"], "order": ["take_orders"],
+	"fetch": ["fetch"], "assemble": ["assemble"], "tray": ["assemble"], "carry": ["carry_trays"], "order": ["take_orders"],
 	"clear": ["clear_tables"], "help_up": ["help_up"], "wash": ["wash_up"], "bin": ["empty_bin"],
 }
 
@@ -74,9 +83,10 @@ func rebuild(world: Dictionary) -> void:
 	for cell: Vector2i in dirt:
 		var level := int(dirt[cell])
 		if level >= DIRT_FROM:
-			var task := _add("dirt:%d,%d" % [cell.x, cell.y], "dirt", cell, 0.0, {"level": level})
+			var greasy: bool = (world.get("grease", {}) as Dictionary).has(cell)
+			var task := _add("dirt:%d,%d" % [cell.x, cell.y], "dirt", cell, 0.0, {"level": level, "grease": greasy})
 			task.urgency += DIRT_PER_LEVEL * (level - DIRT_FROM)
-			task.duties = Staff.CLEAN_TOOLS.duplicate()
+			task.duties = dirt_duties(level, greasy)
 	for f: Dictionary in world.get("fallen", []):
 		_add("help_up:%s" % str(f.id), "help_up", f.cell, float(f.get("wait", 0.0)), {"person": f.id})
 	for s: Dictionary in world.get("sinks", []):
@@ -85,10 +95,24 @@ func rebuild(world: Dictionary) -> void:
 	for b: Dictionary in world.get("bins", []):
 		if b.get("full", false):
 			_add("bin:%d,%d" % [b.cell.x, b.cell.y], "bin", b.cell, 0.0)
+	for b: Dictionary in world.get("burnt", []):
+		var task := _add("scrap:%d,%d" % [b.cell.x, b.cell.y], "scrap", b.cell, 0.0, {"kind": b.get("kind", "")})
+		task.duties = [b.duty] if str(b.get("duty", "")) != "" else ["fetch"]
 	# A chef's claim lasts while its task does.
 	for key: String in chef_keys.keys():
 		if not tasks.has(key):
 			chef_keys.erase(key)
+
+
+## The cleaning duties that can clear dirt (PRD 10.7): a mop or a sponge anything; the
+## grease scraper kitchen grease only; the spill kit a cell at `CleanTools.SPILL_LEVEL`.
+static func dirt_duties(level: int, grease: bool) -> Array:
+	var out := ["mop", "sponge"]
+	if grease:
+		out.append("scraper")
+	if level >= CleanTools.SPILL_LEVEL:
+		out.append("spill_kit")
+	return out
 
 
 func _add(key: String, type: String, cell: Vector2i, wait: float, extra := {}) -> Dictionary:
@@ -102,10 +126,13 @@ func _add(key: String, type: String, cell: Vector2i, wait: float, extra := {}) -
 ## Each ticket's lacks, matched to the items already out (one item covers one lack, the
 ## oldest ticket first): a raw item at a station is a prep; cooking or held is in hand;
 ## a drink is poured straight from a dispenser; anything else is fetched from storage,
-## to a station that can do its job (or to the ticket, if it needs none).
+## to a station that can do its job (or to the ticket, if it needs none). A kind made
+## from another's stock (lemonade from lemons, PRD 8.6) is fetched as its source; a kind
+## boxed ready-made needs no tool and goes straight to the ticket (PRD 10.7).
 func _ingredient_tasks(world: Dictionary) -> void:
 	var items: Array = (world.get("items", []) as Array).duplicate()
 	var storage: Array = world.get("storage", [])
+	var room := int(world.get("tray_room", 99))
 	for t: Dictionary in world.get("tickets", []):
 		var lacks: Array = t.get("lacks", [])
 		var wait := float(t.get("wait", 0.0))
@@ -113,6 +140,13 @@ func _ingredient_tasks(world: Dictionary) -> void:
 			if not t.get("assembled", false):
 				_add("assemble:%s" % str(t.id), "assemble", t.cell, wait, {"ticket": t.id})
 			continue
+		if not t.get("tray", true):
+			# No more trays started than worktops to start them on; a ticket with no tray
+			# and no worktop free waits, rather than have food made with nowhere to go.
+			if room <= 0:
+				continue
+			room -= 1
+			_add("tray:%s" % str(t.id), "tray", t.cell, wait, {"ticket": t.id})
 		for i in lacks.size():
 			var kind := String(lacks[i])
 			var job := Pantry.tool_of(kind) if Pantry.ITEMS.has(kind) else ""
@@ -124,33 +158,52 @@ func _ingredient_tasks(world: Dictionary) -> void:
 			if job == "pour":
 				_prep_task("pour:%s:%d" % [str(t.id), i], kind, job, t, wait, {})
 				continue
-			var from: Variant = _storage_with(storage, kind)
-			if from == null:
+			var src := Pantry.source_of(kind)
+			var from := _storage_with(storage, src, src == kind)
+			if from.is_empty():
 				continue   # nothing to fetch: stuck until restocked
+			if from.ready:
+				job = "none"
 			var dest: Variant = t.cell
 			if job != "" and job != "none":
 				var st := _best_station(job, kind)
 				if st.is_empty():
 					continue   # no tool in the room can do it
 				dest = st.cell
-			_add("fetch:%s:%d" % [str(t.id), i], "fetch", from, wait,
-				{"ticket": t.id, "kind": kind, "job": job, "dest": dest})
+			_add("fetch:%s:%d" % [str(t.id), i], "fetch", from.cell, wait,
+				{"ticket": t.id, "kind": kind, "source": src, "ready": from.ready, "job": job, "dest": dest})
 
 
+## The item that covers a lack of `kind`: one being made into it, else (for a kind made
+## from another's stock) its source lying loose, away from any tool.
 func _take_item(items: Array, kind: String) -> Dictionary:
 	for i in items.size():
 		if items[i].kind == kind:
 			var it: Dictionary = items[i]
 			items.remove_at(i)
 			return it
+	if Pantry.is_derived(kind):
+		var src := Pantry.source_of(kind)
+		for i in items.size():
+			if items[i].kind == src and not items[i].has("station") and items[i].state == "raw":
+				var it: Dictionary = items[i].duplicate()
+				items.remove_at(i)
+				it.form = str(it.get("form", HelperWork.hold_for(src)))
+				return it
 	return {}
 
 
-func _storage_with(storage: Array, kind: String) -> Variant:
+## The storage holding `kind`: {cell, ready}, a ready-made box first where `ready_ok`;
+## {} when nothing holds it.
+func _storage_with(storage: Array, kind: String, ready_ok := true) -> Dictionary:
+	if ready_ok:
+		for s: Dictionary in storage:
+			if (s.get("ready", []) as Array).has(kind):
+				return {"cell": s.cell, "ready": true}
 	for s: Dictionary in storage:
 		if (s.get("kinds", []) as Array).has(kind):
-			return s.cell
-	return null
+			return {"cell": s.cell, "ready": false}
+	return {}
 
 
 ## A prep task: every station that can do the job (stand-ins too), each with its duty and
@@ -166,8 +219,10 @@ func _prep_task(key: String, kind: String, job: String, t: Dictionary, wait: flo
 		if not duties.has(o.duty):
 			duties.append(o.duty)
 	var cell: Vector2i = item.cell if item.has("cell") else options[0].cell
-	_add(key, "prep", cell, wait, {"ticket": t.id, "kind": kind, "job": job, "options": options,
+	var task := _add(key, "prep", cell, wait, {"ticket": t.id, "kind": kind, "job": job, "options": options,
 		"item": item.get("id"), "duties": duties})
+	if item.has("form"):
+		task.hold = item.form
 
 
 ## The stations that can do `job` (for `kind`, a drink from its own dispenser), best first.

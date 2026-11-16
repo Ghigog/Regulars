@@ -740,6 +740,8 @@ const CLEAN_TOOLS: Array[String] = ["mop", "sponge", "scraper", "spill_kit"]
 ## is sold on its hook). The robot sweeper works by itself and needs no one.
 const CLEAN_PIECES := {"mop_bucket": "mop", "mop": "mop", "sponge": "sponge", "scraper": "scraper",
 	"spill_kit": "spill_kit"}
+## Every tree node a cleaning home can be bought up to (PRD 9.5) brings its line's duty
+## too, through the tool it keeps (`clean_duty`): a flat mop's bucket is still the mop's.
 ## Duties listed whatever is in the room.
 const FIXED_DUTIES := {"food": ["fetch", "assemble"], "service": ["take_orders", "carry_trays", "clear_tables", "help_up"],
 	"clean": ["wash_up", "empty_bin"]}
@@ -756,8 +758,9 @@ static func room_duties(tools: Array, pieces: Array) -> Dictionary:
 		if TOOL_DUTIES.has(t):
 			have[TOOL_DUTIES[t]] = true
 	for p in pieces:
-		if CLEAN_PIECES.has(p):
-			have[CLEAN_PIECES[p]] = true
+		var d := str(CLEAN_PIECES.get(p, clean_duty(Kitchen.tool_of(p) if Kitchen.has_node(p) else str(p))))
+		if d != "":
+			have[d] = true
 	var out := {}
 	for k in KINDS:
 		var list: Array[String] = []
@@ -791,6 +794,21 @@ static func duty_of_tool(node: String) -> String:
 		if best == "" or float(jobs[job]) > float(jobs[best]):
 			best = job
 	return str(TOOL_DUTIES.get(best, ""))
+
+
+## The cleaning duty a cleaning tool is used under (PRD 10.7): every mop on the bucket
+## line is the mop's, the scourer the sponge's, the grease scraper and spill kit their own.
+static func clean_duty(tool: String) -> String:
+	if not CleanTools.TOOLS.has(tool):
+		return ""
+	if CleanTools.is_mop(tool):
+		return "mop"
+	match tool:
+		"grease_scraper":
+			return "scraper"
+		"spill_kit":
+			return "spill_kit"
+	return "sponge"
 
 
 static func duty_word(id: String) -> String:

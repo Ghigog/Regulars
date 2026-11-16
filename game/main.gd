@@ -457,6 +457,10 @@ func _apply_demo(demo: String) -> void:
 			a.time = 1.0
 	elif demo in ["helpers", "helpers_break"]:   # PRD 10.6: staff at work; see Crew.demo
 		crew.demo(demo)
+	elif demo == "staff_only":   # PRD 10.7: a busy day run by helpers alone; see Crew.staff_only
+		ledger.day = 8
+		flyers_out = true
+		crew.staff_only()
 	elif demo == "dirt":  # every level of floor dirt, footprints, guests slowed tracking it in; shoot at about 7
 		floor_dirt.sync_room()
 		var m := floor_dirt.mess
@@ -4146,8 +4150,10 @@ func desk_in_front(ch: Player = null) -> Station:
 ## The duties a post can hold tonight, by kind, read from the room (`Staff.room_duties`).
 func room_duties() -> Dictionary:
 	var pieces := []
-	for st: Station in stations.values():
+	for st: Station in stations.values() + highs.values():   # a hook's sponge hangs high (PRD 9.4)
 		pieces.append(st.type)
+		if st.kit_tool != "":
+			pieces.append(st.kit_tool)
 	return Staff.room_duties(kitchen_tools(), pieces)
 
 
