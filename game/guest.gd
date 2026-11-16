@@ -51,6 +51,10 @@ var _gross_time := 0.0
 var _heart_time := 0.0
 var _last_stage := 0
 var _age := 0.0
+var helping: Node3D       # someone down after a slip (9.3) this guest is helping up
+var _alarm_time := 0.0    # saw someone fall: a "!" in the bubble for a moment
+const DOWN_TILT := -1.45   # lying on their back after a slip, face to the sky
+const DOWN_LIFT := 0.24    # so the body lies on the floor, not through it
 
 
 func setup(game_, idx_: int, start: Vector2i) -> void:
@@ -236,8 +240,69 @@ func stand_up() -> void:
 		_meal = null
 
 
+## Slipped on the floor (9.3): down on the cell, dazed. FloorDirt keeps the time.
+func fall() -> void:
+	heading = Vector3.ZERO
+	_body.create_tween().tween_property(_body, "rotation:x", DOWN_TILT, 0.22) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	_body.position = Vector3(0, DOWN_LIFT, 0)
+
+
+func rise() -> void:
+	_body.position = Vector3.ZERO
+	_label.position = Vector3(0, _label.position.y, 0)
+	_body.create_tween().tween_property(_body, "rotation:x", 0.0, 0.3) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Saw someone slip within a cell: a smaller hit and a thought.
+func witness_fall() -> void:
+	mood.patience = maxf(0.0, mood.patience - FloorMess.WITNESS_PATIENCE)
+	mood.delight(-FloorMess.WITNESS_JOY, FloorMess.WITNESS_THOUGHT)
+	_alarm_time = 2.5
+
+
+## Lying on the floor: no walking, waiting, eating or bars; just the dazed face.
+func _lie(delta: float) -> void:
+	_bar.visible = false
+	_body.set_face("dazed")
+	_body.pose = "idle"
+	_body.position.x = 0.0
+	Fx.set_bubble(_order, "")
+	_label.position = FloorDirt.lying_dir(self) * 1.0 + Vector3(0, 1.75, 0)   # over the head
+	_alarm_time -= delta
+
+
+## Helping someone up: over to their side, then crouched with both hands out.
+func _help(delta: float) -> void:
+	var spot := FloorDirt.help_spot(helping)
+	if position.distance_to(spot) > 0.02:
+		position = position.move_toward(spot, SPEED * 0.5 * delta)
+		_body.position.y = absf(sin(_age * 11.0)) * 0.04
+	else:
+		_body.position.y = 0.0
+	var to := helping.position + FloorDirt.lying_dir(helping) * 0.55 - position
+	to.y = 0.0
+	_face(to, delta)
+	_body.pose = "help"
+	_body.rotation.x = lerpf(_body.rotation.x, 0.35, 1.0 - exp(-8.0 * delta))
+	_bar.visible = false
+	_alarm_time -= delta
+	Fx.set_bubble(_order, "warning" if _alarm_time > 0.0 else "")
+	_order.position.y = 2.72
+	_label.position.y = 3.24 if _alarm_time > 0.0 else 2.1
+
+
 func tick(delta: float) -> void:
 	_age += delta
+	if game.floor_dirt.is_down(self):
+		_lie(delta)
+		return
+	if helping != null:
+		if is_instance_valid(helping) and game.floor_dirt.is_down(helping):
+			_help(delta)
+			return
+		helping = null
 	match state:
 		"queue":
 			_advance(delta)
@@ -306,6 +371,7 @@ func _refresh(delta: float) -> void:
 	# One bold icon says what is on their mind (sheet 13).
 	# Disgust shows only once it has crossed a threshold: a stage icon pops up when
 	# they reach a new stage, and comes back every few seconds while it lasts.
+	_alarm_time -= delta
 	var stage := mood.disgust_level()
 	if stage > _last_stage:
 		_gross_time = 3.0
@@ -313,7 +379,9 @@ func _refresh(delta: float) -> void:
 	_gross_time -= delta
 	_heart_time -= delta
 	var want := ""
-	if stage > 0 and (seated_waiting() or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
+	if _alarm_time > 0.0:
+		want = "warning"   # someone just fell beside them
+	elif stage > 0 and (seated_waiting() or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
 		want = GuestMood.DISGUST_ICONS[stage]
 	elif state == "ordering":
 		want = "order"   # a notepad: come and take my order
