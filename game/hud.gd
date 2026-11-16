@@ -59,6 +59,7 @@ var _guest_state: Label
 var _guest_bill: Label   # what a served guest is paying (mood scales it)
 var _guest_meters := {}
 var _guest_thoughts: Label
+var _guest_hints: Label
 var _search := ""
 var _category := ""
 var _search_box: LineEdit
@@ -1064,6 +1065,8 @@ func show_guest(g: Guest) -> void:
 		ol.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		ol.custom_minimum_size = Vector2(190, 0)
 		ol.add_theme_color_override("font_color", Color(Build.CABINET))
+	_guest_hints = _label(box, 13)   # tolerances are never shown, only hinted once felt
+	_guest_hints.add_theme_color_override("font_color", Color(Build.CORAL_DARK))
 	_guest_state = _label(box, 15)
 	_guest_bill = _label(box, 14)
 	_guest_bill.add_theme_color_override("font_color", Color(Build.CABINET))
@@ -1088,6 +1091,9 @@ func _update_guest() -> void:
 		return
 	var m: GuestMood = _guest.mood
 	_guest_state.text = STATE_WORDS.get(_guest.state, "")
+	var hints := m.tolerance_hints()
+	_guest_hints.visible = not hints.is_empty()
+	_guest_hints.text = "\n".join(hints)
 	_guest_bill.visible = m.served_comfort >= 0.0
 	if _guest_bill.visible:
 		_guest_bill.text = _bill_words(m, _guest.bill_base)

@@ -59,6 +59,7 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	info = game.town.people[idx]
 	var hello: Dictionary = game.town.greeting(idx)
 	mood.patience = hello.patience
+	mood.tolerance = info.tolerance   # shared, so training (PRD 10) carries into later visits
 	mood.delight(hello.joy, hello.thought)
 	cell = start
 	position = Grid.center(start)
