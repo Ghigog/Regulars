@@ -60,6 +60,20 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+**The upgrade tree (PRD 8.3)**
+- A wooden tray like the shop's, but the paper is blueprint blue (`#2c5c8c`) with a faint
+  24 px grid and white lines and type; the chosen card is outlined in gold. Cards beyond
+  reach are dimmer, with a dashed inner rule. Line kinds read by shape: an efficient step
+  is a straight line with a chevron, a specialist an elbow with a white diamond at the
+  fork. Quality pips read by shape, not colour. Job icons are new flat icons
+  (`job_grill`, `job_fry`, `job_boil`, `job_chop`, `job_slice`, `job_pour`,
+  `job_store`, `job_chill` in `icons.gd`). A departure from paper-and-wood, on purpose:
+  blueprint says "plans for this piece", not "buy something new".
+- Tree steps on a tool get small marks until the art pass (8.7): a brass stud on the
+  worktop edge per efficient step, grill bars on the char grill, a second pan on the
+  two-hob range, a second basket handle on the twin fryer, a motor on the auto slicer,
+  an end-grain block for the butcher block, a white door for the under-counter fridge.
+
 **How it is made**
 - Nothing is modelled in Blender yet. Every mesh is generated in GDScript: chamfered
   boxes (the 3 cm bevel), lathed shapes (bodies, plates, pots, hats) and flat cut-out

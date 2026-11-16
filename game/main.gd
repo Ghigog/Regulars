@@ -128,6 +128,7 @@ var theme_path := "user://regulars_theme.cfg"   # the last theme picked, presele
 var allow_quit := true           # tests turn this off to check Quit without leaving
 var quit_asked := false
 var shopper: Player              # the chef whose player opened the shop; they stand still while it is open
+var upgrading := false           # the shop is showing the upgrade tree of what the shopper holds (PRD 8.3)
 var shopping: bool:              # the shop is open over the build phase
 	get: return shopper != null
 var door_open := true            # which side of the door card faces the street
@@ -502,6 +503,10 @@ func _apply_demo(demo: String) -> void:
 			ledger.record_sale(DEMO_BILL, 3)
 			arrivals.clear()
 			get_tree().create_timer(1.5).timeout.connect(confirm_receipt.bind(0))
+	elif demo in ["tree", "tree_stove", "tree_counter", "tree_fern", "upgraded"]:   # PRD 8.3 upgrade trees; shoot at 3
+		ledger.record_sale(DEMO_BILL, 5)
+		arrivals.clear()
+		get_tree().create_timer(1.0).timeout.connect(_demo_tree.bind(demo))
 	elif demo == "counters":   # PRD 8: a double counter, a board on a double counter, a stove on the pass; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.money = 300
@@ -631,6 +636,42 @@ func _demo_counters() -> void:
 	find_station("board").set_item(Tray.kind("prep", "lemon" if Scenery.seaside() else "tomato"))   # a tool's surface still holds a thing
 	player.position = Grid.center(Vector2i(2, 4))
 	player.look(Vector2i(1, 0))
+
+
+## The upgrade trees (PRD 8.3): a piece picked up at night and the shop opened.
+## "tree" a board in hand; "tree_stove" a stove, the choice scrolled down to the fryer;
+## "tree_counter" a counter (its fridge line); "tree_fern" a fern's short tree;
+## "upgraded" a row of upgraded pieces standing in the kitchen.
+func _demo_tree(demo: String) -> void:
+	open_build()
+	ledger.money = 300
+	ledger.xp = 500
+	var c := Vector2i(2, 5)
+	if demo == "upgraded":
+		var row := [["counter", "long_counter", Vector2i(1, 5)], ["butcher_block", "counter", Vector2i(2, 5)],
+			["auto_slicer", "counter", Vector2i(3, 5)], ["char_grill", "fridge", Vector2i(2, 4)],
+			["two_hob_range", "counter", Vector2i(3, 4)], ["twin_fryer", "counter", Vector2i(4, 5)]]
+		for spot: Array in row:
+			add_station("counter", spot[2], 1, 0, spot[1])
+			if spot[0] != "counter":
+				add_station(spot[0], spot[2])
+		player.position = Grid.center(Vector2i(2, 6))
+		player.look(Vector2i(0, -1))
+		return
+	var piece: String = {"tree": "board", "tree_stove": "stove", "tree_counter": "", "tree_fern": fern()}[demo]
+	if demo == "tree_fern":
+		add_station(piece, c)
+	else:
+		add_station("counter", c)
+		if piece != "":
+			add_station(piece, c)
+	player.position = Grid.center(c + Vector2i(0, 1))
+	player.look(Vector2i(0, -1))
+	pick_up(Grid.center(c))
+	open_shop()
+	if demo == "tree_stove":
+		for i in 3:
+			get_tree().create_timer(0.4 + 0.3 * i).timeout.connect(hud.tree_move.bind("down"))
 
 
 func _demo_build(demo: String) -> void:
@@ -1128,6 +1169,7 @@ func _onto_counter(top: Station, cell: Vector2i, facing: int) -> void:
 		if till:
 			till.reparent(top, false)
 		top.set_base(under.base, under.pass_look)
+		top.stacked = under.stacked
 		under.queue_free()
 	top.place_at(cell, facing)
 	_register(top)
@@ -1139,6 +1181,7 @@ func _off_counter(top: Station) -> void:
 	var under := Station.new()
 	add_child(under)
 	under.setup("counter", top.cell, 1, top.facing, top.base, top.pass_look)
+	under.stacked = top.stacked
 	var till := top.get_node_or_null("till")
 	if till:
 		till.reparent(under, false)
@@ -1152,8 +1195,9 @@ func _stacks_on(cell: Vector2i, h: Dictionary) -> bool:
 	var under := _bare_counter(cell)
 	if under == null or under.item != "" or not (Kitchen.is_top(h.id) or Kitchen.is_counter(h.id)):
 		return false
-	if h.get("moving", false) and (h.node as Station).item != "":
-		return false
+	if h.get("moving", false) and ((h.node as Station).item != "" \
+			or (Kitchen.is_counter(h.id) and (h.node as Station).base != "counter")):
+		return false   # an upgraded counter (a fridge, a long counter) does not stack
 	return kitchen.can_place(cell, Kitchen.node_of(h.id))
 
 
@@ -1163,7 +1207,7 @@ func _register(st: Station) -> void:
 	for s in st.seats:
 		grid.reserved[s] = true
 	if st.base != "":
-		kitchen.set_cell(st.cell, st.base, Kitchen.node_of(st.type) if Kitchen.is_top(st.type) else "")
+		kitchen.set_cell(st.cell, st.base, st.node if Kitchen.is_top(st.type) else "")
 	_update_racks()
 
 
@@ -1376,6 +1420,7 @@ func start_day() -> void:
 	phase = Phase.SERVICE
 	clock = 0.0
 	shopper = null
+	upgrading = false
 	set_door(true)
 	hud.close_menu()
 	hud.hide_card()
@@ -1561,6 +1606,17 @@ func open_shop(ch: Player = null) -> void:
 		sfx("fail")
 		hud.say(Cleaning.HANDS_FULL)
 		return
+	if ch.hand.get("moving", false):   # a piece in hand: its upgrade tree instead (PRD 8.3)
+		var key := hand_key(ch)
+		if not Upgrades.has_tree(key):
+			sfx("fail")
+			hud.say("Nothing to upgrade the %s to. Put it down to shop." % piece_name(ch.hand).to_lower())
+			return
+		shopper = ch
+		upgrading = true
+		sfx("slide")
+		hud.show_tree(key)
+		return
 	shopper = ch
 	sfx("slide")
 	hud.show_shop()
@@ -1571,7 +1627,51 @@ func close_shop() -> void:
 		return
 	shopper = null
 	sfx("slide", 0.0, 0.8)
-	hud.hide_shop()
+	if upgrading:
+		upgrading = false
+		hud.hide_tree()
+	else:
+		hud.hide_shop()
+
+
+## The upgrade-tree key of the piece a chef has picked up: its kitchen node, its tier
+## in a tiered piece's short tree, or "" (nothing picked up, or a piece with no tree).
+func hand_key(ch: Player = null) -> String:
+	ch = _me(ch)
+	if not ch.hand.get("moving", false) or not (ch.hand.get("node") is Station):
+		return ""
+	var st: Station = ch.hand.node
+	return Upgrades.key_of(st.type, st.tier, st.base if st.type == "counter" else st.node)
+
+
+## Buys a node of the tree for the piece in the shopper's hand: only a child of what it
+## is now, paid for at once (the step's price). The piece turns into it, still in hand.
+func buy_upgrade(to: String, ch: Player = null) -> bool:
+	ch = shopper if ch == null and shopper != null else _me(ch)
+	var from := hand_key(ch)
+	if phase != Phase.BUILD or from == "" or not Upgrades.can_buy(from, to, ledger.money, ledger.level()) \
+			or not ledger.spend(Upgrades.step_price(to)):
+		sfx("fail")
+		return false
+	var st: Station = ch.hand.node
+	if Upgrades.is_tiered(to):
+		st.tier = Upgrades.tier_of(to)
+		st.set_base(st.base)   # redraws it at the new tier
+		ch.hand.tier = st.tier
+	elif st.type == "counter":
+		st.set_base(to)
+	else:   # a tool: it may now work as another (a stove into a fryer), so it is made anew
+		var up := Station.new()
+		add_child(up)
+		up.setup(to, st.cell, st.tier, st.facing, st.base, st.pass_look)
+		up.stacked = st.stacked
+		up.visible = false
+		st.queue_free()
+		ch.hand.node = up
+		ch.hand.id = up.type
+	sfx("coin")
+	hud.show_build()
+	return true
 
 
 ## Buys what the shop is showing. Flyers are paid for at once; a piece goes into
@@ -1632,9 +1732,10 @@ func pick_up(p: Vector3, ch: Player = null) -> bool:
 		var st: Station = stations[c]
 		if Kitchen.is_top(st.type):
 			_off_counter(st)   # the tool comes off first; its counter stays
-		elif Kitchen.unstacked(st.base) != "":
+		elif Kitchen.unstacked(st.base) != "" and st.stacked:
 			# One counter comes off a double counter; the other stays with what is on it.
 			st.set_base(Kitchen.unstacked(st.base))
+			st.stacked = false
 			kitchen.set_cell(c, st.base)
 			st = Station.new()
 			add_child(st)
@@ -1691,6 +1792,7 @@ func _stack_counter(cell: Vector2i) -> void:
 	var under := _bare_counter(cell)
 	kitchen.place(cell, "counter")
 	under.set_base(kitchen.get_piece(cell, "base"))
+	under.stacked = true
 
 
 ## Turns the piece in hand a quarter turn. Partitions turn by where you point.
@@ -1706,6 +1808,9 @@ func sell_value(ch: Player = null) -> int:
 	ch = _me(ch)
 	if not ch.hand.get("moving", false) or not Catalog.ITEMS.has(ch.hand.id):
 		return 0
+	var key := hand_key(ch)
+	if key != "":
+		return Upgrades.price(key) / 2   # the piece's whole price, upgrades and all
 	return Catalog.price_of(ch.hand.id, int(ch.hand.tier)) / 2
 
 
@@ -2184,7 +2289,7 @@ func build_interact(ch: Player = null) -> void:
 func _update_ghost(ch: Player = null) -> void:
 	ch = _me(ch)
 	_update_tool_ghost(ch)
-	var key := "%s:%s" % [ch.hand.get("id", ""), ch.hand.get("tier", 0)] if phase == Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) else ""
+	var key := "%s:%s:%s" % [ch.hand.get("id", ""), ch.hand.get("tier", 0), hand_key(ch)] if phase == Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) else ""
 	if key != ch.ghost_key:
 		ch.ghost_key = key
 		if ch.ghost:
@@ -2197,6 +2302,9 @@ func _update_ghost(ch: Player = null) -> void:
 				_wall_visual(ch.ghost, 0.9 + 0.1 * int(ch.hand.tier))
 			elif ch.hand.id == "rug":
 				Scenery.rug(ch.ghost)
+			elif ch.hand.get("node") is Station:
+				var hs: Station = ch.hand.node
+				Build.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" else "", false, hs.node)
 			else:
 				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier))
 	var p := _hover_point(ch)
@@ -2387,6 +2495,7 @@ func _end_day() -> void:
 	_cancel_all_preps()
 	set_door(false)
 	shopper = null
+	upgrading = false
 	ready_chefs.clear()
 	phase = Phase.SUMMARY
 	play_music("night")
@@ -2967,9 +3076,12 @@ func kitchen_stock() -> Array:
 func kitchen_tools() -> Array:
 	var out := []
 	for st: Station in stations.values():
-		var t := Catalog.tool_of(st.type)
-		if t != "" and not out.has(t):
-			out.append(t)
+		var jobs := Kitchen.jobs_of(st.node) if Kitchen.has_node(st.node) else {}
+		if jobs.is_empty() and Catalog.tool_of(st.type) != "":
+			jobs = {Catalog.tool_of(st.type): 1.0}
+		for t: String in jobs:   # stand-ins count: a board can slice (PRD 8.3)
+			if jobs[t] > 0.0 and not out.has(t):
+				out.append(t)
 	return out
 
 
@@ -3417,6 +3529,21 @@ func prompt_for(st: Station, ch: Player = null) -> String:
 	return use_station(st, true, ch)
 
 
+## Which tool's way of working a station is used as right now (PRD 8.3): a heat tool
+## works as the tool of what is cooking on it, or of the raw thing in hand when it can
+## cook that at all (a stove that fries works as a fryer). Others as themselves.
+func _use_as(st: Station, held_ing: Dictionary) -> String:
+	if not st.is_heat_tool():
+		return st.type
+	if st.heat != "":
+		return st.mode()
+	if not held_ing.is_empty() and held_ing.state == "raw" and st.item == "":
+		var job := Pantry.tool_of(held_ing.id)
+		if Station.HEAT_MODE.has(job) and st.q(job) > 0.0:
+			return str(Station.HEAT_MODE[job])
+	return st.type
+
+
 ## The player uses the station they are facing. Returns the name of the action taken.
 ## With dry_run, nothing changes and only the name is returned. A refusal (a tray
 ## that is not finished, an ingredient its ticket does not need) is returned as its
@@ -3452,7 +3579,7 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			act = "Put back"
 			if not dry_run:
 				ch.set_held("")
-	match st.type:
+	match _use_as(st, held_ing):
 		"stove":
 			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "grill":
 				act = "Grill"
@@ -3463,7 +3590,7 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				act = "Take off the heat"
 				if not dry_run:
 					var p := Tray.parse(st.item)
-					var res := Prep.grill(st.cook)
+					var res := Prep.grill(st.cook, st.q("grill"))
 					ch.set_held(Tray.kind(res.state, p.id), res.quality)
 					st.set_item("")
 					_prep_done(chefs.find(ch), st, "grill", res.result)
@@ -3487,7 +3614,7 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				act = "Lift basket"
 				if not dry_run:
 					var p := Tray.parse(st.item)
-					var res := Prep.fry(st.cook)
+					var res := Prep.fry(st.cook, st.q("fry"))
 					if res.state == "prep":
 						st.lift_to_rack(Tray.kind("prep", p.id), res.quality, res.result)
 					else:
@@ -3513,7 +3640,10 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go in the pot" % Pantry.name_of(held_ing.id)
 		"board", "slicer":
-			var tool := "chop" if st.type == "board" else "slice"
+			var tool := st.main_job()
+			var wants := Pantry.tool_of(held_ing.id) if not held_ing.is_empty() else ""
+			if wants in ["chop", "slice"] and st.q(wants) > 0.0:
+				tool = wants   # a stand-in: a board slices, a slicer chops (PRD 8.3)
 			if st.prep_by >= 0:
 				why = "In use"
 			elif not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == tool:
@@ -3710,12 +3840,14 @@ static func surface_first(st: Station, held: String) -> bool:
 
 func start_prep(p: int, st: Station, tool: String, ing: String) -> void:
 	var chef: Player = chefs[p]
-	preps[p] = {"tool": tool, "st": st, "ing": ing, "t": 0.0, "hits": [], "presses": 0, "fill": 0.0, "last": 0.0}
+	var q := st.q(tool) if st.q(tool) > 0.0 else 1.0
+	preps[p] = {"tool": tool, "st": st, "ing": ing, "t": 0.0, "hits": [], "presses": 0, "fill": 0.0, "last": 0.0,
+		"q": q, "sweep": Prep.chop_sweep(q), "auto": Kitchen.is_auto(st.node)}
 	st.prep_by = p
 	chef.set_held("")
 	if tool != "pour":
 		st.set_item(Tray.kind("raw", ing))
-	st.show_widget(tool)
+	st.show_widget(tool, q)
 	chef.punch()
 	st.used()
 	_show_prep(p)
@@ -3728,10 +3860,12 @@ func prep_of(p := 0) -> Dictionary:
 ## Use was pressed during a minigame.
 func prep_press(p: int) -> void:
 	var s: Dictionary = preps[p]
+	if s.get("auto", false):
+		return   # it plays itself
 	match s.tool:
 		"chop":
-			if s.hits.size() == int(s.t / Prep.CHOP_SWEEP_TIME) and s.hits.size() < Prep.CHOP_SWEEPS:
-				var hit := Prep.chop_hit(_chop_pos(s))
+			if s.hits.size() == int(s.t / s.sweep) and s.hits.size() < Prep.CHOP_SWEEPS:
+				var hit := Prep.chop_hit(_chop_pos(s), s.q)
 				s.hits.append(hit)
 				sfx("chop", 0.1, 1.0 if hit else 0.8)
 				chefs[p].punch()
@@ -3757,7 +3891,7 @@ func cancel_prep(p: int) -> void:
 
 
 func _chop_pos(s: Dictionary) -> float:
-	return fmod(s.t, Prep.CHOP_SWEEP_TIME) / Prep.CHOP_SWEEP_TIME
+	return fmod(s.t, s.sweep) / s.sweep
 
 
 func _tick_preps(delta: float) -> void:
@@ -3767,22 +3901,32 @@ func _tick_preps(delta: float) -> void:
 			continue   # a demo shot
 		s.t += delta
 		var result := ""
+		if s.get("auto", false):   # an auto piece plays itself: always good, no burst
+			s.presses = mini(int(s.t / Prep.AUTO_TIME * Prep.SLICE_COUNT), Prep.SLICE_COUNT)
+			s.hits = []
+			for k in mini(int(s.t / Prep.AUTO_TIME * Prep.CHOP_SWEEPS), Prep.CHOP_SWEEPS):
+				s.hits.append(true)
+			if s.t >= Prep.AUTO_TIME:
+				_finish_prep(p, "good")
+			else:
+				_show_prep(p)
+			continue
 		match s.tool:
 			"chop":
-				while s.hits.size() < mini(int(s.t / Prep.CHOP_SWEEP_TIME), Prep.CHOP_SWEEPS):
+				while s.hits.size() < mini(int(s.t / s.sweep), Prep.CHOP_SWEEPS):
 					s.hits.append(false)   # a sweep went by without a press
 				if s.hits.size() >= Prep.CHOP_SWEEPS:
 					result = Prep.chop(s.hits.count(true))
 			"slice":
-				if s.t >= Prep.SLICE_TIME or (s.presses >= Prep.SLICE_COUNT and s.t - s.last > 0.5):
-					result = Prep.slice(s.presses)
+				if s.t >= Prep.slice_time(s.q) or (s.presses >= Prep.SLICE_COUNT and s.t - s.last > 0.5):
+					result = Prep.slice(s.presses, s.q)
 			"pour":
 				if controls.holding(p, "use"):
-					s.fill += Prep.POUR_RATE * delta
+					s.fill += Prep.pour_rate(s.q) * delta
 					if s.fill > 1.04:
 						result = "bad"   # overflowed
 				else:
-					result = Prep.pour(s.fill)
+					result = Prep.pour(s.fill, s.q)
 		if result != "":
 			_finish_prep(p, result)
 		else:
@@ -3796,7 +3940,7 @@ func _show_prep(p: int) -> void:
 		"chop":
 			w.show_state({"pos": _chop_pos(s), "hits": s.hits})
 		"slice":
-			w.show_state({"presses": s.presses, "left": 1.0 - s.t / Prep.SLICE_TIME})
+			w.show_state({"presses": s.presses, "left": 1.0 - s.t / (Prep.AUTO_TIME if s.get("auto", false) else Prep.slice_time(s.q))})
 		"pour":
 			w.show_state({"fill": s.fill})
 
@@ -3820,7 +3964,7 @@ func _prep_done(p: int, st: Station, tool: String, result: String) -> void:
 		return
 	floor_dirt.prep_grease(tool, result, chefs[p].cell(), st)
 	PrepWidget.pop(st, Vector3(0, 2.0, 0), result)
-	match Prep.reward(tool, result):
+	match Prep.reward(tool, result, Kitchen.is_auto(st.node) and tool in ["chop", "slice"]):
 		"burst":
 			chefs[p].boost("burst")
 			sfx("zoom")
@@ -3965,6 +4109,13 @@ func _messy_at_mouse(ch: Player = null) -> Station:
 
 ## One action while the shop is open. Returns whether it was used.
 func shop_action(action: String) -> bool:
+	if upgrading:
+		match action:
+			"left", "right", "up", "down": hud.tree_move(action)
+			"back", "shop": close_shop()
+			"use", "confirm": hud.tree_buy()
+			_: return false
+		return true
 	match action:
 		"left": hud.shop_move(-1)
 		"right": hud.shop_move(1)

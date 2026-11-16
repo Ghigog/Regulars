@@ -10,6 +10,7 @@ const W := 0.8   # the chop bar's length
 const RING := 12 # segments in the boil ring
 
 var kind := ""
+var quality := 1.0   # the tool's quality at the job: sizes the notch, the slack and the band (PRD 8.3)
 var _knife: Node3D
 var _sweeps: Array = []   # chop: per sweep [empty, hit, miss]
 var _pips: Array = []     # slice: per pip [empty, full]
@@ -23,9 +24,10 @@ var _age := 0.0
 var _liquid := "#7a3b2e"   # pour: the drink's colour
 
 
-static func make(kind_: String, liquid := "") -> PrepWidget:
+static func make(kind_: String, liquid := "", q := 1.0) -> PrepWidget:
 	var w := PrepWidget.new()
 	w.kind = kind_
+	w.quality = q
 	if liquid != "":
 		w._liquid = liquid
 	w.basis = Build.CAM_BASIS
@@ -43,7 +45,7 @@ func _build() -> void:
 		"chop":
 			Build.flat(self, Icons.rect(0, 0, W + 0.08, 0.22), Build.TRIM)
 			Build.flat(self, Icons.rect(0, 0, W, 0.15), "#c98f58", 0.002)
-			Build.flat(self, Icons.rect(0, 0, Prep.CHOP_NOTCH * 2.0 * W, 0.15), Build.GOOD, 0.004)
+			Build.flat(self, Icons.rect(0, 0, Prep.chop_notch(quality) * 2.0 * W, 0.15), Build.GOOD, 0.004)
 			Build.flat(self, PackedVector2Array([Vector2(-0.05, 0.075), Vector2(0.05, 0.075), Vector2(0, 0.02)]), Build.TRIM, 0.006)
 			_knife = Node3D.new()
 			_knife.position.z = 0.01
@@ -53,12 +55,12 @@ func _build() -> void:
 			for k in Prep.CHOP_SWEEPS:
 				_sweeps.append(_slot(Vector2(-0.16 + k * 0.16, 0.24)))
 		"slice":
-			var n := Prep.SLICE_COUNT + Prep.SLICE_SLACK + 1
+			var n := Prep.SLICE_COUNT + Prep.slice_slack(quality) + 1
 			Build.flat(self, Icons.rect(0, 0.02, n * 0.085 + 0.06, 0.28), Build.TRIM)
 			Build.flat(self, Icons.rect(0, 0.02, n * 0.085 + 0.02, 0.24), Build.PAPER, 0.002)
 			for k in n:
 				var at := Vector2((k - (n - 1) / 2.0) * 0.085, 0.05)
-				var col := Build.GOOD if k < Prep.SLICE_COUNT else (Build.WARN if k < Prep.SLICE_COUNT + Prep.SLICE_SLACK else Build.DANGER)
+				var col := Build.GOOD if k < Prep.SLICE_COUNT else (Build.WARN if k < Prep.SLICE_COUNT + Prep.slice_slack(quality) else Build.DANGER)
 				var empty := Build.flat(self, Build.disc_pts(0.03, at, 12), "#d8ccb6", 0.004)
 				var full := Build.flat(self, Build.disc_pts(0.036, at, 12), col, 0.006)
 				if k == Prep.SLICE_COUNT - 1:   # the target pip: a star, so it reads by shape
@@ -76,7 +78,7 @@ func _build() -> void:
 			_fill.position = Vector3(0, -0.28, 0.004)
 			add_child(_fill)
 			Build.flat(_fill, Icons.rect(0, 0.28, 0.36, 0.56), _liquid)
-			var band := -0.28 + 0.56 * Prep.POUR_GOOD
+			var band := -0.28 + 0.56 * Prep.pour_good(quality)
 			Build.flat(self, Icons.rect(0, band, 0.44, 0.02), Build.TRIM, 0.008)
 			Build.flat(self, Build.star_pts(0.05, 5, 0.5, Vector2(0.27, band)), Build.WARN, 0.008)
 			_spill = Node3D.new()

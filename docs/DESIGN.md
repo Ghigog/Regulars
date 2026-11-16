@@ -273,10 +273,35 @@ Survive as many days as you can; three walkouts in one day ends the run.
   refunds half the catalog price. Fixtures (fridge, sink, bin, plate stack, pass
   counters) can be moved but not sold, and the last stove and last table cannot be sold.
   Player-built partitions move and sell the same way; the entrance wall does not.
-- **Upgrades are catalog entries.** Stove, fern and table are sold in three tiers; a
-  tier costs 1x, 2x, 4x the base price and each tier needs one more level. Counter and
-  partition have one tier. There are no free blueprints.
-- **Tier effects:** faster stove, a fern that gives more and is seen from further, a tier 2+ table gives seated guests
+- **Upgrade trees (PRD 8.3).** Nothing is upgraded in the shop. At night, pick a piece
+  up and open the shop (Tab, Y, the Shop button): with a piece in hand the shop shows its
+  upgrade tree instead, on blue blueprint paper (`game/tree_screen.gd`; rules in
+  `sim/upgrades.gd`, data in `Kitchen.NODES`). The held piece sits on the left; an
+  efficient step runs straight on along its row, a specialist forks to a new row below.
+  Branches off the paper end in an arrow and the view scrolls to the choice (stick,
+  arrows, wheel or drag). Each node shows its piece, its jobs as tool icons with a
+  quality pip (ring: stand-in, dot: own job, dot and plus: better, star: specialist,
+  star in a ring: plays itself), storage slots, and the step's price (the new price less
+  the old). Only a child of the held piece can be bought; it is paid at once and the
+  piece turns into it, still in hand. A piece with no tree (sink, bin) says so and the
+  shop stays shut; a new, unpaid piece in hand opens the shop as before. Trees: the
+  board, stove, soda fountain, wine barrel and the counter (double, long counter;
+  under-counter fridge, tall fridge, glass fridge; storage itself arrives in 8.4). Tiered
+  catalog pieces (fern, palm, jukebox, aquarium, tables, booth, stool) get a short tree of
+  their tiers, priced and levelled as before. The shop sells tier 1 and tree roots only:
+  the fryer, pot and slicer are reached from the stove and board. Selling pays half the
+  piece's whole price, as before. A counter bought into a double in its tree lifts off
+  whole; two counters stacked by hand still come apart one at a time.
+- **Quality is difficulty (PRD 8.3).** The tools' three tiers are gone; each tool does
+  its jobs at a quality from its tree node, and the minigames read it (`Prep`): 1.0
+  plays as before; a stand-in (0.6) has a narrower chop notch and faster marker, less
+  time to slice and less slack, a narrower pour band and a faster cup, and a grill or
+  fry window and slide to burnt 0.6 as long; a specialist (1.6) the reverse; a pot boils
+  in `BOIL_TIME / q`. Stand-ins work: a board slices, a slicer chops, a stove fries and
+  boils (working as a fryer or pot while that is on it), a pot or fryer grills at 0.4,
+  and the menu counts them as tools. The auto slicer plays itself: always good, no burst.
+  `REGULARS_DEMO=tree`, `tree_stove`, `tree_counter`, `tree_fern`, `upgraded`.
+- **Tier effects:** a fern that gives more and is seen from further, a tier 2+ table gives seated guests
   +0.05 joy per tier. Counters and partitions gain nothing but looks.
 - **Guest card.** Click a guest during service to see their standing, visit number, the
   four meters and their last six thoughts. It follows them live and closes when they go.

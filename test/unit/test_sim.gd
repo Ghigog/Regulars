@@ -428,17 +428,17 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 84, "45 room pieces, five tools of three tiers, 18 ingredient stations and 6 ready-made")
+	assert_eq(Catalog.search().size(), 55, "one entry a piece: higher tiers, the fryer, pot and slicer are bought in upgrade trees (PRD 8.3)")
 	var ferns := Catalog.search("FERN")
-	assert_eq(ferns.size(), 3)
+	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen", "diner")
-	assert_eq(kitchen.size(), 32, "the counter, a bin, a dish rack, a sink, five tools, nine diner stations and four ready-made")
+	assert_eq(kitchen.size(), 19, "the counter, a bin, a dish rack, a sink, stove and board, nine diner stations and four ready-made")
 	assert_eq(kitchen[0].id, "crate_bun", "cheapest first, then by name")
 	assert_eq(Catalog.search("", "Kitchen", "seaside").filter(func(bp: Dictionary) -> bool:
 		return Catalog.ITEMS[bp.id].get("theme", "seaside") != "seaside").size(), 0, "only the run's theme")
 	assert_eq(Catalog.search("two more seats").size(), 1, "matches what a piece does")
-	assert_eq(Catalog.search("stove ++").size(), 1)
+	assert_eq(Catalog.search("stove ++").size(), 0, "tiers are steps in the trees now")
 	assert_eq(Catalog.search("fern", "Kitchen").size(), 0)
 	assert_eq(Catalog.search("partition")[0].id, "screen")
 	assert_eq(Catalog.search("", "Build").size(), 11, "four floors, wall, three finishes, door, archway and the partition")
@@ -1182,7 +1182,8 @@ func test_a_themed_search_lists_untagged_pieces_and_that_themes_own():
 			ids[bp.id] = true
 			assert_ne(str(Catalog.ITEMS[bp.id].get("theme", theme)), other, "%s is not sold in the %s" % [bp.id, theme])
 		for id: String in Catalog.ITEMS:
-			if not Catalog.ITEMS[id].has("theme"):
+			var node := Kitchen.node_of(id)
+			if not Catalog.ITEMS[id].has("theme") and (node == "" or Kitchen.is_root(node)):
 				assert_true(ids.has(id), "%s is sold everywhere" % id)
 	assert_true(Catalog.sold_in("jukebox", "diner"))
 	assert_false(Catalog.sold_in("jukebox", "seaside"))

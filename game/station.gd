@@ -12,7 +12,14 @@ const SINK_PILED := 3      # this many trays soaking and the washing-up shows (a
 const RACK_HOLDS := 2      # a dish rack beside a sink: this many more trays before it looks piled
 const BIN_HOLDS := 4       # scraps a bin takes before it overflows
 
-var type := ""
+## A heat tool's behaviour for each heat job: a stove that fries works as a fryer.
+const HEAT_MODE := {"grill": "stove", "fry": "fryer", "boil": "pot"}
+const HEAT_TOOLS: Array[String] = ["stove", "fryer", "pot"]
+
+var type := ""        # the catalog piece it behaves as (a range is a "stove")
+var node := ""        # its node in the upgrade trees (Kitchen.NODES), or "" for none
+var heat := ""        # a heat tool: the job of what is cooking ("grill", "fry", "boil")
+var stacked := false  # a double counter made by stacking two counters: picking it up takes one
 var cell := Vector2i.ZERO
 var tier := 1
 var facing := 0       # quarter turns; 0 puts the front toward +z
@@ -74,26 +81,59 @@ static func patty_look(t: float) -> String:
 
 ## `facing` 0 puts the front toward +z; 1 turns it to face +x (for the left wall).
 ## A tool (a top) and a bare counter always have a counter base; `base_` overrides it.
-func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0, base_ := "", pass_look_ := false) -> void:
-	type = type_
+func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0, base_ := "", pass_look_ := false, node_ := "") -> void:
+	type = Kitchen.family_of(type_) if Kitchen.has_node(type_) and not Catalog.ITEMS.has(type_) else type_
+	node = node_ if node_ != "" else Kitchen.node_of(type_)
 	cell = cell_
 	tier = tier_
 	pass_look = pass_look_
 	base = base_ if base_ != "" else ("counter" if Kitchen.is_top(type) or Kitchen.is_counter(type) else "")
 	_vis = Node3D.new()
 	add_child(_vis)
-	Build.station(_vis, type, tier, base, pass_look)
+	Build.station(_vis, type, tier, base, pass_look, node)
 	place_at(cell_, facing)
 	if type == "trays":
 		count = TRAYS
-	if type == "stove" or type == "fryer":
+	if is_heat_tool():
 		_ring = _vis.get_node_or_null("ring")
 		_make_cook_bar()
 		_make_smoke()
-	if type == "fryer" or type == "pot":
-		show_widget("rack" if type == "fryer" else "boil")
-		widget.visible = false
+		_heat_widget()
 	refresh()
+
+
+## A stove, fryer or pot, or any piece in their trees.
+func is_heat_tool() -> bool:
+	return type in HEAT_TOOLS
+
+
+## The job this piece does best (its own job): "grill" for a stove.
+func main_job() -> String:
+	return str(Catalog.ITEMS[type].get("tool_of", Catalog.tool_of(type))) if Catalog.ITEMS.has(type) else ""
+
+
+## How well this piece does a job (PRD 8.3): its tree node's quality, 0.0 if it cannot.
+## A piece outside the trees does its own job at 1.0.
+func q(job: String) -> float:
+	if node != "" and Kitchen.has_node(node):
+		return Kitchen.quality(node, job)
+	return 1.0 if job == main_job() else 0.0
+
+
+## How a heat tool behaves right now: as the tool of what is cooking on it.
+func mode() -> String:
+	return str(HEAT_MODE[heat]) if heat != "" else type
+
+
+## Shows the gauge the current heat job uses (a fryer's rack, a pot's ring), hidden.
+func _heat_widget() -> void:
+	var want: String = {"fryer": "rack", "pot": "boil"}.get(mode(), "")
+	if want == "":
+		if widget != null and widget.kind in ["rack", "boil"]:
+			widget.visible = false
+		return
+	show_widget(want)
+	widget.visible = false
 
 
 ## Changes the counter under (or of) this piece and redraws it: a counter stacked into
@@ -104,7 +144,7 @@ func set_base(base_: String, pass_look_ := pass_look) -> void:
 	for c in _vis.get_children():
 		_vis.remove_child(c)
 		c.queue_free()
-	Build.station(_vis, type, tier, base, pass_look)
+	Build.station(_vis, type, tier, base, pass_look, node)
 	if _ring:
 		_ring = _vis.get_node_or_null("ring")
 		_update_cooking_visuals()
@@ -120,10 +160,10 @@ func _show_item(kind: String) -> void:
 		_item_node.position = Vector3(0, 0.9, 0)
 		add_child(_item_node)
 	elif kind != "":
-		var on_heat := type == "stove"
-		_shown_look = patty_look(cook) if on_heat else Build.look_for(kind, quality)
+		var on_heat := is_heat_tool() and mode() == "stove"
+		_shown_look = _look(cook) if on_heat else Build.look_for(kind, quality)
 		_item_node = Build.item(kind, quality, _shown_look)
-		match type:
+		match mode():
 			"stove":
 				_item_node.position = Vector3(Build.PAN.x, 0.93, Build.PAN.z)
 			"fryer":
@@ -143,14 +183,31 @@ func set_item(kind: String, q := 1.0) -> void:
 	quality = q
 	if kind != "tray":
 		tray = null
-	if type == "stove" or type == "fryer" or type == "pot":
+	if is_heat_tool():
+		var was := heat
+		heat = _heat_for(kind)
+		if heat != was:
+			_make_cook_bar()
+			_heat_widget()
 		var state: String = Tray.parse(kind).get("state", "")
-		cook = {"prep": _times()[2], "burnt": _times()[3]}.get(state, 0.0) if type != "pot" else (Prep.BOIL_TIME if state == "prep" else 0.0)
+		cook = {"prep": _times()[2], "burnt": _times()[3]}.get(state, 0.0) if mode() != "pot" else (Prep.boil_time(q("boil")) if state == "prep" else 0.0)
 		rest = 0.0
 		result = ""
 	_show_item(kind)
-	if type == "stove" or type == "fryer" or type == "pot":
+	if is_heat_tool():
 		_update_cooking_visuals()
+
+
+## The heat job an item here would cook by: its own tool where this piece can do it,
+## else this piece's own job. "" when nothing (or a tray) is here.
+func _heat_for(kind: String) -> String:
+	var p := Tray.parse(kind)
+	if p.is_empty():
+		return ""
+	var job := Pantry.tool_of(p.id)
+	if HEAT_MODE.has(job) and q(job) > 0.0:
+		return job
+	return main_job()
 
 
 ## Puts a tray down here (a counter or the pass).
@@ -169,18 +226,32 @@ func show_tray() -> void:
 
 ## Quality of whatever is here right now; a stove reads it off the timer.
 func current_quality() -> float:
-	if type == "stove":
-		return quality_at(cook)
-	if type == "pot":
-		return float(Prep.boil(cook).quality)
+	if not is_heat_tool():
+		return quality
+	if mode() == "stove":
+		return float(Prep.grill(cook, q("grill")).quality)
+	if mode() == "pot":
+		return float(Prep.boil(cook, q("boil")).quality)
 	return quality
 
 
-## [raw until, done from, good until, burnt at] for this heat tool.
+## [raw until, done from, good until, burnt at] for this heat tool and what is on it,
+## stretched by the tool's quality at the job (PRD 8.3).
 func _times() -> Array:
-	if type == "fryer":
-		return [Prep.FRY_MIN, Prep.FRY_GOOD, Prep.FRY_LATE, Prep.FRY_BURN]
-	return [NEARLY_TIME, COOK_TIME, PERFECT_END, BURN_TIME]
+	var job := "fry" if mode() == "fryer" else "grill"
+	return Prep.heat_times(job, q(job) if q(job) > 0.0 else 1.0)
+
+
+## Which of the five looks a piece on this grill has after `t` seconds.
+func _look(t: float) -> String:
+	var tt := _times()
+	if t < tt[0]:
+		return "raw"
+	if t < tt[1]:
+		return "nearly"
+	if t <= tt[2]:
+		return "perfect"
+	return "dry" if t < tt[3] else "burnt"
 
 
 ## A fryer's basket is lifted: the piece drains on the rack before it can be taken.
@@ -196,7 +267,7 @@ func lift_to_rack(kind: String, q: float, res: String) -> void:
 
 ## Whether a fryer's piece has been lifted onto the drain rack.
 func on_rack() -> bool:
-	return type == "fryer" and result != ""
+	return is_heat_tool() and mode() == "fryer" and result != ""
 
 
 ## Whether a fryer's piece is still draining on the rack.
@@ -215,19 +286,20 @@ func tick_cooking(delta: float) -> String:
 		return "rested" if rest <= 0.0 else ""
 	if not is_cooking():
 		return ""
-	cook += delta * tier
-	if type == "pot":
+	cook += delta
+	if mode() == "pot":
 		_update_cooking_visuals()
-		if cook >= Prep.BOIL_TIME:
+		if cook >= Prep.boil_time(q("boil")):
 			item = Tray.kind("prep", Tray.parse(item).id)
 			_show_item(item)
 			return "prep"
 		return ""
 	_update_cooking_visuals()
 	var p := Tray.parse(item)
-	var stage := stage_at(cook) if type == "stove" else ("raw" if cook < Prep.FRY_GOOD else ("prep" if cook < Prep.FRY_BURN else "burnt"))
+	var tt := _times()
+	var stage := "raw" if cook < tt[1] else ("prep" if cook < tt[3] else "burnt")
 	if stage == p.state:
-		if patty_look(cook) != _shown_look:
+		if mode() == "stove" and _look(cook) != _shown_look:
 			_show_item(item)
 			_update_cooking_visuals()
 		return ""
@@ -244,6 +316,8 @@ func _dial_angle(t: float) -> float:
 ## The doneness dial (sheet 9): a chunky ring gauge that faces the camera. Cream
 ## warm-up arc, green sweet spot with a star, then yellow shrinking into red.
 func _make_cook_bar() -> void:
+	if _bar:
+		_bar.queue_free()
 	_bar = Node3D.new()
 	_bar.position = Vector3(0, 1.72, 0)
 	_bar.basis = Build.CAM_BASIS
@@ -282,9 +356,9 @@ func _make_smoke() -> void:
 
 
 func is_cooking() -> bool:
-	if item == "" or item == "tray" or item.begins_with("burnt"):
+	if item == "" or item == "tray" or item.begins_with("burnt") or not is_heat_tool():
 		return false
-	match type:
+	match mode():
 		"stove":
 			return true
 		"fryer":
@@ -295,14 +369,14 @@ func is_cooking() -> bool:
 
 
 ## Shows a minigame gauge over this piece (replacing any other).
-func show_widget(kind: String) -> PrepWidget:
-	if widget != null and widget.kind == kind:
+func show_widget(kind: String, q_ := 1.0) -> PrepWidget:
+	if widget != null and widget.kind == kind and is_equal_approx(widget.quality, q_):
 		widget.visible = true
 		return widget
 	if widget != null:
 		widget.queue_free()
 	var ing := Catalog.ingredient_of(type)
-	widget = PrepWidget.make(kind, str(Pantry.ITEMS[ing].prepped) if kind == "pour" and ing != "" else "")
+	widget = PrepWidget.make(kind, str(Pantry.ITEMS[ing].prepped) if kind == "pour" and ing != "" else "", q_)
 	widget.position = Vector3(0, 1.72, 0)
 	if kind in ["chop", "slice"]:
 		widget.scale = Vector3.ONE * 1.4   # flat bars: as easy to read as the round dial
@@ -312,7 +386,7 @@ func show_widget(kind: String) -> PrepWidget:
 
 
 func hide_widget() -> void:
-	if widget != null and type != "fryer" and type != "pot":
+	if widget != null and not (is_heat_tool() and widget.kind in ["rack", "boil"]):
 		widget.queue_free()
 		widget = null
 	elif widget != null:
@@ -320,14 +394,19 @@ func hide_widget() -> void:
 
 
 func _update_cooking_visuals() -> void:
-	if type == "pot":
+	if mode() == "pot":
 		widget.visible = item != ""
-		widget.show_state({"t": cook / Prep.BOIL_TIME, "done": item.begins_with("prep")})
+		widget.show_state({"t": cook / Prep.boil_time(q("boil")), "done": item.begins_with("prep")})
+		_bar.visible = false
+		for fx in _fx.values():
+			fx.visible = false
+		if _ring:
+			_ring.material_override = Build.mat(Color("#ff8a3c") if is_cooking() else Color(Build.STEEL_DARK), 1.6 if is_cooking() else 0.0)
 		return
-	if type == "fryer":
+	if mode() == "fryer" and widget != null and widget.kind == "rack":
 		widget.visible = rest > 0.0
 		widget.show_state({"left": rest / Prep.FRY_REST})
-	_bar.visible = is_cooking() or (type == "stove" and item.begins_with("prep"))
+	_bar.visible = is_cooking() or (mode() == "stove" and item.begins_with("prep"))
 	_needle.rotation.z = -deg_to_rad(_dial_angle(cook))
 	if _ring:
 		_ring.material_override = Build.mat(Color("#ff8a3c") if is_cooking() else Color(Build.STEEL_DARK), 1.6 if is_cooking() else 0.0)
