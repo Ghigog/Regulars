@@ -428,7 +428,7 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 58, "one entry a piece: higher tiers, the fryer, pot and slicer are bought in upgrade trees (PRD 8.3)")
+	assert_eq(Catalog.search().size(), 66, "one entry a piece: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
@@ -436,7 +436,7 @@ func test_catalog_search_by_word_and_category():
 	assert_eq(kitchen.size(), 10, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, stove, board and the soda fountain")
 	assert_eq(kitchen[0].id, "shelf", "cheapest first, then by name")
 	var pantry := Catalog.search("", "Pantry", "diner")
-	assert_eq(pantry.size(), 12, "a box per diner food kind and four ready-made (PRD 8.4)")
+	assert_eq(pantry.size(), 16, "a box per boxed diner food kind and four ready-made (PRD 8.4, 8.6)")
 	assert_eq(pantry[0].id, "box_bun", "boxes are free to take: by name")
 	assert_eq(Catalog.search("", "Kitchen", "seaside").filter(func(bp: Dictionary) -> bool:
 		return Catalog.ITEMS[bp.id].get("theme", "seaside") != "seaside").size(), 0, "only the run's theme")
@@ -842,10 +842,13 @@ func test_every_ingredient_has_its_fields():
 		var it: Dictionary = Pantry.ITEMS[id]
 		for key in ["name", "theme", "tool", "tags", "worth", "fee", "colour", "prepped", "shape"]:
 			assert_true(it.has(key), "%s has %s" % [id, key])
-		assert_true(Pantry.TOOLS.has(it.tool), "%s's tool is one of the seven" % id)
+		assert_true(Pantry.TOOLS.has(it.tool), "%s's tool is one of the twelve" % id)
 		assert_true(Pantry.THEMES.has(it.theme))
-		assert_eq(Pantry.is_drink(id), it.tool == "pour", "only drinks are poured")
-	assert_eq(Pantry.TOOLS.size(), 7)
+		if it.tool == "pour":
+			assert_true(Pantry.is_drink(id), "only drinks are poured")
+		if Pantry.is_drink(id):
+			assert_has(["pour", "juice", "blend"], it.tool, "a drink is poured, juiced or blended (PRD 8.6)")
+	assert_eq(Pantry.TOOLS.size(), 12, "the seven, and grate, saw, juice, blend and steam (PRD 8.6)")
 
 
 ## The seaside list from the PRD: tool, tags, worth and fee as in the table.
@@ -857,7 +860,7 @@ func test_seaside_ingredients_are_complete():
 		"new_potato": ["boil", ["vegetable"], 3, 3], "beans": ["boil", ["vegetable"], 2, 2],
 		"wine": ["pour", ["drink"], 5, 5],
 	}
-	assert_eq(Pantry.for_theme("seaside").size(), table.size())
+	assert_eq(Pantry.for_theme("seaside").size(), table.size() + 7, "and the seven of PRD 8.6")
 	for id: String in table:
 		var row: Array = table[id]
 		var it: Dictionary = Pantry.ITEMS[id]
@@ -1146,6 +1149,64 @@ func test_fry_and_grill_windows():
 	assert_eq(Prep.grill(Prep.GRILL_PERFECT + 0.1).result, "plain", "drying out")
 	assert_eq(Prep.grill(Prep.GRILL_BURN).result, "spoiled")
 	assert_lt(float(Prep.grill(Prep.GRILL_BURN - 0.1).quality), 0.5, "the curve falls toward bad")
+
+
+# PRD 8.6: the five new jobs' minigames.
+
+func test_grate_fills_in_the_band_and_scrapes_over_the_top():
+	var band := Prep.grate_band()
+	assert_eq(band, Vector2(Prep.GRATE_LOW, Prep.GRATE_HIGH))
+	assert_gt(Prep.grate_band(1.6).y, band.y, "a better grater has a wider band")
+	assert_lt(Prep.grate_band(0.6).y, band.y, "a stand-in a narrower one")
+	assert_almost_eq(Prep.grate_speed(0.0, true, 1.0), Prep.GRATE_RISE, 0.001, "holding speeds it up")
+	assert_eq(Prep.grate_speed(0.1, false, 1.0), 0.0, "letting go slows it, never below still")
+	assert_eq(Prep.grate(1.0, false, false), "", "still going")
+	assert_eq(Prep.grate(Prep.GRATE_GOOD, true, false), "good", "filled in time")
+	assert_eq(Prep.grate(Prep.GRATE_GOOD + 0.1, true, false), "plain", "filled, slowly")
+	assert_eq(Prep.grate(0.5, false, true), "bad", "a scraped knuckle")
+	assert_eq(Prep.grate(Prep.GRATE_LIMIT, false, false), "bad", "out of time")
+
+
+func test_saw_scores_presses_at_the_end_of_each_stroke():
+	assert_eq(Prep.saw(4), "good")
+	assert_eq(Prep.saw(3), "plain")
+	assert_eq(Prep.saw(2), "bad")
+	assert_true(Prep.saw_hit(1.0 - Prep.SAW_END))
+	assert_false(Prep.saw_hit(1.0 - Prep.SAW_END - 0.01), "mid-stroke")
+	assert_true(Prep.saw_hit(1.0 - Prep.SAW_END * 1.5, 1.6), "a specialist's end zone is wider")
+	assert_gt(Prep.saw_stroke(1.6), Prep.saw_stroke(), "and its strokes slower")
+
+
+func test_juice_scores_squeezes_let_go_in_the_band():
+	assert_eq(Prep.juice(3), "good")
+	assert_eq(Prep.juice(2), "plain")
+	assert_eq(Prep.juice(1), "bad")
+	assert_true(Prep.juice_hit(Prep.JUICE_GOOD))
+	assert_true(Prep.juice_hit(Prep.JUICE_TOP))
+	assert_false(Prep.juice_hit(Prep.JUICE_GOOD - 0.01), "too gentle")
+	assert_false(Prep.juice_hit(Prep.JUICE_TOP + 0.01), "the pips squirt")
+	assert_lt(Prep.juice_good(1.6), Prep.JUICE_GOOD, "a juicer's band is wider than a base tool's")
+
+
+func test_blend_pulses_smooth_without_spilling():
+	assert_eq(Prep.blend(1.0, 3, false), "", "still going")
+	assert_eq(Prep.blend(2.0, Prep.BLEND_PULSES, false), "good")
+	assert_eq(Prep.blend(Prep.BLEND_GOOD + 0.1, Prep.BLEND_PULSES, false), "plain", "slow")
+	assert_eq(Prep.blend(1.0, 2, true), "bad", "the lid flew off")
+	assert_eq(Prep.blend(Prep.BLEND_LIMIT, 2, false), "bad", "out of time")
+	assert_lt(Prep.blend_kick(1.6), Prep.blend_kick(), "a better blender rocks less")
+	assert_eq(Prep.blend_settle(0.1, 1.0), 0.0)
+
+
+func test_steam_lifts_on_the_green():
+	var band := Prep.steam_band()
+	assert_eq(Prep.steam(band.x - 0.01), "bad", "still firm")
+	assert_eq(Prep.steam(band.x), "good")
+	assert_eq(Prep.steam(band.y), "good")
+	assert_eq(Prep.steam(band.y + 0.01), "plain", "soft")
+	assert_eq(Prep.steam(Prep.STEAM_OVER), "bad", "mushy")
+	assert_gt(Prep.steam_band(1.6).y, band.y)
+	assert_eq(Prep.reward("steam", "good"), "burst", "steaming is a skill, unlike boiling")
 
 
 func test_boil_is_always_plain_and_never_rewards():

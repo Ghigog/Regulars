@@ -14,6 +14,11 @@ const DEMO_PREP := {
 	"diner": {"fry": "potato", "boil": "corn", "chop": "tomato", "slice": "cheese", "pour": "soda"},
 	"seaside": {"fry": "calamari", "boil": "new_potato", "chop": "courgette", "slice": "lemon", "pour": "wine"},
 }
+## PRD 8.6: what the new jobs' demos make, per theme (the kind made; its source is held).
+const DEMO_PREP_NEW := {
+	"diner": {"grate": "shredded_cheese", "saw": "sourdough", "juice": "orange_juice", "blend": "milkshake", "steam": "steamed_corn"},
+	"seaside": {"grate": "breadcrumbs", "saw": "crusty_loaf", "juice": "lemonade", "blend": "fruit_smoothie", "steam": "mussels"},
+}
 const W := 10            # restaurant interior is 10 x 7 cells
 const H := 7             # columns 10 and 11 are the pavement outside, to the right
 const DOOR := Vector2i(W, 4)         # the pavement cell just outside the doorway, on the right-hand wall
@@ -537,7 +542,7 @@ func _apply_demo(demo: String) -> void:
 			ledger.record_sale(DEMO_BILL, 3)
 			arrivals.clear()
 			get_tree().create_timer(1.5).timeout.connect(confirm_receipt.bind(0))
-	elif demo in ["tree", "tree_stove", "tree_counter", "tree_fern", "upgraded"]:   # PRD 8.3 upgrade trees; shoot at 3
+	elif demo in ["tree", "tree_stove", "tree_counter", "tree_fern", "upgraded", "tree_cut", "jobs"]:   # PRD 8.3 upgrade trees; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_tree.bind(demo))
@@ -754,6 +759,10 @@ func _demo_tree(demo: String) -> void:
 	ledger.money = 300
 	ledger.xp = 500
 	var c := Vector2i(2, 5)
+	if demo == "jobs":   # PRD 8.6: the new tools in a row, and the new food on the counters before them
+		_demo_jobs()
+		_frame = [Vector3(5.0, 0, 3.2), 6.8, Vector3(5.0, 0, 3.2), 6.8]   # close up, held
+		return
 	if demo == "upgraded":
 		var row := [["counter", "long_counter", Vector2i(1, 5)], ["butcher_block", "counter", Vector2i(2, 5)],
 			["auto_slicer", "counter", Vector2i(3, 5)], ["char_grill", "fridge", Vector2i(2, 4)],
@@ -765,7 +774,7 @@ func _demo_tree(demo: String) -> void:
 		player.position = Grid.center(Vector2i(2, 6))
 		player.look(Vector2i(0, -1))
 		return
-	var piece: String = {"tree": "board", "tree_stove": "stove", "tree_counter": "", "tree_fern": fern()}[demo]
+	var piece: String = {"tree": "board", "tree_cut": "board", "tree_stove": "stove", "tree_counter": "", "tree_fern": fern()}[demo]
 	if demo == "tree_fern":
 		add_station(piece, c)
 	else:
@@ -779,6 +788,41 @@ func _demo_tree(demo: String) -> void:
 	if demo == "tree_stove":
 		for i in 3:
 			get_tree().create_timer(0.4 + 0.3 * i).timeout.connect(hud.tree_move.bind("down"))
+	if demo == "tree_cut":   # PRD 8.6: the whole cutting tree, scrolled down to the bread knife's line
+		for i in 2:
+			get_tree().create_timer(0.4 + 0.2 * i).timeout.connect(hud.tree_move.bind("down"))
+
+
+## PRD 8.6: the new jobs' tools along the back (cutting, heat and pour lines), and
+## counters in front holding each new kind, raw and made, so their models can be checked.
+func _demo_jobs() -> void:
+	var diner := Scenery.theme_id != "seaside"
+	var tools := ["grater", "rotary_grater", "bread_knife", "juicer", "blender", "steamer",
+		"coffee_machine" if diner else "beer_tap", "two_tap_fountain" if diner else "wine_rack"]
+	var spots := [Vector2i(5, 2), Vector2i(6, 2), Vector2i(7, 2), Vector2i(8, 2), Vector2i(5, 3), Vector2i(6, 3),
+		Vector2i(7, 3), Vector2i(5, 4), Vector2i(6, 4), Vector2i(7, 4)].filter(func(c: Vector2i) -> bool: return not stations.has(c))
+	for i in tools.size():
+		add_station("counter", spots[i])
+		add_station(tools[i], spots[i])
+	var shown: Array[String] = []   # each new kind made, then each source raw
+	for k: String in Pantry.for_theme(Scenery.theme_id):
+		if Pantry.tool_of(k) in DEMO_PREP_NEW.diner or k in ["cola", "coffee", "red_wine", "ale", "ice_cream"]:
+			shown.append(Tray.kind("prep", k))
+	for k: String in Pantry.for_theme(Scenery.theme_id):
+		if Pantry.tool_of(k) in DEMO_PREP_NEW.diner and Pantry.needs_prep(Pantry.source_of(k)):
+			var raw := Tray.kind("raw", Pantry.source_of(k))
+			if not shown.has(raw):
+				shown.append(raw)
+	var free := []
+	for z in range(3, 7):
+		for x in range(1, 4):
+			if not stations.has(Vector2i(x, z)):
+				free.append(Vector2i(x, z))
+	for i in mini(shown.size(), free.size()):
+		add_station("counter", free[i])
+		stations[free[i]].set_item(shown[i])
+	player.position = Grid.center(Vector2i(6, 5))
+	player.look(Vector2i(0, -1))
 
 
 ## PRD 10.3. Two desks along the front wall and a grill cook's post up; the town warmed
@@ -1051,6 +1095,34 @@ func _demo_prep(which: String) -> void:
 					s.presses = 4
 				"pour":
 					s.fill = 0.72
+			_show_prep(0)
+		"grate", "saw", "juice", "blend", "steam":   # PRD 8.6
+			var ing: String = DEMO_PREP_NEW.get(Scenery.theme_id, DEMO_PREP_NEW.diner)[which]
+			var src := Pantry.source_of(ing)
+			var held := Tray.kind("prep" if src != ing and not Pantry.needs_prep(src) else "raw", src)
+			add_station("counter", at, 1, 1)
+			var st := add_station(str(Pantry.TOOL_STATION[which]), at, 1, 1)
+			start_prep(0, st, which, ing, held)
+			var s: Dictionary = preps[0]
+			s.frozen = true
+			match which:
+				"grate":
+					s.t = 1.4
+					s.v = 0.6
+					s.fill = 0.55
+				"saw":
+					s.t = s.sweep * 1.6
+					s.hits = [true]
+				"juice":
+					s.t = 1.5
+					s.fill = 0.55
+					s.hits = [true]
+				"blend":
+					s.t = 1.2
+					s.presses = 4
+					s.w = 0.55
+				"steam":
+					s.t = Prep.steam_time(s.q) * 0.62
 			_show_prep(0)
 		"good", "bad":
 			player.set_held("prep:" + use.chop, Prep.GOOD if which == "good" else Prep.BAD)
@@ -3499,6 +3571,14 @@ func kitchen_stock() -> Array:
 			if not seen.has(Pantry.box_id(d)):
 				seen[Pantry.box_id(d)] = true
 				out.append({"ingredient": d, "ready": false, "stocked": true})
+	# Kinds made from a stocked kind (lemonade from lemons, PRD 8.6): no box, no fee.
+	for s: Dictionary in out.duplicate():
+		if s.ready:
+			continue
+		for d: String in Pantry.made_from(s.ingredient):
+			if not seen.has(Pantry.box_id(d)):
+				seen[Pantry.box_id(d)] = true
+				out.append({"ingredient": d, "ready": false, "stocked": true, "derived": true})
 	return out
 
 
@@ -3509,9 +3589,25 @@ func dispenser_drinks(st: Station) -> Array[String]:
 	if drinks.is_empty() and Catalog.ingredient_of(st.type) != "" and not Catalog.is_box(st.type):
 		drinks = [Catalog.ingredient_of(st.type)]
 	for d: String in drinks:
-		if Pantry.has(d):   # cola, red wine: their kinds join in 8.6
+		if Pantry.has(d):
 			out.append(d)
 	return out
+
+
+## The dispenser each poured drink comes from, for the menu screen's greyed lines.
+const POURED_FROM := {"soda": "soda fountain", "cola": "two-tap fountain", "coffee": "coffee machine",
+	"wine": "wine barrel", "red_wine": "wine rack", "ale": "beer tap"}
+
+
+## Which drink a dispenser with several taps pours next: the first a ticket on the
+## rail still wants, else the tap it is turned to.
+func pour_pick(st: Station, taps: Array[String]) -> String:
+	for t: Dictionary in tickets:
+		for it: Dictionary in t.get("items", []):
+			for d: String in it.get("ingredients", []):
+				if taps.has(d):
+					return d
+	return taps[st.tap % taps.size()]
 
 
 ## Why a menu item is off tonight, worded for the menu screen: a kind with no box says
@@ -3525,8 +3621,12 @@ func item_off_reason(it: Dictionary) -> String:
 		have[s.ingredient] = true
 	for ing: String in it.ingredients:
 		if not have.has(ing):
-			if Pantry.is_drink(ing):
-				return "%s: needs a %s" % [Pantry.name_of(ing), "wine barrel" if ing == "wine" else "soda fountain"]
+			if Pantry.is_poured(ing):
+				return "%s: needs a %s" % [Pantry.name_of(ing), POURED_FROM.get(ing, "soda fountain")]
+			if Pantry.is_derived(ing):
+				return "%s: needs %s" % [Pantry.name_of(ing), Pantry.name_of(Pantry.source_of(ing)).to_lower()]
+			if Kitchen.is_frozen(ing):
+				return "%s: needs a freezer" % Pantry.name_of(ing)
 			if Kitchen.is_chilled(ing) and not kitchen.has_fridge():
 				return "%s: needs a fridge" % Pantry.name_of(ing)
 			return "%s: needs a box" % Pantry.name_of(ing)
@@ -3539,7 +3639,7 @@ func item_off_reason(it: Dictionary) -> String:
 func stock_box(kind: String, cell: Vector2i, ready := false, facing := 0) -> Station:
 	var box := Pantry.box_id(kind, ready)
 	if not stations.has(cell):
-		add_station("counter", cell, 1, facing, "fridge" if Kitchen.is_chilled(box) else "")
+		add_station("counter", cell, 1, facing, "freezer" if Kitchen.is_frozen(box) else ("fridge" if Kitchen.is_chilled(box) else ""))
 	if not _store_box(cell, box):
 		return null
 	return stations[cell]
@@ -3616,6 +3716,8 @@ func night_cost() -> int:
 func stock_lines() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for s: Dictionary in kitchen_stock():
+		if s.get("derived", false):
+			continue   # made from another kind's stock, which is listed
 		out.append({"name": Pantry.name_of(s.ingredient) + (" (ready)" if s.ready else ""),
 			"fee": Pantry.fee_of(s.ingredient, s.ready)})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.fee) > int(b.fee))
@@ -4249,7 +4351,9 @@ func prompt_for(st: Station, ch: Player = null) -> String:
 	var s := prep_of(chefs.find(ch))
 	if not s.is_empty():
 		return {"chop": "Chop on the notch", "slice": "Slice %d times" % Prep.SLICE_COUNT,
-			"pour": "Let go to stop"}.get(s.tool, "")
+			"pour": "Let go to stop", "grate": "Hold to grate, keep it green",
+			"saw": "Press at the end of each stroke", "juice": "Squeeze, let go on the green",
+			"blend": "Pulse %d times, don't spill" % Prep.BLEND_PULSES, "steam": "Lift the lid on the green"}.get(s.tool, "")
 	return use_station(st, true, ch)
 
 
@@ -4282,8 +4386,19 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	if surface_first(st, held):
 		return _finish_use(st, _use_surface(st, dry_run, ch), dry_run, ch)
 	var ing := Catalog.ingredient_of(st.type)   # a drink dispenser's own drink
+	var taps := dispenser_drinks(st)
+	if taps.size() > 1:
+		# Two taps (PRD 8.6): pour what a ticket wants, else the tap in turn. Putting a
+		# poured drink back turns to the next tap.
+		ing = pour_pick(st, taps)
+		if held != "" and taps.has(Tray.parse(held).get("id", "")) and held.begins_with("prep"):
+			act = "Put back"
+			if not dry_run:
+				ch.set_held("")
+				st.tap = (taps.find(Tray.parse(held).id) + 1) % taps.size()
+			return _finish_use(st, [act, ""], dry_run, ch)
 	if ing != "":
-		var ready: bool = Catalog.ITEMS[st.type].get("ready", false)
+		var ready: bool = Catalog.ITEMS[st.type].get("ready", false) if Catalog.ITEMS.has(st.type) else false
 		if held == "" and Pantry.tool_of(ing) == "pour":
 			act = "Pour %s" % Pantry.name_of(ing).to_lower()
 			if not dry_run:
@@ -4360,22 +4475,25 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 					st.set_item("")
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go in the pot" % Pantry.name_of(held_ing.id)
-		"board", "slicer":
+		"board", "slicer", "grater", "bread_knife", "juicer", "blender", "steamer":
+			# The press tools: one minigame each. A stand-in counts (a board slices, a
+			# slicer chops, PRD 8.3), and a kind made from what is held (a lemon juices
+			# into lemonade, ice cream blends into a milkshake, PRD 8.6).
 			var tool := st.main_job()
-			var wants := Pantry.tool_of(held_ing.id) if not held_ing.is_empty() else ""
-			if wants in ["chop", "slice"] and st.q(wants) > 0.0:
-				tool = wants   # a stand-in: a board slices, a slicer chops (PRD 8.3)
+			var pj := press_job(st, held_ing)
+			if pj[0] != "":
+				tool = pj[0]
 			if st.prep_by >= 0:
 				why = "In use"
-			elif not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == tool:
-				act = "Chop" if tool == "chop" else "Slice"
+			elif pj[0] != "":
+				act = str(PRESS_VERBS[tool])
 				if not dry_run:
-					start_prep(chefs.find(ch), st, tool, held_ing.id)
+					start_prep(chefs.find(ch), st, tool, pj[1], held)
 					return act
-			elif not held_ing.is_empty() and held_ing.state == "prep" and Pantry.tool_of(held_ing.id) == tool:
-				why = "%s is already %s" % [Pantry.name_of(held_ing.id), "chopped" if tool == "chop" else "sliced"]
+			elif not held_ing.is_empty() and held_ing.state == "prep" and st.q(Pantry.tool_of(held_ing.id)) > 0.0:
+				why = "%s is already %s" % [Pantry.name_of(held_ing.id), PRESS_DONE[Pantry.tool_of(held_ing.id)]]
 			elif not held_ing.is_empty():
-				why = "%s doesn't go on the %s" % [Pantry.name_of(held_ing.id), Pantry.TOOL_NAMES[tool]]
+				why = "%s doesn't go on the %s" % [Pantry.name_of(held_ing.id), Pantry.TOOL_NAMES.get(tool, "tool")]
 		"counter", "pass":
 			# Empty hands: the top first, then storage. Full hands: a box's kind goes
 			# back or swaps for the next first, then the thing goes down on the top.
@@ -4596,6 +4714,34 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 	return [act, why]
 
 
+## The press tools' actions and what a kind is once done (PRD 8.6).
+const PRESS_VERBS := {"chop": "Chop", "slice": "Slice", "grate": "Grate", "saw": "Saw", "juice": "Juice",
+	"blend": "Blend", "steam": "Steam"}
+const PRESS_DONE := {"chop": "chopped", "slice": "sliced", "grate": "grated", "saw": "sawn", "juice": "juiced",
+	"blend": "blended", "steam": "steamed"}
+
+
+## What a press tool would make of what is held: [job, kind made], or ["", ""]. The
+## held kind's own job first, where this piece does it; else a kind made from it whose
+## job this piece does (lemon: lemonade at a juicer). Raw only, except a kind that
+## needs no prep of its own (ice cream comes out of the freezer ready).
+static func press_job(st: Station, held_ing: Dictionary) -> Array:
+	if held_ing.is_empty():
+		return ["", ""]
+	var id: String = held_ing.id
+	if held_ing.state == "raw":
+		var own := Pantry.tool_of(id)
+		if PRESS_VERBS.has(own) and st.q(own) > 0.0:
+			return [own, id]
+	elif held_ing.state != "prep" or Pantry.needs_prep(id):
+		return ["", ""]
+	for k: String in Pantry.made_from(id):
+		var job := Pantry.tool_of(k)
+		if PRESS_VERBS.has(job) and st.q(job) > 0.0:
+			return [job, k]
+	return ["", ""]
+
+
 ## Whether a tool's surface, rather than the tool, answers Use: empty hands take what
 ## sits on it first, and a tray goes down on it or is built on it. A heat tool's own
 ## item is its cooking, so only a tray rests there.
@@ -4609,16 +4755,21 @@ static func surface_first(st: Station, held: String) -> bool:
 
 # ---------------------------------------------------------------- prep minigames
 
-func start_prep(p: int, st: Station, tool: String, ing: String) -> void:
+## `src`: the kind the chef held, when it differs from what is made (a lemon for
+## lemonade, PRD 8.6); it sits on the tool meanwhile and comes back on Back.
+func start_prep(p: int, st: Station, tool: String, ing: String, src := "") -> void:
 	var chef: Player = chefs[p]
 	var q := st.q(tool) if st.q(tool) > 0.0 else 1.0
 	preps[p] = {"tool": tool, "st": st, "ing": ing, "t": 0.0, "hits": [], "presses": 0, "fill": 0.0, "last": 0.0,
-		"q": q, "sweep": Prep.chop_sweep(q), "auto": Kitchen.is_auto(st.node)}
+		"q": q, "sweep": Prep.chop_sweep(q), "auto": Kitchen.is_auto(st.node),
+		"src": src if src != "" else Tray.kind("raw", ing), "v": 0.0, "w": 0.0, "was_held": true}
+	if tool == "saw":
+		preps[p].sweep = Prep.saw_stroke(q)
 	st.prep_by = p
 	chef.set_held("")
 	if tool != "pour":
-		st.set_item(Tray.kind("raw", ing))
-	st.show_widget(tool, q)
+		st.set_item(preps[p].src)
+	st.show_widget(tool, q, ing if tool in ["pour", "grate", "blend", "juice"] else "")
 	chef.punch()
 	st.used()
 	_show_prep(p)
@@ -4645,6 +4796,19 @@ func prep_press(p: int) -> void:
 			s.last = s.t
 			sfx("slice", 0.15)
 			chefs[p].punch()
+		"saw":
+			if s.hits.size() == int(s.t / s.sweep) and s.hits.size() < Prep.SAW_STROKES:
+				var hit := Prep.saw_hit(_chop_pos(s), s.q)
+				s.hits.append(hit)
+				sfx("chop", 0.1, 0.7 if hit else 0.55)
+				chefs[p].punch()
+		"blend":
+			s.presses += 1
+			s.w += Prep.blend_kick(s.q)
+			sfx("slice", 0.15, 0.6)
+			chefs[p].punch()
+		"steam":
+			s.lift = true
 	_show_prep(p)
 
 
@@ -4657,7 +4821,7 @@ func cancel_prep(p: int) -> void:
 	st.hide_widget()
 	if s.tool != "pour":
 		st.set_item("")
-		chefs[p].set_held(Tray.kind("raw", s.ing))
+		chefs[p].set_held(s.src, Prep.PLAIN if str(s.src).begins_with("prep") else 1.0)
 	sfx("putdown")
 
 
@@ -4698,6 +4862,45 @@ func _tick_preps(delta: float) -> void:
 						result = "bad"   # overflowed
 				else:
 					result = Prep.pour(s.fill, s.q)
+			"grate":
+				var holding := controls.holding(p, "use")
+				s.v = Prep.grate_speed(s.v, holding, delta, s.q)
+				var band := Prep.grate_band(s.q)
+				if s.v >= band.x and s.v <= band.y:
+					s.fill += delta / Prep.GRATE_FILL
+					if fmod(s.t, 0.25) < delta:
+						sfx("slice", 0.1, 1.3)
+				result = Prep.grate(s.t, s.fill >= 1.0, s.v > 1.0, s.q)
+			"saw":
+				while s.hits.size() < mini(int(s.t / s.sweep), Prep.SAW_STROKES):
+					s.hits.append(false)   # a stroke went by without a press
+				if s.hits.size() >= Prep.SAW_STROKES:
+					result = Prep.saw(s.hits.count(true))
+			"juice":
+				var holding := controls.holding(p, "use")
+				if holding:
+					s.fill += Prep.juice_rate(s.q) * delta
+					if s.fill > 1.0:   # pressed too hard: the pips squirt
+						s.hits.append(false)
+						s.fill = 0.0
+						sfx("wobble", 0.1)
+				elif s.fill >= Prep.JUICE_MIN:
+					var hit := Prep.juice_hit(s.fill, s.q)
+					s.hits.append(hit)
+					sfx("pickup", 0.1, 1.2 if hit else 0.8)
+					chefs[p].punch()
+					s.fill = 0.0
+				else:
+					s.fill = 0.0
+				if s.hits.size() >= Prep.JUICE_HALVES:
+					result = Prep.juice(s.hits.count(true))
+			"blend":
+				s.w = Prep.blend_settle(s.w, delta)
+				result = Prep.blend(s.t, s.presses, s.w > 1.0, s.q)
+			"steam":
+				var frac: float = s.t / Prep.steam_time(s.q)
+				if s.get("lift", false) or frac >= Prep.STEAM_OVER:
+					result = Prep.steam(frac, s.q)
 		if result != "":
 			_finish_prep(p, result)
 		else:
@@ -4714,6 +4917,16 @@ func _show_prep(p: int) -> void:
 			w.show_state({"presses": s.presses, "left": 1.0 - s.t / (Prep.AUTO_TIME if s.get("auto", false) else Prep.slice_time(s.q))})
 		"pour":
 			w.show_state({"fill": s.fill})
+		"grate":
+			w.show_state({"v": s.v, "fill": s.fill})
+		"saw":
+			w.show_state({"pos": _chop_pos(s), "stroke": int(s.t / s.sweep), "hits": s.hits})
+		"juice":
+			w.show_state({"p": s.fill, "hits": s.hits})
+		"blend":
+			w.show_state({"w": s.w, "pulses": s.presses})
+		"steam":
+			w.show_state({"frac": s.t / Prep.steam_time(s.q)})
 
 
 func _finish_prep(p: int, result: String) -> void:

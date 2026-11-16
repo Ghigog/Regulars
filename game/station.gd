@@ -38,6 +38,7 @@ var rest := 0.0       # a fryer: seconds left draining on the rack before it can
 var result := ""      # a fryer: how the piece on the rack came out (good, plain)
 var prep_by := -1        # the player playing a press-based minigame here, or -1
 var widget: PrepWidget   # the gauge over a pot or fryer rack, or a press-based minigame
+var tap := 0          # a dispenser with several taps: the one it is turned to (PRD 8.6)
 var count := 0        # clean trays in a tray stack; scraps in a bin
 var dirty := 0        # dirty trays left on a table, or soaking in a sink
 var dirty_age := 0.0  # seconds this piece has been messy (see `messy`)
@@ -390,16 +391,18 @@ func is_cooking() -> bool:
 
 
 ## Shows a minigame gauge over this piece (replacing any other).
-func show_widget(kind: String, q_ := 1.0) -> PrepWidget:
-	if widget != null and widget.kind == kind and is_equal_approx(widget.quality, q_):
+## `ing`: what is being made, for the colour of a drink, a heap or a jug (PRD 8.6).
+func show_widget(kind: String, q_ := 1.0, ing := "") -> PrepWidget:
+	if widget != null and widget.kind == kind and is_equal_approx(widget.quality, q_) and ing == "":
 		widget.visible = true
 		return widget
 	if widget != null:
 		widget.queue_free()
-	var ing := Catalog.ingredient_of(type)
-	widget = PrepWidget.make(kind, str(Pantry.ITEMS[ing].prepped) if kind == "pour" and ing != "" else "", q_)
+	if ing == "" and kind == "pour":
+		ing = Catalog.ingredient_of(type)
+	widget = PrepWidget.make(kind, str(Pantry.ITEMS[ing].prepped) if ing != "" and Pantry.has(ing) else "", q_)
 	widget.position = Vector3(0, 1.72, 0)
-	if kind in ["chop", "slice"]:
+	if kind in ["chop", "slice", "saw", "grate", "juice", "blend"]:
 		widget.scale = Vector3.ONE * 1.4   # flat bars: as easy to read as the round dial
 		widget.position.y = 1.85
 	add_child(widget)

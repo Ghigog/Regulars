@@ -173,3 +173,141 @@ static func reward(tool: String, result: String, auto := false) -> String:
 	if result == "good":
 		return "burst"
 	return "penalty" if result == "bad" or result == "spoiled" else ""
+
+
+# ---------- The new jobs (PRD 8.6) ----------
+# Each is short and plays on the one Use button, like the seven above. Tool quality
+# is difficulty: a wider band or window, a gentler pace (`_pace`).
+
+## Grate: hold to rub faster, let go to slow. The grater fills while the speed sits in
+## the green band; over the top is a scraped knuckle (bad). Fill it in time.
+const GRATE_RISE := 1.1     # tunable: speed gained a second while held
+const GRATE_FALL := 0.9     # tunable: speed lost a second when let go
+const GRATE_LOW := 0.4      # the band's bottom
+const GRATE_HIGH := 0.75    # its top for a tool of quality 1.0
+const GRATE_FILL := 1.6     # seconds in the band to fill the pile
+const GRATE_GOOD := 3.2     # filled by this many seconds (x pace) is good, else plain
+const GRATE_LIMIT := 6.0    # not filled by now (x pace) is bad
+## Saw: the blade runs back and forth; press as it reaches the end of each stroke.
+const SAW_STROKES := 4
+const SAW_STROKE_TIME := 0.7   # tunable: seconds for one stroke, end to end
+const SAW_END := 0.2           # tunable: the share of a stroke, at its end, a press counts in
+## Juice: hold to press a half down on the cone, let go with the pressure in the green.
+## Too hard squirts the pips (a miss). Three halves.
+const JUICE_HALVES := 3
+const JUICE_RISE := 0.9     # tunable: pressure gained a second while held
+const JUICE_GOOD := 0.6     # the green band's bottom for a tool of quality 1.0; its top is JUICE_TOP
+const JUICE_TOP := 0.9
+const JUICE_MIN := 0.12     # letting go below this was no squeeze at all
+## Blend: press to pulse. Each pulse rocks the jug; it settles on its own. Too much
+## rocking and the lid flies off (bad). Pulse it smooth in time.
+const BLEND_PULSES := 7
+const BLEND_KICK := 0.3     # tunable: rocking a pulse adds, for a tool of quality 1.0
+const BLEND_SETTLE := 0.55  # rocking lost a second
+const BLEND_GOOD := 3.0     # done by this many seconds (x pace) is good, else plain
+const BLEND_LIMIT := 6.0    # not done by now (x pace) is bad
+## Steam: the lid rattles as the steam builds; lift it (press) while the gauge is green.
+## Early is still firm (bad), late soft (plain); left too long it goes mushy (bad).
+const STEAM_TIME := 3.2     # tunable: seconds for the gauge to fill
+const STEAM_LOW := 0.55     # share of the gauge where green starts
+const STEAM_HIGH := 0.8     # where it ends, for a tool of quality 1.0
+const STEAM_OVER := 1.0     # mushy from here: the minigame ends bad
+
+
+## The grate's speed after `delta` seconds, held or not.
+static func grate_speed(v: float, held: bool, delta: float, q := 1.0) -> float:
+	return maxf(0.0, v + (GRATE_RISE / _pace(q) if held else -GRATE_FALL) * delta)
+
+
+## The grate's green band [low, high] for a tool of quality `q`.
+static func grate_band(q := 1.0) -> Vector2:
+	return Vector2(GRATE_LOW, minf(0.95, GRATE_LOW + (GRATE_HIGH - GRATE_LOW) * q))
+
+
+## Grating's result: filled after `t` seconds, or not ("" while it goes on).
+## `scraped`: the speed went over the top.
+static func grate(t: float, filled: bool, scraped: bool, q := 1.0) -> String:
+	if scraped:
+		return "bad"
+	if filled:
+		return "good" if t <= GRATE_GOOD * _pace(q) else "plain"
+	return "bad" if t >= GRATE_LIMIT * _pace(q) else ""
+
+
+## Seconds for one saw stroke.
+static func saw_stroke(q := 1.0) -> float:
+	return SAW_STROKE_TIME * _pace(q)
+
+
+## Whether a press at `pos` (0 to 1 through a stroke) is at its end.
+static func saw_hit(pos: float, q := 1.0) -> bool:
+	return pos >= 1.0 - SAW_END * q
+
+
+## Four strokes: all four on the end is good, three plain, fewer bad.
+static func saw(hits: int) -> String:
+	if hits >= SAW_STROKES:
+		return "good"
+	return "plain" if hits == SAW_STROKES - 1 else "bad"
+
+
+## How fast the juice press's pressure builds.
+static func juice_rate(q := 1.0) -> float:
+	return JUICE_RISE / _pace(q)
+
+
+## Where the juice band starts: a better juicer leaves a wider band.
+static func juice_good(q := 1.0) -> float:
+	return clampf(JUICE_TOP - (JUICE_TOP - JUICE_GOOD) * q, 0.2, JUICE_TOP - 0.05)
+
+
+## Whether letting go at pressure `p` juiced the half well.
+static func juice_hit(p: float, q := 1.0) -> bool:
+	return p >= juice_good(q) and p <= JUICE_TOP
+
+
+## Three halves: all three is good, two plain, fewer bad.
+static func juice(hits: int) -> String:
+	if hits >= JUICE_HALVES:
+		return "good"
+	return "plain" if hits == JUICE_HALVES - 1 else "bad"
+
+
+## The rocking one pulse adds: a better blender rocks less.
+static func blend_kick(q := 1.0) -> float:
+	return BLEND_KICK / maxf(q, 0.1)
+
+
+## The jug's rocking after `delta` seconds of settling.
+static func blend_settle(w: float, delta: float) -> float:
+	return maxf(0.0, w - BLEND_SETTLE * delta)
+
+
+## Blending's result ("" while it goes on): spilled is bad; all pulses in good time
+## good, else plain; out of time bad.
+static func blend(t: float, pulses: int, spilled: bool, q := 1.0) -> String:
+	if spilled:
+		return "bad"
+	if pulses >= BLEND_PULSES:
+		return "good" if t <= BLEND_GOOD * _pace(q) else "plain"
+	return "bad" if t >= BLEND_LIMIT * _pace(q) else ""
+
+
+## Seconds for the steam gauge to fill (a better steamer is slower, so roomier).
+static func steam_time(q := 1.0) -> float:
+	return STEAM_TIME * _pace(q)
+
+
+## The steam gauge's green band, as shares of the gauge.
+static func steam_band(q := 1.0) -> Vector2:
+	return Vector2(STEAM_LOW, minf(0.97, STEAM_LOW + (STEAM_HIGH - STEAM_LOW) * q))
+
+
+## Lifting the lid at `frac` of the gauge (1.0 or more: left too long).
+static func steam(frac: float, q := 1.0) -> String:
+	var band := steam_band(q)
+	if frac >= STEAM_OVER:
+		return "bad"
+	if frac < band.x:
+		return "bad"
+	return "good" if frac <= band.y else "plain"
