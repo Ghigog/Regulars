@@ -734,13 +734,16 @@ func _wear(h: Helper, delta: float) -> void:
 ## REGULARS_DEMO=helpers: a grill cook, a server and a washer at work in a busy room, two
 ## desks along the front (shoot at about 12). helpers_break: the server and the washer on
 ## their break, chatting by the desks, while the cook works on (shoot at about 4).
+## helpers_slip (PRD 10.8): the washer down on a level 4 cell, dazed, and the server, who
+## has the help-up duty, crossing to lift them (shoot at about 3 and 5).
 func demo(which: String) -> void:
 	for c: Vector2i in [Vector2i(8, 6), Vector2i(9, 6)]:
 		if not game.stations.has(c):
 			game.add_station("desk", c)
 	var on_break := which == "helpers_break"
+	var slip := which == "helpers_slip"
 	var hires := [[2, "Grill cook", ["fetch", "grill", "assemble"], 0, 0.85, Vector2i(1, 4)],
-		[5, "Server", ["take_orders", "carry_trays", "clear_tables"], 1 if on_break else 0, 0.7, Vector2i(7, 5) if on_break else Vector2i(5, 3)],
+		[5, "Server", ["take_orders", "carry_trays", "clear_tables"] + (["help_up"] as Array if slip else []), 1 if on_break else 0, 0.7, Vector2i(7, 5) if on_break else Vector2i(5, 3)],
 		[9, "Washer", ["wash_up", "empty_bin", "clear_tables", "mop"], 1 if on_break else 0, 0.35, Vector2i(8, 5) if on_break else Vector2i(3, 3)]]
 	for row: Array in hires:
 		var pid: int = game.staff.add_post(row[1], row[2], row[3], 0, 99)
@@ -749,16 +752,27 @@ func demo(which: String) -> void:
 		game.staff.cvs.append(cv)
 		game.staff.hire(cv.id, -1, game.ledger.day)
 		game.staff.employee(row[0]).satisfaction = row[4]
-		add_helper(row[0], row[5])
+		var helper := add_helper(row[0], row[5])
+		if slip and row[0] == 9:   # once the day is under way, as the guest slip demo does
+			game.get_tree().create_timer(1.0).timeout.connect(_demo_slip.bind(helper, Vector2i(6, 3)))
 	game.find_station("sink").dirty = 2
-	game.stations[Vector2i(8, 3)].dirty = 1
-	game.stations[Vector2i(8, 3)].refresh()
+	if not slip:   # in the slip demo the server is free to help
+		game.stations[Vector2i(8, 3)].dirty = 1
+		game.stations[Vector2i(8, 3)].refresh()
 	game.find_station("sink").refresh()
 	if on_break:
 		game.clock = Staff.break_starts(1, game.day_length())[0] + 0.2
 		game.floor_dirt.mess.dirt[Vector2i(6, 3)] = 2
 	var t: float = game.clock
 	game.arrivals.assign([{"time": t + 0.5, "group": [0, 1]}, {"time": t + 2.0, "group": [4]}, {"time": t + 5.0, "group": [6, 7]}])
+
+
+func _demo_slip(h: Helper, c: Vector2i) -> void:
+	h.position = Grid.center(c)   # open floor between the tables, in plain view
+	h.path.clear()
+	for i in 4:
+		game.floor_dirt.mess.add_dirt(c)
+	game.floor_dirt.slip(h, c)
 
 
 # ---------------------------------------------------------------- the all-staff run (PRD 10.7)

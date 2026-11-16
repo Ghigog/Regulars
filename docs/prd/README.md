@@ -12,9 +12,9 @@ project can build it. Read `CLAUDE.md` first, then the PRD, then only the code i
 | 5 | [Night cleaning](05-night-cleaning.md) | Small | nothing | Built (merged) |
 | 6 | [Reach display for finishes and rugs](06-reach-display.md) | Small | nothing | Built (merged) |
 | 7 | [More catalog pieces and themed shops](07-catalog-and-themes.md) | Medium | piece list signed off | Built (13 November 2026) |
-| 8 | [Counters, storage and the tool tree](08-counters-storage-tools.md) | Very large, seven milestones | nothing | Agreed, not built (16 November 2026) |
-| 9 | [Floor mess and cleaning](09-floor-mess.md) | Large, six milestones | 8, from 9.4 on | Agreed, not built (16 November 2026) |
-| 10 | [Staff](10-staff.md) | Very large, eight milestones | 8, 9 (per milestone) | Agreed, not built (16 November 2026) |
+| 8 | [Counters, storage and the tool tree](08-counters-storage-tools.md) | Very large, seven milestones | nothing | Built (16 November 2026, all seven milestones) |
+| 9 | [Floor mess and cleaning](09-floor-mess.md) | Large, six milestones | 8, from 9.4 on | Built (16 November 2026, all six milestones) |
+| 10 | [Staff](10-staff.md) | Very large, eight milestones | 8, 9 (per milestone) | Built (16 November 2026, all eight milestones) |
 
 ## Suggested order
 

@@ -401,6 +401,87 @@ Survive as many days as you can; three walkouts in one day ends the run.
   stands head up in its bucket so its kind and dirt show, the wringer bucket has a coral
   press, the extractor its own fan box, and every tool on the trees draws in the chef's
   hands. Details in the style guide's "As built".
+- **Staff (PRD 10).** Townspeople hired to work in the restaurant. Rules in
+  `sim/staff.gd` (posts, CVs, wages, satisfaction, the week), `sim/jobs.gd` (`JobBoard`,
+  the task board) and `sim/helper_work.gd` (how a helper does each task); the room side
+  is `game/crew.gd` and `game/helper.gd`, the screen `game/desk_screen.gd`. All numbers
+  are named constants, all tunable.
+  - *Tolerances (10.1).* Everyone has a tolerance for food, service and clean, 1 to 5
+    (two dice averaged, so middling is common; low means they care). It scales the
+    topic's effect on a guest from x1.6 at 1 to x0.4 at 5 (3 is today's guest): food the
+    joy from the food, service how fast patience drains, clean how fast disgust rises.
+    After a strong reaction the guest card shows a hint ("Hates to wait", "Doesn't mind a
+    mess"), never a number. Skill in a kind of duty is 6 minus the tolerance.
+  - *The desk (10.3).* $40 in the shop's Kitchen tab. Each desk holds one open post or
+    one hire. A post has a name, its duties (ticked under Cooking, Serving and Cleaning:
+    a duty for each tool kind in the room, plus fetch, assemble, take orders, carry trays,
+    clear tables, help up, wash up and empty the bin), breaks a day (0 to 3) and days off
+    a week (0 to 2). Each night everyone not employed and not staying away may apply:
+    chance 0.6 x fit x how much they like the place, at most four new CVs a night. Fit
+    is their skill over the post's kinds, less a penalty per duty in a kind they are
+    weak at (1 or 2 stars). Applicants wait in a line outside the door; their CVs (face,
+    three skills, overall rating, ask, post) go on a pile on the desk. Swipe right (or
+    Hire) at the ask, left to dismiss; an unread CV waits. Haggle offers less: the
+    chance they accept falls 0.3 for every 10% under the ask, less with low
+    satisfaction; after two refused counters they take the last offer (satisfaction 0.5
+    or more) or walk.
+  - *Pay and satisfaction (10.4).* Ask = $5 x rating + each duty's weight (mop 4,
+    sponge 2, grill 4, board 2 ...). Wages are paid at the end of the night in hiring
+    order while the money lasts, days off included, as a STAFF line on the restock note
+    and the receipt. An unpaid wage is not owed later: they lose 0.4 satisfaction
+    instead. Satisfaction (0 to 1) closes 35% of the gap to its target each night: 0.6
+    when paid what the duties are worth to them (a duty in a weak kind counts double),
+    +0.05 a break, +0.1 a day off. In the day it drops with their own tolerances at work
+    (a clean-sensitive helper near dirt) and 0.05 a slip. Below 0.5 they are slower (up
+    to x1.6) and make mistakes (up to 30% of tasks, 30% of those on purpose): burnt
+    food, a dropped tray, dirt left behind. Three nights at the bottom fifth and they
+    quit. Words on the list: Happy, Content, So-so, Unhappy, Fed up. A satisfied hire
+    (above 0.6) may come in to eat on a day off; otherwise staff stop coming as guests.
+  - *Managing (10.4).* The staff list shows each hire's face, post, wage, duties, the
+    five-day week (days off crossed, chosen at the start of each week), satisfaction and
+    skills. Ticking a new duty: they accept with a chance from their satisfaction after
+    it, or name a raise (approve, haggle, withdraw the duty, or deny and they quit).
+    Removing a duty, adding a break or a day off is free and pleases them. No pay cuts.
+    Firing pays a day's wage as severance (their opinion -0.1) or nothing (-0.3, and
+    their friends hear half of it). Skill grows 0.02 per task done in its kind.
+  - *In service (10.5, 10.6).* Hires walk in as the door opens and leave as it closes;
+    the build phase is the chefs' alone. Five times a second the board is rebuilt from
+    the room: an ingredient a ticket lacks (fetch, then prep at its tool), a tray to
+    start, food to assemble, a tray to carry, a table to order or clear, dirt at level 2
+    or more, someone fallen, dishes in the sink, a full bin, burnt food to scrap. Each
+    free helper takes the task their duties allow that is most urgent for the walk (an
+    urgency point is worth four cells; help up 6,
+    carry 5, tray 4.5, assemble 4, scrap 3.8, prep 3.5, fetch and order 3, clear 2, wash
+    and bin 1.5, dirt 1 plus 0.5 a level; waiting adds urgency) and reserves it. A chef
+    doing a task takes it over, and the helper moves on. No minigames: a prep rolls
+    good, plain or bad from skill, the tool's tree quality and satisfaction; a bad roll
+    drops grease. They walk at 3 m/s plus 0.3 a star (a chef walks 4.4) and work slower
+    at fewer stars. Breaks (8 s each, at even points through the day, so equal counts
+    break together) and idle time are spent by a desk; two free helpers within two
+    cells chat (speech bubbles) and their satisfaction moves 5% of the gap a second
+    toward each other's. They slip and are helped up like anyone. Nothing is steered in
+    service: everything is set at the desks.
+  - *The all-staff run (10.7).* A busy day 8 run by five helpers with no chef, in a
+    kitchen with every tool, the cleaning trees and the floor treated, in both themes
+    (`staff_only` and `test_all_staff.gd`, which fails if any ticket, table or chore
+    sits unchanged for 120 s). What it changed: kinds made from another's stock
+    (lemonade, milkshake, steamed corn) are fetched as their source and worked at their
+    tool, and ready-made boxes go straight to the ticket; a new *tray* task (the
+    assemble duty) starts a ticket's tray first so food goes straight on it, never more
+    trays than free worktops; a new *scrap* task bins burnt food on a tool, done by
+    whoever works that tool, and a cook finishes what is on the heat before a break;
+    fetchers leave raw food on the press tool itself; for dirt, the scraper takes grease
+    only and the spill kit level 4 only, helpers wipe with the room's tool (the flat mop
+    a whole cell a press) and floor cleaner's one press counts; the cleaning trees bring
+    their line's duty to the desk (flat mop and wringer bucket: mop; scourer: sponge;
+    tools on hooks counted); food is never set down on treatment boxes or a tall fridge.
+  - *Demos:* `tolerance`, `desk_line`, `desk_post`, `desk_cvs`, `desk_haggle`,
+    `desk_staff`, `desk_raise`, `desk_fire`, `desk_restock`, `desk_wages`, `helpers`,
+    `helpers_break`, `helpers_slip`, `staff_only` (see `CLAUDE.md`).
+- **Art pass (PRD 10.8).** Every PRD 10 visual checked in both themes; nothing needed
+  redrawing. Two demos added: `desk_fire` and `helpers_slip`. Hires keep their own look
+  with a white apron rather than sheet 5's role uniforms. Details in the style guide's
+  "As built".
 - **Tier effects:** a fern that gives more and is seen from further, a tier 2+ table gives seated guests
   +0.05 joy per tier. Counters and partitions gain nothing but looks.
 - **Guest card.** Click a guest during service to see their standing, visit number, the
@@ -593,7 +674,8 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 
 - **Character creator**: very simple. Name, skin, shirt, hat. Peg-person style.
 - **Roster**: created characters can be played by other players or assigned as staff NPCs.
-- **Staff jobs**: cook, server, dishwasher, host. Simple task queues.
+- **Staff jobs**: *built* (PRD 10) as hires with any mix of duties rather than fixed roles;
+  see "Staff" in section 1.
 - **Relationships** between your characters: friends hand off faster, rivals fumble.
 - **No needs** for now.
 
@@ -655,7 +737,8 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
     works; swap pieces in where a sculpted model would beat the generated one (hair, hats,
     the fridge, the tree are the best candidates).
   - *Built* (PRD 7): a theme picker in the game, after Play on the title.
-  - Hired staff (server, dishwasher, host), co-op chefs 3 and 4 (trim colours exist),
+  - *Built* (PRD 10): hired staff, as townspeople in a work apron.
+  - Co-op chefs 3 and 4 (trim colours exist),
     future dishes, awning and photo view (the floor lamp is built, PRD 7).
   - A bundled hand-lettered font (the HUD uses a rounded system font).
   - The open items: the real title screen composition, colour-blind support, the "Town

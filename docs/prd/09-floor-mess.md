@@ -1,6 +1,6 @@
 # PRD 9: Floor mess and cleaning
 
-**Status:** agreed, not built (16 November 2026). Build after PRD 8.
+**Status:** built, all six milestones (16 November 2026). What it built is in `docs/DESIGN.md` section 1.
 **Size:** large; six milestones (9.1 to 9.6). **Needs:** only from 9.4 on: PRD 8
 milestones 8.3 to 8.5 (tree screen, storage, wall layer). 9.1 to 9.3 can start now. **Touches:** a new `sim/floor_mess.gd`, `sim/cleaning.gd`, `sim/guest_mood.gd`,
 `sim/critic.gd`, `sim/catalog.gd`, `sim/town.gd` (a messy trait), `game/main.gd`,

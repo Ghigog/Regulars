@@ -455,7 +455,7 @@ func _apply_demo(demo: String) -> void:
 		player.set_held("tray", 1.0, Tray.new())
 		for a in arrivals:
 			a.time = 1.0
-	elif demo in ["helpers", "helpers_break"]:   # PRD 10.6: staff at work; see Crew.demo
+	elif demo in ["helpers", "helpers_break", "helpers_slip"]:   # PRD 10.6/10.8: staff at work; see Crew.demo
 		crew.demo(demo)
 	elif demo == "staff_only":   # PRD 10.7: a busy day run by helpers alone; see Crew.staff_only
 		ledger.day = 8
@@ -677,7 +677,7 @@ func _apply_demo(demo: String) -> void:
 		_demo_hires()
 		ledger.money = 40
 		pay_staff()
-	elif demo.begins_with("desk_"):   # PRD 10.3/10.4: desk_line, desk_post, desk_cvs, desk_haggle, desk_staff, desk_raise, desk_restock; shoot at 3
+	elif demo.begins_with("desk_"):   # PRD 10.3/10.4: desk_line, desk_post, desk_cvs, desk_haggle, desk_staff, desk_raise, desk_restock, desk_fire; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_desk.bind(demo))
@@ -1026,7 +1026,7 @@ func _demo_jobs() -> void:
 func _demo_desk(demo: String) -> void:
 	for c: Vector2i in [Vector2i(8, 6), Vector2i(9, 6)]:
 		add_station("desk", c)
-	if demo in ["desk_staff", "desk_raise", "desk_restock"]:   # PRD 10.4: three hires, the week of days 6 to 10
+	if demo in ["desk_staff", "desk_raise", "desk_restock", "desk_fire"]:   # PRD 10.4: three hires, the week of days 6 to 10
 		for c: Vector2i in [Vector2i(7, 6), Vector2i(6, 6)]:
 			add_station("desk", c)
 		_demo_hires()
@@ -1046,6 +1046,9 @@ func _demo_desk(demo: String) -> void:
 			var e: Dictionary = staff.employee(person)
 			e.pending = {"duty": "wash_up", "raise": 3, "haggle": staff._new_haggle(int(e.wage) + 3)}
 			hud.desk.render()
+		elif demo == "desk_fire":   # PRD 10.8: the fed-up washer opened, both fire buttons out
+			hud.desk.open_person(staff.employees.keys()[2])
+			hud.desk._set_firing(true)
 		return
 	staff.add_post("Grill cook", ["grill", "fetch", "assemble"], 1, 1, desk_count())
 	for p in town.people:

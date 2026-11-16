@@ -1,6 +1,6 @@
 # PRD 10: Staff
 
-**Status:** agreed, not built (16 November 2026). Build after PRDs 8 and 9.
+**Status:** built, all eight milestones (16 November 2026). What it built is in `docs/DESIGN.md` section 1.
 **Size:** very large; eight milestones (10.1 to 10.8). **Needs:** per milestone (see
 the end). 10.1 and 10.2 can start now; helpers in the room need PRDs 8 and 9 well along. **Touches:** new `sim/staff.gd` (applicants,
 wages, satisfaction, haggling, breaks, training), new `sim/jobs.gd` (the task board),
