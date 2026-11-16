@@ -156,6 +156,7 @@ var hud: Hud
 var controls: Controls           # input per player: devices, touch buttons, presses sent to act()
 var cam: Camera3D
 var _gross: Array[Dictionary] = []
+var floor_dirt: FloorDirt              # dirt on the floor (PRD 9)
 var _sfx := {}
 var music_id := ""               # which MUSIC track is playing
 var _music: AudioStreamPlayer
@@ -179,6 +180,9 @@ func _ready() -> void:
 	order_rng.seed = seed_value
 	_build_layout()
 	_start_plan()
+	floor_dirt = FloorDirt.new()
+	add_child(floor_dirt)
+	floor_dirt.setup(self)
 	_load_sounds()
 	add_chef()
 	controls = Controls.new()
@@ -304,6 +308,20 @@ func _apply_demo(demo: String) -> void:
 		player.set_held("tray", 1.0, Tray.new())
 		for a in arrivals:
 			a.time = 1.0
+	elif demo == "dirt":  # every level of floor dirt, footprints, guests slowed tracking it in; shoot at about 7
+		floor_dirt.sync_room()
+		var m := floor_dirt.mess
+		for lvl in range(1, 5):   # a few drops, a puddle, a big puddle, the whole cell, along the front
+			for i in lvl:
+				m.add_dirt(Vector2i(4 + lvl, 6))
+		for i in 4:
+			m.add_dirt(ENTRANCE_CELL)   # the whole cell inside the door: guests track it in, slowed
+		for i in 2:
+			m.add_dirt(Vector2i(2, 3))   # grease by the stove
+		floor_dirt.prints[Vector2i(2, 3)] = Vector2i(0, 1)
+		arrivals.resize(mini(arrivals.size(), 2))
+		for a in arrivals:
+			a.time = 0.5
 	elif demo == "messy":  # a sink piled with washing-up and an overflowing bin; shoot at about 10
 		var sink := find_station("sink")
 		sink.dirty = 4
@@ -2604,6 +2622,7 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 			if g == critic_guest and rate >= GuestMood.NOTICE:
 				g.mood.think(Critic.thought("gross"))
 			saw_gross = saw_gross or rate >= GuestMood.NOTICE
+	saw_gross = floor_dirt.disgust(g, delta, SIGHT_RANGE) or saw_gross
 	for st: Station in stations.values():
 		if st.type == "stove" and not saw_gross and st.is_cooking() \
 				and _near(g.cell, st.cell, SIGHT_RANGE) and grid.has_los(g.cell, st.cell):
@@ -2863,6 +2882,23 @@ static func _flat_box(parent: Node3D, at: Vector3, size: Vector2, turn: float, m
 
 static func _near(a: Vector2i, b: Vector2i, r: int) -> bool:
 	return absi(a.x - b.x) <= r and absi(a.y - b.y) <= r
+
+
+## Dirt on the floor follows the room, moves with everyone's feet and is drawn (PRD 9).
+func _tick_floor() -> void:
+	floor_dirt.sync_room()
+	var walkers := []
+	for ch in chefs:
+		walkers.append([ch, ch.cell()])
+	for g in guests:
+		walkers.append([g, Grid.to_cell(g.position)])
+	floor_dirt.step_feet(walkers)
+	floor_dirt.redraw()
+
+
+## How fast anyone moves standing at `p`: slowed by the floor dirt under them.
+func floor_speed(p: Vector3) -> float:
+	return floor_dirt.speed_at(p) if floor_dirt != null else 1.0
 
 
 func _collect_gross() -> void:
@@ -3304,6 +3340,7 @@ func finish_meal(g: Guest) -> void:
 	_critic_leaves(g, false)
 	g.table.dirty += 1
 	g.table.refresh()
+	floor_dirt.meal_mess(g)
 	popup("+$%d" % (bill + tip), g.position + Vector3(0, 1.9, 0), Color(Build.TRIM))
 	Fx.coin(self, g.position + Vector3(0, 1.5, 0))
 	if g.mood.satisfaction() > 0.5:
@@ -3471,6 +3508,7 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				act = "Take out"
 				if not dry_run:
 					ch.set_held(st.item, Prep.PLAIN)
+					floor_dirt.prep_grease("boil", "plain", ch.cell(), st)
 					st.set_item("")
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go in the pot" % Pantry.name_of(held_ing.id)
@@ -3780,6 +3818,7 @@ func _finish_prep(p: int, result: String) -> void:
 func _prep_done(p: int, st: Station, tool: String, result: String) -> void:
 	if result == "" or p < 0:
 		return
+	floor_dirt.prep_grease(tool, result, chefs[p].cell(), st)
 	PrepWidget.pop(st, Vector3(0, 2.0, 0), result)
 	match Prep.reward(tool, result):
 		"burst":
@@ -3815,6 +3854,7 @@ func _tick_stoves(delta: float) -> void:
 func step(delta: float) -> void:
 	for st: Station in stations.values():
 		st.dirty_age = Cleaning.aged(st.dirty_age, delta, st.messy(), phase == Phase.SERVICE)
+	_tick_floor()
 	if phase != Phase.SERVICE:
 		return
 	clock += delta

@@ -2148,6 +2148,7 @@ func test_fries_left_in_burn_and_slow_the_chef():
 	_run(Prep.FRY_BURN + 0.5)
 	game.use_station(fryer)
 	assert_eq(game.player.held, "burnt:potato")
+	game.floor_dirt.mess.dirt.clear()   # a bad fry may drop grease, which slows the chef too (PRD 9)
 	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.PENALTY_SPEED, 0.01)
 
 

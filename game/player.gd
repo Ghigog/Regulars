@@ -151,7 +151,7 @@ func tick(delta: float) -> void:
 
 
 func speed() -> float:
-	return SPEED * boost_speed
+	return SPEED * boost_speed * game.floor_speed(position)
 
 
 ## A quick squash and stretch whenever the chef does something.
