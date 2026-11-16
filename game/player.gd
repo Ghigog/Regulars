@@ -187,11 +187,11 @@ func target_cell() -> Vector2i:
 	for dx in range(-2, 3):
 		for dy in range(-2, 3):
 			var n := here + Vector2i(dx, dy)
-			if not game.stations.has(n):
+			var st: Station = game.station_at(n)   # a piece hung over bare floor too (PRD 8.5)
+			if st == null:
 				continue
 			if absi(dx) + absi(dy) == 1 and not game.grid.edge_open(here, n):
 				continue   # a partition is in the way
-			var st: Station = game.stations[n]
 			var to := Grid.center(n) - position
 			to.y = 0.0
 			var dist := to.length()

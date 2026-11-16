@@ -265,7 +265,7 @@ func disgust_at(cell: Vector2i, visible: Array) -> float:
 	return sight_disgust(visible) + smell_disgust(cell)
 
 
-## The hood's multiplier on a stove's grease. Until PRD 8.5 there is no hood.
+## The hood's multiplier on a stove's grease (a hood hangs over it, PRD 8.5).
 static func hood_factor(has_hood: bool = false) -> float:
 	return HOOD if has_hood else 1.0
 

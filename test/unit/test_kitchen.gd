@@ -366,6 +366,9 @@ func test_lifting_a_tool_leaves_its_counter_and_both_sell():
 	assert_true(game.sell_hand())
 	assert_eq(game.ledger.money, 500 + Catalog.price_of("stove") / 2)
 	assert_true(game.pick_up(_at(0, 3)))
+	assert_eq(game.player.hand.id, "hood", "then the hood over it (PRD 8.5)")
+	assert_true(game.sell_hand())
+	assert_true(game.pick_up(_at(0, 3)))
 	assert_eq(game.player.hand.id, "counter")
 	assert_true(game.sell_hand(), "counters are for sale")
 	assert_false(game.stations.has(c))
@@ -564,7 +567,7 @@ func test_the_shop_with_a_piece_in_hand_opens_its_tree():
 
 func test_a_piece_with_no_tree_does_not_open_the_shop():
 	_game()
-	assert_true(game.pick_up(_at(3, 2)), "the sink")
+	assert_true(game.pick_up(_at(2, 2)), "the tray stack")
 	game.open_shop()
 	assert_false(game.shopping)
 
@@ -898,3 +901,226 @@ func test_night_zero_is_winnable_with_counters_a_fridge_and_boxes():
 		assert_eq(game.open_block(), "", theme + ": the door card will flip")
 		assert_gte(game.ledger.money, game.night_cost(), theme + ": with money for the stock")
 		game.queue_free()
+
+
+# ---------- The wall layer (PRD 8.5) ----------
+
+func test_freezer_is_the_tall_fridges_specialist():
+	assert_eq(Kitchen.parent_of("freezer"), "tall_fridge")
+	assert_eq(Kitchen.step_of("freezer"), Kitchen.SPECIALIST_STEP)
+	assert_eq(Kitchen.slots_of("freezer"), 2)
+	assert_true(Kitchen.freezes("freezer"))
+	assert_false(Kitchen.freezes("tall_fridge"))
+	assert_true(Kitchen.is_tall("freezer"))
+	assert_eq(Kitchen.children_of("tall_fridge"), ["glass_fridge", "freezer"] as Array[String])
+
+
+func test_no_kind_is_frozen_yet_and_a_freezer_stores_like_a_fridge():
+	for kind: String in Pantry.ITEMS:
+		assert_false(Kitchen.is_frozen(kind), kind)
+	var k := _kitchen()
+	k.place(W, "freezer")
+	assert_true(k.store(W, "patty"), "chilled kinds keep in a freezer")
+	assert_true(k.store(W, "bun"))
+	assert_false(k.can_place(W, "cabinet"), "a freezer fills both wall layers")
+
+
+func test_wall_pieces_hang_over_anything_but_a_tall_piece():
+	var k := _kitchen()
+	assert_true(k.can_hang(W, "cabinet"), "over bare floor")
+	assert_true(k.can_hang(W, "shelf"))
+	assert_false(k.can_hang(W, "counter"), "a counter does not hang")
+	assert_false(k.can_hang(C, "hood"), "only on a wall cell")
+	assert_true(k.hang(W, "hood"))
+	assert_false(k.can_hang(W, "cabinet"), "one high piece a cell")
+	assert_eq(k.high_cells(), {W: "hood"})
+	var t := _kitchen()
+	t.place(W, "tall_fridge")
+	assert_false(t.can_hang(W, "cabinet"))
+	assert_true(Kitchen.is_high_only("cabinet") and Kitchen.is_high_only("hood"))
+	assert_false(Kitchen.is_high_only("shelf"), "a shelf may stand low")
+
+
+func test_lifting_the_base_leaves_the_wall_piece_and_its_stock():
+	var k := _kitchen()
+	k.set_cell(W, "counter")
+	k.hang(W, "cabinet")
+	assert_true(k.store(W, "bun"))
+	assert_true(k.store(W, "lettuce"))
+	assert_eq(k.cells[W].stock, {"base": ["bun"], "high": ["lettuce"]})
+	k.set_cell(W, "")
+	assert_eq(k.get_piece(W, "high"), "cabinet")
+	assert_eq(k.stock(W), ["lettuce"], "the cabinet's box stays")
+	assert_eq(k.remove(W, "high"), {"id": "cabinet", "stock": ["lettuce"]})
+	assert_false(k.cells.has(W), "an empty cell is forgotten")
+
+
+func test_a_closet_needs_a_shelf_low_and_high():
+	var k := _kitchen()
+	k.place(W, "shelf")
+	assert_true(k.is_closet_with(W, "wide_shelf"))
+	assert_false(k.is_closet_with(W, "cabinet"))
+	k.hang(W, "cabinet")
+	assert_false(k.is_closet(W))
+
+
+func test_first_room_hangs_its_fixtures_as_pieces_in_both_themes():
+	for theme in Pantry.THEMES:
+		_night_zero(theme)
+		for at: Vector2i in [Vector2i(0, 3), Vector2i(0, 4)]:
+			assert_true(game.kitchen.has_hood(at), theme + ": a hood where the stoves go")
+		for at: Vector2i in [Vector2i(0, 5), Vector2i(0, 6)]:
+			assert_eq(game.kitchen.get_piece(at, "high"), "cabinet", theme)
+		assert_eq(game.kitchen.get_piece(Vector2i(3, 2), "high"), "shelf", theme + ": the jar shelf over the sink")
+		assert_eq(game.highs.size(), 5)
+		assert_eq(game.highs[Vector2i(0, 3)].facing, 1, "faces off the left wall")
+		assert_eq(game.highs[Vector2i(3, 2)].facing, 0, "faces off the back wall")
+		assert_true(game.pick_up(_at(0, 4)))
+		assert_eq(game.player.hand.id, "hood")
+		assert_eq(game.sell_block(), "", theme + ": sellable")
+		var money: int = game.ledger.money
+		assert_true(game.sell_hand())
+		assert_eq(game.ledger.money, money + Catalog.price_of("hood") / 2)
+		assert_false(game.kitchen.has_hood(Vector2i(0, 4)))
+		game.queue_free()
+
+
+func test_wall_cells_are_back_wall_cells_without_a_window():
+	_game()
+	assert_true(game.kitchen.is_wall(Vector2i(0, 4)), "the kitchen's left wall")
+	assert_true(game.kitchen.is_wall(Vector2i(2, 2)), "the kitchen's back wall")
+	assert_false(game.kitchen.is_wall(Vector2i(2, 4)), "the middle of the floor")
+	assert_false(game.kitchen.is_wall(Vector2i(9, 4)), "the street side is cut low")
+	var glass := 0
+	for x in range(4, 10):
+		glass += 0 if game.kitchen.is_wall(Vector2i(x, 0)) else 1
+	assert_gt(glass, 0, "the dining room's windows take no wall piece")
+
+
+func test_a_cabinet_hangs_over_a_piece_and_comes_off_before_it():
+	_game()
+	var c := Vector2i(2, 2)   # the tray stack, against the back wall
+	assert_true(game.pick_catalog("cabinet"))
+	assert_false(game.can_place(Vector3i(2, 4, 0)), "not away from a wall")
+	assert_true(game.can_place(Vector3i(2, 2, 0)))
+	game._demo_hover = _at(2, 2)
+	assert_eq(game.build_action(), "Hang")
+	assert_true(game.place(Vector3i(2, 2, 0)))
+	game.cancel_hand()
+	assert_eq(game.ledger.money, 500 - Catalog.price_of("cabinet"))
+	var cab: Station = game.highs[c]
+	assert_true(cab.high)
+	assert_eq(game.stations[c].type, "trays", "the tray stack still stands below")
+	assert_false(game.grid.blocked.has(Vector2i(2, 3)))
+	assert_true(game.pick_catalog("hood"))
+	assert_false(game.can_place(Vector3i(2, 2, 0)), "one high piece a cell")
+	game.cancel_hand()
+	assert_true(game.pick_up(_at(2, 2)))
+	assert_eq(game.player.hand.node, cab, "the wall piece comes off first")
+	game.cancel_hand()
+	assert_eq(game.highs[c], cab, "cancel hangs it back")
+	assert_true(cab.visible)
+	assert_true(game.pick_up(_at(2, 2)))
+	assert_true(game.place(Vector3i(1, 2, 0)), "moved along the wall")
+	assert_eq(game.kitchen.get_piece(Vector2i(1, 2), "high"), "cabinet")
+	assert_eq(game.kitchen.get_piece(c, "high"), "")
+	assert_false(game.stations.has(Vector2i(1, 2)), "it hangs over bare floor")
+
+
+func test_a_shelf_stands_low_then_hangs_high_as_a_closet():
+	_game()
+	var c := Vector2i(2, 2)
+	assert_true(game.pick_up(_at(2, 2)), "the tray stack makes room")
+	assert_true(game.place(Vector3i(2, 5, 0)))
+	assert_true(game.pick_catalog("shelf"))
+	game._demo_hover = _at(2, 2)
+	assert_eq(game.hand_layer(), "base", "on bare floor a shelf stands")
+	assert_true(game.place(Vector3i(2, 2, 0)))
+	assert_eq(game.stations[c].type, "shelf")
+	assert_eq(game.kitchen.get_piece(c, "base"), "shelf")
+	assert_true(game.grid.blocked.has(c))
+	assert_eq(game.hand_layer(), "high", "over a shelf, the next one hangs")
+	assert_true(game.place(Vector3i(2, 2, 0)))
+	game.cancel_hand()
+	assert_true(game.kitchen.is_closet(c))
+	assert_true(game.highs[c].closet, "drawn as one closet")
+	assert_true(game.pick_up(_at(2, 2)))
+	assert_false(game.kitchen.is_closet(c))
+	assert_false(game.highs.has(c))
+
+
+func test_a_tall_fridge_will_not_go_under_a_wall_piece():
+	_game()
+	game.add_station("counter", Vector2i(2, 5))
+	assert_true(game.pick_up(_at(2, 5)))
+	game.open_shop()
+	assert_true(game.buy_upgrade("fridge"))
+	assert_true(game.buy_upgrade("tall_fridge"))
+	game.close_shop()
+	assert_false(game.can_place(Vector3i(0, 5, 0)), "a cabinet hangs there")
+	assert_true(game.place(Vector3i(2, 5, 0)))
+	assert_eq(game.kitchen.get_piece(Vector2i(2, 5), "base"), "tall_fridge")
+	assert_true(game.pick_up(_at(2, 2)), "the tray stack, off the back wall")
+	assert_true(game.place(Vector3i(3, 5, 0)))
+	assert_true(game.pick_up(_at(2, 5)))
+	assert_true(game.place(Vector3i(2, 2, 0)), "a tall fridge against the wall")
+	assert_true(game.pick_catalog("cabinet"))
+	assert_false(game.can_place(Vector3i(2, 2, 0)), "nothing above a tall fridge")
+
+
+func test_tall_fridge_tree_reaches_the_freezer_and_glass_door():
+	_game()
+	game.add_station("counter", Vector2i(2, 5))
+	assert_true(game.pick_up(_at(2, 5)))
+	game.open_shop()
+	assert_true(game.buy_upgrade("fridge"))
+	assert_true(game.buy_upgrade("tall_fridge"))
+	assert_true(game.buy_upgrade("freezer"))
+	assert_eq(game.hand_key(), "freezer")
+	game.close_shop()
+	assert_true(game.place(Vector3i(2, 5, 0)))
+	assert_true(game.kitchen.chilled_slots(Vector2i(2, 5)) == 2)
+
+
+func test_boxes_go_into_a_cabinet_and_come_out_from_below():
+	_game()
+	var c := Vector2i(1, 2)
+	assert_true(game.pick_catalog("cabinet"))
+	assert_true(game.place(Vector3i(1, 2, 0)))
+	game.cancel_hand()
+	assert_true(game.pick_catalog("box_lettuce" if Scenery.theme_id != "seaside" else "box_courgette"))
+	assert_true(game.can_place(Vector3i(1, 2, 0)), "a hung cabinet is a storage slot like any other")
+	assert_true(game.place(Vector3i(1, 2, 0)))
+	assert_eq(game.kitchen.cells[c].stock.high.size(), 1)
+	assert_eq(game.station_at(c), game.highs[c], "reached over bare floor")
+	assert_true(game.kitchen_stock().size() > 0)
+	game.start_day()
+	game.player.position = _at(1, 3)
+	game.player.look(Vector2i(0, -1))
+	assert_eq(game.player.target_cell(), c)
+	assert_true(game.use_station(game.station_at(c)).begins_with("Take"))
+	assert_true(game.pick_up(_at(1, 2)) == false, "nothing is moved by day")
+
+
+func test_no_floor_or_door_takes_the_wall_from_a_hung_piece():
+	_game()
+	game.pick_catalog("floor_tile")
+	assert_false(game.can_place(Vector3i(-1, 4, 0)), "floor behind the hood would take its wall away")
+	assert_true(game.can_place(Vector3i(-1, 2, 0)) or not game.plan.can_lay(Vector2i(-1, 2), "tile"), "beside it is fine")
+	game.cancel_hand()
+	game.pick_catalog("door")
+	assert_false(game.can_place(Vector3i(0, 5, 1)), "not through a cabinet's wall")
+	game.cancel_hand()
+	assert_true(game.pick_up(_at(0, 5)))
+	assert_true(game.sell_hand())
+	game.pick_catalog("door")
+	assert_true(game.can_place(Vector3i(0, 5, 1)))
+
+
+func test_a_hood_over_a_stove_is_the_grease_flag():
+	_game()
+	var stove: Station = game.stations[Vector2i(0, 3)]
+	assert_true(game.floor_dirt.grease_factors(stove).hood)
+	game.add_station("counter", Vector2i(2, 5))
+	game.add_station("stove", Vector2i(2, 5))
+	assert_false(game.floor_dirt.grease_factors(game.stations[Vector2i(2, 5)]).hood)

@@ -24,6 +24,8 @@ var cell := Vector2i.ZERO
 var tier := 1
 var facing := 0       # quarter turns; 0 puts the front toward +z
 var base := ""        # the counter this piece is or stands on ("counter", "double_counter"); "" for the rest
+var high := false     # hung in a wall cell's high layer (PRD 8.5): a cabinet, a high shelf, a hood
+var closet := false   # a high shelf over a low one, drawn as one closet
 var pass_look := false  # a counter drawn as a length of the frame's long teal pass (the starting ones)
 var lamp: OmniLight3D # a table's lamp light, owned by the game
 var item := ""        # what is sitting on a counter or stove: an ingredient kind ("raw:patty") or "tray"
@@ -89,9 +91,11 @@ func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0, base_ := "",
 	tier = tier_
 	pass_look = pass_look_
 	base = base_ if base_ != "" else ("counter" if Kitchen.is_top(type) or Kitchen.is_counter(type) else "")
+	if Kitchen.has_node(node) and Kitchen.fit_of(node) == "shelf":
+		base = node   # a shelf is its own base when it stands low
 	_vis = Node3D.new()
 	add_child(_vis)
-	Build.station(_vis, type, tier, base, pass_look, node)
+	_draw()
 	place_at(cell_, facing)
 	if type == "trays":
 		count = TRAYS
@@ -142,13 +146,29 @@ func _heat_widget() -> void:
 func set_base(base_: String, pass_look_ := pass_look) -> void:
 	base = base_
 	pass_look = pass_look_
-	for c in _vis.get_children():
-		_vis.remove_child(c)
-		c.queue_free()
-	Build.station(_vis, type, tier, base, pass_look, node)
+	_draw()
 	if _ring:
 		_ring = _vis.get_node_or_null("ring")
 		_update_cooking_visuals()
+
+
+func _draw() -> void:
+	for c in _vis.get_children():
+		_vis.remove_child(c)
+		c.queue_free()
+	if high:
+		Build.wall_piece(_vis, node, closet)
+	else:
+		Build.station(_vis, type, tier, base, pass_look, node)
+
+
+## Hangs this piece in the high layer, or stands it low, and redraws it (PRD 8.5).
+func set_wall(high_: bool, closet_ := false) -> void:
+	if high == high_ and closet == closet_:
+		return
+	high = high_
+	closet = closet_
+	_draw()
 
 
 func _show_item(kind: String) -> void:
@@ -503,7 +523,7 @@ func refresh() -> void:
 
 
 ## Shows which kinds this cell stores: a row of tags over it (PRD 8.4).
-func set_boxes(b: Array) -> void:
+func set_boxes(b: Array, y := 1.6) -> void:
 	boxes = b.duplicate()
 	if _tags:
 		_tags.queue_free()
@@ -513,7 +533,7 @@ func set_boxes(b: Array) -> void:
 	_tags = Node3D.new()
 	_tags.name = "box_tags"
 	add_child(_tags)
-	Build.box_tags(_tags, boxes)
+	Build.box_tags(_tags, boxes, y)
 
 
 ## A little show when the chef uses the station: a door swings open.

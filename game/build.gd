@@ -1132,6 +1132,63 @@ static func _node_marks(n: Node3D, node: String) -> void:
 			ball(n, Vector3(0.22, 1.36, 0.2), 0.05, CORAL if node == "two_tap_fountain" else "#7a2e3a")
 
 
+## The wall layer (PRD 8.5). Heights of the high band: a high piece hangs between
+## HIGH_Y0 and HIGH_Y1, its back on the wall (local z -0.5), front toward +z.
+const HIGH_Y0 := 1.38
+const HIGH_Y1 := 2.32
+const HOOD_COL := "#7fa3a8"
+
+
+## A piece hung in a cell's high layer: a wall cabinet, an open shelf (two planks when
+## wide), or a hood. `closet`: a high shelf over a low one, drawn as one tall closet
+## (side panels to the floor, a back and a cornice). `drop` lowers it (shop previews).
+static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) -> void:
+	var y0 := HIGH_Y0 - drop
+	var back := -0.5
+	match node:
+		"cabinet":
+			# A teal wall cabinet: two doors with brass pulls under a thin cornice.
+			_add(n, bevel_mesh(Vector3(0.94, 0.86, 0.42), 0.04), Vector3(0, y0 + 0.48, back + 0.21), Color(CABINET), 0.0)
+			box(n, Vector3(0, y0 + 0.9, back + 0.22), Vector3(0.98, 0.05, 0.46), WOOD, 0.0, R_WOOD)
+			for sx: float in [-1.0, 1.0]:
+				box(n, Vector3(sx * 0.225, y0 + 0.1, back + 0.43), Vector3(0.42, 0.76, 0.03), _tint(CABINET, 0.07))
+				box(n, Vector3(sx * 0.07, y0 + 0.14, back + 0.455), Vector3(0.035, 0.16, 0.03), "#d9a441", 0.0, R_WOOD)
+		"shelf", "wide_shelf":
+			var planks := 2 if node == "wide_shelf" else 1
+			for i in planks:
+				var y := y0 + 0.12 + i * 0.44
+				box(n, Vector3(0, y, back + 0.15), Vector3(0.94, 0.05, 0.3), WOOD, 0.0, R_WOOD)
+				if not closet:   # brass brackets under each plank
+					for sx: float in [-0.36, 0.36]:
+						box(n, Vector3(sx, y - 0.16, back + 0.04), Vector3(0.04, 0.16, 0.08), "#d9a441", 0.0, R_WOOD)
+				# Jars on the plank: the jar shelf of sheet 1.
+				var jars := [PAPER, CORAL, TILE_TEAL, WARN]
+				for j in 3:
+					var jx := -0.28 + j * 0.28
+					var tall := 0.18 + 0.05 * ((i + j) % 2)
+					cyl(n, Vector3(jx, y + 0.05, back + 0.15), 0.08, tall, jars[(i + j) % jars.size()], 0.0, R_GLOSS)
+					cyl(n, Vector3(jx, y + 0.05 + tall, back + 0.15), 0.065, 0.04, WOOD_DARK)
+			if closet:
+				# Side panels from the floor, a back and a cornice: the low shelf and this
+				# one read as a single closet.
+				var top := y0 + 0.94
+				for sx: float in [-1.0, 1.0]:
+					box(n, Vector3(sx * 0.475, -drop, back + 0.24), Vector3(0.05, top + drop, 0.48), CABINET)
+				box(n, Vector3(0, -drop, back + 0.02), Vector3(0.94, top + drop, 0.04), _shade(CABINET))
+				box(n, Vector3(0, top, back + 0.25), Vector3(1.02, 0.07, 0.52), WOOD, 0.0, R_WOOD)
+		"hood":
+			# A sloped steel-blue canopy over the stove (sheet 1), a square frustum squashed
+			# to the wall's depth, with a duct up to the top of the wall.
+			var hold := Node3D.new()
+			hold.position = Vector3(0, y0, back + 0.37)
+			hold.scale = Vector3(1, 1, 0.76)
+			n.add_child(hold)
+			var canopy := _add(hold, lathe_mesh([[0.0, 0.0], [0.69, 0.0], [0.69, 0.1], [0.34, 0.46], [0.0, 0.46]], 4), Vector3.ZERO, Color(HOOD_COL), 0.0, R_WOOD)
+			canopy.rotation.y = PI / 4
+			_add(n, bevel_mesh(Vector3(0.46, 0.5, 0.36), 0.03), Vector3(0, y0 + 0.68, back + 0.19), Color(_shade(HOOD_COL, 0.08)), 0.0, R_WOOD)
+			box(n, Vector3(0, y0 - 0.005, back + 0.38), Vector3(0.8, 0.02, 0.56), "#4a5a5e")   # the filter
+
+
 static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false) -> void:
 	if base == "double_counter":
 		_double(n, type == "counter")
@@ -1211,6 +1268,19 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			box(n, Vector3(0, 0.89, 0.04), Vector3(0.58, 0.03, 0.44), "#8fc3cf", 0.0, R_GLOSS)
 			cyl(n, Vector3(0, 0.9, -0.36), 0.035, 0.26, "#c9d0d1", 0.0, R_WOOD)
 			box(n, Vector3(0, 1.12, -0.25), Vector3(0.06, 0.05, 0.26), "#c9d0d1", 0.0, R_WOOD)
+		"shelf":
+			# A low open shelf (PRD 8.5): half depth against the back, no worktop, so it
+			# reads smaller than a counter. A wide shelf has a third board.
+			var boards := 3 if tier > 1 or base == "wide_shelf" else 2
+			for sx: float in [-1.0, 1.0]:
+				box(n, Vector3(sx * 0.44, 0, -0.27), Vector3(0.06, 0.86, 0.46), WOOD_DARK, 0.0, R_WOOD)
+			box(n, Vector3(0, 0, -0.48), Vector3(0.88, 0.86, 0.04), _shade(WOOD))
+			for i in boards:
+				box(n, Vector3(0, 0.04 + i * 0.78 / (boards - 1), -0.27), Vector3(0.84, 0.05, 0.44), WOOD, 0.0, R_WOOD)
+			for j in 2:   # a couple of tins on the lower board
+				cyl(n, Vector3(-0.2 + j * 0.36, 0.09, -0.27), 0.09, 0.2, [CORAL, TILE_TEAL][j], 0.0, R_GLOSS)
+		"cabinet", "hood":
+			wall_piece(n, type, false, HIGH_Y0 - 0.3)
 		"bin":
 			# Sheet 8: a dark brown tub, wider at the top, with a steel rim.
 			_add(n, lathe_mesh([[0.0, 0.0], [0.34, 0.0], [0.43, 0.62], [0.0, 0.62]], 4), Vector3.ZERO, Color("#5a4034"), 0.0).rotation.y = PI / 4

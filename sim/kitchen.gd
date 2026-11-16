@@ -78,6 +78,10 @@ const NODES := {
 		"step": SPECIALIST_STEP, "slots": 2, "chilled": true},
 	"glass_fridge": {"name": "Tall fridge, glass door", "fit": "tall", "price": 160, "parent": "tall_fridge",
 		"step": EFFICIENT, "slots": 3, "chilled": true},
+	# A freezer also takes frozen kinds (ice cream, 8.6). None exists yet, so for now it
+	# stores like a tall fridge.
+	"freezer": {"name": "Freezer", "fit": "tall", "price": 150, "parent": "tall_fridge",
+		"step": SPECIALIST_STEP, "slots": 2, "chilled": true, "frozen": true},
 	"shelf": {"name": "Wall shelf", "fit": "shelf", "price": 10, "slots": 1},
 	"wide_shelf": {"name": "Wide shelf", "fit": "shelf", "price": 20, "parent": "shelf", "step": EFFICIENT,
 		"slots": 2},
@@ -176,6 +180,26 @@ static func chills(id: String) -> bool:
 	return NODES.has(id) and NODES[id].get("chilled", false)
 
 
+## A piece whose slots take frozen kinds (the freezer).
+static func freezes(id: String) -> bool:
+	return NODES.has(id) and NODES[id].get("frozen", false)
+
+
+## A piece that hangs in the high layer only (wall cabinet, hood).
+static func is_high_only(id: String) -> bool:
+	return NODES.has(id) and FITS[fit_of(id)] == ["high"]
+
+
+## A piece that may go in the high layer (a shelf, a wall cabinet, a hood).
+static func can_go_high(id: String) -> bool:
+	return NODES.has(id) and (FITS[fit_of(id)] as Array).has("high")
+
+
+## A piece that fills both wall layers (tall fridge, glass fridge, freezer).
+static func is_tall(id: String) -> bool:
+	return NODES.has(id) and fit_of(id) == "tall"
+
+
 static func fit_of(id: String) -> String:
 	return str(NODES[id].fit)
 
@@ -246,6 +270,12 @@ static func is_chilled(kind: String) -> bool:
 	return k != "" and Pantry.ITEMS[k].get("chilled", false)
 
 
+## Whether an ingredient must be kept in a freezer slot (none yet; ice cream in 8.6).
+static func is_frozen(kind: String) -> bool:
+	var k := Pantry.kind_of(kind)
+	return k != "" and Pantry.ITEMS[k].get("frozen", false)
+
+
 # ---------- Cells ----------
 
 func set_wall(cell: Vector2i, on := true) -> void:
@@ -266,10 +296,16 @@ func _cell(cell: Vector2i) -> Dictionary:
 
 
 ## Sets a cell's base and top outright (the game keeps its cells in step this way).
-## Stock already held there is kept. An empty base clears the cell.
+## Stock already held there is kept. An empty base clears the low layer and its stock;
+## a high piece stays on the wall (PRD 8.5).
 func set_cell(cell: Vector2i, base: String, top := "") -> void:
 	if base == "":
-		cells.erase(cell)
+		if cells.has(cell) and get_piece(cell, "high") != "":
+			cells[cell].base = ""
+			cells[cell].top = ""
+			cells[cell].stock.base = []
+		else:
+			cells.erase(cell)
 		return
 	var c := _cell(cell)
 	c.base = base
@@ -301,9 +337,25 @@ func layer_for(cell: Vector2i, id: String) -> String:
 					continue
 				return layer
 			"high":
-				if is_wall(cell) and not (base != "" and fit_of(base) == "tall"):
+				if can_hang(cell, id):
 					return layer
 	return ""
+
+
+## Whether a piece can hang in this cell's high layer: a wall cell, the layer free, and
+## no tall piece below filling it. Whatever else stands below does not matter (a sink,
+## a stove, bare floor), so the game asks this for cells the kitchen holds no base for.
+func can_hang(cell: Vector2i, id: String) -> bool:
+	return can_go_high(id) and is_wall(cell) and get_piece(cell, "high") == "" \
+		and not is_tall(get_piece(cell, "base"))
+
+
+## Hangs a piece in the high layer. Returns whether it went up.
+func hang(cell: Vector2i, id: String) -> bool:
+	if not can_hang(cell, id):
+		return false
+	_cell(cell).high = id
+	return true
 
 
 func can_place(cell: Vector2i, id: String) -> bool:
@@ -332,6 +384,8 @@ func remove(cell: Vector2i, layer: String) -> Dictionary:
 	if c.stock.has(layer):
 		held = c.stock[layer]
 		c.stock[layer] = []
+	if c.base == "" and c.high == "":
+		cells.erase(cell)
 	return {"id": id, "stock": held}
 
 
@@ -342,8 +396,24 @@ func is_closet(cell: Vector2i) -> bool:
 	return base != "" and high != "" and fit_of(base) == "shelf" and fit_of(high) == "shelf"
 
 
+## Whether hanging this piece here would make a closet (a high shelf over a low one).
+func is_closet_with(cell: Vector2i, id: String) -> bool:
+	var base := get_piece(cell, "base")
+	return base != "" and fit_of(base) == "shelf" and NODES.has(id) and fit_of(id) == "shelf"
+
+
+## Whether a hood hangs over this cell (PRD 9 reads it: a hood cuts a stove's grease).
 func has_hood(cell: Vector2i) -> bool:
 	return get_piece(cell, "high") == "hood"
+
+
+## The cells with a high piece on the wall: Vector2i -> its node.
+func high_cells() -> Dictionary:
+	var out := {}
+	for cell: Vector2i in cells:
+		if get_piece(cell, "high") != "":
+			out[cell] = get_piece(cell, "high")
+	return out
 
 
 # ---------- Storage ----------
@@ -374,11 +444,13 @@ func stock(cell: Vector2i) -> Array:
 func store_layer(cell: Vector2i, kind: String) -> String:
 	if not cells.has(cell) or holds_kind(cell, Pantry.kind_of(kind)):
 		return ""
-	var chilled := is_chilled(kind)
+	var chilled := is_chilled(kind) or is_frozen(kind)
 	var best := ""
 	for layer: String in ["base", "high"]:
 		var id := get_piece(cell, layer)
 		if id == "" or cells[cell].stock[layer].size() >= slots_of(id):
+			continue
+		if is_frozen(kind) and not freezes(id):
 			continue
 		if chilled and not chills(id):
 			continue

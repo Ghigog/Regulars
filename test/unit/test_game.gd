@@ -18,6 +18,7 @@ func before_each():
 	game.test_kitchen()   # the old burger line and a one-Burger menu; a run starts empty
 	_neutral_tastes()
 	_neutral_tolerance_and_dirt()
+	game.clear_walls()   # the start's hood, cabinets and shelf (PRD 8.5) are tested in test_kitchen.gd
 
 
 ## Nobody dislikes anything, so every guest orders from the test menu.
