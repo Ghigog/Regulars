@@ -345,7 +345,7 @@ func _apply_demo(demo: String) -> void:
 		arrivals.resize(mini(arrivals.size(), 2))
 		for a in arrivals:
 			a.time = 0.5
-	elif demo == "slip":  # a guest down on a level 4 cell, dizzy, a friend who saw it helping them up; shoot at about 7
+	elif demo == "slip":  # a guest down on a level 4 cell, dizzy, a friend who saw it helping them up; shoot at about 7.5
 		arrivals.clear()
 		arrivals.append({"time": 0.2, "group": [0, 1]})
 		get_tree().create_timer(5.5).timeout.connect(_demo_slip)
