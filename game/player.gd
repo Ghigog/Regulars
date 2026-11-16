@@ -253,8 +253,46 @@ func _way_out() -> Vector3:
 	return Grid.center(best)
 
 
+## Slipped on the floor (9.3): down on the cell until helped or after GET_UP_ALONE_CHEF.
+func fall() -> void:
+	_velocity = Vector3.ZERO
+	_body.create_tween().tween_property(_body, "rotation:x", Guest.DOWN_TILT, 0.22) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	_body.position.y = Guest.DOWN_LIFT
+	_body.set_face("dazed")
+
+
+func rise() -> void:
+	_body.position.y = 0.0
+	_body.set_face("neutral")
+	_body.create_tween().tween_property(_body, "rotation:x", 0.0, 0.3) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Turns the chef towards a cell (helping someone up there).
+func look_at_cell(c: Vector2i) -> void:
+	var to := Grid.center(c) - position
+	to.y = 0.0
+	if to.length_squared() > 0.0001:
+		aim = to.normalized()
+
+
 ## Moves by a screen-space input vector (x = right, y = up on screen).
 func move(input: Vector2, delta: float) -> void:
+	if game.floor_dirt.is_down(self):
+		_velocity = Vector3.ZERO   # on the floor: no walking until up again
+		return
+	var lifting: Node3D = game.floor_dirt.helping(self)
+	if lifting != null:   # bent over, both hands out, for the second it takes
+		_velocity = Vector3.ZERO
+		look_at_cell(Grid.to_cell(lifting.position))
+		_body.pose = "help"
+		_body.position.y = 0.0
+		_body.rotation.x = lerpf(_body.rotation.x, 0.35, 1.0 - exp(-10.0 * delta))
+		_body.rotation.y = lerp_angle(_body.rotation.y, atan2(aim.x, aim.z), 1.0 - exp(-18.0 * delta))
+		return
+	if _body.pose == "help":
+		_body.pose = "carry" if held != "" else "idle"
 	if stuck():   # slide out, through whatever is in the way, before anything else
 		_velocity = Vector3.ZERO
 		position = position.move_toward(_way_out(), SPEED * 1.2 * delta)

@@ -437,6 +437,14 @@ static func fx(id: String) -> Array:
 				else:
 					var g := 0.7 if f == 2 else 1.0
 					_blob(o, [[-0.3 * g, 0.5, 0.36 * g], [0.3 * g, 0.5, 0.36 * g], [0, 0.78, 0.4 * g], [0, 0.4, 0.34 * g]], GREEN)
+			"dizzy":  # after a slip: three gold stars on a tilted ring, going round
+				for k in 3:
+					var a := TAU * k / 3.0 + f * TAU / 12.0
+					var x := cos(a) * 0.85
+					var y := sin(a) * 0.3
+					var r := 0.3 + 0.1 * sin(a)   # nearer the front, bigger
+					o.append([star(x, y, r + 0.08, 5, 0.45), Build.TRIM])
+					o.append([star(x, y, r, 5, 0.45), GOLD])
 			"anger":  # the vein-pop mark, pulsing, with small puffs
 				var s := 0.85 if f % 2 else 1.0
 				o.append_array(_moved(icon("anger"), Vector2.ZERO, s))

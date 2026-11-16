@@ -41,11 +41,11 @@ const LOOKS := {
 	"Felix": {"skin": 2, "hair": "side_swept", "hair_col": "auburn", "outfit": "cream", "pattern": "collar"},
 	"Nell": {"skin": 3, "hair": "top_knot", "hair_col": "black", "outfit": "periwinkle", "pattern": "dungarees"},
 }
-const FACES: Array[String] = ["neutral", "content", "delighted", "impatient", "snap", "disgusted", "angry", "chewing"]
+const FACES: Array[String] = ["neutral", "content", "delighted", "impatient", "snap", "disgusted", "angry", "chewing", "dazed"]
 const TINTS := {"snap": ["#f08a3c", 0.5], "disgusted": ["#8fc27a", 0.7], "angry": ["#e0463a", 0.9]}
 
 var skin := SKINS[1]
-var pose := "idle"   # idle, carry, eat, tap, wave
+var pose := "idle"   # idle, carry, eat, tap, wave, help
 var face := ""
 var _head: MeshInstance3D
 var _features: Node3D
@@ -288,6 +288,9 @@ func set_face(kind: String) -> void:
 				_stroke(f, [c + Vector2(-0.034, -0.012), c + Vector2(0, 0.014), c + Vector2(0.034, -0.012)], 0.014, ink)
 			"squeeze":
 				_stroke(f, [c + Vector2(-sx * 0.03, 0.028), c + Vector2(sx * 0.022, 0), c + Vector2(-sx * 0.03, -0.028)], 0.014, ink)
+			"cross":   # knocked silly: an X for each eye
+				for k: float in [-1.0, 1.0]:
+					_stroke(f, [c + Vector2(-0.03, -0.03 * k), c + Vector2(0.03, 0.03 * k)], 0.014, ink)
 			"narrow":
 				_stroke(f, [c + Vector2(-0.028, 0), c + Vector2(0.028, 0)], 0.02, ink)
 	var brow := func(sx: float, inner: float, outer: float, r := 0.014) -> void:
@@ -331,6 +334,12 @@ func set_face(kind: String) -> void:
 				eye.call(sx, "narrow")
 				brow.call(sx, 0.02, 0.075, 0.021)
 			mouth.call([Vector2(-0.045, -0.118), Vector2(-0.02, -0.1), Vector2(0.02, -0.1), Vector2(0.045, -0.118)])
+		"dazed":   # just slipped (PRD 9.3): X eyes, an "o" of surprise, brows up
+			for sx: float in [-1.0, 1.0]:
+				eye.call(sx, "cross")
+				brow.call(sx, 0.075, 0.06, 0.012)
+			Build.ball(f, _on_head(0, -0.11, -0.022), 0.034, ink)
+			Build.ball(f, _on_head(0, -0.112, -0.008), 0.019, "#7a3b33")
 		"chewing":
 			eye.call(-1.0, "dot")
 			eye.call(1.0, "arc")
@@ -354,6 +363,8 @@ func _hand_target(side: float) -> Vector3:
 			return Vector3(side * 0.16, 0.42 + maxf(0.0, sin(_age * 7.0 + side)) * 0.16, 0.27)
 		"tap":  # an impatient drum on the table
 			return Vector3(side * 0.2, 0.4 + absf(sin(_age * 16.0 + side * 0.8)) * 0.07, 0.28)
+		"help":  # both hands out and low, reaching down to someone on the floor
+			return Vector3(side * 0.13, 0.22, 0.38)
 		"wave":
 			if side > 0.0:
 				return Vector3(0.36 + sin(_age * 9.0) * 0.07, 0.78, 0.05)

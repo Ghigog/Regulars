@@ -24,6 +24,19 @@ const WITNESS_RADIUS := 1
 ## After a slip, the walkout chance runs from this (opinion 0) to this (opinion 1). (tunable)
 const SLIP_WALKOUT_HATED := 0.9
 const SLIP_WALKOUT_LOVED := 0.1
+## What a slip does to mood (9.3). The fallen guest loses about a walkout's worth; each
+## witness within WITNESS_RADIUS a little; left on the floor until GET_UP_ALONE_GUEST, a
+## guest gets up angrier still. (tunable)
+const SLIP_PATIENCE := 0.35
+const SLIP_JOY := 0.4
+const WITNESS_PATIENCE := 0.05
+const WITNESS_JOY := 0.1
+const ALONE_PATIENCE := 0.15
+const ALONE_JOY := 0.2
+const SLIP_THOUGHT := "Ow! The floor!"
+const WITNESS_THOUGHT := "Did they just fall?"
+const ALONE_THOUGHT := "Nobody helped me up"
+const HELPED_THOUGHT := "Thanks for the hand"
 
 ## Disgust per second to anyone who can see a dirty cell, by level. Same scale as GROSS
 ## in game/main.gd. (tunable)
@@ -192,6 +205,32 @@ func rolls_slip(cell: Vector2i, chef: bool = false) -> bool:
 ## affinity and current mood, 0 to 1): low for one who loves it, very high otherwise.
 static func slip_walkout_chance(opinion: float) -> float:
 	return lerpf(SLIP_WALKOUT_HATED, SLIP_WALKOUT_LOVED, clampf(opinion, 0.0, 1.0))
+
+
+## A guest's opinion of the place, 0 to 1, for the walkout roll after a slip: their town
+## affinity (-1 to 1) and how the visit feels now (GuestMood.satisfaction, -1 to 1), equally.
+static func slip_opinion(affinity: float, satisfaction: float) -> float:
+	return clampf(0.25 * (clampf(affinity, -1.0, 1.0) + 1.0) + 0.25 * (clampf(satisfaction, -1.0, 1.0) + 1.0), 0.0, 1.0)
+
+
+## Rolls whether a guest who slipped walks out on getting up.
+func rolls_slip_walkout(opinion: float) -> bool:
+	return rng.randf() < slip_walkout_chance(opinion)
+
+
+## How long someone stays down: until helped (a chef 1 s, a guest 6 s, from when help
+## starts) or alone (a guest 20 s, a chef 4 s).
+static func get_up_alone_time(chef: bool) -> float:
+	return GET_UP_ALONE_CHEF if chef else GET_UP_ALONE_GUEST
+
+
+static func help_time(by_chef: bool) -> float:
+	return HELP_UP_CHEF if by_chef else HELP_UP_GUEST
+
+
+## Whether `who` at cell `at` is close enough to see a fall at `fell` (or to help).
+static func within_witness(at: Vector2i, fell: Vector2i) -> bool:
+	return maxi(absi(at.x - fell.x), absi(at.y - fell.y)) <= WITNESS_RADIUS
 
 
 static func sight_disgust_of(lvl: int) -> float:

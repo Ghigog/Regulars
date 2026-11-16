@@ -467,3 +467,279 @@ func test_dirt_stays_overnight():
 	game._end_day()
 	game.step(0.01)
 	assert_eq(game.floor_dirt.mess.level(Vector2i(6, 5)), 3, "no cleaning until the mop (9.4)")
+
+
+# ---------- Slipping in the room (9.3) ----------
+
+func test_slip_opinion_reads_affinity_and_mood_equally():
+	assert_almost_eq(FloorMess.slip_opinion(-1.0, -1.0), 0.0, 0.001)
+	assert_almost_eq(FloorMess.slip_opinion(1.0, 1.0), 1.0, 0.001)
+	assert_almost_eq(FloorMess.slip_opinion(1.0, -1.0), 0.5, 0.001)
+	assert_almost_eq(FloorMess.slip_opinion(0.0, 0.0), 0.5, 0.001)
+
+
+func test_slip_walkout_rolls_follow_the_chance():
+	var m := _room()
+	var out := 0
+	for i in 2000:
+		if m.rolls_slip_walkout(1.0):
+			out += 1
+	assert_between(out, 140, 260, "about one in ten for someone who loves the place")
+
+
+func test_getting_up_times():
+	assert_eq(FloorMess.help_time(true), 1.0)
+	assert_eq(FloorMess.help_time(false), 6.0)
+	assert_eq(FloorMess.get_up_alone_time(false), 20.0)
+	assert_eq(FloorMess.get_up_alone_time(true), 4.0)
+	assert_true(FloorMess.within_witness(Vector2i(3, 3), Vector2i(4, 4)))
+	assert_false(FloorMess.within_witness(Vector2i(3, 3), Vector2i(5, 3)))
+
+
+func _guest_at(game, idx: int, c: Vector2i) -> Guest:
+	var g: Guest = game.spawn_guest(idx)
+	g.position = Grid.center(c)
+	g.cell = c
+	g.path.clear()
+	g.goal = g.position
+	return g
+
+
+func test_stepping_onto_a_level_four_cell_in_service_can_slip():
+	var game = _game()
+	var g := _guest_at(game, 0, Vector2i(6, 5))
+	var a := Vector2i(6, 5)
+	var b := Vector2i(6, 6)
+	var fd: FloorDirt = game.floor_dirt
+	for i in 200:
+		fd.step_feet([[g, a]], true)
+		fd.mess.dirt[b] = 4
+		fd.step_feet([[g, b]], true)
+		if fd.is_down(g):
+			break
+	assert_true(fd.is_down(g), "a quarter of steps onto level 4 slip")
+	assert_eq(fd.down[g].cell, b)
+
+
+func test_no_slips_below_level_four_or_outside_service():
+	var game = _game()
+	var g := _guest_at(game, 0, Vector2i(6, 5))
+	var fd: FloorDirt = game.floor_dirt
+	for i in 100:
+		fd.mess.dirt.clear()
+		fd.step_feet([[g, Vector2i(6, 5)]], true)
+		fd.mess.dirt[Vector2i(6, 6)] = 3
+		fd.step_feet([[g, Vector2i(6, 6)]], true)
+		fd.step_feet([[g, Vector2i(6, 5)]], false)
+		fd.mess.dirt[Vector2i(6, 6)] = 4
+		fd.step_feet([[g, Vector2i(6, 6)]], false)
+	assert_false(fd.is_down(g))
+
+
+func test_a_fallen_guest_feels_it_and_witnesses_within_a_cell_are_put_off():
+	var game = _game()
+	var g := _guest_at(game, 0, Vector2i(6, 5))
+	var near := _guest_at(game, 1, Vector2i(7, 6))
+	var far := _guest_at(game, 2, Vector2i(9, 5))
+	var joy: float = g.mood.joy
+	var near_joy: float = near.mood.joy
+	game.floor_dirt.slip(g, Vector2i(6, 5))
+	assert_almost_eq(g.mood.joy, maxf(0.0, joy - FloorMess.SLIP_JOY), 0.001)
+	assert_true(g.mood.thoughts.has(FloorMess.SLIP_THOUGHT))
+	assert_almost_eq(near.mood.joy, near_joy - FloorMess.WITNESS_JOY, 0.001)
+	assert_true(near.mood.thoughts.has(FloorMess.WITNESS_THOUGHT))
+	assert_false(far.mood.thoughts.has(FloorMess.WITNESS_THOUGHT), "two cells off: did not see")
+
+
+func test_a_fallen_guest_tracks_nothing_and_does_not_walk():
+	var game = _game()
+	var a := Vector2i(6, 5)
+	var g := _guest_at(game, 0, a)
+	var fd: FloorDirt = game.floor_dirt
+	fd.step_feet([[g, a]])
+	fd.slip(g, a)
+	_dirty(game, a, 3)
+	fd.step_feet([[g, a + Vector2i(0, 1)]])
+	assert_eq(fd.mess.level(a), 3)
+	assert_eq(fd.mess.level(a + Vector2i(0, 1)), 0)
+	g.state = "to_seat"
+	g.path.assign([Vector2i(5, 5)])
+	var at := g.position
+	g.tick(0.5)
+	assert_eq(g.position, at, "down on the cell")
+
+
+func test_left_alone_a_guest_gets_up_after_twenty_seconds_angrier():
+	var game = _game()
+	var g := _guest_at(game, 0, Vector2i(6, 5))
+	var fd: FloorDirt = game.floor_dirt
+	fd.slip(g, Vector2i(6, 5))
+	for i in 199:
+		fd.tick_slips(0.1)
+	assert_true(fd.is_down(g), "still down at 19.9 s")
+	var joy: float = g.mood.joy
+	fd.tick_slips(0.2)
+	assert_false(fd.is_down(g))
+	assert_true(g.mood.thoughts.has(FloorMess.ALONE_THOUGHT))
+	assert_lt(g.mood.joy, joy + 0.0001)
+
+
+func test_a_chef_helps_a_fallen_guest_up_with_e_in_a_second():
+	var game = _game()
+	var c := Vector2i(6, 5)
+	var g := _guest_at(game, 0, c)
+	var ch: Player = game.player
+	ch.position = Grid.center(c + Vector2i(0, 1))
+	assert_false(game.grid.is_blocked(c + Vector2i(0, 1)), "the test needs open floor below")
+	var fd: FloorDirt = game.floor_dirt
+	fd.slip(g, c)
+	assert_eq(fd.help_target(ch), g)
+	game.act(0, "use")
+	assert_eq(fd.helping(ch), g)
+	var at := ch.position
+	ch.move(Vector2(1, 0), 0.2)
+	assert_eq(ch.position, at, "the chef stays put while helping")
+	fd.tick_slips(0.9)
+	assert_true(fd.is_down(g))
+	fd.tick_slips(0.2)
+	assert_false(fd.is_down(g))
+	assert_null(fd.helping(ch))
+	assert_true(g.mood.thoughts.has(FloorMess.HELPED_THOUGHT))
+
+
+func test_a_chef_too_far_away_cannot_help():
+	var game = _game()
+	var g := _guest_at(game, 0, Vector2i(6, 5))
+	game.player.position = Grid.center(Vector2i(2, 3))
+	game.floor_dirt.slip(g, Vector2i(6, 5))
+	assert_null(game.floor_dirt.help_target(game.player))
+
+
+func test_an_unseated_guest_nearby_helps_up_in_six_seconds():
+	var game = _game()
+	var c := Vector2i(6, 5)
+	var g := _guest_at(game, 0, c)
+	var o := _guest_at(game, 1, c + Vector2i(1, 0))
+	o.state = "to_seat"
+	var fd: FloorDirt = game.floor_dirt
+	fd.slip(g, c)
+	fd.tick_slips(0.1)
+	assert_eq(o.helping, g, "the friend comes over")
+	for i in 58:
+		fd.tick_slips(0.1)
+	assert_true(fd.is_down(g), "still down just short of six seconds")
+	fd.tick_slips(0.2)
+	assert_false(fd.is_down(g))
+	assert_null(o.helping, "free to go on")
+
+
+func test_a_seated_guest_does_not_get_up_to_help():
+	var game = _game()
+	var c := Vector2i(6, 5)
+	var g := _guest_at(game, 0, c)
+	var o := _guest_at(game, 1, c + Vector2i(1, 0))
+	o.state = "waiting"
+	game.floor_dirt.slip(g, c)
+	game.floor_dirt.tick_slips(0.1)
+	assert_null(o.helping)
+
+
+func test_a_chef_takes_over_from_a_helping_guest():
+	var game = _game()
+	var c := Vector2i(6, 5)
+	var g := _guest_at(game, 0, c)
+	var o := _guest_at(game, 1, c + Vector2i(1, 0))
+	o.state = "to_seat"
+	var fd: FloorDirt = game.floor_dirt
+	fd.slip(g, c)
+	fd.tick_slips(0.1)
+	game.player.position = Grid.center(c + Vector2i(0, 1))
+	assert_true(fd.help_up(game.player))
+	assert_null(o.helping)
+	fd.tick_slips(1.05)
+	assert_false(fd.is_down(g))
+
+
+func test_a_guest_who_already_disliked_the_place_mostly_walks_out_on_getting_up():
+	var game = _game()
+	var c := Vector2i(6, 5)
+	var fd: FloorDirt = game.floor_dirt
+	var walked := false
+	for k in 10:
+		var g := _guest_at(game, k, c)
+		game.town.people[k].affinity = -1.0
+		g.mood.joy = 0.0
+		g.mood.patience = 0.6
+		g.state = "to_seat"
+		assert_lt(fd.opinion(g), 0.3)
+		fd.slip(g, c)
+		fd.get_up(g, true)
+		if g.state == "leaving" and g.stormed:
+			walked = true
+			break
+	assert_true(walked, "nine in ten walk out")
+
+
+func test_a_guest_already_leaving_is_not_rolled_again():
+	var game = _game()
+	var g := _guest_at(game, 0, Vector2i(6, 5))
+	g.state = "leaving"
+	var walkouts: int = game.ledger.strikes()
+	game.floor_dirt.slip(g, Vector2i(6, 5))
+	game.floor_dirt.get_up(g, true)
+	assert_eq(game.ledger.strikes(), walkouts)
+
+
+func test_a_chef_slips_cannot_move_and_gets_up_alone_after_four_seconds():
+	var game = _game()
+	var ch: Player = game.player
+	var fd: FloorDirt = game.floor_dirt
+	fd.slip(ch, ch.cell())
+	var at := ch.position
+	ch.move(Vector2(1, 0), 0.2)
+	assert_eq(ch.position, at)
+	game.act(0, "use")   # nothing: they are on the floor
+	for i in 39:
+		fd.tick_slips(0.1)
+	assert_true(fd.is_down(ch))
+	fd.tick_slips(0.2)
+	assert_false(fd.is_down(ch))
+
+
+func test_the_other_chef_helps_a_fallen_chef_up():
+	var game = _game()
+	var one: Player = game.player
+	var c: Vector2i = one.cell()
+	var two: Player = game.add_chef(c + Vector2i(1, 0))
+	var fd: FloorDirt = game.floor_dirt
+	fd.slip(one, c)
+	assert_null(fd.help_target(one), "not themselves")
+	assert_true(fd.help_up(two))
+	fd.tick_slips(1.05)
+	assert_false(fd.is_down(one))
+
+
+func test_a_fallen_guest_is_drawn_down_with_stars_and_a_help_bar():
+	var game = _game()
+	var c := Vector2i(6, 5)
+	var g := _guest_at(game, 0, c)
+	var fd: FloorDirt = game.floor_dirt
+	fd.slip(g, c)
+	var mark: Node3D = fd.down[g].mark
+	assert_eq(mark.get_parent(), g)
+	assert_false(mark.get_node("bar").visible, "no help yet")
+	game.player.position = Grid.center(c + Vector2i(0, 1))
+	fd.help_up(game.player)
+	fd.tick_slips(0.5)
+	assert_true(mark.get_node("bar").visible)
+	g.tick(0.1)
+	assert_eq(g._body.face, "dazed")
+	fd.tick_slips(0.6)
+	assert_true(mark.is_queued_for_deletion())
+
+
+func test_the_end_of_the_day_gets_everyone_up():
+	var game = _game()
+	game.floor_dirt.slip(game.player, game.player.cell())
+	game._end_day()
+	assert_false(game.floor_dirt.is_down(game.player))

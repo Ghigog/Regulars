@@ -299,6 +299,29 @@ func _me(ch: Player) -> Player:
 	return ch if ch != null else player
 
 
+## The slip demo: the first guest inside goes down on a level 4 cell, the friend beside them.
+func _demo_slip() -> void:
+	var party: Array = guests.filter(func(o: Guest) -> bool: return o.state == "to_seat")
+	if party.is_empty():
+		return
+	var c := Vector2i(7, 4)   # open floor between the tables, in plain view
+	for d in [Vector2i.ZERO, Vector2i(0, 1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1)]:
+		if not grid.is_blocked(c + d) and plan.floors.has(c + d):
+			c += d
+			break
+	for i in 4:
+		floor_dirt.mess.add_dirt(c)
+	var g: Guest = party[0]
+	g.position = Grid.center(c) + Vector3(-0.3, 0, 0.3)
+	g.cell = c
+	g._body.rotation.y = -PI / 4   # so they fall across the screen, the puddle in front of them
+	if party.size() > 1:   # the friend a step behind, who saw it
+		var o: Guest = party[1]
+		o.position = Grid.center(c) + Vector3(-0.6, 0, -1.0)   # behind, on the side they help from
+		o.cell = Grid.to_cell(o.position)
+	floor_dirt.slip(g, c)
+
+
 ## Dev aid for screenshots: REGULARS_DEMO=cook or =summary jumps to that moment.
 func _apply_demo(demo: String) -> void:
 	if demo == "cook":   # a patty on the grill, the chef with a tray for it
@@ -323,6 +346,10 @@ func _apply_demo(demo: String) -> void:
 		arrivals.resize(mini(arrivals.size(), 2))
 		for a in arrivals:
 			a.time = 0.5
+	elif demo == "slip":  # a guest down on a level 4 cell, dizzy, a friend who saw it helping them up; shoot at about 7.5
+		arrivals.clear()
+		arrivals.append({"time": 0.2, "group": [0, 1]})
+		get_tree().create_timer(5.5).timeout.connect(_demo_slip)
 	elif demo == "messy":  # a sink piled with washing-up and an overflowing bin; shoot at about 10
 		var sink := find_station("sink")
 		sink.dirty = 4
@@ -2493,6 +2520,7 @@ func close_early() -> void:
 
 func _end_day() -> void:
 	_cancel_all_preps()
+	floor_dirt.clear_slips()   # a chef still down gets up for the night
 	set_door(false)
 	shopper = null
 	upgrading = false
@@ -2994,14 +3022,15 @@ static func _near(a: Vector2i, b: Vector2i, r: int) -> bool:
 
 
 ## Dirt on the floor follows the room, moves with everyone's feet and is drawn (PRD 9).
-func _tick_floor() -> void:
+func _tick_floor(delta: float) -> void:
 	floor_dirt.sync_room()
 	var walkers := []
 	for ch in chefs:
 		walkers.append([ch, ch.cell()])
 	for g in guests:
 		walkers.append([g, Grid.to_cell(g.position)])
-	floor_dirt.step_feet(walkers)
+	floor_dirt.step_feet(walkers, phase == Phase.SERVICE)   # slips only while open (9.3)
+	floor_dirt.tick_slips(delta)
 	floor_dirt.redraw()
 
 
@@ -3998,7 +4027,7 @@ func _tick_stoves(delta: float) -> void:
 func step(delta: float) -> void:
 	for st: Station in stations.values():
 		st.dirty_age = Cleaning.aged(st.dirty_age, delta, st.messy(), phase == Phase.SERVICE)
-	_tick_floor()
+	_tick_floor(delta)
 	if phase != Phase.SERVICE:
 		return
 	clock += delta
@@ -4067,6 +4096,11 @@ func _update_camera(delta: float) -> void:
 
 func _update_cursor(ch: Player = null) -> void:
 	ch = _me(ch)
+	var fallen: Node3D = floor_dirt.help_target(ch) if phase == Phase.SERVICE else null
+	if fallen != null:   # someone down beside the chef: helping them up comes first (PRD 9.3)
+		ch.cursor.visible = false
+		hud.show_prompt(cam.unproject_position(fallen.position + Vector3(0, 1.9, 0)), "Help up", chefs.find(ch))
+		return
 	var st: Station = stations.get(ch.target_cell())
 	var action := ""
 	if st != null:
@@ -4430,6 +4464,10 @@ func act(p: int, action: String, echo := false) -> void:
 				turn_tray(stations.get(ch.target_cell()))
 			elif action == "menu":
 				open_menu(ch)   # refused: it says why
+			elif floor_dirt.is_down(ch) or floor_dirt.helping(ch) != null:
+				pass   # on the floor, or helping someone up (PRD 9.3)
+			elif action == "use" and floor_dirt.help_up(ch):
+				ch.punch()
 			elif action == "use":
 				var st: Station = stations.get(ch.target_cell())
 				if st != null and prompt_for(st, ch) != "":
