@@ -13,7 +13,8 @@ project can build it. Read `CLAUDE.md` first, then the PRD, then only the code i
 | 6 | [Reach display for finishes and rugs](06-reach-display.md) | Small | nothing | Built (merged) |
 | 7 | [More catalog pieces and themed shops](07-catalog-and-themes.md) | Medium | piece list signed off | Built (13 November 2026) |
 | 8 | [Counters, storage and the tool tree](08-counters-storage-tools.md) | Very large, seven milestones | nothing | Agreed, not built (16 November 2026) |
-| 9 | [Floor mess and cleaning](09-floor-mess.md) | Large, six milestones | 8 | Agreed, not built (16 November 2026) |
+| 9 | [Floor mess and cleaning](09-floor-mess.md) | Large, six milestones | 8, from 9.4 on | Agreed, not built (16 November 2026) |
+| 10 | [Staff](10-staff.md) | Very large, eight milestones | 8, 9 (per milestone) | Agreed, not built (16 November 2026) |
 
 ## Suggested order
 
@@ -27,12 +28,57 @@ doing that move twice.
 same time in one checkout. Use a worktree each and merge one at a time, or build them in
 sequence.
 
+## Build order for PRDs 8 to 10
+
+Written 16 November 2026, after all three were agreed. Each milestone has an id (8.1,
+9.4, 10.6 and so on) and a *Needs* line in its PRD. Start a session per track below.
+
+| Wave | Track A: PRD 8 spine | Track B: floor mess | Track C: staff | Can start when |
+| --- | --- | --- | --- | --- |
+| 1 | 8.1 kitchen sim | 9.1 floor-mess sim | 10.1 tolerances, then 10.2 staff sim | now |
+| 2 | 8.2 counters and tops | 9.2 dirt in the room | | 8.1 / 9.1 merged |
+| 3 | 8.3 upgrade trees | 9.3 slipping | 10.3 desk and CVs | 8.2 merged (for 10.3) |
+| 4 | 8.4 storage | | 10.4 staff list | |
+| 5 | 8.5 wall layer | | | |
+| 6 | 8.6 new jobs and ingredients | 9.4 mops, hook, robot; then 9.5 treatments and trees | | 8.5 merged |
+| 7 | 8.7 art and docs | 9.6 docs | 10.5 task board | 8.4 and 9.4 merged |
+| 8 | | | 10.6 helpers in the room | 10.4 and 10.5 merged |
+| 9 | | | 10.7 all-staff run, 10.8 docs | 8.6 merged |
+
+**The critical path** is 8.1 > 8.2 > 8.3 > 8.4 > 8.5 > 9.4 > 10.5 > 10.6 > 10.7. Keep a
+session on track A at all times; tracks B and C fill in around it.
+
+**Why this order**
+- Wave 1 is all pure `sim/` code in four new files (`kitchen.gd`, `floor_mess.gd`,
+  `staff.gd`) plus 10.1 in `town.gd` and `guest_mood.gd`, so up to four sessions can run
+  at once (10.1 and 10.2 split into two) with almost no overlap.
+- PRD 8's milestones were reordered so the upgrade screen (8.3) comes before storage
+  (8.4): chilled food has to live in a fridge, and a fridge is reached by upgrading a
+  counter. Removing the crates before fridges exist would strand patties and fish.
+- Dirt (9.2, 9.3) needs nothing from PRD 8: tool `mess` factors and the hood read as 1.0
+  and absent until 8.3 and 8.5 merge. Mops need PRD 8's wall layer (the hook, the closet).
+- The desk screen (10.3, 10.4) only needs tools on counters to list duties, so it runs
+  beside PRD 8. The desk stays out of the shop until helpers can work (10.6).
+- The task board (10.5) needs every kind of task to exist: fetching from storage (8.4),
+  dirt, fallen people and mops (9.2 to 9.4). The all-staff run (10.7) needs every tool
+  (8.6), since it is the check that no task is left without a duty.
+
+**Working in tandem**
+- One worktree per track, branched from the latest `main`. Merge one at a time, always
+  track A first when two are ready, then rebase the others on `main` before they merge.
+- Waves 2 to 7 all edit `game/main.gd` and `game/hud.gd`. That is why there are at most
+  three tracks; do not split a track further.
+- Each PRD's tests go in its own file (`test_kitchen.gd`, `test_floor_mess.gd`,
+  `test_staff.gd`), not `test_sim.gd`, so merges do not collide there. Update the test
+  count in `CLAUDE.md` after each merge, on `main`.
+- Run `--headless --import` in every new worktree before anything else (`CLAUDE.md`).
+
 ## Rules for every PRD
 
 - `sim/` stays pure: no scene or node dependencies, every rule unit-tested there. `game/`
   only draws and wires it up.
-- All existing tests pass before and after (252 after PRDs 7 and 2, 13 November 2026; update the count in
-  `CLAUDE.md` when it changes). Each PRD lists the new tests it needs.
+- All existing tests pass before and after (the count is in `CLAUDE.md`; update it there
+  when it changes). Each PRD lists the new tests it needs.
 - Every visible feature gets a `REGULARS_DEMO` hook in `_apply_demo` (`game/main.gd`), is
   listed in `CLAUDE.md`, and is checked with a screenshot at the times given.
 - New interface follows `docs/STYLE_GUIDE.md` (paper and wood, toy diorama), reads at

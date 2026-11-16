@@ -1,8 +1,8 @@
 # PRD 9: Floor mess and cleaning
 
 **Status:** agreed, not built (16 November 2026). Build after PRD 8.
-**Size:** large. **Needs:** PRD 8 (upgrade trees from the shop, the hood, tool `mess`
-factors). **Touches:** a new `sim/floor_mess.gd`, `sim/cleaning.gd`, `sim/guest_mood.gd`,
+**Size:** large; six milestones (9.1 to 9.6). **Needs:** only from 9.4 on: PRD 8
+milestones 8.3 to 8.5 (tree screen, storage, wall layer). 9.1 to 9.3 can start now. **Touches:** a new `sim/floor_mess.gd`, `sim/cleaning.gd`, `sim/guest_mood.gd`,
 `sim/critic.gd`, `sim/catalog.gd`, `sim/town.gd` (a messy trait), `game/main.gd`,
 `game/guest.gd`, `game/player.gd`, `game/build.gd`, `game/fx.gd`, tests, docs.
 
@@ -136,15 +136,23 @@ cuts the smell radius of kitchen dirt by one).
 
 ## Milestones
 
-1. `sim/floor_mess.gd`: levels, overflow, tracking, speed, slip, disgust by sight and
-   smell, sources. Tests only.
-2. Dirt in the room: drawn by level, footprints, slowing for chefs and guests, sources from
-   prep and meals, disgust and the critic.
-3. Slipping: down, helped up, witnesses.
-4. Mop bucket, wall hook, sponge and mop, in service and at night, uncovering cells by
-   moving furniture; the robot sweeper and its dock.
-5. Treatments and the cleaning and hood trees.
-6. Demos, style guide "As built", `DESIGN.md`.
+Build order and tandem work: `docs/prd/README.md`, "Build order for PRDs 8 to 10". Tests
+for this PRD go in a new `test/unit/test_floor_mess.gd`. Until PRD 8 lands, a tool's
+`mess` factor and the hood are 1.0 and absent: read them through one function so they
+light up when 8.3 and 8.5 merge.
+
+1. **9.1** `sim/floor_mess.gd`: levels, overflow, tracking, speed, slip, disgust by sight
+   and smell, sources. Tests only. *Needs nothing.*
+2. **9.2** Dirt in the room: drawn by level, footprints, slowing for chefs and guests,
+   sources from prep and meals, disgust and the critic. *Needs 9.1.*
+3. **9.3** Slipping: down, helped up, witnesses, the walkout chance. *Needs 9.2.*
+4. **9.4** Mop bucket, wall hook, sponge and mop, in service and at night, uncovering
+   cells by moving furniture; the robot sweeper and its dock. *Needs 9.3 and 8.5* (the
+   wall hook is a high-layer piece; the closet is PRD 8 storage).
+5. **9.5** Treatments (boxes in storage, the no-chemicals-with-food rule, re-laid
+   nightly on the restock note) and the cleaning and hood trees. *Needs 9.4, 8.3 (tree
+   screen) and 8.4 (Pantry tab and slots).*
+6. **9.6** Demos, style guide "As built", `DESIGN.md`. *Needs 9.5.*
 
 ## Open questions
 

@@ -1,7 +1,7 @@
 # PRD 8: Counters, storage and the tool tree
 
 **Status:** agreed, not built (16 November 2026).
-**Size:** very large; build it in the seven milestones at the end, each mergeable.
+**Size:** very large; build it in the seven milestones at the end (8.1 to 8.7), each mergeable.
 **Needs:** nothing. **Touches:** `sim/catalog.gd`, `sim/pantry.gd`, `sim/menu.gd`,
 `sim/prep.gd`, a new `sim/kitchen.gd` (cells, layers, slots), `game/main.gd`,
 `game/station.gd`, `game/build.gd`, `game/scenery.gd`, `game/hud.gd`, `game/menu_screen.gd`,
@@ -184,18 +184,28 @@ is a flag (`has_hood(cell)`) ready for it, and each tree node carries a `mess` f
 
 ## Milestones
 
-1. `sim/kitchen.gd`: cells with base, top, high; slot counting; chilled rules; `jobs` and
-   stand-in quality. Tests only.
-2. Counters and tops: tools move onto counters, double counters, every counter sellable,
-   starting kitchen rebuilt from pieces.
-3. Storage: Pantry tab, boxes into slots, crates removed, menu and restock read slots, E
-   takes and cycles.
-4. Wall layer: cabinets, shelves, closet, fridges level 1 and 2, hood, first-room fixtures
-   as pieces.
-5. Upgrade trees: the shop-in-hand screen on blueprint paper, quality in the minigames, the five
-   existing jobs' trees.
-6. New jobs and ingredients (grate, saw, juice, blend, steam) and their trees' nodes.
-7. Art pass, demos, style guide "As built", `DESIGN.md`.
+Build order, cross-PRD tandem work and merge rules: `docs/prd/README.md`, "Build order
+for PRDs 8 to 10". Milestone ids below (8.1 and so on) are used there. Tests for this PRD
+go in a new `test/unit/test_kitchen.gd`, not `test_sim.gd`, so parallel work does not
+collide.
+
+1. **8.1** `sim/kitchen.gd`: cells with base, top, high; slot counting; chilled rules;
+   the tree data (nodes, efficient or specialist, `jobs`, `mess` factor, price); stand-in
+   quality. Tests only. *Needs nothing.*
+2. **8.2** Counters and tops: tools move onto counters, double counters, every counter
+   sellable, starting kitchen rebuilt from pieces. Crates still work. *Needs 8.1.*
+3. **8.3** Upgrade trees: the shop opened with a piece in hand, on blueprint paper; trees
+   for the five existing jobs and the counter line (fridge nodes included); stand-in and
+   specialist quality in the minigames. *Needs 8.2.*
+4. **8.4** Storage: Pantry tab, boxes into slots, chilled kinds only in fridges (the
+   under-counter fridge, reached through the counter tree), crates removed, menu and
+   restock read slots, E takes and cycles. *Needs 8.3* (a fridge is only reached by
+   upgrading a counter).
+5. **8.5** Wall layer: cabinets, shelves, closet, tall fridge and its branches, hood,
+   first-room fixtures as pieces. *Needs 8.4.*
+6. **8.6** New jobs and ingredients (grate, saw, juice, blend, steam), their minigames and
+   their trees' nodes. *Needs 8.5.*
+7. **8.7** Art pass, demos, style guide "As built", `DESIGN.md`. *Needs 8.6.*
 
 ## Open questions
 
