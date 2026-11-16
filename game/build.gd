@@ -1144,9 +1144,10 @@ static func register(n: Node3D) -> void:
 
 
 ## Which body an ingredient station has: a cold cabinet for meat, fish and cheese,
-## a sack for potatoes and onions, a fountain or barrel for drinks, else a crate.
+## a sack for potatoes and onions, a fountain or barrel for poured drinks, else a crate
+## (a juiced or blended drink's box is a crate of its fruit, not a dispenser).
 static func _store_kind(id: String) -> String:
-	if Pantry.is_drink(id):
+	if Pantry.is_poured(id):
 		return "drink"
 	if id in ["fish", "calamari", "mussels"]:
 		return "ice"
@@ -1366,10 +1367,11 @@ static func _node_marks(n: Node3D, node: String) -> void:
 				box(n, Vector3(-0.2 + k * 0.1, 0.93, 0.02), Vector3(0.03, 0.03, 0.7), "#1f2224", 0.0, R_WOOD)
 		"twin_fryer":   # a second basket handle
 			box(n, Vector3(0.05, 1.02, -0.36), Vector3(0.04, 0.24, 0.04), STEEL_DARK)
-		"rotary_grater":   # a crank on the grater's side
-			cyl(n, Vector3(0.06, 1.15, -0.04), 0.05, 0.04, STEEL_DARK).rotation.z = PI / 2
-			box(n, Vector3(0.1, 1.22, -0.04), Vector3(0.03, 0.16, 0.03), STEEL_DARK)
-			ball(n, Vector3(0.1, 1.31, -0.04), 0.035, CORAL)
+		"rotary_grater":   # a drum and a big crank on the grater's side, a coral knob
+			cyl(n, Vector3(0.07, 1.12, -0.04), 0.09, 0.05, STEEL_DARK).rotation.z = PI / 2
+			box(n, Vector3(0.11, 1.22, -0.04), Vector3(0.035, 0.24, 0.035), STEEL_DARK)
+			box(n, Vector3(0.16, 1.33, -0.04), Vector3(0.1, 0.035, 0.035), STEEL_DARK)
+			ball(n, Vector3(0.22, 1.33, -0.04), 0.05, CORAL)
 		"two_tap_fountain", "wine_rack":   # a second tap
 			box(n, Vector3(0.22, 1.25, 0.2), Vector3(0.06, 0.16, 0.06), "#c9d0d1", 0.0, R_WOOD)
 			ball(n, Vector3(0.22, 1.36, 0.2), 0.05, CORAL if node == "two_tap_fountain" else "#7a2e3a")

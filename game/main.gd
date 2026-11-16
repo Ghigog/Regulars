@@ -824,6 +824,8 @@ func _demo_tree(demo: String) -> void:
 	var c := Vector2i(2, 5)
 	if demo == "jobs":   # PRD 8.6: the new tools in a row, and the new food on the counters before them
 		_demo_jobs()
+		player.position = Grid.center(Vector2i(4, 6))   # off the row, so no prompt hides a tool
+		player.look(Vector2i(0, 1))
 		_frame = [Vector3(5.0, 0, 3.2), 6.8, Vector3(5.0, 0, 3.2), 6.8]   # close up, held
 		return
 	if demo == "upgraded":
@@ -862,8 +864,8 @@ func _demo_jobs() -> void:
 	var diner := Scenery.theme_id != "seaside"
 	var tools := ["grater", "rotary_grater", "bread_knife", "juicer", "blender", "steamer",
 		"coffee_machine" if diner else "beer_tap", "two_tap_fountain" if diner else "wine_rack"]
-	var spots := [Vector2i(5, 2), Vector2i(6, 2), Vector2i(7, 2), Vector2i(8, 2), Vector2i(5, 3), Vector2i(6, 3),
-		Vector2i(7, 3), Vector2i(5, 4), Vector2i(6, 4), Vector2i(7, 4)].filter(func(c: Vector2i) -> bool: return not stations.has(c))
+	var spots := [Vector2i(5, 2), Vector2i(6, 2), Vector2i(7, 2), Vector2i(5, 3), Vector2i(6, 3),
+		Vector2i(7, 3), Vector2i(5, 4), Vector2i(6, 4), Vector2i(7, 4), Vector2i(8, 2)].filter(func(c: Vector2i) -> bool: return not stations.has(c))
 	for i in tools.size():
 		add_station("counter", spots[i])
 		add_station(tools[i], spots[i])

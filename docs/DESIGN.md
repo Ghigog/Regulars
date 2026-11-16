@@ -27,7 +27,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   cell draw as one closet. The counter's tree goes on from the under-counter fridge to
   the tall fridge (two kinds, fills both wall layers, no top), then the glass-door tall
   fridge (three kinds) or the freezer (two kinds; takes frozen kinds, of which there are
-  none until 8.6). The first room starts with two hoods over the cooking line, two
+  ice cream since 8.6). The first room starts with two hoods over the cooking line, two
   cabinets by the back door and the jar shelf over the sink, each sellable; the kitchen
   sconce is gone. At night E lifts the tool, then the boxes, then the wall piece, then
   what stands below. High slots are storage like any other; a cabinet hung over bare
@@ -332,6 +332,27 @@ Survive as many days as you can; three walkouts in one day ends the run.
   boils (working as a fryer or pot while that is on it), a pot or fryer grills at 0.4,
   and the menu counts them as tools. The auto slicer plays itself: always good, no burst.
   `REGULARS_DEMO=tree`, `tree_stove`, `tree_counter`, `tree_fern`, `upgraded`.
+- **New jobs (PRD 8.6).** Five more jobs, each a specialist branch of an existing tree
+  with a short press minigame (`Prep`, `PrepWidget`): grate (grater off the slicer, then
+  the rotary grater; hold to rub, keep the speed in the green), saw (bread knife off the
+  board; press at the end of each stroke), juice (juicer off the bread knife; hold to
+  press a half, let go in the green, three halves), blend (blender off the juicer; pulse
+  without rocking the lid off) and steam (steamer off the stock pot; lift the lid while
+  the gauge is green). Two more dispensers: the coffee machine off the soda fountain and
+  the beer tap off the wine barrel; the two-tap fountain adds cola, the wine rack red
+  wine. New kinds, diner: shredded cheese, sourdough, steamed corn (from the corn box),
+  ice cream (frozen: freezer only), orange juice, milkshake (from the ice cream box),
+  cola, coffee. Seaside: breadcrumbs (a coating: bread to taste, never wraps; makes a
+  breaded fillet), crusty loaf, mussels (chilled), lemonade (from the lemon box), fruit
+  smoothie, red wine, ale. A made-from kind needs no box of its own. Stand-ins: a grater
+  slices, a bread knife chops, a blender juices. `REGULARS_DEMO=jobs`, `tree_cut`,
+  `prep_grate`, `prep_saw`, `prep_juice`, `prep_blend`, `prep_steam`.
+- **Art pass (PRD 8.7).** Every PRD 8 visual checked in both themes (`counters`,
+  `storage`, `pantry`, `wall`, `wall_build`, the tree demos, `upgraded`, `jobs`, the new
+  prep demos). Changes: a juiced or blended drink's box is a crate of its fruit, not a
+  dispenser; the rotary grater's crank is bigger; a tool's tree card is framed closer;
+  `jobs` shows all eight new tools with the chef stood clear. Details in the style
+  guide's "As built".
 - **Tier effects:** a fern that gives more and is seen from further, a tier 2+ table gives seated guests
   +0.05 joy per tier. Counters and partitions gain nothing but looks.
 - **Guest card.** Click a guest during service to see their standing, visit number, the
