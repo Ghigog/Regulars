@@ -174,6 +174,7 @@ var cam: Camera3D
 var _gross: Array[Dictionary] = []
 var floor_dirt: FloorDirt              # dirt on the floor (PRD 9)
 var clean_kit: CleanKit                # mops, sponges and robot sweepers (PRD 9.4)
+var crew: Crew                         # the hired helpers at work in the room (PRD 10.6)
 var _sfx := {}
 var music_id := ""               # which MUSIC track is playing
 var _music: AudioStreamPlayer
@@ -205,6 +206,9 @@ func _ready() -> void:
 	clean_kit = CleanKit.new()
 	add_child(clean_kit)
 	clean_kit.setup(self)
+	crew = Crew.new()
+	add_child(crew)
+	crew.setup(self)
 	_load_sounds()
 	add_chef()
 	controls = Controls.new()
@@ -410,6 +414,8 @@ func _apply_demo(demo: String) -> void:
 		player.set_held("tray", 1.0, Tray.new())
 		for a in arrivals:
 			a.time = 1.0
+	elif demo in ["helpers", "helpers_break"]:   # PRD 10.6: staff at work; see Crew.demo
+		crew.demo(demo)
 	elif demo == "dirt":  # every level of floor dirt, footprints, guests slowed tracking it in; shoot at about 7
 		floor_dirt.sync_room()
 		var m := floor_dirt.mess
@@ -1974,6 +1980,7 @@ func start_day() -> void:
 		arrivals.append({"time": t, "group": groups[i]})
 	if critic_day:
 		_book_critic(critic.arrival_time(day_length()))
+	crew.start_day()   # staff at work today walk in as the door opens (PRD 10.6)
 	play_music("day")
 	hud.show_banner("Day %d" % ledger.day)
 	hud.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
@@ -3218,6 +3225,7 @@ func close_early() -> void:
 
 func _end_day() -> void:
 	_cancel_all_preps()
+	crew.clear()   # the staff go home
 	floor_dirt.clear_slips()   # a chef still down gets up for the night
 	clean_kit.end_day()   # robot sweepers go back to their docks
 	floor_dirt.mess.treat = {}   # the day's treatments are worn off (PRD 9.5)
@@ -3239,6 +3247,7 @@ func _end_day() -> void:
 
 func _close_down() -> void:
 	_cancel_all_preps()
+	crew.clear()
 	play_music("closed")
 	phase = Phase.CLOSED
 	var days := ledger.day
@@ -3735,7 +3744,7 @@ static func _near(a: Vector2i, b: Vector2i, r: int) -> bool:
 func _tick_floor(delta: float) -> void:
 	floor_dirt.sync_room()
 	var walkers := []
-	for ch in chefs:
+	for ch in hands():   # chefs and helpers
 		walkers.append([ch, ch.cell()])
 	for g in guests:
 		walkers.append([g, Grid.to_cell(g.position)])
@@ -3763,7 +3772,7 @@ func _collect_gross() -> void:
 			_gross.append({"cell": st.cell, "kind": "sink", "age": st.dirty_age, "thought": "Look at that washing-up"})
 		elif (st.type == "stove" or st.type == "fryer") and st.item.begins_with("burnt:"):
 			_gross.append({"cell": st.cell, "kind": "burning", "age": st.cook - Station.BURN_TIME, "thought": "Something is burning in there"})
-	for ch in chefs:
+	for ch in hands():
 		if ch.carrying_something_gross():
 			_gross.append({"cell": ch.cell(), "kind": "rubbish", "key": "rubbish", "thought": "I just watched the chef carry rubbish past me"})
 
@@ -4362,13 +4371,21 @@ func find_ticket(id: int) -> Dictionary:
 	return {}
 
 
+## Everyone with hands in the room: the chefs, then the helpers at work (PRD 10.6).
+func hands() -> Array[Player]:
+	var out: Array[Player] = chefs.duplicate()
+	if crew != null:
+		out.append_array(crew.helpers)
+	return out
+
+
 ## Every tray in the room and in hand.
 func all_trays() -> Array[Tray]:
 	var out: Array[Tray] = []
 	for st: Station in stations.values():
 		if st.item == "tray" and st.tray != null:
 			out.append(st.tray)
-	for ch in chefs:
+	for ch in hands():
 		if ch.held == "tray" and ch.tray != null:
 			out.append(ch.tray)
 	return out
@@ -4417,7 +4434,7 @@ func _show_tray(t: Tray) -> void:
 		st.tray_tag = tray_tag(t)
 		st.show_tray()
 	else:
-		for ch in chefs:
+		for ch in hands():
 			if ch.tray == t:
 				ch.set_held("tray", 1.0, t, tray_tag(t))
 
@@ -5289,6 +5306,7 @@ func step(delta: float) -> void:
 	_tick_preps(delta)
 	for c in chefs:
 		c.tick(delta)
+	crew.tick(delta)
 	_collect_gross()
 	_seat_waiting_guests()
 	for g in guests.duplicate():

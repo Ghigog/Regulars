@@ -514,14 +514,13 @@ func test_ratings_leave_tolerances_and_tastes_alone():
 	assert_eq(a.people.map(func(p: Dictionary) -> Array: return p.likes), likes)
 
 
-func test_the_desk_is_a_one_cell_catalog_piece_kept_off_sale():
+func test_the_desk_is_a_one_cell_catalog_piece_on_sale_with_helpers():
 	assert_true(Catalog.ITEMS.has("desk"))
 	assert_eq(int(Catalog.ITEMS.desk.tiers), 1)
-	assert_eq(Catalog.STAFF_ON_SALE, false, "on sale with helpers (10.6)")
-	assert_false(Catalog.sold_in("desk", "diner"))
-	assert_false(Catalog.sold_in("desk", ""))
-	for bp in Catalog.search("desk"):
-		assert_ne(bp.id, "desk")
+	assert_eq(Catalog.STAFF_ON_SALE, true, "on sale since helpers work (10.6)")
+	assert_true(Catalog.sold_in("desk", "diner"))
+	assert_true(Catalog.sold_in("desk", "seaside"))
+	assert_true(Catalog.search("desk").any(func(bp: Dictionary) -> bool: return bp.id == "desk"))
 
 
 # ---------- The staff list (PRD 10.4) ----------
