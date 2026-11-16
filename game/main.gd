@@ -139,6 +139,11 @@ var allow_quit := true           # tests turn this off to check Quit without lea
 var quit_asked := false
 var shopper: Player              # the chef whose player opened the shop; they stand still while it is open
 var upgrading := false           # the shop is showing the upgrade tree of what the shopper holds (PRD 8.3)
+## Floor treatments (PRD 9.5): Vector2i -> Treatments key, laid at night and re-laid each
+## night for its price while switched on and its box is stored; key -> true for those
+## switched off (still laid, not paid for or in force).
+var treat_laid := {}
+var treat_off := {}
 var shopping: bool:              # the shop is open over the build phase
 	get: return shopper != null
 var door_open := true            # which side of the door card faces the street
@@ -421,6 +426,10 @@ func _apply_demo(demo: String) -> void:
 			a.time = 0.5
 	elif demo in ["mop", "robot", "mop_night"]:  # PRD 9.4: see _demo_mop
 		_demo_mop(demo)
+	elif demo in ["treat", "treat_day", "tree_box", "tree_bucket", "tree_sponge"]:  # PRD 9.5: see _demo_treat
+		ledger.record_sale(DEMO_BILL, 5)
+		arrivals.clear()
+		get_tree().create_timer(1.0).timeout.connect(_demo_treat.bind(demo))
 	elif demo == "slip":  # a guest down on a level 4 cell, dizzy, a friend who saw it helping them up; shoot at about 7.5
 		arrivals.clear()
 		arrivals.append({"time": 0.2, "group": [0, 1]})
@@ -856,6 +865,73 @@ func _demo_tree(demo: String) -> void:
 	if demo == "tree_cut":   # PRD 8.6: the whole cutting tree, scrolled down to the bread knife's line
 		for i in 2:
 			get_tree().create_timer(0.4 + 0.2 * i).timeout.connect(hud.tree_move.bind("down"))
+
+
+## The floor treatment and cleaning tree demos (PRD 9.5). "treat": at night, a strip of
+## each treatment's sheen, a little dirt on some, the boxes on a counter by the wall with
+## their chemical tags, the small tools on their hooks, the chef laying primer (shoot at 3).
+## "treat_day": the same laid for service, the sheens in force (shoot at 3). "tree_box",
+## "tree_bucket", "tree_sponge": the tree of a cleaner's box, a mop bucket, a sponge's hook.
+func _demo_treat(demo: String) -> void:
+	open_build()
+	ledger.money = 600
+	ledger.xp = 500
+	floor_dirt.drops = false
+	var shelf := Vector2i(2, 5)
+	add_station("counter", shelf, 1, 0, "double_counter")
+	var keys: Array = Treatments.ITEMS.keys()
+	for k: String in ["cleaner", "finish"]:
+		_store_box(shelf, Treatments.box_id(k))
+	var hooks := 0
+	for c: Vector2i in kitchen.wall_cells:
+		if hooks >= 4 or stations.has(c) or highs.has(c) or not kitchen.can_hang(c, "hook"):
+			continue
+		clean_kit.keep(add_high("hook", c), ["sponge", "scourer", "grease_scraper", "spill_kit"][hooks], 0)
+		hooks += 1
+	if demo.begins_with("tree_"):
+		var at := Vector2i(5, 4)
+		player.position = Grid.center(at + Vector2i(0, 1))
+		player.look(Vector2i(0, -1))
+		match demo:
+			"tree_box":
+				kitchen.unstore(shelf, "box_finish")
+				pick_up(Grid.center(shelf))   # the cleaner's box
+				_store_box(shelf, "box_finish")
+			"tree_bucket":
+				clean_kit.on_built(add_station("mop_bucket", at), "mop_bucket")
+				pick_up(Grid.center(at))
+			"tree_sponge":
+				var w: Vector2i = highs.keys().filter(func(c: Vector2i) -> bool: return (highs[c] as Station).kit_tool == "sponge")[0]
+				pick_up(Grid.center(w))
+		open_shop()
+		return
+	var row: Array = plan.floors.keys().filter(func(c: Vector2i) -> bool:
+		return c.x >= 7 and c.y >= 4 and not grid.is_blocked(c) and not grid.reserved.has(c))
+	row.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or (a.y == b.y and a.x < b.x))
+	for i in mini(keys.size(), row.size()):
+		treat_laid[row[i]] = keys[i]
+		if i % 2 == 1:   # a puddle on every other one: dirt shows more on a shine
+			floor_dirt.mess.add_dirt(row[i])
+			floor_dirt.mess.add_dirt(row[i])
+	treat_off["sealing_primer"] = true   # dimmed: switched off
+	player.position = Grid.center(Vector2i(3, 3))
+	player.look(Vector2i(1, 0))
+	pick_catalog("treat_cleaner")
+	player.drag = {"from": Grid.center(Vector2i(3, 2)), "remove": false}
+	player.demo_hover = Grid.center(Vector2i(4, 2))
+	if demo == "treat_day":
+		for k: String in keys:
+			if not kitchen.stocked().has(Treatments.box_id(k)):
+				var c := Vector2i(1, 5) if k.contains("primer") else Vector2i(3, 5)
+				if not stations.has(c):
+					add_station("counter", c, 1, 0, "double_counter")
+				_store_box(c, Treatments.box_id(k))
+		treat_off.clear()
+		cancel_hand()
+		player.demo_hover = Vector3.INF
+		start_day()
+		arrivals.assign([{"time": 99999.0, "idx": 0}])   # keeps the day open, nobody comes
+	floor_dirt.redraw()
 
 
 ## PRD 8.6: the new jobs' tools along the back (cutting, heat and pour lines), and
@@ -1874,6 +1950,10 @@ func start_day() -> void:
 	hud.hide_card()
 	hud.hide_build()
 	ledger.pay_stock(night_cost())   # the door checked it can be paid (tests may skip the door)
+	floor_dirt.mess.treat = treat_active()   # tonight's laying lasts the day (PRD 9.5)
+	floor_dirt.mess.extractor = kitchen.has_extractor()
+	clean_kit.start_day()
+	floor_dirt.redraw()
 	pay_staff()
 	menu_board.refresh(tonight_menu())
 	town.new_day()
@@ -2032,12 +2112,23 @@ func open_build() -> void:
 	hud.show_build()
 
 
-## What the shop lists for a search and a category tab: the catalog, and the flyers
-## under Extras.
-static func shop_items(query := "", category := "") -> Array[Dictionary]:
+## What the shop lists for a search and a category tab: the catalog, the laying tool of
+## each floor treatment with its box stored (PRD 9.5) under Build, and the flyers under Extras.
+func shop_items(query := "", category := "") -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	if category != "Extras":
 		found = Catalog.search(query, category, Scenery.theme_id)
+	if category == "" or category == "Build":
+		for k: String in Treatments.ITEMS:
+			var id := Treatments.tool_id(k)
+			if not treat_boxed().has(k):
+				continue
+			var hit := true
+			var text := ("%s build floor treatment %s" % [Treatments.name_of(k), Treatments.ITEMS[k].blurb]).to_lower()
+			for w in query.strip_edges().to_lower().split(" ", false):
+				hit = hit and text.contains(w)
+			if hit:
+				found.append({"id": id, "tier": 1})
 	if category == "" or category == "Extras":
 		var hit := true
 		for w in query.strip_edges().to_lower().split(" ", false):
@@ -2091,9 +2182,13 @@ func close_shop() -> void:
 ## in a tiered piece's short tree, or "" (nothing picked up, or a piece with no tree).
 func hand_key(ch: Player = null) -> String:
 	ch = _me(ch)
+	if ch.hand.get("moving", false) and Treatments.is_box(ch.hand.get("id", "")):
+		return ch.hand.id   # a treatment's box, picked up from storage (PRD 9.5)
 	if not ch.hand.get("moving", false) or not (ch.hand.get("node") is Station):
 		return ""
 	var st: Station = ch.hand.node
+	if st.type == "hook" and Kitchen.has_node(st.kit_tool):
+		return st.kit_tool   # a hook's tree is its tool's: sponge, scourer and on (PRD 9.5)
 	return Upgrades.key_of(st.type, st.tier, st.base if st.type == "counter" else st.node)
 
 
@@ -2106,7 +2201,18 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 			or not ledger.spend(Upgrades.step_price(to)):
 		sfx("fail")
 		return false
+	if Upgrades.is_treatment(to):   # a box: it is the new treatment's now (PRD 9.5)
+		ch.hand.id = to
+		_swap_treatment(Treatments.key_of(from), Treatments.key_of(to))
+		sfx("coin")
+		hud.show_build()
+		return true
 	var st: Station = ch.hand.node
+	if st.type == "hook" and Kitchen.tool_of(to) != "":   # the hook's tool is swapped
+		clean_kit.upgrade_tool(st, Kitchen.tool_of(to))
+		sfx("coin")
+		hud.show_build()
+		return true
 	if Upgrades.is_tiered(to):
 		st.tier = Upgrades.tier_of(to)
 		st.set_base(st.base)   # redraws it at the new tier
@@ -2119,12 +2225,23 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		up.setup(to, st.cell, st.tier, st.facing, st.base, st.pass_look)
 		up.stacked = st.stacked
 		up.visible = false
+		clean_kit.upgrade_home(st, up, Kitchen.tool_of(to))   # a bucket's mop goes with it (PRD 9.5)
 		st.queue_free()
 		ch.hand.node = up
 		ch.hand.id = up.type
 	sfx("coin")
 	hud.show_build()
 	return true
+
+
+## A treatment's box upgraded: the cells laid with the old one are the new one's now.
+func _swap_treatment(was: String, now: String) -> void:
+	for c: Vector2i in treat_laid:
+		if treat_laid[c] == was:
+			treat_laid[c] = now
+	if treat_off.has(was):
+		treat_off.erase(was)
+		treat_off[now] = true
 
 
 ## Buys what the shop is showing. Flyers are paid for at once; a piece goes into
@@ -2288,6 +2405,12 @@ func _stack_counter(cell: Vector2i) -> void:
 ## Turns the piece in hand a quarter turn. Partitions turn by where you point.
 func rotate_hand(ch: Player = null) -> void:
 	ch = _me(ch)
+	if Treatments.is_laying_tool(ch.hand.get("id", "")):   # a treatment's laying tool: turn switches it off or on
+		var k := Treatments.key_of(ch.hand.id)
+		switch_treatment(k, treat_off.has(k))
+		sfx("pickup")
+		hud.show_build()
+		return
 	if not ch.hand.is_empty() and not on_edge(ch.hand.id) and not Catalog.is_build_tool(ch.hand.id) \
 			and not Kitchen.is_high_only(hand_node(ch.hand)):   # a hung piece faces off its wall
 		ch.hand.facing = (int(ch.hand.facing) + 1) % 4
@@ -2371,6 +2494,8 @@ static func on_edge(id: String) -> bool:
 static func tool_kind(id: String) -> String:
 	if floor_kind(id) != "":
 		return "floor"
+	if Treatments.is_laying_tool(id):
+		return "treat"   # a floor treatment (PRD 9.5)
 	return "finish" if Catalog.is_finish(id) else id
 
 
@@ -2460,6 +2585,8 @@ func can_place(spot: Vector3i, ch: Player = null) -> bool:
 				and (plan.has_floor(cell) or not _strands_high(Floorplan.cell_edges(cell)))
 		"finish":
 			return plan.can_finish(spot, ch.hand.id)
+		"treat":   # any floor, one treatment a cell: a new one replaces the old
+			return plan.has_floor(cell) and treat_laid.get(cell, "") != Treatments.key_of(ch.hand.id)
 		"rug":
 			return can_lay_rug(cell, int(ch.hand.facing))
 		"wall":
@@ -2562,6 +2689,11 @@ func _build_at(spot: Vector3i, ch: Player = null) -> bool:
 			if had != "":
 				ledger.refund(Catalog.price_of(had))
 			plan.openings[spot] = ch.hand.id
+		"treat":   # laid free: its price is paid at the door each night it is re-laid
+			treat_laid[cell] = Treatments.key_of(ch.hand.id)
+			floor_dirt.redraw()
+			menu_changed()
+			return true
 	_sync_grid()
 	return true
 
@@ -2574,6 +2706,13 @@ func remove_at(spot: Vector3i, ch: Player = null) -> bool:
 		return false
 	var cell := Vector2i(spot.x, spot.y)
 	match tool_kind(ch.hand.id):
+		"treat":   # lifted: bare from tomorrow
+			if not treat_laid.has(cell):
+				return false
+			treat_laid.erase(cell)
+			floor_dirt.redraw()
+			menu_changed()
+			return true
 		"floor":
 			if not plan.has_floor(cell) or cell == ENTRANCE_CELL or stations.has(cell) or highs.has(cell) \
 					or grid.reserved.has(cell) or chefs.any(func(o: Player) -> bool: return o.cell() == cell) or rug_at(cell) != null:
@@ -2639,6 +2778,10 @@ func drag_spots(from: Vector3, to: Vector3, ch: Player = null) -> Array[Vector3i
 			cells = plan.lay_order(cells, floor_kind(id))
 		for c in cells:
 			out.append(Vector3i(c.x, c.y, 0))
+	elif Treatments.is_laying_tool(id):   # a treatment is laid over a rectangle of floor
+		for c in Floorplan.rect_cells(Grid.to_cell(from), Grid.to_cell(to)):
+			if plan.has_floor(c):
+				out.append(Vector3i(c.x, c.y, 0))
 	elif id == "wall" or Catalog.is_finish(id):
 		var a := Vector2i(roundi(from.x), roundi(from.z))
 		var b := Vector2i(roundi(to.x), roundi(to.z))
@@ -2683,6 +2826,9 @@ func drag_summary(ch: Player = null) -> String:
 	if ch.drag.remove:
 		return "Remove"
 	var n := spots.size() if floor_kind(ch.hand.id) != "" else spots.filter(func(sp: Vector3i) -> bool: return can_place(sp, ch)).size()
+	if Treatments.is_laying_tool(ch.hand.id):
+		var each := Treatments.price_of(Treatments.key_of(ch.hand.id))
+		return "Lay %d cell%s  $%d a night" % [n, "" if n == 1 else "s", n * each]
 	var price := int(ch.hand.price)
 	var noun: String = "tile" if floor_kind(ch.hand.id) != "" else ("wall" if ch.hand.id == "wall" or Catalog.is_finish(ch.hand.id) else ch.hand.id)
 	var verb := "Lay" if floor_kind(ch.hand.id) != "" else ("Paint" if ch.hand.id == "paint" else ("Paper" if Catalog.is_finish(ch.hand.id) else "Build"))
@@ -2745,8 +2891,12 @@ func build_action(ch: Player = null) -> String:
 				return "Add door"
 			"arch":
 				return "Add archway"
-		if Catalog.is_box(ch.hand.id):
-			return "Put in"
+			"treat":
+				return "Lay %s" % Treatments.name_of(Treatments.key_of(ch.hand.id)).to_lower()
+		if Catalog.is_box(ch.hand.id):   # where it will not go, why: chemicals and food (PRD 9.5)
+			var c := Grid.to_cell(_hover_point(ch))
+			var why := kitchen.store_refusal(c, ch.hand.id) if kitchen.slots(c) > 0 else ""
+			return why if why != "" else "Put in"
 		return "Hang" if hand_layer(ch) == "high" else "Put down"
 	var kit := _kit_action(ch)
 	if kit != "":
@@ -2928,9 +3078,9 @@ func _update_tool_ghost(ch: Player = null) -> void:
 	var removing: bool = ch.drag.get("remove", false)
 	var dragging := not ch.drag.is_empty()
 	for spot in spots:
-		var ok := not removing and (dragging and floor_kind(ch.hand.id) != "" or can_place(spot, ch))
+		var ok := not removing and (dragging and (floor_kind(ch.hand.id) != "" or Treatments.is_laying_tool(ch.hand.id)) or can_place(spot, ch))
 		var col := Color(Build.DANGER if removing or not ok else Build.GOOD, 0.55)
-		if floor_kind(ch.hand.id) != "":
+		if floor_kind(ch.hand.id) != "" or Treatments.is_laying_tool(ch.hand.id):   # a treatment: its cells, flat (PRD 9.5)
 			var tile := Build.box(ch.tool_ghost, Vector3(spot.x + 0.5, 0.02, spot.y + 0.5), Vector3(0.94, 0.03, 0.94), Build.GOOD)
 			tile.material_override = Build.overlay_mat(col, 3)
 		elif ch.hand.id == "wall" or Catalog.is_finish(ch.hand.id):
@@ -3070,6 +3220,8 @@ func _end_day() -> void:
 	_cancel_all_preps()
 	floor_dirt.clear_slips()   # a chef still down gets up for the night
 	clean_kit.end_day()   # robot sweepers go back to their docks
+	floor_dirt.mess.treat = {}   # the day's treatments are worn off (PRD 9.5)
+	floor_dirt.redraw()
 	set_door(false)
 	shopper = null
 	upgrading = false
@@ -3358,6 +3510,15 @@ func decor_near(cell: Vector2i) -> Array:
 			floors[id].append(c)
 	for id: String in floors:
 		add.call(id, floors[id], r, 1)
+	var treated := {}   # a floor finish in force today is decor, like parquet (PRD 9.5)
+	for c: Vector2i in floor_dirt.mess.treat:
+		var id := Treatments.tool_id(floor_dirt.mess.treat[c])
+		if Catalog.joy_of(id) > 0.0:
+			if not treated.has(id):
+				treated[id] = []
+			treated[id].append(c)
+	for id: String in treated:
+		add.call(id, treated[id], r, 1)
 	for a: Vector2i in rugs:
 		add.call("rug", rug_cells(a, int(rugs[a].get_meta("facing", 0))), r, 1)
 	var walls := {}
@@ -3647,6 +3808,8 @@ func kitchen_stock() -> Array:
 	var out := []
 	var seen := {}
 	for b: String in kitchen.stocked():
+		if Kitchen.is_cleaning(b):
+			continue   # a treatment's box stocks no food (PRD 9.5)
 		var s := Pantry.station_ingredient(b)
 		var key := Pantry.box_id(s.id, s.ready)
 		if not seen.has(key):
@@ -3792,9 +3955,42 @@ func write_test_menu() -> void:
 	menu.add("main", [fixed_main().bread, fixed_main().grill], fixed_main().name)
 
 
-## What tomorrow's stock costs: every stocked ingredient station's fee.
+## What tomorrow's stock costs: every stocked ingredient station's fee, and re-laying
+## the floor treatments switched on (PRD 9.5).
 func night_cost() -> int:
-	return Menu.night_cost(kitchen_stock())
+	return Menu.night_cost(kitchen_stock()) + Treatments.night_cost(_laid_on_floor(), treat_off, treat_boxed())
+
+
+## The treatments with a box stored somewhere: key -> true.
+func treat_boxed() -> Dictionary:
+	var out := {}
+	for b: String in kitchen.stocked():
+		if Treatments.is_box(b):
+			out[Treatments.key_of(b)] = true
+	return out
+
+
+## The laid cells still floor (floor taken up takes its treatment with it).
+func _laid_on_floor() -> Dictionary:
+	var out := {}
+	for c: Vector2i in treat_laid:
+		if plan.has_floor(c):
+			out[c] = treat_laid[c]
+	return out
+
+
+## The cells treated for tomorrow's service: laid, switched on, box stored.
+func treat_active() -> Dictionary:
+	return Treatments.active(_laid_on_floor(), treat_off, treat_boxed())
+
+
+## Switches a laid treatment off (not re-laid, nothing paid) or back on.
+func switch_treatment(key: String, on: bool) -> void:
+	if on:
+		treat_off.erase(key)
+	else:
+		treat_off[key] = true
+	menu_changed()
 
 
 ## The restock note's ingredient lines, one per stocked kind: {name, fee}, dearest
@@ -3806,6 +4002,12 @@ func stock_lines() -> Array[Dictionary]:
 			continue   # made from another kind's stock, which is listed
 		out.append({"name": Pantry.name_of(s.ingredient) + (" (ready)" if s.ready else ""),
 			"fee": Pantry.fee_of(s.ingredient, s.ready)})
+	var lines := Treatments.night_lines(_laid_on_floor(), treat_off, treat_boxed())
+	for k: String in lines:   # floor treatments, re-laid each night (PRD 9.5)
+		var l: Dictionary = lines[k]
+		var why := "" if l.on else (", off" if treat_off.has(k) else ", no box")
+		out.append({"name": "%s, %d cell%s%s" % [Treatments.name_of(k), l.cells, "" if l.cells == 1 else "s", why],
+			"fee": l.fee})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.fee) > int(b.fee))
 	return out
 
@@ -4722,7 +4924,7 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 ## as it came out of a box here, each use swaps it for the next kind, or with one kind
 ## puts it back. Returns [action, refusal].
 func _use_storage(st: Station, dry_run: bool, ch: Player) -> Array:
-	var boxes := kitchen.stock(st.cell)
+	var boxes := kitchen.stock(st.cell).filter(func(b: String) -> bool: return not Kitchen.is_cleaning(b))
 	if boxes.is_empty():
 		return ["", ""]
 	var held := ch.held

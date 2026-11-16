@@ -59,6 +59,7 @@ const GREASE := {
 const GREASE_BAD := 2.0    # a badly played prep (or a spoiled one)
 const GREASE_GOOD := 0.5   # a well played prep
 const HOOD := 0.3          # a hood over the stove
+const EXTRACTOR := 0.15    # an extractor (the hood's tree step, PRD 9.5)
 
 ## Guests: the chance once per meal, when they finish eating. (tunable)
 const GUEST_BASE := 0.15
@@ -77,6 +78,13 @@ const NEIGHBOURS: Array[Vector2i] = [
 var floor_cells := {}   # Vector2i -> true: where dirt can be
 var covered := {}       # Vector2i -> true: floor under furniture
 var dirt := {}          # Vector2i -> int 1..4; clean cells are absent
+## Floor treatments in force today (PRD 9.5): Vector2i -> Treatments key.
+var treat := {}
+## Cells whose dirt is kitchen grease (the last dirt to land or be tracked there was):
+## Vector2i -> true. The grease scraper clears only these; an extractor cuts their smell.
+var grease := {}
+## An extractor hangs somewhere (PRD 9.5): kitchen grease smells one cell less far.
+var extractor := false
 var rng := RandomNumberGenerator.new()
 
 
@@ -120,6 +128,7 @@ func total() -> int:
 func _set_level(cell: Vector2i, value: int) -> void:
 	if value <= 0:
 		dirt.erase(cell)
+		grease.erase(cell)
 	else:
 		dirt[cell] = mini(value, MAX_LEVEL)
 
@@ -127,14 +136,23 @@ func _set_level(cell: Vector2i, value: int) -> void:
 ## One level of new dirt lands on `cell`. Below 4 it grows the cell by one; at 4 it goes
 ## to a random one of the eight neighbours instead (under furniture included), and on
 ## from there if that is full too. Returns the cell that grew, or null if none did
-## (not floor, or everything around was full).
-func add_dirt(cell: Vector2i) -> Variant:
+## (not floor, everything around was full, or a primer stopped it). `fresh`: a spill
+## landing, which a primed cell may stop; tracked dirt (fresh false) always lands.
+## `is_grease`: kitchen grease, marked on the cell it lands on (else the mark goes).
+func add_dirt(cell: Vector2i, fresh := true, is_grease := false) -> Variant:
 	if not is_floor(cell):
 		return null
 	var at := cell
 	for i in OVERFLOW_TRIES:
+		if fresh and treat.has(at) and Treatments.block(treat[at]) > 0.0 \
+				and rng.randf() < Treatments.block(treat[at]):
+			return null
 		if level(at) < MAX_LEVEL:
 			_set_level(at, level(at) + 1)
+			if is_grease:
+				grease[at] = true
+			else:
+				grease.erase(at)
 			return at
 		var around := _floor_neighbours(at)
 		if around.is_empty():
@@ -171,11 +189,15 @@ func clean(cell: Vector2i, levels: int = 1) -> int:
 ## Someone walks from `from` to the next cell `to`. Off a dirty cell they carry one
 ## level: `from` loses one, `to` gains one (overflowing as new dirt does). Returns
 ## whether anything was tracked. A fallen guest does not walk, so is never passed here.
+## A strong cleaner under `from` (PRD 9.5) keeps its dirt where it is.
 func track(from: Vector2i, to: Vector2i) -> bool:
 	if level(from) <= 0 or not is_floor(to) or from == to:
 		return false
+	if treat.has(from) and Treatments.no_track(treat[from]):
+		return false
+	var greasy := grease.has(from)
 	_set_level(from, level(from) - 1)
-	add_dirt(to)
+	add_dirt(to, false, greasy)
 	return true
 
 
@@ -184,8 +206,22 @@ static func speed_of(lvl: int) -> float:
 	return SPEED[clampi(lvl, 0, MAX_LEVEL)]
 
 
+## A finish on the cell (PRD 9.5) speeds everyone on it, offsetting its dirt.
 func speed_at(cell: Vector2i) -> float:
-	return speed_of(level(cell))
+	return speed_of(level(cell)) * treat_speed(cell)
+
+
+func treat_speed(cell: Vector2i) -> float:
+	return Treatments.speed(treat.get(cell, ""))
+
+
+## Whether dirt on the cell mops off in one press (a cleaner is laid there).
+func one_press(cell: Vector2i) -> bool:
+	return Treatments.one_press(treat.get(cell, ""))
+
+
+func is_grease(cell: Vector2i) -> bool:
+	return grease.has(cell)
 
 
 ## The chance of slipping on stepping onto a cell at this level.
@@ -242,20 +278,27 @@ static func smell_disgust_of(lvl: int) -> float:
 
 
 ## Disgust per second from the dirty cells someone can see (the game's sightlines).
+## Dirt on a finish shows more (PRD 9.5).
 func sight_disgust(visible: Array) -> float:
 	var sum := 0.0
 	for c in visible:
-		sum += sight_disgust_of(level(c))
+		sum += sight_disgust_of(level(c)) * Treatments.shows(treat.get(c, ""))
 	return sum
 
 
-## Disgust per second from smell at `cell`: every level 3 or 4 cell within SMELL_RADIUS,
-## seen or not.
+## How far a dirty cell smells: SMELL_RADIUS, one less for kitchen grease while an
+## extractor hangs in the room (PRD 9.5).
+func smell_radius(cell: Vector2i) -> int:
+	return SMELL_RADIUS - (1 if extractor and grease.has(cell) else 0)
+
+
+## Disgust per second from smell at `cell`: every level 3 or 4 cell within its smell
+## radius, seen or not.
 func smell_disgust(cell: Vector2i) -> float:
 	var sum := 0.0
 	for c in dirt:
 		var d: Vector2i = c - cell
-		if maxi(absi(d.x), absi(d.y)) <= SMELL_RADIUS:
+		if maxi(absi(d.x), absi(d.y)) <= smell_radius(c):
 			sum += smell_disgust_of(dirt[c])
 	return sum
 
@@ -265,15 +308,18 @@ func disgust_at(cell: Vector2i, visible: Array) -> float:
 	return sight_disgust(visible) + smell_disgust(cell)
 
 
-## The hood's multiplier on a stove's grease (a hood hangs over it, PRD 8.5).
-static func hood_factor(has_hood: bool = false) -> float:
+## The hood's multiplier on a stove's grease (a hood hangs over it, PRD 8.5). `has_hood`
+## is true or "hood" for a hood, "extractor" for its tree step (PRD 9.5), false or "".
+static func hood_factor(has_hood: Variant = false) -> float:
+	if has_hood is String:
+		return EXTRACTOR if has_hood == "extractor" else (HOOD if has_hood != "" else 1.0)
 	return HOOD if has_hood else 1.0
 
 
 ## The chance one prep drops grease. `result` is the prep's ("good", "plain", "bad",
 ## "spoiled"); `mess` is the tool node's factor from PRD 8's trees (1.0 until 8.3).
 static func grease_chance(tool: String, result: String = "plain", mess: float = 1.0,
-		has_hood: bool = false) -> float:
+		has_hood: Variant = false) -> float:
 	var p: float = GREASE.get(tool, 0.0)
 	match result:
 		"good":
@@ -286,10 +332,10 @@ static func grease_chance(tool: String, result: String = "plain", mess: float = 
 ## Rolls one prep's grease; on a hit a level lands on one of `cells` (the chef's cell and
 ## the cells beside the station). Returns the cell that grew, or null.
 func drop_grease(tool: String, result: String, cells: Array, mess: float = 1.0,
-		has_hood: bool = false) -> Variant:
+		has_hood: Variant = false) -> Variant:
 	if cells.is_empty() or rng.randf() >= grease_chance(tool, result, mess, has_hood):
 		return null
-	return add_dirt(cells[rng.randi() % cells.size()])
+	return add_dirt(cells[rng.randi() % cells.size()], true, true)
 
 
 ## The chance a guest leaves mess when they finish eating. `annoyance` is 0 to 1.

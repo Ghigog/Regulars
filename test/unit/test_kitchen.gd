@@ -471,9 +471,9 @@ func test_tree_keys_for_kitchen_pieces_and_tiered_pieces():
 	assert_eq(Upgrades.key_of("plant", 2), "plant@2")
 	assert_eq(Upgrades.key_of("table"), "table@1")
 	assert_eq(Upgrades.key_of("bin"), "", "a bin has no tree")
-	for key: String in ["board", "stove", "counter", "fountain", "wine_barrel", "plant@1", "jukebox@2", "booth@1"]:
-		assert_true(Upgrades.has_tree(key), key)
-	for key: String in ["", "cabinet", "hood"]:
+	for key: String in ["board", "stove", "counter", "fountain", "wine_barrel", "plant@1", "jukebox@2", "booth@1", "hood"]:
+		assert_true(Upgrades.has_tree(key), key)   # the hood grows into an extractor (PRD 9.5)
+	for key: String in ["", "cabinet"]:
 		assert_false(Upgrades.has_tree(key), key + " has nowhere to go")
 	assert_eq(Upgrades.catalog_id("jukebox@3"), "jukebox")
 	assert_eq(Upgrades.children("plant@3"), [] as Array[String], "three tiers in all")
@@ -1130,10 +1130,10 @@ func test_no_floor_or_door_takes_the_wall_from_a_hung_piece():
 func test_a_hood_over_a_stove_is_the_grease_flag():
 	_game()
 	var stove: Station = game.stations[Vector2i(0, 3)]
-	assert_true(game.floor_dirt.grease_factors(stove).hood)
+	assert_eq(game.floor_dirt.grease_factors(stove).hood, "hood")
 	game.add_station("counter", Vector2i(2, 5))
 	game.add_station("stove", Vector2i(2, 5))
-	assert_false(game.floor_dirt.grease_factors(game.stations[Vector2i(2, 5)]).hood)
+	assert_eq(game.floor_dirt.grease_factors(game.stations[Vector2i(2, 5)]).hood, "")
 
 
 # ---------- 8.6: new jobs and ingredients ----------

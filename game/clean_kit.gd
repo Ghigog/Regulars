@@ -46,8 +46,68 @@ func kind_of(home: Station) -> String:
 
 ## A newly bought piece: a mop bucket comes with its mop, a sponge on its hook.
 func on_built(st: Station, bought: String) -> void:
-	if st != null and CleanTools.COMES_WITH.has(bought):
-		keep(st, CleanTools.COMES_WITH[bought], 0)
+	var tool := CleanTools.comes_with(bought)
+	if st != null and tool != "":
+		keep(st, tool, 0)
+
+
+## A hook's tool bought up its tree (PRD 9.5): the new tool is kept there, clean. If the
+## old one was out (in someone's hands, on the floor), that one is swapped instead.
+func upgrade_tool(home: Station, tool: String) -> void:
+	var was := home.kit_tool
+	if was == "":
+		was = CleanTools.comes_with(home.node) if home.node != "hook" else ""
+	if home.kit_tool == "" and _swap_out(was, tool):
+		return
+	keep(home, tool, 0)
+
+
+## A bucket bought up its tree is a new piece: its mop (now the new one) goes with it.
+## A home that keeps no tool (the robot's dock) leaves the old mop wherever it is.
+func upgrade_home(old: Station, up: Station, tool: String) -> void:
+	if tool == "":
+		return
+	if old.kit_tool != "":
+		keep(up, tool, 0)
+	elif not _swap_out(CleanTools.comes_with(old.node), tool):
+		keep(up, tool, 0)
+
+
+## Swaps a tool of this kind that is out of its home (held, or lying) for the new one.
+func _swap_out(was: String, tool: String) -> bool:
+	if was == "":
+		return false
+	for ch: Player in game.chefs:
+		if held_tool(ch) == was:
+			hold(ch, tool, 0)
+			return true
+	for c: Vector2i in lying:
+		if lying[c].tool == was:
+			pick_up_lying(c)
+			put_down(tool, 0, c)
+			return true
+	return false
+
+
+## A new day: a spill kit has its three uses again, wherever it is.
+func start_day() -> void:
+	for home: Station in _homes():
+		if CleanTools.uses_of(home.kit_tool) > 0:
+			keep(home, home.kit_tool, 0)
+	for ch: Player in game.chefs:
+		if CleanTools.uses_of(held_tool(ch)) > 0:
+			hold(ch, held_tool(ch), 0)
+	for c: Vector2i in lying:
+		if CleanTools.uses_of(lying[c].tool) > 0:
+			lying[c].used = 0
+
+
+func _homes() -> Array[Station]:
+	var out: Array[Station] = []
+	for st: Station in game.stations.values() + game.highs.values():
+		if st.kit_tool != "":
+			out.append(st)
+	return out
 
 
 ## Puts a tool in a home (no checks) and draws it there.
@@ -66,16 +126,18 @@ func show_home(home: Station) -> void:
 		return
 	var n := Node3D.new()
 	n.name = "kit_tool"
+	n.rotation.y = home.facing * PI / 2   # turned with the piece: a hook on a side wall faces out
 	home.add_child(n)
 	var clean := CleanTools.cleanness(home.kit_tool, home.kit_used)
 	match kind_of(home):
 		"bucket":
 			Build.bucket_mop(n, clean)
 		"hook":
-			Build.sponge(n, clean).position = Build.hook_spot(Build.HIGH_Y0)
+			Build.hand_tool(n, home.kit_tool, clean).position = Build.hook_spot(Build.HIGH_Y0)
 		_:   # a closet: the mop stands in the corner, a sponge sits on the low shelf
-			var t: Node3D = Build.mop(n, clean) if home.kit_tool == "mop" else Build.sponge(n, clean)
-			t.position = Vector3(0.28, 0.02, -0.28) if home.kit_tool == "mop" else Vector3(-0.2, 0.2, -0.28)
+			var mop := CleanTools.is_mop(home.kit_tool)
+			var t: Node3D = Build.mop(n, clean) if mop else Build.hand_tool(n, home.kit_tool, clean)
+			t.position = Vector3(0.28, 0.02, -0.28) if mop else Vector3(-0.2, 0.2, -0.28)
 
 
 # ---------------------------------------------------------------- held tools
@@ -196,7 +258,7 @@ func floor_action(ch: Player) -> String:
 	if tool != "":
 		var nm := CleanTools.name_of(tool).to_lower()
 		if clean_target(ch) != null:
-			var verb := "Mop" if tool == "mop" else "Wipe"
+			var verb := "Mop" if CleanTools.is_mop(tool) else ("Scrape" if tool == "grease_scraper" else "Wipe")
 			return verb + (" (dirty: spreads)" if CleanTools.is_dirty(tool, held_used(ch)) else "")
 		if drop_target(ch) != null:
 			return "Put %s down" % nm
@@ -254,6 +316,11 @@ func press(ch: Player) -> String:
 			game.hud.say("The %s is dirty: rinse it at the bucket or a sink." % CleanTools.name_of(tool).to_lower())
 	elif r.did == "spread":
 		game.sfx("fail")
+	elif r.did == "refused":   # the scraper on guest mess, a spill kit on a small spill (PRD 9.5)
+		game.sfx("fail")
+		game.hud.say(r.why)
+	if CleanTools.used_up(tool, r.used) and r.did == "clean":
+		game.hud.say("The spill kit is used up for today.")
 	game.floor_dirt.redraw()
 	return r.did
 
@@ -269,8 +336,8 @@ func put_down(tool: String, used: int, cell: Vector2i) -> void:
 	var n := Node3D.new()
 	add_child(n)
 	var clean := CleanTools.cleanness(tool, used)
-	var t: Node3D = Build.mop(n, clean) if tool == "mop" else Build.sponge(n, clean)
-	if tool == "mop":
+	var t: Node3D = Build.mop(n, clean) if CleanTools.is_mop(tool) else Build.hand_tool(n, tool, clean)
+	if CleanTools.is_mop(tool):
 		t.rotation = Vector3(0, 0, PI / 2 - 0.04)
 		t.position = Vector3(0.6, 0.06, 0)
 	n.position = Grid.center(cell)
@@ -299,6 +366,7 @@ func _robot_cells() -> Dictionary:
 func tick(delta: float) -> void:
 	for ch: Player in _wait.keys():
 		_wait[ch] = maxf(0.0, float(_wait[ch]) - delta)
+	_push(delta)
 	for st: Station in game.stations.values():
 		if st.type == "robot_dock" and not robots.has(st):
 			_add_robot(st)
@@ -396,6 +464,29 @@ func _robot_step(dock: Station, r: Dictionary, delta: float) -> void:
 	var n: Node3D = r.node
 	n.position = r.pos
 	n.rotation.y = atan2(r.dir.x, r.dir.z)
+
+
+# ---------------------------------------------------------------- the floor scrubber
+
+## A chef pushing a floor scrubber (PRD 9.5) clears every cell they walk over, a level at
+## the scrubber's pace, as long as they hold it.
+func _push(_delta: float) -> void:
+	var m: FloorMess = game.floor_dirt.mess
+	for ch: Player in game.chefs:
+		var tool := held_tool(ch)
+		if not CleanTools.pushes(tool) or _wait.get(ch, 0.0) > 0.0:
+			continue
+		var c := ch.cell()
+		if m.level(c) > 0 and m.can_clean(c):
+			m.clean(c, int(CleanTools.TOOLS[tool].levels))
+			_wait[ch] = CleanTools.press_time(tool)
+			game.burst(Grid.center(c) + Vector3(0, 0.2, 0), "bubbles", 0.3)
+			game.floor_dirt.redraw()
+
+
+## How fast a chef walks with what they hold: a floor scrubber is slow to push.
+static func walk_factor(ch: Player) -> float:
+	return CleanTools.walk_speed(held_tool(ch))
 
 
 ## Clears everything for tests: tools on the floor and robots.

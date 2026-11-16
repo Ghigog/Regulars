@@ -931,6 +931,57 @@ static func sponge(parent: Node3D, clean := 1.0) -> Node3D:
 	return n
 
 
+## A small cleaning tool (PRD 9.5), each its own silhouette at 20 px: the sponge; the
+## scourer, a sponge under a steel-wool pad; the grease scraper, a wide steel blade on
+## a wooden handle; the spill kit, a coral pouch with a white band and cross.
+static func hand_tool(parent: Node3D, tool: String, clean := 1.0) -> Node3D:
+	match tool:
+		"scourer":
+			var n := Node3D.new()
+			parent.add_child(n)
+			var body := Color(MOP_DIRTY).lerp(Color(SPONGE), clean).to_html(false)
+			_add(n, bevel_mesh(Vector3(0.24, 0.08, 0.15), 0.03), Vector3(0, 0.04, 0), Color(body), 0.0)
+			_add(n, bevel_mesh(Vector3(0.26, 0.07, 0.17), 0.03), Vector3(0, 0.115, 0), Color("#b9c2c4"), 0.0, R_WOOD)
+			return n
+		"grease_scraper":
+			var n := Node3D.new()
+			parent.add_child(n)
+			box(n, Vector3(0, 0.02, 0), Vector3(0.3, 0.03, 0.14), STEEL, 0.0, R_GLOSS)
+			cyl(n, Vector3(0, 0.03, 0.07), 0.025, 0.06, STEEL_DARK)
+			box(n, Vector3(0, 0.05, 0.2), Vector3(0.06, 0.05, 0.22), WOOD)
+			return n
+		"spill_kit":
+			var n := Node3D.new()
+			parent.add_child(n)
+			_add(n, bevel_mesh(Vector3(0.26, 0.2, 0.14), 0.04), Vector3(0, 0.1, 0), Color(CORAL), 0.0)
+			box(n, Vector3(0, 0.13, 0.072), Vector3(0.27, 0.05, 0.005), "#fbf6ea")
+			box(n, Vector3(0, 0.13, 0.076), Vector3(0.025, 0.09, 0.005), DANGER)
+			box(n, Vector3(0, 0.13, 0.076), Vector3(0.09, 0.025, 0.005), DANGER)
+			return n
+	return sponge(parent, clean)
+
+
+## The colour of each floor treatment's liquid, as its sheen on the floor (PRD 9.5).
+const TREAT_COL := {
+	"cleaner": "#5fb8c4", "strong_cleaner": "#2f8fa8", "primer": "#c9c1ae", "sealing_primer": "#9a917c",
+	"finish": "#f0b04a", "high_gloss": "#f7cf5a",
+}
+
+
+## A floor treatment's box (PRD 9.5): a kraft crate of two jugs in the treatment's
+## colour, a white diamond label on the front for chemicals. Sits where a box of stock does.
+static func treatment_box(n: Node3D, key: String) -> void:
+	var col: String = TREAT_COL.get(key, TREAT_COL.cleaner)
+	_add(n, bevel_mesh(Vector3(0.7, 0.26, 0.5), 0.03), Vector3(0, 0.6, 0), Color("#c9a26b"), 0.0, R_WOOD)
+	for x: float in [-0.17, 0.17]:
+		_add(n, lathe_mesh([[0.0, 0.0], [0.13, 0.0], [0.13, 0.26], [0.07, 0.34], [0.05, 0.4], [0.0, 0.4]], 12),
+			Vector3(x, 0.73, 0), Color(col), 0.0, R_GLOSS)
+		cyl(n, Vector3(x, 1.13, 0), 0.055, 0.05, "#fbf6ea")
+	var label := box(n, Vector3(0, 0.62, 0.255), Vector3(0.16, 0.16, 0.01), "#fbf6ea")
+	label.rotation.z = PI / 4
+	box(n, Vector3(0, 0.62, 0.262), Vector3(0.06, 0.06, 0.005), col).rotation.z = PI / 4
+
+
 ## Where a tool hangs off a hook drawn at height y0 against the wall.
 static func hook_spot(y0: float) -> Vector3:
 	return Vector3(0, y0 - 0.12, -0.5 + 0.2)
@@ -985,10 +1036,18 @@ static func robot(n: Node3D) -> void:
 static func box_tags(n: Node3D, boxes: Array, y := 1.6) -> void:
 	var gap := 0.5
 	for i in boxes.size():
+		var at := CAM_BASIS.x * (i - (boxes.size() - 1) / 2.0) * gap + Vector3(0, y, 0)
+		if Treatments.is_box(boxes[i]):   # chemicals (PRD 9.5): a diamond card, a jug on it
+			var col: String = TREAT_COL.get(Treatments.key_of(boxes[i]), TREAT_COL.cleaner)
+			var tag := Fx.card([[Icons.rect(0, 0, 1.7, 1.7, PI / 4), Icons.INK], [Icons.rect(0, 0, 1.46, 1.46, PI / 4), "#fbf6ea"],
+				[Icons.rect(0, -0.12, 0.5, 0.62), Icons.INK], [Icons.rect(0, -0.12, 0.38, 0.5), col],
+				[Icons.rect(0, 0.3, 0.2, 0.26), Icons.INK]], 0.23)
+			tag.position = at
+			n.add_child(tag)
+			continue
 		var s := Pantry.station_ingredient(boxes[i])
 		if s.is_empty():
 			continue
-		var at := CAM_BASIS.x * (i - (boxes.size() - 1) / 2.0) * gap + Vector3(0, y, 0)
 		var layers: Array = []
 		if Kitchen.is_chilled(boxes[i]):
 			layers.append([Icons.rect(0, 0, 2.0, 2.0), Icons.INK])
@@ -1313,7 +1372,7 @@ static func _double(n: Node3D, front: bool) -> void:
 ## Shapes and heights are shared by every theme (sheets 8 and 10). `node` is the
 ## piece's place in its upgrade tree (PRD 8.3): a step adds its own marks.
 static func station(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "") -> void:
-	_station_body(n, type, tier, base, pass_look)
+	_station_body(n, type, tier, base, pass_look, node)
 	_base_marks(n, base)
 	if node != "" and node != base:
 		_node_marks(n, node)
@@ -1439,9 +1498,12 @@ static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) ->
 			box(n, Vector3(0, y0 - 0.005, back + 0.38), Vector3(0.8, 0.02, 0.56), "#4a5a5e")   # the filter
 
 
-static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false) -> void:
+static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "") -> void:
 	if base == "double_counter":
 		_double(n, type == "counter")
+	if Treatments.is_box(type):
+		treatment_box(n, Treatments.key_of(type))
+		return
 	var ing := Catalog.ingredient_of(type)
 	if ing != "" and not type in ["coffee_machine", "beer_tap"]:
 		_ingredient_station(n, ing, Catalog.ITEMS[type].get("ready", false), Catalog.is_box(type))
@@ -1630,9 +1692,9 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 				cyl(n, Vector3(-0.2 + j * 0.36, 0.09, -0.27), 0.09, 0.2, [CORAL, TILE_TEAL][j], 0.0, R_GLOSS)
 		"cabinet", "hood", "hook":
 			wall_piece(n, type, false, HIGH_Y0 - 0.3)
-		"sponge":   # sold on its own hook (PRD 9.4): seen in hand as both
+		"sponge":   # sold on its own hook (PRD 9.4): seen in hand as both; up its tree, the node's tool (9.5)
 			wall_piece(n, "hook", false, HIGH_Y0 - 0.3)
-			var hung := sponge(n, 1.0)
+			var hung := hand_tool(n, Kitchen.tool_of(node) if Kitchen.tool_of(node) != "" else "sponge", 1.0)
 			hung.position = hook_spot(HIGH_Y0 - 0.3)
 		"mop_bucket":
 			mop_bucket(n)

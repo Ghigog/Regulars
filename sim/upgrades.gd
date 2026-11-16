@@ -4,7 +4,9 @@ extends RefCounted
 ## in a tree is a key: a kitchen node id ("range", "fridge") for kitchen pieces, or
 ## "<catalog id>@<tier>" for a catalog piece sold in tiers (a fern, a jukebox, a table),
 ## whose short tree is one efficient step per tier. A node is bought only from its
-## parent, for the new price less the old. Pure: no scene dependencies.
+## parent, for the new price less the old. A floor treatment's box is "box_<treatment>"
+## (PRD 9.5): its tree is Treatments', and a step's price is the difference in "unlock".
+## Pure: no scene dependencies.
 
 const TIER_SEP := "@"
 ## What each job is called in a node's line.
@@ -16,6 +18,8 @@ const JOB_WORDS := {"grill": "grilling", "fry": "frying", "boil": "boiling", "ch
 ## The key of a piece in the room: its kitchen node, or its tier in a tiered piece's
 ## short tree. "" for a piece with no tree.
 static func key_of(id: String, tier := 1, node := "") -> String:
+	if Treatments.is_box(id):
+		return id
 	if node != "" and Kitchen.has_node(node):
 		return node
 	var n := Kitchen.node_of(id)
@@ -30,10 +34,17 @@ static func is_tiered(key: String) -> bool:
 	return key.contains(TIER_SEP)
 
 
+## A floor treatment's box (PRD 9.5).
+static func is_treatment(key: String) -> bool:
+	return Treatments.is_box(key)
+
+
 ## For a tiered key, the catalog id; for a node, the catalog piece it behaves as.
 static func catalog_id(key: String) -> String:
 	if is_tiered(key):
 		return key.get_slice(TIER_SEP, 0)
+	if is_treatment(key):
+		return key
 	return Kitchen.family_of(key)
 
 
@@ -49,6 +60,9 @@ static func parent(key: String) -> String:
 	if is_tiered(key):
 		var t := tier_of(key)
 		return _tier_key(catalog_id(key), t - 1) if t > 1 else ""
+	if is_treatment(key):
+		var up := Treatments.parent(Treatments.key_of(key))
+		return Treatments.box_id(up) if up != "" else ""
 	return Kitchen.parent_of(key)
 
 
@@ -58,6 +72,11 @@ static func children(key: String) -> Array[String]:
 		if tier_of(key) < int(Catalog.ITEMS[catalog_id(key)].tiers):
 			out.append(_tier_key(catalog_id(key), tier_of(key) + 1))
 		return out
+	if is_treatment(key):
+		var kids: Array[String] = []
+		for k: String in Treatments.children(Treatments.key_of(key)):
+			kids.append(Treatments.box_id(k))
+		return kids
 	return Kitchen.children_of(key)
 
 
@@ -76,6 +95,8 @@ static func has_tree(key: String) -> bool:
 static func step(key: String) -> String:
 	if is_tiered(key):
 		return Kitchen.EFFICIENT if tier_of(key) > 1 else ""
+	if is_treatment(key):
+		return Treatments.step(Treatments.key_of(key))   # the same words as Kitchen's steps
 	return Kitchen.step_of(key)
 
 
@@ -83,6 +104,8 @@ static func step(key: String) -> String:
 static func price(key: String) -> int:
 	if is_tiered(key):
 		return Catalog.price_of(catalog_id(key), tier_of(key))
+	if is_treatment(key):
+		return Treatments.unlock(Treatments.key_of(key))
 	return Kitchen.price_of(key)
 
 
@@ -104,19 +127,26 @@ static func level(key: String) -> int:
 static func name_of(key: String) -> String:
 	if is_tiered(key):
 		return Catalog.label({"id": catalog_id(key), "tier": tier_of(key)})
+	if is_treatment(key):
+		return Treatments.name_of(Treatments.key_of(key))
 	return str(Kitchen.NODES[key].name)
 
 
 ## Quality per job ({} for a tiered piece, which does no prep).
 static func jobs(key: String) -> Dictionary:
-	return {} if is_tiered(key) else Kitchen.jobs_of(key)
+	return {} if is_tiered(key) or is_treatment(key) else Kitchen.jobs_of(key)
 
 
 ## A short line on what the node is: its trade for a specialist, its gain for a step.
 static func blurb(key: String) -> String:
 	if is_tiered(key):
 		return Catalog.blurb_of(catalog_id(key), tier_of(key))
+	if is_treatment(key):
+		var k := Treatments.key_of(key)
+		return "%s.  $%d a cell a night" % [Treatments.ITEMS[k].blurb, Treatments.price_of(k)]
 	var n: Dictionary = Kitchen.NODES[key]
+	if n.has("blurb"):
+		return str(n.blurb)   # the cleaning trees and the hood's (PRD 9.5) say what they do
 	var bits: Array[String] = []
 	if Kitchen.is_auto(key):
 		bits.append("Plays itself")
