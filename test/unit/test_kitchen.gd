@@ -271,12 +271,12 @@ func test_a_counter_on_a_bare_counter_makes_a_double_counter():
 
 
 func test_catalog_pieces_map_to_tops_and_counters():
-	for id in ["stove", "fryer", "pot", "board", "slicer", "crate_soda", "crate_wine"]:
+	for id in ["stove", "fryer", "pot", "board", "slicer", "fountain", "wine_barrel"]:
 		assert_true(Kitchen.is_top(id), id + " is a top")
 		assert_true(Catalog.ITEMS.has(id), id + " is sold")
-	assert_eq(Kitchen.node_of("crate_soda"), "fountain")
-	assert_eq(Kitchen.node_of("crate_wine"), "wine_barrel")
-	assert_eq(Kitchen.node_of("crate_bun"), "", "crates are not kitchen pieces until 8.4")
+	assert_eq(Kitchen.node_of("fountain"), "fountain")
+	assert_eq(Kitchen.node_of("wine_barrel"), "wine_barrel")
+	assert_eq(Kitchen.node_of("box_bun"), "", "a box of stock is not a kitchen piece")
 	assert_false(Kitchen.is_top("counter"))
 	assert_true(Kitchen.is_counter("counter"))
 	assert_false(Kitchen.is_counter("sink"))
@@ -456,14 +456,14 @@ func test_a_tops_surface_holds_one_thing_and_empty_hands_take_it_first():
 
 func test_a_node_behaves_as_the_catalog_piece_it_grew_from():
 	for pair: Array in [["range", "stove"], ["two_hob_range", "stove"], ["char_grill", "stove"], ["fryer", "fryer"],
-			["twin_fryer", "fryer"], ["sharp_knife", "board"], ["auto_slicer", "slicer"], ["two_tap_fountain", "crate_soda"],
-			["wine_rack", "crate_wine"], ["fridge", "counter"], ["long_counter", "counter"]]:
+			["twin_fryer", "fryer"], ["sharp_knife", "board"], ["auto_slicer", "slicer"], ["two_tap_fountain", "fountain"],
+			["wine_rack", "wine_barrel"], ["fridge", "counter"], ["long_counter", "counter"]]:
 		assert_eq(Kitchen.family_of(pair[0]), pair[1], pair[0])
 
 
 func test_tree_keys_for_kitchen_pieces_and_tiered_pieces():
 	assert_eq(Upgrades.key_of("stove"), "stove")
-	assert_eq(Upgrades.key_of("crate_soda"), "fountain")
+	assert_eq(Upgrades.key_of("fountain"), "fountain")
 	assert_eq(Upgrades.key_of("stove", 1, "range"), "range", "a station's own node wins")
 	assert_eq(Upgrades.key_of("plant", 2), "plant@2")
 	assert_eq(Upgrades.key_of("table"), "table@1")
@@ -640,11 +640,11 @@ func test_a_fern_climbs_its_short_tree():
 
 func test_the_board_slices_as_a_stand_in():
 	_game(false)
-	game.add_station("crate_cheese", Vector2i(2, 6))
+	game.stock_box("cheese", Vector2i(2, 6))
 	game.add_station("counter", Vector2i(2, 5))
 	var board: Station = game.add_station("board", Vector2i(2, 5))
 	assert_has(game.kitchen_tools(), "slice", "a menu can offer cheese with only a board")
-	game.use_station(game.find_station("crate_cheese"))
+	game.use_station(game.storage_of("cheese"))
 	assert_eq(game.use_station(board), "Slice")
 	assert_almost_eq(float(game.prep_of(0).q), Kitchen.STAND_IN, 0.001)
 	for k in Prep.SLICE_COUNT:
@@ -657,12 +657,12 @@ func test_the_board_slices_as_a_stand_in():
 
 func test_a_stove_fries_as_a_stand_in_with_a_narrower_window():
 	_game(false)
-	game.add_station("crate_potato", Vector2i(2, 6))
+	game.stock_box("potato", Vector2i(2, 6))
 	game.add_station("counter", Vector2i(2, 5))
 	var stove: Station = game.add_station("stove", Vector2i(2, 5))
 	assert_has(game.kitchen_tools(), "fry")
 	assert_has(game.kitchen_tools(), "boil")
-	game.use_station(game.find_station("crate_potato"))
+	game.use_station(game.storage_of("potato"))
 	assert_eq(game.use_station(stove), "Fry")
 	assert_eq(stove.mode(), "fryer", "a stove frying works as a fryer")
 	for i in int((Prep.FRY_GOOD + 0.5) / 0.1):
@@ -678,14 +678,223 @@ func test_a_stove_fries_as_a_stand_in_with_a_narrower_window():
 
 func test_an_auto_slicer_plays_itself():
 	_game(false)
-	game.add_station("crate_cheese", Vector2i(2, 6))
+	game.stock_box("cheese", Vector2i(2, 6))
 	game.add_station("counter", Vector2i(2, 5))
 	var auto: Station = game.add_station("auto_slicer", Vector2i(2, 5))
 	assert_eq([auto.type, auto.node], ["slicer", "auto_slicer"])
-	game.use_station(game.find_station("crate_cheese"))
+	game.use_station(game.storage_of("cheese"))
 	assert_eq(game.use_station(auto), "Slice")
 	for i in int(Prep.AUTO_TIME / 0.1) + 2:
 		game.step(0.1)
 	assert_eq(game.player.held, "prep:cheese")
 	assert_eq(game.player.held_quality, Prep.GOOD)
 	assert_almost_eq(game.player.speed(), Player.SPEED, 0.01, "no burst for a piece that plays itself")
+
+
+# ---------- 8.4: storage ----------
+
+func test_box_ids_name_a_kind_and_whether_it_is_ready():
+	assert_eq(Pantry.box_id("patty"), "box_patty")
+	assert_eq(Pantry.box_id("cheese", true), "ready_cheese")
+	assert_eq(Pantry.station_ingredient("ready_cheese"), {"id": "cheese", "ready": true})
+	assert_eq(Pantry.station_ingredient("box_fish"), {"id": "fish", "ready": false})
+	assert_eq(Pantry.kind_of("patty"), "patty", "a plain kind is its own box")
+	assert_eq(Pantry.kind_of("box_nothing"), "")
+
+
+func test_every_food_kind_has_a_box_in_its_themes_pantry_and_the_crates_are_gone():
+	for theme in Pantry.THEMES:
+		var pantry: Array = Catalog.search("", "Pantry", theme).map(func(bp: Dictionary) -> String: return bp.id)
+		for kind: String in Pantry.for_theme(theme):
+			if Pantry.is_drink(kind):
+				assert_false(pantry.has(Pantry.box_id(kind)), kind + ": a dispenser holds its own")
+				continue
+			assert_has(pantry, Pantry.box_id(kind), kind)
+			assert_eq(Catalog.ingredient_of(Pantry.box_id(kind)), kind)
+			assert_eq(Catalog.price_of(Pantry.box_id(kind)), 0, "a box is free; its kind costs a fee a night")
+	for id: String in Catalog.ITEMS:
+		assert_false(id.begins_with("crate_"), id + ": the crates went in 8.4")
+	assert_true(Catalog.is_box("ready_lettuce"))
+	assert_false(Catalog.is_box("fountain"))
+	assert_eq(Catalog.level_of("ready_lettuce"), 2, "ready-made still needs level 2")
+
+
+func test_ready_boxes_keep_the_chill_of_their_ingredient():
+	assert_true(Kitchen.is_chilled("box_patty"))
+	assert_true(Kitchen.is_chilled("ready_cheese"))
+	assert_false(Kitchen.is_chilled("ready_lettuce"))
+	var k := _kitchen()
+	k.place(C, "counter")
+	assert_false(k.can_store(C, "ready_cheese"), "ready cheese still needs a fridge")
+	assert_true(k.can_store(C, "ready_lettuce"))
+	k.place(W, "fridge")
+	assert_true(k.store(W, "ready_cheese"))
+	assert_true(k.has_fridge())
+
+
+func test_a_cell_holds_one_box_of_a_kind_ready_or_not():
+	var k := _kitchen()
+	k.place(C, "double_counter")
+	assert_true(k.store(C, "box_lettuce"))
+	assert_false(k.store(C, "ready_lettuce"), "one lettuce a cell")
+	assert_true(k.store(C, "box_bun"))
+	assert_false(k.store(C, "box_onion"), "a double counter holds two kinds")
+	assert_eq(k.cells_with("box_bun"), [C])
+	var held := k.take_stock(C)
+	k.set_cell(C, "")
+	k.set_cell(C, "double_counter", "board")
+	k.give_stock(C, held)
+	assert_eq(k.stock(C), ["box_lettuce", "box_bun"], "stock carried over a swap of pieces")
+
+
+func test_a_fridge_is_needed_for_a_chilled_box_and_is_reached_through_the_counters_tree():
+	_game()
+	assert_true(game.pick_catalog("box_fish" if Scenery.theme_id == "seaside" else "box_patty"))
+	var box: String = game.hand.id
+	game.add_station("counter", Vector2i(2, 6))
+	assert_false(game.can_place(Vector3i(2, 6, 0)), "a chilled box does not go in a plain counter")
+	game.cancel_hand()
+	game.player.position = _at(2, 5)
+	assert_true(game.pick_up(_at(2, 6)))
+	game.open_shop()
+	assert_true(game.upgrading)
+	assert_true(game.buy_upgrade("fridge"))
+	game.close_shop()
+	assert_true(game.place(Vector3i(2, 6, 0)))
+	assert_eq(game.stations[Vector2i(2, 6)].base, "fridge")
+	game.kitchen.unstore(Vector2i(0, 2), box)   # the test kitchen's own box goes, so the fee shows
+	var cost: int = game.night_cost()
+	assert_true(game.pick_catalog(box))
+	assert_true(game.place(Vector3i(2, 6, 0)))
+	assert_true(game.hand.is_empty(), "one box a kind: hands are free again")
+	assert_eq(game.night_cost(), cost + Pantry.fee_of(Pantry.kind_of(box)), "its fee starts")
+	assert_eq(game.stations[Vector2i(2, 6)].boxes, [box], "a tag over the cell names it")
+
+
+func test_the_box_comes_out_before_the_counter_and_a_tool_keeps_the_boxes_below():
+	_game()
+	game.stock_box("lettuce", Vector2i(2, 6))
+	game.player.position = _at(2, 5)
+	assert_true(game.pick_catalog("board"))
+	assert_true(game.place(Vector3i(2, 6, 0)), "a tool goes on top of a counter with a box in it")
+	game.cancel_hand()
+	assert_eq(game.kitchen.stock(Vector2i(2, 6)), ["box_lettuce"])
+	assert_eq(game.stations[Vector2i(2, 6)].boxes, ["box_lettuce"])
+	assert_true(game.pick_up(_at(2, 6)))
+	assert_eq(game.hand.id, "board", "the tool comes off first")
+	game.cancel_hand()
+	game.sell_hand()
+	assert_true(game.pick_up(_at(2, 6)))
+	assert_eq(game.hand.id, "board")
+	assert_true(game.sell_hand())
+	assert_eq(game.kitchen.stock(Vector2i(2, 6)), ["box_lettuce"], "the box stays when the tool goes")
+	assert_true(game.pick_up(_at(2, 6)))
+	assert_eq(game.hand.id, "box_lettuce", "then the box")
+	assert_true(game.sell_hand())
+	assert_true(game.pick_up(_at(2, 6)))
+	assert_eq(game.hand.id, "counter", "and last the counter")
+
+
+func test_e_takes_the_top_first_then_storage_and_swaps_through_the_kinds():
+	_game(false)
+	var cell := Vector2i(2, 6)
+	game.add_station("counter", cell)
+	game.kitchen.place(cell, "counter")   # a double counter: two kinds
+	game.stations[cell].set_base("double_counter")
+	game.stock_box("bun", cell)
+	game.stock_box("lettuce", cell)
+	var st: Station = game.stations[cell]
+	st.set_item("prep:tomato", Prep.PLAIN)
+	assert_eq(game.use_station(st), "Pick up", "what is on the top first")
+	game.player.set_held("")
+	assert_eq(game.prompt_for(st), "Take bun")
+	game.use_station(st)
+	assert_eq(game.player.held, "prep:bun")
+	assert_eq(game.use_station(st), "Swap for lettuce")
+	assert_eq(game.player.held, "raw:lettuce")
+	assert_eq(game.use_station(st), "Swap for bun", "round again")
+	assert_eq(game.player.held, "prep:bun")
+	game.kitchen.unstore(cell, "box_lettuce")
+	assert_eq(game.use_station(st), "Put back", "one kind: it goes back")
+	assert_eq(game.player.held, "")
+
+
+func test_a_stove_on_a_fridge_cooks_first_then_hands_out_the_box():
+	_game(false)
+	var fm: Dictionary = game.fixed_main()
+	var cell := Vector2i(2, 6)
+	game.stock_box(fm.grill, cell)
+	var stove: Station = game.add_station("stove", cell)
+	assert_eq(stove.boxes, [Pantry.box_id(fm.grill)], "the box stays under the stove")
+	assert_eq(game.use_station(stove), "Take %s" % Pantry.name_of(fm.grill).to_lower())
+	assert_eq(game.use_station(stove), "Grill", "the tool wins for what it can cook")
+	assert_eq(game.prompt_for(stove), "Take off the heat", "empty hands: what is on the top first")
+	game.player.set_held(Tray.kind("raw", fm.grill))
+	assert_eq(game.prompt_for(stove), "Put back", "the stove is busy, so a second one goes back")
+
+
+func test_a_dispenser_is_its_own_storage_and_a_kind_is_charged_once():
+	_game()
+	var cost: int = game.night_cost()
+	var drink: String = "wine" if Scenery.theme_id == "seaside" else "soda"
+	var piece: String = "wine_barrel" if drink == "wine" else "fountain"
+	game.add_station(piece, Vector2i(2, 6))
+	game.add_station(piece, Vector2i(1, 6))
+	assert_eq(game.night_cost(), cost + Pantry.fee_of(drink), "two dispensers, one fee")
+	game.stock_box(game.fixed_main().bread, Vector2i(3, 6))
+	assert_eq(game.night_cost(), cost + Pantry.fee_of(drink), "a second box of a kind adds nothing")
+	var names: Array = game.stock_lines().map(func(l: Dictionary) -> String: return l.name)
+	assert_has(names, Pantry.name_of(drink))
+	assert_eq(names.count(Pantry.name_of(game.fixed_main().bread)), 1, "the restock note reads the slots, a line a kind")
+
+
+func test_the_menu_says_a_chilled_kind_needs_a_fridge():
+	_game()
+	var grill: String = game.fixed_main().grill
+	game.kitchen.unstore(Vector2i(0, 2), Pantry.box_id(grill))
+	game.menu_changed()
+	assert_eq(game.item_off_reason(game.menu.items[0]), "%s: needs a box" % Pantry.name_of(grill), "a fridge stands empty")
+	var fridge: Station = game.stations[Vector2i(0, 2)]
+	game._unregister(fridge)
+	fridge.queue_free()
+	assert_eq(game.item_off_reason(game.menu.items[0]), "%s: needs a fridge" % Pantry.name_of(grill))
+	assert_false(game.kitchen.has_fridge())
+
+
+func _night_zero(theme: String) -> void:
+	game = load("res://game/main.tscn").instantiate()
+	add_child_autofree(game)
+	game.set_process(false)
+	game.best_path = "user://regulars_best_test.json"
+	game.theme_path = "user://regulars_theme_test.cfg"
+	game.play()
+	game.choose_theme(theme)
+
+
+func test_night_zero_is_winnable_with_counters_a_fridge_and_boxes():
+	for theme in Pantry.THEMES:
+		_night_zero(theme)
+		assert_eq(game.phase, game.Phase.BUILD, theme)
+		assert_eq(game.ledger.money, 150)
+		assert_eq(game.night_hint(), game.NIGHT_HINTS[0])
+		var fm: Dictionary = game.fixed_main()
+		game.player.position = _at(3, 4)
+		assert_true(game.pick_catalog("stove"))
+		assert_true(game.place(Vector3i(4, 4, 0)), theme + ": a stove on the pass")
+		game.cancel_hand()
+		assert_true(game.pick_up(_at(4, 5)), "a pass counter")
+		game.open_shop()
+		assert_true(game.buy_upgrade("fridge"), theme + ": the counter's tree reaches a fridge")
+		game.close_shop()
+		assert_true(game.place(Vector3i(4, 5, 0)))
+		for kind: String in [fm.grill, fm.bread]:
+			assert_true(game.pick_catalog(Pantry.box_id(kind)), kind)
+			var at := Vector3i(4, 5, 0) if Kitchen.is_chilled(kind) else Vector3i(4, 3, 0)
+			assert_true(game.place(at), theme + ": " + kind)
+		assert_eq(game.night_hint(), game.NIGHT_HINTS[1], "next, a menu")
+		game.write_test_menu()
+		game.menu_changed()
+		assert_eq(game.night_hint(), game.NIGHT_HINTS[2])
+		assert_eq(game.open_block(), "", theme + ": the door card will flip")
+		assert_gte(game.ledger.money, game.night_cost(), theme + ": with money for the stock")
+		game.queue_free()

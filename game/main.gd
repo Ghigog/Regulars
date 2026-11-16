@@ -115,7 +115,7 @@ var _openings := {}                    # Vector3i edge -> Scenery opening info
 var _opening_ok := {}                  # Vector3i edge -> whether it was last drawn usable
 var _frame := [WIDE_FOCUS, WIDE_SIZE, CLOSE_FOCUS, CLOSE_SIZE]   # the camera, fitted to the floor
 const NIGHT_ZERO_BLOCK := "Buy an ingredient, a tool, and write a menu."
-const NIGHT_HINTS: Array[String] = ["Buy an ingredient and a tool in the shop.", "Write a menu.", "Flip the door card to open."]
+const NIGHT_HINTS: Array[String] = ["Buy a tool, and boxes of stock from the shop's Pantry.", "Write a menu.", "Flip the door card to open."]
 var menu_board: MenuBoard               # the chalkboard by the door: tonight's names
 const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "trays": "Tray stack", "pass": "Pass counter"}
 var _demo_hover: Vector3:            # chef 1's held spot, for tests and demos
@@ -507,7 +507,7 @@ func _apply_demo(demo: String) -> void:
 			find_station("stove").set_item("raw:" + fixed_main().grill)
 			find_station("stove").cook = -8.2
 			player.position = Grid.center(Vector2i(1, 2))
-			player.look(Vector2i(-1, 0))   # at the patty crate, hands free
+			player.look(Vector2i(-1, 0))   # at the patty fridge, hands free
 			two.position = Grid.center(Vector2i(3, 3))
 			two.look(Vector2i(1, 0))
 			two.set_held(Tray.kind("raw", fixed_main().bread))
@@ -541,6 +541,11 @@ func _apply_demo(demo: String) -> void:
 		ledger.record_sale(DEMO_BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_desk.bind(demo))
+	elif demo in ["pantry", "storage"]:   # PRD 8.4: the shop's Pantry tab; boxes in counters and a fridge; shoot at 3
+		ledger.record_sale(DEMO_BILL, 5)
+		ledger.money = 300
+		arrivals.clear()
+		get_tree().create_timer(1.0).timeout.connect(_demo_storage.bind(demo))
 	elif demo == "counters":   # PRD 8: a double counter, a board on a double counter, a stove on the pass; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.money = 300
@@ -670,6 +675,33 @@ func _demo_counters() -> void:
 	find_station("board").set_item(Tray.kind("prep", "lemon" if Scenery.seaside() else "tomato"))   # a tool's surface still holds a thing
 	player.position = Grid.center(Vector2i(2, 4))
 	player.look(Vector2i(1, 0))
+
+
+## Storage (PRD 8.4): "storage" a double counter with two boxes and a board on it, two
+## under-counter fridges with the chilled kinds, ready-made in a
+## pass counter, and a box held over a counter (its tags show what each cell holds);
+## "pantry" the shop open on its Pantry tab.
+func _demo_storage(demo: String) -> void:
+	open_build()
+	if demo == "pantry":
+		open_shop()
+		hud._set_category("Pantry")
+		get_tree().create_timer(0.3).timeout.connect(hud.shop_move.bind(1))
+		return
+	var sea := Scenery.seaside()
+	for step: Array in [["counter", 2, 5], ["counter", 2, 5]]:
+		pick_catalog(step[0])
+		place(Vector3i(step[1], step[2], 0))
+		cancel_hand()
+	stock_box("roll" if sea else "bun", Vector2i(2, 5))
+	stock_box("courgette" if sea else "lettuce", Vector2i(2, 5))
+	add_station("board", Vector2i(2, 5))
+	stock_box("calamari" if sea else "cheese", Vector2i(1, 6))   # a second under-counter fridge
+	stock_box("pepper" if sea else "tomato", Vector2i(4, 5), true)
+	pick_catalog("box_lemon" if sea else "box_onion")
+	player.position = Grid.center(Vector2i(3, 3))
+	player.look(Vector2i(1, 0))
+	_demo_hover = Vector3(4.5, 0, 3.5)
 
 
 ## The upgrade trees (PRD 8.3): a piece picked up at night and the shop opened.
@@ -844,8 +876,10 @@ func _demo_build(demo: String) -> void:
 ## and a drink, then the screen, an item being named, or the restock note.
 func _demo_menu(demo: String) -> void:
 	open_build()
-	for spot: Array in [["ready_cheese", 1, 6], ["crate_potato", 2, 6], ["fryer", 3, 6], ["crate_soda", 1, 2]]:
-		add_station(spot[0], Vector2i(spot[1], spot[2]))
+	stock_box("cheese", Vector2i(1, 6), true)
+	stock_box("potato", Vector2i(2, 6))
+	add_station("fryer", Vector2i(3, 6))
+	add_station("fountain", Vector2i(1, 2))
 	var cheese := menu.add("main", ["bun", "patty", "cheese"], "Cheeseburger", "dear")
 	menu.add("main", ["bun", "patty", "cheese", "patty", "cheese"], "Double Stack", "dear")
 	menu.add("side", ["potato"], "Fries", "cheap")
@@ -928,7 +962,7 @@ func _demo_prep(which: String) -> void:
 			add_station("pot", at + Vector2i(0, 1), 1, 1).set_item("prep:" + use.boil)
 		"chop", "slice", "pour":
 			var ing: String = use[which]
-			var type: String = {"chop": "board", "slice": "slicer", "pour": "crate_" + ing}[which]
+			var type: String = {"chop": "board", "slice": "slicer", "pour": "wine_barrel" if ing == "wine" else "fountain"}[which]
 			start_prep(0, add_station(type, at, 1, 1), which, ing)
 			var s: Dictionary = preps[0]
 			s.frozen = true
@@ -1014,7 +1048,7 @@ func _demo_fx() -> void:
 		seated[1].mood.patience = 0.0             # walkout: anger mark and a stamp
 	if seated.size() > 2:
 		seated[2]._gross_time = 6.0               # green cloud
-	find_station("crate_" + fixed_main().grill).used()
+	storage_of(fixed_main().grill).used()
 	burst(find_station("sink").position + Vector3(0, 1.15, 0), "bubbles", 0.4)
 
 
@@ -1226,6 +1260,7 @@ func _bare_counter(cell: Vector2i) -> Station:
 ## node gives way to the tool's, which takes over its base, look and the till.
 func _onto_counter(top: Station, cell: Vector2i, facing: int) -> void:
 	var under := _bare_counter(cell)
+	var held := kitchen.take_stock(cell)   # the boxes below stay put (PRD 8.4)
 	if under != null:
 		_unregister(under)
 		var till := under.get_node_or_null("till")
@@ -1236,10 +1271,13 @@ func _onto_counter(top: Station, cell: Vector2i, facing: int) -> void:
 		under.queue_free()
 	top.place_at(cell, facing)
 	_register(top)
+	kitchen.give_stock(cell, held)
+	_show_boxes(cell)
 
 
 ## Lifts the tool off a counter: the bare counter is left standing in its place.
 func _off_counter(top: Station) -> void:
+	var held := kitchen.take_stock(top.cell)
 	_unregister(top)
 	var under := Station.new()
 	add_child(under)
@@ -1249,6 +1287,9 @@ func _off_counter(top: Station) -> void:
 	if till:
 		till.reparent(under, false)
 	_register(under)
+	kitchen.give_stock(under.cell, held)
+	_show_boxes(under.cell)
+	top.set_boxes([])
 
 
 ## Whether the piece in hand can go onto the station at a cell: a tool onto a bare
@@ -1272,6 +1313,12 @@ func _register(st: Station) -> void:
 	if st.base != "":
 		kitchen.set_cell(st.cell, st.base, st.node if Kitchen.is_top(st.type) else "")
 	_update_racks()
+
+
+## Redraws the tags naming what a cell stores.
+func _show_boxes(cell: Vector2i) -> void:
+	if stations.has(cell):
+		(stations[cell] as Station).set_boxes(kitchen.stock(cell))
 
 
 func _unregister(st: Station) -> void:
@@ -1799,6 +1846,16 @@ func pick_up(p: Vector3, ch: Player = null) -> bool:
 		var st: Station = stations[c]
 		if Kitchen.is_top(st.type):
 			_off_counter(st)   # the tool comes off first; its counter stays
+		elif not kitchen.stock(c).is_empty():
+			# Then the boxes, last in first; the counter only once it is empty (PRD 8.4).
+			var box: String = kitchen.stock(c).back()
+			kitchen.unstore(c, box)
+			_show_boxes(c)
+			ch.hand = {"id": box, "tier": 1, "price": 0, "facing": 0, "moving": true,
+				"from": Vector3i(c.x, c.y, 0), "from_facing": 0}
+			sfx("pickup")
+			menu_changed()
+			return true
 		elif Kitchen.unstacked(st.base) != "" and st.stacked:
 			# One counter comes off a double counter; the other stays with what is on it.
 			st.set_base(Kitchen.unstacked(st.base))
@@ -1836,6 +1893,9 @@ func pick_up(p: Vector3, ch: Player = null) -> bool:
 
 ## Stands the carried piece on a spot. No checks: callers have made them.
 func _put_down(h: Dictionary, spot: Vector3i, facing: int) -> void:
+	if Catalog.is_box(h.id):
+		_store_box(Vector2i(spot.x, spot.y), h.id)
+		return
 	var n: Node3D = h.node
 	n.visible = true
 	if h.id == "screen":
@@ -1852,6 +1912,15 @@ func _put_down(h: Dictionary, spot: Vector3i, facing: int) -> void:
 	else:
 		(n as Station).place_at(Vector2i(spot.x, spot.y), facing)
 		_register(n)
+
+
+## Puts a box of stock in a cell's storage: that kind is stocked from tonight (PRD 8.4).
+func _store_box(cell: Vector2i, box: String) -> bool:
+	if not kitchen.store(cell, box):
+		return false
+	_show_boxes(cell)
+	menu_changed()
+	return true
 
 
 ## A counter placed on a bare counter: the two make a double counter.
@@ -1900,6 +1969,12 @@ func sell_hand(ch: Player = null) -> bool:
 	if phase != Phase.BUILD or sell_block(ch) != "":
 		return false
 	ledger.refund(sell_value(ch))
+	if Catalog.is_box(ch.hand.id):   # a box sold: its kind is no longer stocked
+		ch.hand = {}
+		sfx("coin")
+		menu_changed()
+		hud.show_build()
+		return true
 	var n: Node3D = ch.hand.node
 	if n is Station and (n as Station).lamp:
 		_sconces.erase((n as Station).lamp)
@@ -2019,9 +2094,11 @@ func can_place(spot: Vector3i, ch: Player = null) -> bool:
 	ch = _me(ch)
 	if ch.hand.is_empty():
 		return false
+	var cell := Vector2i(spot.x, spot.y)
+	if Catalog.is_box(ch.hand.id):   # a box goes into a free storage slot that takes it
+		return kitchen.can_store(cell, ch.hand.id)
 	var reach := _reach()
 	var touch := _touch()
-	var cell := Vector2i(spot.x, spot.y)
 	match tool_kind(ch.hand.id):
 		"floor":
 			return plan.can_lay(cell, floor_kind(ch.hand.id))
@@ -2063,6 +2140,12 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		return true
 	if not ledger.spend(int(ch.hand.price)):
 		return false
+	if Catalog.is_box(ch.hand.id):
+		_store_box(cell, ch.hand.id)
+		ch.hand = {}   # one box a kind: hands are free again
+		sfx("putdown")
+		hud.show_build()
+		return true
 	if ch.hand.id == "screen":
 		var n := add_wall(cell, spot.z, 0.9 + 0.1 * int(ch.hand.tier))
 		n.set_meta("tier", int(ch.hand.tier))
@@ -2297,7 +2380,7 @@ func build_action(ch: Player = null) -> String:
 				return "Add door"
 			"arch":
 				return "Add archway"
-		return "Put down"
+		return "Put in" if Catalog.is_box(ch.hand.id) else "Put down"
 	var clean := night_clean_action(stations.get(ch.target_cell()), ch)
 	if clean != "":
 		return clean
@@ -2394,6 +2477,8 @@ func _update_ghost(ch: Player = null) -> void:
 		ch.ghost.position = Grid.center(Vector2i(spot.x, spot.y))
 		ch.ghost.rotation.y = int(ch.hand.facing) * PI / 2
 	ch.ghost.position.y = 0.12 + 0.04 * sin(Time.get_ticks_msec() / 160.0)   # held just off the floor
+	if Catalog.is_box(ch.hand.id):
+		ch.ghost.position.y += 0.86   # a box is held over the counter it goes into
 	ch.ghost.visible = ok
 	ch.no_mark.visible = not ok
 	ch.no_mark.position = Vector3(ch.ghost.position.x, 0, ch.ghost.position.z)
@@ -3137,14 +3222,74 @@ func _guests_to_order(table: Station) -> Array[Guest]:
 
 # ---------------------------------------------------------------- menu, tickets and trays
 
-## Every ingredient station in the room: {ingredient, ready, stocked}.
+## Every kind stocked tonight, each once: {ingredient, ready, stocked}. A box in a storage
+## slot stocks its kind (PRD 8.4); a drink dispenser holds its own drinks, no slot needed.
 func kitchen_stock() -> Array:
 	var out := []
+	var seen := {}
+	for b: String in kitchen.stocked():
+		var s := Pantry.station_ingredient(b)
+		var key := Pantry.box_id(s.id, s.ready)
+		if not seen.has(key):
+			seen[key] = true
+			out.append({"ingredient": s.id, "ready": s.ready, "stocked": true})
 	for st: Station in stations.values():
-		var ing := Catalog.ingredient_of(st.type)
-		if ing != "":
-			out.append({"ingredient": ing, "ready": Catalog.ITEMS[st.type].get("ready", false), "stocked": st.stocked})
+		for d: String in dispenser_drinks(st):
+			if not seen.has(Pantry.box_id(d)):
+				seen[Pantry.box_id(d)] = true
+				out.append({"ingredient": d, "ready": false, "stocked": true})
 	return out
+
+
+## The drinks a dispenser on a counter pours (the fountain's soda, the barrel's wine).
+func dispenser_drinks(st: Station) -> Array[String]:
+	var out: Array[String] = []
+	var drinks: Array = Kitchen.NODES[st.node].get("drinks", []) if Kitchen.has_node(st.node) else []
+	if drinks.is_empty() and Catalog.ingredient_of(st.type) != "" and not Catalog.is_box(st.type):
+		drinks = [Catalog.ingredient_of(st.type)]
+	for d: String in drinks:
+		if Pantry.has(d):   # cola, red wine: their kinds join in 8.6
+			out.append(d)
+	return out
+
+
+## Why a menu item is off tonight, worded for the menu screen: a kind with no box says
+## what it needs ("Patty: needs a fridge"), else the menu's own reason. "" if it is on.
+func item_off_reason(it: Dictionary) -> String:
+	var why := Menu.off_reason(it, kitchen_stock(), kitchen_tools())
+	if why == "" or it.get("off", false):
+		return why
+	var have := {}
+	for s: Dictionary in kitchen_stock():
+		have[s.ingredient] = true
+	for ing: String in it.ingredients:
+		if not have.has(ing):
+			if Pantry.is_drink(ing):
+				return "%s: needs a %s" % [Pantry.name_of(ing), "wine barrel" if ing == "wine" else "soda fountain"]
+			if Kitchen.is_chilled(ing) and not kitchen.has_fridge():
+				return "%s: needs a fridge" % Pantry.name_of(ing)
+			return "%s: needs a box" % Pantry.name_of(ing)
+	return why
+
+
+## Puts a box of an ingredient in the room for tests and demos: into the counter at
+## `cell` (one is set there, upgraded to a fridge for a chilled kind, if the cell is
+## free), else nowhere. Returns the station holding it, or null.
+func stock_box(kind: String, cell: Vector2i, ready := false, facing := 0) -> Station:
+	var box := Pantry.box_id(kind, ready)
+	if not stations.has(cell):
+		add_station("counter", cell, 1, facing, "fridge" if Kitchen.is_chilled(box) else "")
+	if not _store_box(cell, box):
+		return null
+	return stations[cell]
+
+
+## The station whose storage holds a kind (or box id), for tests and demos; null if none.
+func storage_of(kind: String) -> Station:
+	for cell: Vector2i in kitchen.cells_with(kind if Catalog.is_box(kind) else Pantry.box_id(kind)) \
+			+ kitchen.cells_with(Pantry.box_id(kind, true)):
+		return stations.get(cell)
+	return null
 
 
 ## The prep tools in the room ("grill", "fry", ...).
@@ -3170,9 +3315,15 @@ func tonight_menu() -> Array[Dictionary]:
 ## (a Burger in the diner, a Fish roll by the sea).
 func test_kitchen() -> void:
 	var fm := fixed_main()
-	for spot: Array in [["crate_" + fm.grill, 0, 2, 0], ["stove", 0, 3, 1], ["stove", 0, 4, 1], ["crate_" + fm.bread, 0, 6, 1]]:
-		if not stations.has(Vector2i(spot[1], spot[2])):
-			add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3])
+	# Built from pieces (PRD 8.4): the grilled kind's box in an under-counter fridge,
+	# two stoves on counters, the bread's box in a plain counter.
+	if not stations.has(Vector2i(0, 2)):
+		stock_box(fm.grill, Vector2i(0, 2))
+	for at: Vector2i in [Vector2i(0, 3), Vector2i(0, 4)]:
+		if not stations.has(at):
+			add_station("stove", at, 1, 1)
+	if not stations.has(Vector2i(0, 6)):
+		stock_box(fm.bread, Vector2i(0, 6), false, 1)
 	write_test_menu()
 	menu_board.refresh(tonight_menu())
 
@@ -3188,45 +3339,24 @@ func night_cost() -> int:
 	return Menu.night_cost(kitchen_stock())
 
 
-## The restock note's lines, one per kind of stocked ingredient station:
-## {name, fee} in the order they were placed, cheapest last.
+## The restock note's ingredient lines, one per stocked kind: {name, fee}, dearest
+## first. (Other lines, such as staff wages, are the note's own.)
 func stock_lines() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for s: Dictionary in kitchen_stock():
-		if s.stocked:
-			out.append({"name": Pantry.name_of(s.ingredient) + (" (ready)" if s.ready else ""),
-				"fee": Pantry.fee_of(s.ingredient, s.ready)})
+		out.append({"name": Pantry.name_of(s.ingredient) + (" (ready)" if s.ready else ""),
+			"fee": Pantry.fee_of(s.ingredient, s.ready)})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.fee) > int(b.fee))
 	return out
 
 
-## The ingredient stations of one catalog type, for the menu screen's stock switches.
+## The stations of one catalog type.
 func stations_of(type: String) -> Array[Station]:
 	var out: Array[Station] = []
 	for st: Station in stations.values():
 		if st.type == type:
 			out.append(st)
 	return out
-
-
-## Switches an ingredient station's stock for tomorrow (night only). Every station
-## of the same type follows, so the menu screen's switch and the room agree.
-func set_stocked(type: String, on: bool) -> bool:
-	if phase != Phase.BUILD or Catalog.ingredient_of(type) == "":
-		return false
-	for st in stations_of(type):
-		st.stocked = on
-		st.refresh()
-	sfx("flip" if on else "putdown")
-	menu_changed()
-	return true
-
-
-## The station in front of the chef, if it is an ingredient station.
-func stock_station_in_front(ch: Player = null) -> Station:
-	ch = _me(ch)
-	var st: Station = stations.get(ch.target_cell())
-	return st if st != null and Catalog.ingredient_of(st.type) != "" else null
 
 
 ## Something about tonight's menu changed: the board by the door and the notes follow.
@@ -3792,11 +3922,8 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	var why := ""
 	if surface_first(st, held):
 		return _finish_use(st, _use_surface(st, dry_run, ch), dry_run, ch)
-	var ing := Catalog.ingredient_of(st.type)
-	if ing != "" and not st.stocked:
-		if held == "" or Tray.parse(held).get("id", "") == ing:
-			why = "Not stocked today"
-	elif ing != "":
+	var ing := Catalog.ingredient_of(st.type)   # a drink dispenser's own drink
+	if ing != "":
 		var ready: bool = Catalog.ITEMS[st.type].get("ready", false)
 		if held == "" and Pantry.tool_of(ing) == "pour":
 			act = "Pour %s" % Pantry.name_of(ing).to_lower()
@@ -3891,7 +4018,13 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			elif not held_ing.is_empty():
 				why = "%s doesn't go on the %s" % [Pantry.name_of(held_ing.id), Pantry.TOOL_NAMES[tool]]
 		"counter", "pass":
-			var r := _use_surface(st, dry_run, ch)
+			# Empty hands: the top first, then storage. Full hands: a box's kind goes
+			# back or swaps for the next first, then the thing goes down on the top.
+			var r := _use_surface(st, dry_run, ch) if held == "" else _use_storage(st, dry_run, ch)
+			if r[0] == "":
+				var r2 := _use_storage(st, dry_run, ch) if held == "" else _use_surface(st, dry_run, ch)
+				if r2[0] != "" or r2[1] != "":
+					r = r2
 			act = r[0]
 			why = r[1]
 		"trays":
@@ -3982,6 +4115,10 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				act = "Free meal for %s" % g.info.name   # after half price, or for disgust
 				if not dry_run:
 					offer_comp(g)
+	if act == "" and not st.type in ["counter", "pass"]:
+		var r := _use_storage(st, dry_run, ch)   # what the tool cannot do, storage below may
+		if r[0] != "":
+			return _finish_use(st, r, dry_run, ch)
 	if act == "" and held != "" and Kitchen.is_top(st.type) and not st.type in ["stove", "fryer", "pot"]:
 		var r := _use_surface(st, true, ch)   # a thing the tool cannot use goes down on its surface
 		if r[0] != "":
@@ -4008,6 +4145,46 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free") or act.begins_with("Take order") or act.ends_with(" orders")):
 			sfx("pickup" if ch.held != "" else "putdown")
 	return act
+
+
+## The storage under a cell (PRD 8.4). Empty hands take its first kind; holding a kind
+## as it came out of a box here, each use swaps it for the next kind, or with one kind
+## puts it back. Returns [action, refusal].
+func _use_storage(st: Station, dry_run: bool, ch: Player) -> Array:
+	var boxes := kitchen.stock(st.cell)
+	if boxes.is_empty():
+		return ["", ""]
+	var held := ch.held
+	if held == "":
+		var b: String = boxes[0]
+		if not dry_run:
+			_hold_from_box(ch, b)
+		return ["Take %s" % Pantry.name_of(Pantry.kind_of(b)).to_lower(), ""]
+	for i in boxes.size():
+		if held != _from_box(boxes[i]) or (held.begins_with("prep") and not is_equal_approx(ch.held_quality, Prep.PLAIN)):
+			continue
+		if boxes.size() == 1:
+			if not dry_run:
+				ch.set_held("")
+			return ["Put back", ""]
+		var next: String = boxes[(i + 1) % boxes.size()]
+		if not dry_run:
+			_hold_from_box(ch, next)
+		return ["Swap for %s" % Pantry.name_of(Pantry.kind_of(next)).to_lower(), ""]
+	return ["", ""]
+
+
+func _hold_from_box(ch: Player, box: String) -> void:
+	var k := _from_box(box)
+	ch.set_held(k, Prep.PLAIN if k.begins_with("prep") else 1.0)
+
+
+## What comes out of a box: raw, or prepped and plain when it is ready-made or needs no prep.
+static func _from_box(box: String) -> String:
+	var s := Pantry.station_ingredient(box)
+	if s.ready or not Pantry.needs_prep(s.id):
+		return Tray.kind("prep", s.id)
+	return Tray.kind("raw", s.id)
 
 
 ## A counter's worktop, and the free surface of any tool on one: it holds one thing,
@@ -4427,10 +4604,6 @@ func _build_mouse(event: InputEvent, ch: Player) -> void:
 	if mb.pressed and ch.hand.is_empty() and not right and menu_board.under(cam, mb.position):
 		open_menu(ch)   # a click on the board by the door
 		return
-	var crate: Station = stations.get(Grid.to_cell(p))
-	if mb.pressed and right and ch.hand.is_empty() and crate != null and Catalog.ingredient_of(crate.type) != "":
-		set_stocked(crate.type, not crate.stocked)   # right click switches a crate's stock
-		return
 	if mb.pressed:
 		if tool:
 			ch.drag = {"from": p, "remove": right or erase}
@@ -4710,11 +4883,7 @@ func _build_act(action: String, ch: Player = null) -> void:
 		"back":
 			cancel_hand(ch)
 		"turn":
-			if ch.hand.is_empty() and stock_station_in_front(ch) != null:
-				var st := stock_station_in_front(ch)
-				set_stocked(st.type, not st.stocked)
-			else:
-				rotate_hand(ch)
+			rotate_hand(ch)
 		"shop":
 			open_shop(ch)
 		"menu":

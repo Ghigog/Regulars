@@ -90,7 +90,6 @@ func test_the_first_use_at_a_station_wins():
 	for ch: Player in [one, two]:
 		ch.position = Grid.center(Vector2i(1, 2))
 		ch.look(Vector2i(-1, 0))
-	game.set_stocked("crate_" + game.fixed_main().grill, true)
 	var stove: Station = game.stations[Vector2i(0, 3)]
 	one.set_held(Tray.kind("raw", game.fixed_main().grill))
 	two.set_held(Tray.kind("raw", game.fixed_main().grill))

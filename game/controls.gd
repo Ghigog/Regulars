@@ -399,9 +399,6 @@ func buttons() -> Array:
 		if hand.is_empty():
 			out.append(["menu", "Dishes", Vector2(x, y), BTN_R])
 			y -= BTN_R * 2 + 14.0
-			var crate: Station = game.stock_station_in_front(_chef_of(owner_of("touch")))
-			if crate != null:
-				out.append(["turn", "Unstock" if crate.stocked else "Stock", Vector2(x, y), BTN_R])
 	elif build and _touch_shops():
 		out.append(["back", "Close", Vector2(x, 70.0), BTN_R])
 	out.append(["options", "Menu", Vector2(r.size.x - 60.0, 196.0), 30.0])

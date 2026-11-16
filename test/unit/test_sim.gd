@@ -433,8 +433,11 @@ func test_catalog_search_by_word_and_category():
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen", "diner")
-	assert_eq(kitchen.size(), 19, "the counter, a bin, a dish rack, a sink, stove and board, nine diner stations and four ready-made")
-	assert_eq(kitchen[0].id, "crate_bun", "cheapest first, then by name")
+	assert_eq(kitchen.size(), 7, "the counter, a bin, a dish rack, a sink, stove, board and the soda fountain")
+	assert_eq(kitchen[0].id, "counter", "cheapest first, then by name")
+	var pantry := Catalog.search("", "Pantry", "diner")
+	assert_eq(pantry.size(), 12, "a box per diner food kind and four ready-made (PRD 8.4)")
+	assert_eq(pantry[0].id, "box_bun", "boxes are free to take: by name")
 	assert_eq(Catalog.search("", "Kitchen", "seaside").filter(func(bp: Dictionary) -> bool:
 		return Catalog.ITEMS[bp.id].get("theme", "seaside") != "seaside").size(), 0, "only the run's theme")
 	assert_eq(Catalog.search("two more seats").size(), 1, "matches what a piece does")
@@ -869,15 +872,15 @@ func test_seaside_ingredients_are_complete():
 			assert_true(Catalog.ITEMS.has(tool_station), "%s's tool is sold" % id)
 			assert_eq(Catalog.tool_of(tool_station), it.tool)
 			assert_false(Catalog.ITEMS[tool_station].has("theme"), "tools are sold to both themes")
-		var crate := Pantry.station_id(id)
+		var crate := "wine_barrel" if Pantry.is_drink(id) else Pantry.box_id(id)
 		assert_true(Catalog.ITEMS.has(crate), "%s has a station" % id)
 		assert_eq(Catalog.ITEMS[crate].theme, "seaside")
 		assert_eq(Catalog.ingredient_of(crate), id)
-		assert_eq(Catalog.ITEMS.has(Pantry.station_id(id, true)), Pantry.can_be_ready(id),
+		assert_eq(Catalog.ITEMS.has(Pantry.box_id(id, true)), Pantry.can_be_ready(id),
 			"%s is sold ready-made only if it is on the list" % id)
-	assert_eq(Catalog.tool_of("crate_wine"), "pour", "wine is poured at its own barrel")
+	assert_eq(Catalog.tool_of("wine_barrel"), "pour", "wine is poured at its own barrel")
 	for id in ["courgette", "pepper"]:
-		assert_eq(Catalog.ITEMS[Pantry.station_id(id, true)].theme, "seaside")
+		assert_eq(Catalog.ITEMS[Pantry.box_id(id, true)].theme, "seaside")
 	assert_false(Pantry.can_be_ready("lemon"), "only the chopped ones and cheese come ready-made")
 
 

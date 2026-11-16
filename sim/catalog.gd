@@ -7,7 +7,7 @@ extends RefCounted
 
 const MAX_TIER := 3
 const SHELF_DAYS := 2
-const CATEGORIES: Array[String] = ["Kitchen", "Dining", "Decor", "Build"]
+const CATEGORIES: Array[String] = ["Kitchen", "Pantry", "Dining", "Decor", "Build"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## PRD 10: the desk is kept out of the shop until helpers can work (10.6). The one
 ## switch that puts every "staff" piece on sale.
@@ -95,54 +95,54 @@ const ITEMS := {
 		"blurb": "Chops vegetables. Slices at a pinch. Upgrade it in hand"},
 	"slicer": {"name": "Slicer", "price": 60, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "slice",
 		"blurb": "Slices cheese and lemons"},
-	"crate_bun": {"name": "Bun crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "bun", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_patty": {"name": "Patty fridge", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "patty", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_lettuce": {"name": "Lettuce crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "lettuce", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_tomato": {"name": "Tomato crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "tomato", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_onion": {"name": "Onion sack", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "onion", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_cheese": {"name": "Cheese fridge", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "cheese", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_potato": {"name": "Potato sack", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "potato", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_corn": {"name": "Corn crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "corn", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_soda": {"name": "Soda fountain", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "soda", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_roll": {"name": "Bread basket", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "roll", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_fish": {"name": "Fish icebox", "price": 25, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "fish", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_calamari": {"name": "Calamari icebox", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "calamari", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_lemon": {"name": "Lemon crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "lemon", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_courgette": {"name": "Courgette crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "courgette", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_pepper": {"name": "Pepper crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "pepper", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_new_potato": {"name": "New potato sack", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "new_potato", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_beans": {"name": "Bean crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "beans", "blurb": "Hands out ingredients. Stocked each night"},
-	"crate_wine": {"name": "Wine barrel", "price": 45, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "wine", "blurb": "Hands out ingredients. Stocked each night"},
-	"ready_lettuce": {"name": "Chopped lettuce tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "lettuce", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
-	"ready_tomato": {"name": "Sliced tomato tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "tomato", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
-	"ready_onion": {"name": "Onion rings tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "onion", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
-	"ready_cheese": {"name": "Cheese slices", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "diner",
-		"ingredient": "cheese", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
-	"ready_courgette": {"name": "Chopped courgette tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "courgette", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
-	"ready_pepper": {"name": "Chopped pepper tub", "price": 35, "level": 2, "category": "Kitchen", "tiers": 1, "theme": "seaside",
-		"ingredient": "pepper", "ready": true, "blurb": "Ready to use, no prep. Always plain"},
+	"box_bun": {"name": "Bun box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "bun", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_patty": {"name": "Patty box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "patty", "box": true, "blurb": "Stocks it every night. A fridge slot only"},
+	"box_lettuce": {"name": "Lettuce box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "lettuce", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_tomato": {"name": "Tomato box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "tomato", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_onion": {"name": "Onion sack", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "onion", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_cheese": {"name": "Cheese box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "cheese", "box": true, "blurb": "Stocks it every night. A fridge slot only"},
+	"box_potato": {"name": "Potato sack", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "potato", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_corn": {"name": "Corn box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "corn", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_roll": {"name": "Bread basket", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "roll", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_fish": {"name": "Fish box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "fish", "box": true, "blurb": "Stocks it every night. A fridge slot only"},
+	"box_calamari": {"name": "Calamari box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "calamari", "box": true, "blurb": "Stocks it every night. A fridge slot only"},
+	"box_lemon": {"name": "Lemon box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "lemon", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_courgette": {"name": "Courgette box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "courgette", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_pepper": {"name": "Pepper box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "pepper", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_new_potato": {"name": "New potato sack", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "new_potato", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"box_beans": {"name": "Bean box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "beans", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
+	"fountain": {"name": "Soda fountain", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
+		"ingredient": "soda", "blurb": "Pours soda. Holds its own, no slot needed"},
+	"wine_barrel": {"name": "Wine barrel", "price": 45, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
+		"ingredient": "wine", "blurb": "Pours white wine. Holds its own, no slot needed"},
+	"ready_lettuce": {"name": "Chopped lettuce tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "lettuce", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
+	"ready_tomato": {"name": "Sliced tomato tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "tomato", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
+	"ready_onion": {"name": "Onion rings tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "onion", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
+	"ready_cheese": {"name": "Cheese slices", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "diner",
+		"ingredient": "cheese", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A fridge slot only"},
+	"ready_courgette": {"name": "Chopped courgette tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "courgette", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
+	"ready_pepper": {"name": "Chopped pepper tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "seaside",
+		"ingredient": "pepper", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
 }
 
 var shelf: Array[Dictionary] = []
@@ -176,12 +176,19 @@ static func ingredient_of(id: String) -> String:
 
 
 ## The prep tool a piece is ("" if none). A drink's station is its own pour tool.
+## A box of one ingredient kind, stocked by placing it in a storage slot (PRD 8.4).
+static func is_box(id: String) -> bool:
+	return ITEMS.has(id) and ITEMS[id].get("box", false)
+
+
 static func tool_of(id: String) -> String:
 	if not ITEMS.has(id):
 		return ""
 	if ITEMS[id].has("tool_of"):
 		return ITEMS[id].tool_of
 	var ing := ingredient_of(id)
+	if is_box(id):
+		return ""
 	return "pour" if ing != "" and Pantry.is_drink(ing) else ""
 
 

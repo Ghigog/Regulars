@@ -739,12 +739,36 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 	return n
 
 
-## An ingredient station switched off for tomorrow: a cloth over the top and a
-## coral tag with a bar across it, so it reads as "not stocked" by shape too.
-static func unstocked(n: Node3D) -> void:
-	_add(n, bevel_mesh(Vector3(0.9, 0.06, 0.9), 0.03), Vector3(0, 1.22, 0), Color("#d8ccb6"), 0.0)
-	box(n, Vector3(0, 1.3, 0.3), Vector3(0.34, 0.2, 0.03), CORAL)
-	box(n, Vector3(0, 1.3, 0.32), Vector3(0.26, 0.05, 0.02), PAPER)
+## The row of tags over a storage cell naming the kinds it holds (PRD 8.4): a cream
+## card per box with the raw ingredient in front of it, readable at 20 px. A box kept
+## cold has a square, frost-blue card (by shape as well as colour); a ready-made one
+## shows the food prepped, with a green corner.
+static func box_tags(n: Node3D, boxes: Array, y := 1.6) -> void:
+	var gap := 0.5
+	for i in boxes.size():
+		var s := Pantry.station_ingredient(boxes[i])
+		if s.is_empty():
+			continue
+		var at := CAM_BASIS.x * (i - (boxes.size() - 1) / 2.0) * gap + Vector3(0, y, 0)
+		var layers: Array = []
+		if Kitchen.is_chilled(boxes[i]):
+			layers.append([Icons.rect(0, 0, 2.0, 2.0), Icons.INK])
+			layers.append([Icons.rect(0, 0, 1.76, 1.76), "#8fc3cf"])
+			layers.append([Icons.rect(0, 0, 1.4, 1.4), "#fbf6ea"])
+		else:
+			layers.append([Icons.ell(0, 0, 1.0), Icons.INK])
+			layers.append([Icons.ell(0, 0, 0.86), "#fbf6ea"])
+		if s.ready:
+			layers.append([Icons.ell(0.62, 0.62, 0.34), Icons.INK])
+			layers.append([Icons.ell(0.62, 0.62, 0.24), GOOD])
+		var card := Fx.card(layers, 0.23)
+		card.position = at
+		n.add_child(card)
+		var food := Node3D.new()
+		food.position = at + CAM_BASIS.z * 0.2 - CAM_BASIS.y * 0.08
+		food.scale = Vector3.ONE * 0.95
+		n.add_child(food)
+		ingredient(food, s.id, "prep" if s.ready else "raw", "" if s.ready else "raw")
 
 
 ## The washing-up in a sink: dirty plates leaning in the basin and, once it has
@@ -899,11 +923,25 @@ static func _store_kind(id: String) -> String:
 ## An ingredient station (sheet 8's kitchen units, one per ingredient): a counter
 ## whose top shows what it hands out, raw, so it reads at 20 px; a ready-made tub
 ## shows the ingredient prepped, in a steel tub with a green tag.
-static func _ingredient_station(n: Node3D, id: String, ready: bool) -> void:
+static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := false) -> void:
 	var kind := "ready" if ready else _store_kind(id)
+	if as_box:
+		# A box of stock (PRD 8.4): the old station's top, lifted off its counter onto a
+		# low body of its own, so it reads as something carried and put away.
+		var inner := Node3D.new()
+		inner.position.y = -0.48
+		inner.scale = Vector3.ONE * 0.8
+		n.add_child(inner)
+		n = inner
+		var body := {"cold": "#eef3f4", "ice": "#4fa3b8", "ready": STEEL, "crate": WOOD}
+		if body.has(kind):
+			box(n, Vector3(0, 0.6, 0), Vector3(0.84, 0.3, 0.8), body[kind])
+		if kind == "cold":   # a frost-blue band: kept cold, by shape as well as colour
+			box(n, Vector3(0, 0.75, 0.41), Vector3(0.6, 0.08, 0.02), "#8fc3cf")
 	match kind:
 		"cold":
-			_counter(n, "#f3ecdc", "#fbf6ea")
+			if not as_box:
+				_counter(n, "#f3ecdc", "#fbf6ea")
 			box(n, Vector3(0, 0.9, 0), Vector3(0.82, 0.06, 0.82), "#cfe3e6", 0.0, R_GLOSS)
 			box(n, Vector3(0, 0.62, 0.48), Vector3(0.5, 0.05, 0.03), STEEL, 0.0, R_WOOD)
 			for k in 3:
@@ -915,7 +953,8 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool) -> void:
 		"ice":
 			# A seaside icebox: a sea-blue cooler with its lid propped open at the back,
 			# full of crushed ice with the catch laid on top.
-			_counter(n, WOOD, WORKTOP, false)
+			if not as_box:
+				_counter(n, WOOD, WORKTOP, false)
 			_add(n, bevel_mesh(Vector3(0.86, 0.2, 0.78), 0.04), Vector3(0, 0.98, 0.0), Color("#4fa3b8"), 0.0)
 			box(n, Vector3(0, 1.06, 0), Vector3(0.74, 0.04, 0.66), "#eef8fa", 0.0, R_GLOSS)
 			for k in 6:
@@ -933,7 +972,8 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool) -> void:
 				ingredient(at, id, "raw", "raw")
 		"basket":
 			# A low wicker basket of rolls, a checked cloth tucked over one side.
-			_counter(n, WOOD, WORKTOP, false)
+			if not as_box:
+				_counter(n, WOOD, WORKTOP, false)
 			lathe(n, Vector3(0, 0.9, 0), [[0.0, 0.0], [0.28, 0.0], [0.36, 0.18], [0.32, 0.18], [0.25, 0.04], [0.0, 0.04]], "#c8964f", 0.0, R_WOOD)
 			for h: float in [0.06, 0.12]:
 				lathe(n, Vector3(0, 0.9 + h, 0), [[0.28 + h * 0.44, 0.0], [0.3 + h * 0.44, 0.0], [0.3 + h * 0.44, 0.012], [0.28 + h * 0.44, 0.012]], "#9a6c34", 0.0, R_WOOD)
@@ -947,7 +987,8 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool) -> void:
 				n.add_child(at)
 				ingredient(at, id, "raw", "raw")
 		"sack":
-			_counter(n, WOOD, WORKTOP, false)
+			if not as_box:
+				_counter(n, WOOD, WORKTOP, false)
 			ball(n, Vector3(0, 1.12, -0.05), 0.33, "#c8a56e").scale = Vector3(1, 0.8, 0.85)
 			lathe(n, Vector3(0, 1.3, -0.05), [[0.0, 0.0], [0.24, 0.0], [0.27, 0.05], [0.0, 0.05]], "#b48c56")
 			for k in 3:
@@ -957,7 +998,8 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool) -> void:
 				n.add_child(at)
 				ingredient(at, id, "raw", "raw")
 		"drink":
-			_counter(n, CORAL, WORKTOP)
+			if not as_box:
+				_counter(n, CORAL, WORKTOP)
 			if id == "wine":
 				var barrel := cyl(n, Vector3(0, 1.18, 0), 0.3, 0.6, WOOD, 0.0, R_WOOD)
 				barrel.rotation.x = PI / 2
@@ -976,7 +1018,8 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool) -> void:
 					cyl(n, Vector3(x, 1.18, 0.0), 0.03, 0.08, STEEL, 0.0, R_WOOD)
 				box(n, Vector3(0, 0.92, 0.1), Vector3(0.5, 0.03, 0.22), STEEL, 0.0, R_WOOD)
 		"ready":
-			_counter(n, STEEL, WORKTOP)
+			if not as_box:
+				_counter(n, STEEL, WORKTOP)
 			box(n, Vector3(0, 0.9, 0), Vector3(0.7, 0.14, 0.6), "#c9d0d1", 0.0, R_WOOD)
 			var at := Node3D.new()
 			at.position = Vector3(0, 0.99, 0)
@@ -984,7 +1027,8 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool) -> void:
 			ingredient(at, id, "prep")
 			box(n, Vector3(0.3, 0.6, 0.48), Vector3(0.2, 0.2, 0.02), GOOD)
 		_:
-			_counter(n, WOOD, WORKTOP, false)
+			if not as_box:
+				_counter(n, WOOD, WORKTOP, false)
 			for x: float in [-0.3, 0.3]:   # slatted crate sides
 				box(n, Vector3(x, 0.9, 0), Vector3(0.06, 0.24, 0.8), WOOD_DARK)
 			for z: float in [-0.38, 0.38]:
@@ -1093,7 +1137,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 		_double(n, type == "counter")
 	var ing := Catalog.ingredient_of(type)
 	if ing != "":
-		_ingredient_station(n, ing, Catalog.ITEMS[type].get("ready", false))
+		_ingredient_station(n, ing, Catalog.ITEMS[type].get("ready", false), Catalog.is_box(type))
 		return
 	match type:
 		"fryer":

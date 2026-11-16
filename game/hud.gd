@@ -656,6 +656,9 @@ class ModelView extends TextureRect:
 			Build.box(n, Vector3(0, 0.25, 0.2), Vector3(0.44, 0.014, 0.1), Build.TILE_TEAL).rotation.y = -0.04
 		else:
 			Build.station(n, bp.id, int(bp.tier), str(bp.get("base", "")), false, str(bp.get("node", "")))
+			if Catalog.is_box(bp.id):   # a box is small: shown up close, at a piece's size
+				n.scale = Vector3.ONE * 1.9
+				n.position.y = 0.05
 		if not live:
 			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
@@ -1998,7 +2001,7 @@ func show_review() -> void:
 	_pop_in(clip)
 
 
-const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
+const SHOP_TABS: Array[String] = ["Kitchen", "Pantry", "Dining", "Decor", "Build", "Extras"]
 const TRAY_DROP := 260.0   # how far below its place the shop tray waits
 
 
@@ -2243,8 +2246,7 @@ func _build_tip(p := 0) -> String:
 	if hand.is_empty():
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % game.ledger.day
-		var stock := "%s stock a crate or not      " % _g("turn", p)
-		return "%s walk      %s pick up      %s%s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, stock, _g("shop", p), _g("menu", p), game.ledger.day]
+		return "%s walk      %s pick up      %s shop (Pantry for stock)      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
 	if Catalog.is_build_tool(hand.id):
 		var floor: bool = game.floor_kind(hand.id) != ""
 		var what := "%s, $%d each." % [Catalog.label(hand), int(hand.price)]
@@ -2258,6 +2260,12 @@ func _build_tip(p := 0) -> String:
 		var drag := "drag for a row" if hand.id == "wall" or Catalog.is_finish(hand.id) else ("drag for a rectangle" if floor else "click to add")
 		return "%s      %s      Mouse: %s, right-drag removes      X remove      Esc done" % [what, how, drag]
 	var turn := _g("turn", p)
+	if Catalog.is_box(hand.id):   # PRD 8.4: a box goes into a storage slot
+		var b := Pantry.station_ingredient(hand.id)
+		var where := "a fridge (pick up a counter, open the shop, upgrade it)" if Kitchen.is_chilled(hand.id) else "a counter or a fridge"
+		var what := "%s, $%d a night.      Put it in %s" % [Catalog.label(hand), Pantry.fee_of(b.id, b.ready), where]
+		var away := ("%s sell stops the fee" % ("Sell" if m == "touch" else _g("sell", p))) if hand.get("moving", false) else "%s drop" % ("Drop" if m == "touch" else _g("back", p))
+		return "%s      %s put in      %s" % [what, "Tap the counter" if m == "touch" else use, away]
 	if hand.get("moving", false):
 		var why: String = game.sell_block(ch)
 		var sell := ("%s for $%d" % ["Sell" if m == "touch" else _g("sell", p) + " sell", game.sell_value(ch)]) if why == "" else why
@@ -2523,8 +2531,12 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 	var id: String = bp.id
 	var tier: int = bp.tier
 	var locked := l.level() < Catalog.level_of(id, tier)
+	var price := "$%d" % Catalog.price_of(id, tier)
+	if Catalog.is_box(id):   # a box is free to take; its kind costs a fee each night (PRD 8.4)
+		var b := Pantry.station_ingredient(id)
+		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
 	return {"name": Catalog.label(bp), "blurb": Catalog.blurb_of(id, tier), "locked": locked,
-		"price": "Level %d" % Catalog.level_of(id, tier) if locked else "$%d" % Catalog.price_of(id, tier),
+		"price": "Level %d" % Catalog.level_of(id, tier) if locked else price,
 		"can": game.catalog.can_buy(id, l.money, l.level(), tier)}
 
 
