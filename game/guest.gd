@@ -135,10 +135,11 @@ func _advance(delta: float) -> bool:
 		_waited = 0.0
 	_face(dir, delta)
 	var was := position
+	var speed: float = SPEED * game.floor_speed(position)   # slowed by dirt underfoot
 	if other != null:
-		position += move * SPEED * delta
+		position += move * speed * delta
 	else:
-		position = position.move_toward(target, SPEED * delta)
+		position = position.move_toward(target, speed * delta)
 	heading = (position - was).normalized()
 	_body.position.y = absf(sin(_age * 11.0)) * 0.06
 	# Stepping round someone counts as passing the cell they were heading for.
