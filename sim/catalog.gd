@@ -9,9 +9,9 @@ const MAX_TIER := 3
 const SHELF_DAYS := 2
 const CATEGORIES: Array[String] = ["Kitchen", "Pantry", "Dining", "Decor", "Build"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
-## PRD 10: the desk is kept out of the shop until helpers can work (10.6). The one
-## switch that puts every "staff" piece on sale.
-const STAFF_ON_SALE := false
+## PRD 10: the desk was kept out of the shop until helpers could work; since 10.6 it is
+## on sale. The one switch that puts every "staff" piece on sale.
+const STAFF_ON_SALE := true
 const TIER_JOY := 0.1   # joy a decor piece gains for each tier above the first
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
 ## A "tool" builds the room itself and is priced per tile or per wall; a "finish"

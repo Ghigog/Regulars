@@ -428,12 +428,12 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 70, "one entry a piece: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; four cleaning pieces (PRD 9.4)")
+	assert_eq(Catalog.search().size(), 71, "one entry a piece: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; four cleaning pieces (PRD 9.4); the desk (PRD 10.6)")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen", "diner")
-	assert_eq(kitchen.size(), 14, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, stove, board, the soda fountain, a mop bucket, a hook, a sponge and the robot sweeper")
+	assert_eq(kitchen.size(), 15, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, stove, board, the soda fountain, a mop bucket, a hook, a sponge, the robot sweeper and the desk (PRD 10.6)")
 	assert_eq(kitchen[0].id, "hook", "cheapest first, then by name")
 	var pantry := Catalog.search("", "Pantry", "diner")
 	assert_eq(pantry.size(), 16, "a box per boxed diner food kind and four ready-made (PRD 8.4, 8.6)")

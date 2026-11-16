@@ -286,6 +286,22 @@ static func icon(id: String) -> Array:
 			for k in 3:
 				o.append([rect(0.0, 0.0, 1.7, 0.22, PI * k / 3.0), "#5aa4c4"])
 			o.append([ell(0.0, 0.0, 0.24), "#ffffff"])
+		"chat":  # PRD 10.6: two helpers talking, a cream speech balloon with three ink dots
+			o.append([ell(0.0, 0.12, 0.98, 0.7), INK])
+			o.append([PackedVector2Array([Vector2(-0.5, -0.38), Vector2(-0.12, -0.42), Vector2(-0.78, -0.92)]), INK])
+			o.append([ell(0.0, 0.12, 0.84, 0.56), CREAM])
+			o.append([PackedVector2Array([Vector2(-0.44, -0.3), Vector2(-0.2, -0.34), Vector2(-0.62, -0.7)]), CREAM])
+			for k in 3:
+				o.append([ell(-0.4 + k * 0.4, 0.12, 0.12), INK])
+		"mug":  # PRD 10.6: a helper on a break, a coral mug with steam over it
+			o.append([rect(0.62, -0.18, 0.5, 0.62), INK])
+			o.append([rect(0.62, -0.18, 0.26, 0.36), CREAM])
+			o.append([rect(-0.1, -0.3, 1.2, 1.12), INK])
+			o.append([rect(-0.1, -0.26, 1.0, 0.96), CORAL])
+			o.append([rect(-0.1, 0.12, 1.0, 0.14), CREAM])
+			for x0: float in [-0.36, 0.12]:
+				for k in 5:
+					o.append([ell(x0 + 0.08 * sin(k * 1.3), 0.5 + k * 0.12, 0.07), INK])
 		"heart":  # a coral heart with a cream rim
 			for pass_: Array in [[1.2, CREAM], [1.0, CORAL]]:
 				var k: float = pass_[0]

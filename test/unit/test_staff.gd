@@ -616,3 +616,301 @@ func test_days_off_are_picked_as_a_week_starts():
 	assert_true(game.staff.picked_week(3, 6))
 	var off: Array = game.staff.week_boxes(3, 6).filter(func(b: Dictionary) -> bool: return b.off)
 	assert_eq(off.size(), 2)
+
+
+# ================================================================ 10.6 helpers in the room
+
+# ---------- How a helper works (sim/helper_work.gd) ----------
+
+func test_better_rated_helpers_walk_and_work_faster():
+	assert_lt(HelperWork.walk_speed(1), HelperWork.walk_speed(5))
+	assert_lt(HelperWork.walk_speed(5), Player.SPEED, "no helper outruns a chef")
+	assert_gt(HelperWork.work_time(1.0, 1, 1.0), HelperWork.work_time(1.0, 5, 1.0))
+	assert_almost_eq(HelperWork.work_time(1.0, 5, 1.0), 1.0, 0.0001)
+
+
+func test_low_satisfaction_slows_their_work():
+	assert_gt(HelperWork.work_time(1.0, 3, 0.0), HelperWork.work_time(1.0, 3, 0.9))
+	assert_almost_eq(HelperWork.work_time(1.0, 3, 0.0) / HelperWork.work_time(1.0, 3, 0.9), 1.0 + Staff.SLOW_MAX, 0.0001)
+
+
+func test_a_fetch_is_cooked_by_a_cook_and_left_for_one_otherwise():
+	var task := {"type": "fetch", "cell": Vector2i(0, 2), "kind": "patty", "job": "grill", "dest": Vector2i(0, 3), "ticket": 4}
+	var cook := HelperWork.steps(task, ["fetch", "grill", "assemble"], "grill")
+	assert_eq(cook.map(func(s: Dictionary) -> String: return s.do), ["take", "cook", "deliver"])
+	assert_eq(cook[1].at, Vector2i(0, 3))
+	assert_true(cook[2].assemble, "with the assemble duty it goes on the tray")
+	var runner := HelperWork.steps(task, ["fetch"], "grill")
+	assert_eq(runner.map(func(s: Dictionary) -> String: return s.do), ["take", "leave"])
+	var bun := HelperWork.steps({"type": "fetch", "cell": Vector2i(0, 6), "kind": "bun", "job": "none", "dest": Vector2i(4, 4), "ticket": 4}, ["fetch"])
+	assert_eq(bun.map(func(s: Dictionary) -> String: return s.do), ["take", "deliver"])
+	assert_false(bun[1].assemble)
+
+
+func test_prep_steps_pick_up_cook_in_place_or_pour():
+	var moved := HelperWork.steps({"type": "prep", "cell": Vector2i(4, 3), "station": Vector2i(0, 3), "kind": "patty",
+		"job": "grill", "item": "c:4,3", "ticket": 1}, ["grill"])
+	assert_eq(moved.map(func(s: Dictionary) -> String: return s.do), ["pick", "cook", "deliver"])
+	var here := HelperWork.steps({"type": "prep", "cell": Vector2i(5, 2), "station": Vector2i(5, 2), "kind": "lettuce",
+		"job": "chop", "item": "c:5,2", "ticket": 1}, ["board"])
+	assert_eq(here.map(func(s: Dictionary) -> String: return s.do), ["cook", "deliver"])
+	assert_true(here[0].in_place)
+	var pour := HelperWork.steps({"type": "prep", "cell": Vector2i(1, 2), "station": Vector2i(1, 2), "kind": "soda",
+		"job": "pour", "item": null, "ticket": 1}, ["tap"])
+	assert_eq(pour.map(func(s: Dictionary) -> String: return s.do), ["pour", "deliver"])
+
+
+func test_serving_and_cleaning_steps():
+	var c := Vector2i(6, 1)
+	assert_eq(HelperWork.steps({"type": "carry", "cell": Vector2i(4, 4), "tray": 2, "table": c}, []).map(
+		func(s: Dictionary) -> String: return s.do), ["pick_tray", "serve"])
+	assert_eq(HelperWork.steps({"type": "order", "cell": c}, [])[0].do, "order")
+	assert_eq(HelperWork.steps({"type": "clear", "cell": c}, []).map(func(s: Dictionary) -> String: return s.do), ["clear", "to_sink"])
+	assert_eq(HelperWork.steps({"type": "bin", "cell": c}, []).map(func(s: Dictionary) -> String: return s.do), ["empty_bin", "to_door"])
+	assert_eq(HelperWork.steps({"type": "wash", "cell": c}, [])[0].do, "wash")
+	assert_eq(HelperWork.steps({"type": "help_up", "cell": c, "person": 7}, [])[0].do, "help")
+	var wipe := HelperWork.steps({"type": "dirt", "cell": c}, ["sponge", "mop"])
+	assert_eq(wipe[0].tool, "mop", "a mop before a sponge")
+	assert_eq(HelperWork.steps({"type": "nothing"}, []), [])
+
+
+func test_what_is_in_hand_is_put_away_where_it_belongs():
+	assert_eq(HelperWork.stash_for(""), "")
+	assert_eq(HelperWork.stash_for("dirty_tray"), "to_sink")
+	assert_eq(HelperWork.stash_for("rubbish_bag"), "to_door")
+	assert_eq(HelperWork.stash_for("burnt:patty"), "bin")
+	assert_eq(HelperWork.stash_for("tool:mop"), "drop")
+	assert_eq(HelperWork.stash_for("prep:patty"), "stash")
+	assert_eq(HelperWork.stash_for("tray"), "stash")
+
+
+func test_made_food_covers_the_oldest_ticket_first():
+	var lacks := HelperWork.ticket_lacks([{"id": 1, "needs": ["bun", "patty"]}, {"id": 2, "needs": ["bun", "patty"]}],
+		["patty", "bun", "bun"])
+	assert_eq(lacks[1], [])
+	assert_eq(lacks[2], ["patty"])
+
+
+func test_free_helpers_close_together_chat_in_pairs():
+	var pairs := HelperWork.chat_pairs([{"id": 1, "cell": Vector2i(0, 0)}, {"id": 2, "cell": Vector2i(1, 0)},
+		{"id": 3, "cell": Vector2i(2, 0)}, {"id": 4, "cell": Vector2i(9, 9)}])
+	assert_eq(pairs.size(), 1, "three in a row make one pair; the far one is alone")
+	assert_eq(pairs[0], [1, 2])
+	assert_eq(HelperWork.chat_pairs([{"id": 1, "cell": Vector2i(0, 0)}, {"id": 2, "cell": Vector2i(3, 0)}]), [])
+
+
+func test_an_idle_helper_waits_beside_a_desk():
+	var open := {Vector2i(8, 5): true, Vector2i(7, 6): true}
+	assert_eq(HelperWork.wait_cell([Vector2i(8, 6)], open, {}, Vector2i(2, 2)), Vector2i(8, 5))
+	assert_eq(HelperWork.wait_cell([Vector2i(8, 6)], open, {Vector2i(8, 5): true}, Vector2i(2, 2)), Vector2i(7, 6))
+	assert_null(HelperWork.wait_cell([Vector2i(8, 6)], {}, {}, Vector2i(2, 2)))
+
+
+func test_dirt_wears_down_a_helper_who_minds_it():
+	assert_eq(HelperWork.work_drain(5.0, 4, 1.0), 0.0, "tolerance 5 does not mind")
+	assert_eq(HelperWork.work_drain(1.0, 2, 1.0), 0.0, "a little dirt is nothing")
+	assert_gt(HelperWork.work_drain(1.0, 3, 1.0), 0.0)
+	assert_gt(HelperWork.work_drain(1.0, 4, 1.0), HelperWork.work_drain(1.0, 3, 1.0))
+
+
+func test_skill_sets_a_wipe_and_how_a_guest_likes_being_served():
+	assert_eq(HelperWork.wipe_levels(5.0), 2)
+	assert_eq(HelperWork.wipe_levels(2.0), 1)
+	assert_gt(HelperWork.serve_joy(5.0), 0.0)
+	assert_eq(HelperWork.serve_joy(3.0), 0.0)
+	assert_lt(HelperWork.serve_joy(1.0), 0.0)
+
+
+# ---------- Helpers in the room (game/crew.gd) ----------
+
+func _run(seconds: float) -> void:
+	for i in int(seconds / 0.1):
+		game.step(0.1)
+
+
+## A hire at work in the room today, standing at `at`.
+func _helper(person: int, duties: Array, at := Vector2i(5, 4), breaks := 0) -> Helper:
+	_hire_one(person, duties, breaks, 0)
+	game.staff.employee(person).satisfaction = 0.9   # no slips or slowness unless a test wants them
+	return game.crew.add_helper(person, at)
+
+
+func _seated(idx := 0) -> Guest:
+	var g: Guest = game.spawn_guest(idx)
+	_run(12.0)
+	return g
+
+
+func test_staff_walk_in_as_the_door_opens_and_go_home_as_the_day_ends():
+	_game()
+	_hire_one(3, ["take_orders"], 0, 0)
+	_hire_one(4, ["wash_up"], 0, 1)
+	game.staff.employee(4).week_start = game.ledger.day
+	game.staff.employee(4).week_off = [Staff.week_day(game.ledger.day)] as Array[int]
+	game.crew.start_day()
+	assert_eq(game.crew.helpers.size(), 1, "the one with today off stays home")
+	var h: Helper = game.crew.helpers[0]
+	assert_eq(h.person, 3)
+	assert_eq(h.cell(), game.DOOR, "in through the front door")
+	assert_true(game.hands().has(h))
+	game.arrivals.clear()
+	_run(0.5)
+	assert_true(game.crew.helpers.is_empty(), "the day ended and they went home")
+
+
+func test_a_server_takes_a_tables_order():
+	_game()
+	var g := _seated()
+	assert_eq(g.state, "ordering")
+	_helper(3, ["take_orders"])
+	_run(8.0)
+	assert_eq(game.tickets.size(), 1, "the helper took the order")
+	assert_eq(g.state, "waiting")
+
+
+func test_a_grill_cook_and_server_make_and_serve_a_whole_meal():
+	_game()
+	var g := _seated()
+	var h := _helper(3, ["take_orders", "fetch", "grill", "assemble", "carry_trays"])
+	var ate := false
+	for i in 900:
+		game.step(0.1)
+		g.mood.patience = 1.0   # one helper doing it all is slow: the guest waits
+		if g.state == "eating":
+			ate = true
+			break
+	assert_true(ate, "ordered, grilled, built and carried with no chef")
+	assert_eq(h.held, "", "hands free again")
+	assert_gt(float(game.staff.employee(3).skills.food), 3.0, "the cooking trained them")
+
+
+func test_a_helper_with_no_assemble_duty_leaves_the_cooking_for_others():
+	_game()
+	var g := _seated()
+	_order_by_chef(g)
+	_helper(3, ["fetch", "grill"])
+	_run(30.0)
+	var made: Array = game.stations.values().filter(func(st: Station) -> bool: return st.item == "prep:" + game.fixed_main().grill)
+	assert_eq(made.size(), 1, "the patty is grilled and put down for someone to plate")
+	assert_null(game.tray_for_ticket(int(game.tickets[0].id)), "nobody built a tray")
+
+
+func _order_by_chef(g: Guest) -> void:
+	game.use_station(g.table)
+	assert_eq(game.tickets.size(), 1)
+
+
+func test_a_washer_washes_up_into_the_tray_stack():
+	_game()
+	var sink: Station = game.find_station("sink")
+	var stack: Station = game.find_station("trays")
+	sink.dirty = 2
+	var before := stack.count
+	_helper(3, ["wash_up"], Vector2i(3, 3))
+	_run(10.0)
+	assert_eq(sink.dirty, 0)
+	assert_eq(stack.count, before + 2)
+
+
+func test_a_full_bin_is_emptied_and_the_bag_goes_out_the_front():
+	_game()
+	var bin: Station = game.find_station("bin")
+	bin.count = Crew.BIN_FULL
+	var h := _helper(3, ["empty_bin"], Vector2i(1, 5))
+	var carried := false
+	for i in 200:
+		game.step(0.1)
+		carried = carried or h.held == "rubbish_bag"
+	assert_eq(bin.count, 0)
+	assert_true(carried, "the bag was carried out")
+	assert_eq(h.held, "")
+
+
+func test_a_table_is_cleared_into_the_sink():
+	_game()
+	var table: Station = game.stations[Vector2i(6, 5)]
+	var sink: Station = game.find_station("sink")
+	table.dirty = 1
+	_helper(3, ["clear_tables"])
+	_run(15.0)
+	assert_eq(table.dirty, 0)
+	assert_eq(sink.dirty, 1)
+
+
+func test_a_cleaner_mops_dirt_off_the_floor():
+	_game()
+	var c := Vector2i(6, 3)
+	var mess: FloorMess = game.floor_dirt.mess
+	mess.dirt[c] = 3
+	var h := _helper(3, ["mop"], Vector2i(7, 3))
+	_run(10.0)
+	assert_eq(mess.level(c), 0)
+	assert_false(h.held.begins_with(CleanKit.PREFIX), "the mop is put away")
+
+
+func test_a_helper_helps_someone_up():
+	_game()
+	var g := _seated()
+	game.floor_dirt.slip(g, Grid.to_cell(g.position))
+	_helper(3, ["help_up"], Vector2i(5, 3))
+	_run(5.0)
+	assert_false(game.floor_dirt.is_down(g), "helped up")
+
+
+func test_on_a_break_they_take_nothing_and_chat_with_another_on_a_break():
+	_game()
+	var g := _seated()
+	var a := _helper(3, ["take_orders"], Vector2i(7, 5), 1)
+	var b := _helper(4, ["take_orders"], Vector2i(8, 5), 1)
+	game.staff.employee(3).satisfaction = 0.9
+	game.staff.employee(4).satisfaction = 0.3
+	game.clock = Staff.break_starts(1, game.day_length())[0] + 0.1
+	_run(3.0)
+	assert_true(a.resting and b.resting)
+	assert_eq(game.tickets.size(), 0, "nobody takes the order on a break")
+	assert_true(a.chatting and b.chatting, "two on a break side by side chat")
+	assert_lt(float(game.staff.employee(3).satisfaction), 0.9)
+	assert_gt(float(game.staff.employee(4).satisfaction), 0.3)
+	_run(Staff.BREAK_SECONDS)
+	assert_false(a.resting)
+	_run(6.0)
+	assert_eq(g.state, "waiting", "back to work: the order is taken")
+
+
+func test_a_chef_taking_the_task_sends_the_helper_on():
+	_game()
+	var g := _seated()
+	var h := _helper(3, ["take_orders"], Vector2i(9, 6))
+	_run(0.8)
+	assert_false(h.task.is_empty(), "the helper set off for the table")
+	_order_by_chef(g)
+	_run(6.0)
+	assert_eq(game.tickets.size(), 1, "one order, taken once")
+	assert_true(h.task.is_empty() and h.steps.is_empty(), "the helper moved on")
+
+
+func test_a_slip_costs_a_helper_some_satisfaction():
+	_game()
+	var h := _helper(3, ["wash_up"])
+	var before := float(game.staff.employee(3).satisfaction)
+	game.floor_dirt.slip(h, h.cell())
+	assert_almost_eq(float(game.staff.employee(3).satisfaction), before - HelperWork.SLIP_HIT, 0.0001)
+	assert_true(game.floor_dirt.is_down(h))
+
+
+func test_enough_training_changes_a_tolerance_for_good():
+	_game()
+	var h := _helper(3, ["wash_up"], Vector2i(3, 3))
+	game.staff.employee(3).skills.clean = 3.49
+	var sink: Station = game.find_station("sink")
+	sink.dirty = 1
+	_run(6.0)
+	assert_eq(sink.dirty, 0)
+	assert_eq(game.town.tolerance(3, "clean"), 2, "a better cleaner minds dirt more")
+	assert_true(h.task.is_empty())
+
+
+func test_the_desk_is_in_the_shop_now():
+	_game()
+	var ids: Array = Catalog.search("desk", "", Scenery.theme_id).map(func(bp: Dictionary) -> String: return bp.id)
+	assert_true(ids.has("desk"))
