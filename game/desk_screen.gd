@@ -9,6 +9,11 @@ extends Control
 ## - CVs: the pile, read as a stack. The top CV shows the face, name, post, three skills,
 ##   the overall rating and the asking wage. Drag it right (or Hire) to hire at the ask,
 ##   left (or Dismiss) to send them home; Haggle names a lower figure.
+## - Staff (PRD 10.4): each hire with face, post, wage, duties, breaks, the week as five
+##   boxes (days off crossed), satisfaction (a meter with a face, and a word) and the three
+##   skills. Manage opens one hire: tick a duty to offer it (they may name a raise: approve,
+##   haggle, withdraw or deny, and they quit), untick to take it off, add a break or a day
+##   off, or fire them with or without a day's wage as severance.
 ## All rules are `Staff`'s (game.staff); this only draws and wires them.
 ##
 ## Keys and pad move a highlight between the buttons (`action`), as on the menu screen;
@@ -24,7 +29,7 @@ const DEFAULT_NAME := "Helper"
 
 var game
 var hud
-var tab := "cvs"           # "cvs" or "posts"
+var tab := "cvs"           # "cvs", "posts" or "staff"
 var note := ""             # what just happened, under the CV ("Mabel wants more.")
 var _card: Control
 var _content: VBoxContainer
@@ -39,6 +44,10 @@ var _drag_from := Vector2.INF
 var _targets: Array[Control] = []
 var _sel := 0
 var _sel_key := ""
+var _person := -1          # the hire being managed on the staff tab; -1 for the list
+var _raise_offer := -1     # the raise being haggled; -1 when not haggling
+var _firing := false       # the fire buttons are out (with or without severance)
+var _scroll: ScrollContainer
 
 
 func setup(game_, hud_) -> void:
@@ -67,8 +76,8 @@ func setup(game_, hud_) -> void:
 	_frame.draw.connect(_draw_frame)
 	add_child(_frame)
 	if game.staff.cvs.is_empty():
-		tab = "posts"
-	_sel_key = "hire" if tab == "cvs" else "write"
+		tab = "staff" if not game.staff.employees.is_empty() else "posts"
+	_sel_key = {"cvs": "hire", "posts": "write", "staff": "tab:staff"}[tab]
 	render()
 	hud._pop_in(_card)
 	_card.pivot_offset = _card.custom_minimum_size / 2.0
@@ -86,6 +95,7 @@ func render() -> void:
 		c.queue_free()
 	_targets.clear()
 	_line = null
+	_scroll = null
 	_cv_card = null
 	_drag_from = Vector2.INF
 	_header()
@@ -93,6 +103,13 @@ func render() -> void:
 		_post_page()
 	elif tab == "posts":
 		_posts()
+	elif tab == "staff":
+		if _person >= 0 and game.staff.employee(_person).is_empty():
+			_person = -1   # they quit or were fired
+		if _person >= 0:
+			_manage()
+		else:
+			_staff_list()
 	else:
 		_cvs()
 	_keys_line()
@@ -110,7 +127,8 @@ func _header() -> void:
 	_content.add_child(top)
 	_ribbon(top, "THE DESK" if _draft.is_empty() else "NEW JOB POST")
 	if _draft.is_empty():
-		for t: Array in [["cvs", "CVs (%d)" % game.staff.cvs.size()], ["posts", "Job posts"]]:
+		for t: Array in [["cvs", "CVs (%d)" % game.staff.cvs.size()], ["posts", "Job posts"],
+				["staff", "Staff (%d)" % game.staff.employees.size()]]:
 			var b := _paper_button(top, "tab:" + t[0], _set_tab.bind(t[0]), t[1], 22)
 			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			if tab == t[0]:
@@ -166,10 +184,8 @@ func _posts() -> void:
 		var none := _label(list, 20, "No posts up. Write one: townspeople who suit it apply overnight.")
 		none.modulate.a = 0.6
 	if not staff.employees.is_empty():
-		_label(list, 26, "Staff")
-		for person: int in staff.employees:
-			var e: Dictionary = staff.employees[person]
-			_label(list, 20, "%s  -  %s  -  $%d a day" % [game.town.people[person].name, e.post_name, e.wage])
+		var hired := _label(list, 20, "%s on the staff: see the Staff tab." % _count_word(staff.employees.size(), "hire"))
+		hired.modulate.a = 0.7
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 14)
 	_content.add_child(foot)
@@ -464,6 +480,8 @@ func move(dir: Vector2) -> void:
 	if best >= 0:
 		_sel = best
 		_sel_key = _targets[best].get_meta("key")
+		if _scroll != null and _scroll.is_ancestor_of(_targets[best]):
+			_scroll.ensure_control_visible(_targets[best])
 		game.sfx("tick")
 
 
@@ -480,6 +498,12 @@ func back() -> void:
 		_finish_name()
 	elif _offer >= 0:
 		_stop_haggle()
+	elif _raise_offer >= 0:
+		_stop_raise_haggle()
+	elif _firing:
+		_set_firing(false)
+	elif _person >= 0:
+		close_person()
 	elif not _draft.is_empty():
 		_cancel_post()
 	else:
@@ -536,6 +560,9 @@ func _set_tab(t: String) -> void:
 	_sel_key = "hire" if t == "cvs" and not game.staff.cvs.is_empty() else "tab:" + t
 	note = ""
 	_offer = -1
+	_person = -1
+	_raise_offer = -1
+	_firing = false
 	game.sfx("page")
 	render()
 
@@ -706,6 +733,361 @@ func _finish_name() -> void:
 	render()
 
 
+# ---------------------------------------------------------------- the staff list (PRD 10.4)
+
+## Every hire, one card each: face; name, post and wage; duties and breaks; the week;
+## how they feel; their skills; and Manage.
+func _staff_list() -> void:
+	var staff: Staff = game.staff
+	if staff.employees.is_empty():
+		var area := CenterContainer.new()
+		area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_content.add_child(area)
+		var none := _label(area, 22, "Nobody works here yet. Put up a job post, then hire from the CVs.")
+		none.modulate.a = 0.6
+		return
+	_scroll = ScrollContainer.new()
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_content.add_child(_scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 8)
+	_scroll.add_child(list)
+	var people := staff.employees.keys()
+	people.sort()
+	for person: int in people:
+		var sheet := Hud.Sheet.new("card", 14, 8)
+		sheet.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		list.add_child(sheet)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 16)
+		sheet.add_child(row)
+		_person_row(row, person, 84)
+		var m := _paper_button(row, "manage:%d" % person, open_person.bind(person), "Manage", 20)
+		m.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var wages := _label(_content, 18, "Wages tonight: $%d, paid with the stock as the door opens. Days off are paid." % staff.wages_due())
+	wages.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wages.modulate.a = 0.75
+	if note != "":
+		var n := _label(_content, 18, note)
+		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		n.add_theme_color_override("font_color", Hud.CORAL.darkened(0.3))
+
+
+## One hire across a row: face, who and what, the week, their mood and their skills.
+func _person_row(row: HBoxContainer, person: int, face_px: int) -> void:
+	var staff: Staff = game.staff
+	var e: Dictionary = staff.employee(person)
+	var who: Dictionary = game.town.people[person]
+	var face := Hud.ModelView.new(face_px, false)
+	row.add_child(face)
+	face.show_peg(who.name)
+	var info := VBoxContainer.new()
+	info.add_theme_constant_override("separation", 0)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(info)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	info.add_child(head)
+	_label(head, 24, who.name)
+	var post := _label(head, 18, "%s,  $%d a day" % [e.post_name, int(e.wage)])
+	post.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	post.modulate.a = 0.8
+	_duty_line(info, e.duties, game.room_duties())
+	var rest := _label(info, 16, "%s a day,  %s a week" % [_count_word(int(e.breaks), "break"),
+		_count_word(int(e.days_off), "day off", "days off")])
+	rest.modulate.a = 0.7
+	var wk := VBoxContainer.new()
+	wk.add_theme_constant_override("separation", 2)
+	wk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(wk)
+	var day: int = game.ledger.day
+	var first := Staff.week_first(day)
+	var wl := _label(wk, 15, "Week: days %d to %d" % [first, first + Staff.WEEK - 1])
+	wl.modulate.a = 0.7
+	wk.add_child(Week.new(staff.week_boxes(person, day), day))
+	if int(e.days_off) > 0 and not staff.picked_week(person, day):
+		var later := _label(wk, 14, "Days off from next week")
+		later.modulate.a = 0.6
+	var md := VBoxContainer.new()
+	md.add_theme_constant_override("separation", 2)
+	md.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	md.custom_minimum_size = Vector2(170, 0)
+	row.add_child(md)
+	md.add_child(Mood.new(float(e.satisfaction)))
+	var word := _label(md, 18, Staff.mood_word(float(e.satisfaction)))
+	if int(e.bottom_nights) > 0:
+		word.text += "  (%d of %d nights)" % [int(e.bottom_nights), Staff.QUIT_NIGHTS]
+		word.add_theme_color_override("font_color", Hud.CORAL.darkened(0.3))
+	var sk := VBoxContainer.new()
+	sk.add_theme_constant_override("separation", 0)
+	sk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(sk)
+	for k in Staff.KINDS:
+		var r := HBoxContainer.new()
+		r.add_theme_constant_override("separation", 6)
+		sk.add_child(r)
+		var l := _label(r, 16, Staff.KIND_WORDS[k])
+		l.custom_minimum_size = Vector2(80, 0)
+		var st := Hud.Rating.new(Staff.stars(float(e.skills[k])), true)
+		st.custom_minimum_size = Vector2(5 * 20, 20)
+		r.add_child(st)
+
+
+## One hire: their row, their duties as ticks, breaks and days off, and firing. A raise
+## they named waits at the top until answered.
+func _manage() -> void:
+	var staff: Staff = game.staff
+	var e: Dictionary = staff.employee(_person)
+	var who: String = game.town.people[_person].name
+	var top := Hud.Sheet.new("card", 14, 8)
+	_content.add_child(top)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	top.add_child(row)
+	_person_row(row, _person, 96)
+	if not (e.pending as Dictionary).is_empty():
+		_raise_panel(e, who)
+	else:
+		var cols := HBoxContainer.new()
+		cols.add_theme_constant_override("separation", 24)
+		cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_content.add_child(cols)
+		var room: Dictionary = game.room_duties()
+		for k in Staff.KINDS:
+			var col := VBoxContainer.new()
+			col.custom_minimum_size = Vector2(330, 0)
+			col.add_theme_constant_override("separation", 4)
+			cols.add_child(col)
+			_label(col, 22, Staff.KIND_WORDS[k])
+			var list: Array = (room[k] as Array).duplicate()
+			for d in e.duties:
+				if staff.duty_kind(d) == k and not list.has(d):
+					list.append(d)   # their tool left the room: shown so it can come off
+			for d: String in list:
+				var on: bool = (e.duties as Array).has(d)
+				var b := _paper_button(col, "duty:" + d, _toggle_staff_duty.bind(d), "", 18)
+				var r := HBoxContainer.new()
+				r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				r.add_theme_constant_override("separation", 8)
+				r.add_child(Tick.new(on))
+				var l := _label(r, 18, Staff.duty_word(d) + ("" if (room[k] as Array).has(d) else " (not in the room)"))
+				l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				_fill(b, r)
+				if on:
+					_mark(b)
+	if note != "":
+		var n := _label(_content, 18, note)
+		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		n.add_theme_color_override("font_color", Hud.CORAL.darkened(0.3))
+	_rule()
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 12)
+	_content.add_child(foot)
+	if _firing:
+		var sev := _paper_button(foot, "fire_pay", _fire.bind(true), "Fire, paying $%d severance" % int(e.wage), 20)
+		if not game.can_pay_severance(_person):
+			sev.disabled = true
+			sev.modulate.a = 0.5
+		_paper_button(foot, "fire_harsh", _fire.bind(false), "Fire with nothing (friends hear)", 20)
+		var g := Control.new()
+		g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		foot.add_child(g)
+		_paper_button(foot, "keep", _set_firing.bind(false), "Keep them", 20)
+		return
+	var br := _paper_button(foot, "break", _more_break, "Add a break (%d of %d)" % [int(e.breaks), Staff.MAX_BREAKS], 20)
+	if int(e.breaks) >= Staff.MAX_BREAKS:
+		br.disabled = true
+		br.modulate.a = 0.5
+	var off := _paper_button(foot, "day_off", _more_day_off, "Add a day off (%d of %d)" % [int(e.days_off), Staff.MAX_DAYS_OFF], 20)
+	if int(e.days_off) >= Staff.MAX_DAYS_OFF:
+		off.disabled = true
+		off.modulate.a = 0.5
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot.add_child(gap)
+	_paper_button(foot, "fire", _set_firing.bind(true), "Fire...", 20)
+	_paper_button(foot, "staff_back", close_person, "Back to the list", 20)
+
+
+## The raise they named for a new duty: approve it, haggle it down, withdraw the duty, or
+## deny it (and they quit).
+func _raise_panel(e: Dictionary, who: String) -> void:
+	var p: Dictionary = e.pending
+	var area := CenterContainer.new()
+	area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_content.add_child(area)
+	var sheet := Hud.Sheet.new("note", 24, 16)
+	sheet.rotation = -0.01
+	area.add_child(sheet)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	sheet.add_child(box)
+	var ask := HBoxContainer.new()
+	ask.add_theme_constant_override("separation", 10)
+	box.add_child(ask)
+	ask.add_child(Hud.Icon.new("coin", 30, false))
+	_label(ask, 26, "%s wants $%d more a day to take on %s." % [who, int(p.raise), Staff.duty_word(p.duty).to_lower()])
+	var now := _label(box, 18, "Now $%d a day; with the raise $%d." % [int(e.wage), int(e.wage) + int(p.raise)])
+	now.modulate.a = 0.75
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 14)
+	box.add_child(buttons)
+	if _raise_offer >= 0:
+		_paper_button(buttons, "rless", _nudge_raise.bind(-1), "-", 24).custom_minimum_size = Vector2(56, 0)
+		var fig := _label(buttons, 26, "+$%d a day" % _raise_offer)
+		fig.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_paper_button(buttons, "rmore", _nudge_raise.bind(1), "+", 24).custom_minimum_size = Vector2(56, 0)
+		var offer: Button = hud._button(buttons, "Offer +$%d" % _raise_offer, func() -> void: answer_raise("haggle", _raise_offer))
+		offer.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		offer.custom_minimum_size = Vector2(180, 0)
+		_target(offer, "raise_offer")
+		_paper_button(buttons, "raise_back", _stop_raise_haggle, "Back", 22)
+		return
+	_paper_button(buttons, "withdraw", answer_raise.bind("withdraw"), "Withdraw the duty", 20)
+	_paper_button(buttons, "raise_haggle", _start_raise_haggle, "Haggle", 20)
+	_paper_button(buttons, "deny", answer_raise.bind("deny"), "Deny (they quit)", 20)
+	var ok: Button = hud._button(buttons, "Approve +$%d" % int(p.raise), answer_raise.bind("approve"))
+	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ok.custom_minimum_size = Vector2(190, 0)
+	_target(ok, "approve")
+
+
+func open_person(person: int) -> void:
+	if game.staff.employee(person).is_empty():
+		return
+	tab = "staff"
+	_person = person
+	_raise_offer = -1
+	_firing = false
+	note = ""
+	_sel_key = "staff_back"
+	game.sfx("page")
+	render()
+
+
+func close_person() -> void:
+	var was := _person
+	_person = -1
+	_raise_offer = -1
+	_firing = false
+	note = ""
+	_sel_key = "manage:%d" % was
+	render()
+
+
+## Ticking a duty offers it; unticking takes it off (free, and they are glad).
+func _toggle_staff_duty(d: String) -> void:
+	var e: Dictionary = game.staff.employee(_person)
+	var who: String = game.town.people[_person].name
+	_sel_key = "duty:" + d
+	if (e.duties as Array).has(d):
+		game.desk_remove_duty(_person, d)
+		note = "%s is glad to be off %s." % [who, Staff.duty_word(d).to_lower()]
+	else:
+		var r: Dictionary = game.desk_add_duty(_person, d)
+		if r.ok:
+			note = "%s takes on %s." % [who, Staff.duty_word(d).to_lower()]
+		else:
+			note = ""
+			_sel_key = "approve"
+	render()
+
+
+## The answer to a named raise (`Staff.answer_raise`), from the buttons or a test.
+func answer_raise(choice: String, offer := 0) -> String:
+	if _person < 0:
+		return ""
+	var person := _person
+	var who: String = game.town.people[person].name
+	var duty: String = Staff.duty_word(str(game.staff.employee(person).pending.get("duty", ""))).to_lower()
+	var r: String = game.desk_answer_raise(person, choice, offer)
+	match r:
+		"added":
+			note = "%s takes on %s, at $%d a day." % [who, duty, int(game.staff.employee(person).wage)]
+			_raise_offer = -1
+			_sel_key = "staff_back"
+		"withdrawn":
+			note = "Withdrawn. %s carries on as before." % who
+			_sel_key = "staff_back"
+		"refuse":
+			note = "%s wants more than +$%d." % [who, offer]
+		"quit":
+			note = "%s quits." % who
+			_person = -1
+			_raise_offer = -1
+			_sel_key = "tab:staff"
+	render()
+	return r
+
+
+func _start_raise_haggle() -> void:
+	var p: Dictionary = game.staff.employee(_person).pending
+	_raise_offer = maxi(0, int(p.raise) - 1)
+	_sel_key = "raise_offer"
+	game.sfx("page")
+	render()
+
+
+func _nudge_raise(by: int) -> void:
+	var p: Dictionary = game.staff.employee(_person).pending
+	_raise_offer = clampi(_raise_offer + by, 0, maxi(0, int(p.raise) - 1))
+	game.sfx("tick")
+	render()
+
+
+func _stop_raise_haggle() -> void:
+	_raise_offer = -1
+	_sel_key = "raise_haggle"
+	render()
+
+
+func _more_break() -> void:
+	if game.desk_add_break(_person):
+		note = "%s has a break more a day." % game.town.people[_person].name
+	_sel_key = "break"
+	render()
+
+
+func _more_day_off() -> void:
+	if game.desk_add_day_off(_person):
+		note = "%s has a day off more a week, picked next week." % game.town.people[_person].name
+	_sel_key = "day_off"
+	render()
+
+
+func _set_firing(on: bool) -> void:
+	_firing = on
+	_sel_key = "keep" if on else "fire"
+	game.sfx("page")
+	render()
+
+
+func _fire(severance: bool) -> void:
+	var who: String = game.town.people[_person].name
+	if game.desk_fire(_person, severance):
+		note = "%s is let go%s." % [who, " with a day's wage" if severance else ", and their friends will hear of it"]
+		_person = -1
+		_firing = false
+		_sel_key = "tab:staff"
+	render()
+
+
+## For tests and demos: opens the raise haggle at `offer`.
+func start_raise_haggle(offer := -1) -> void:
+	_start_raise_haggle()
+	if offer >= 0:
+		_raise_offer = offer
+		render()
+
+
+func managing() -> int:
+	return _person
+
+
 # ---------------------------------------------------------------- for tests and demos
 
 ## Starts a post with these fields, as if typed and ticked.
@@ -823,3 +1205,66 @@ class Tick extends Control:
 			var pts := PackedVector2Array([Vector2(5, 12), Vector2(10, 18), Vector2(20, 4)])
 			draw_polyline(pts, Hud.INK, 6.0, true)
 			draw_polyline(pts, Hud.CORAL, 3.5, true)
+
+
+
+## The week as five boxes, day numbers inside: a day off crossed out in bold, the coming
+## day ringed. Read by shape: the cross, and the thick ring.
+class Week extends Control:
+	const BOX := 28.0
+	var boxes: Array[Dictionary]
+	var today := 0
+
+	func _init(boxes_: Array[Dictionary], today_: int) -> void:
+		boxes = boxes_
+		today = today_
+		custom_minimum_size = Vector2(5 * (BOX + 4), BOX + 4)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var font := get_theme_default_font()
+		for k in boxes.size():
+			var b: Dictionary = boxes[k]
+			var r := Rect2(Vector2(2 + k * (BOX + 4), 2), Vector2(BOX, BOX))
+			draw_rect(r, Hud.CREAM if not b.off else Color("#efe1cc"))
+			draw_rect(r, Hud.INK, false, 3.5 if int(b.day) == today else 1.6)
+			var t := str(b.day)
+			var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+			draw_string(font, r.position + Vector2((BOX - w) / 2.0, BOX / 2.0 + 5), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 15,
+				Color(Hud.INK, 0.45 if b.off else 0.9))
+			if b.off:
+				var a := r.grow(-4)
+				for line in [[a.position, a.end], [Vector2(a.end.x, a.position.y), Vector2(a.position.x, a.end.y)]]:
+					draw_line(line[0], line[1], Hud.INK, 5.0, true)
+					draw_line(line[0], line[1], Hud.CORAL, 3.0, true)
+
+
+## Satisfaction: a face whose mouth bends from a frown to a smile, then a bar read by its
+## length with a notch at the bottom fifth. Colour follows, from coral to green.
+class Mood extends Control:
+	var value := 0.5
+
+	func _init(value_: float) -> void:
+		value = clampf(value_, 0.0, 1.0)
+		custom_minimum_size = Vector2(160, 28)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var tint := Hud.CORAL.lerp(Color("#6fae6a"), value)
+		var c := Vector2(13, 14)
+		draw_circle(c, 12.0, Hud.INK)
+		draw_circle(c, 10.0, tint.lightened(0.35))
+		draw_circle(c + Vector2(-4, -3), 1.8, Hud.INK)
+		draw_circle(c + Vector2(4, -3), 1.8, Hud.INK)
+		var bend := (value - 0.5) * 8.0   # down at the ends for a smile, up for a frown
+		var mouth := PackedVector2Array()
+		for i in 7:
+			var x := -5.0 + i * (10.0 / 6.0)
+			mouth.append(c + Vector2(x, 4.0 + bend * (1.0 - pow(x / 5.0, 2)) * 0.5))
+		draw_polyline(mouth, Hud.INK, 2.2, true)
+		var bar := Rect2(Vector2(32, 7), Vector2(size.x - 34, 14))
+		draw_rect(bar, Hud.CREAM)
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * value, bar.size.y)), tint)
+		draw_rect(bar, Hud.INK, false, 2.0)
+		var notch := bar.position.x + bar.size.x * Staff.BOTTOM
+		draw_line(Vector2(notch, bar.position.y - 3), Vector2(notch, bar.end.y + 3), Hud.INK, 2.0)

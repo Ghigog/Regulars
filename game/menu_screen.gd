@@ -829,6 +829,17 @@ class BuildNotes extends HBoxContainer:
 				hud._label(row, 18, "$%d" % int(l.fee))
 			if lines.is_empty():
 				hud._label(_box, 18, "Nothing stocked yet").modulate.a = 0.6
+		var wages: int = game.staff_wages()
+		if wages > 0:   # STAFF: tonight's wages, paid with the stock as the door opens (PRD 10.4)
+			var srow := HBoxContainer.new()
+			srow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_box.add_child(srow)
+			var sn: Label = hud._label(srow, 18, "STAFF wages")
+			sn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			hud._label(srow, 18, "$%d" % wages)
+			if not short and cost + wages > game.ledger.money:
+				var sw: Label = hud._label(_box, 18, "Not every wage can be paid.")
+				sw.add_theme_color_override("font_color", Hud.CORAL.darkened(0.25))
 		if short:
 			var warn: Label = hud._label(_box, 18, "You can't pay it: the door won't open.")
 			warn.add_theme_color_override("font_color", Hud.CORAL.darkened(0.25))

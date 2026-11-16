@@ -13,7 +13,7 @@ var history: Array[Dictionary] = []
 
 
 static func _blank() -> Dictionary:
-	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "found_nothing": 0}
+	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0}
 
 
 func level() -> int:
@@ -36,6 +36,15 @@ func pay_stock(amount: int) -> bool:
 	money -= amount
 	today.stock += amount
 	return true
+
+
+## Staff wages, paid with the stock as the night ends (PRD 10.4): `amount` paid, and how
+## many could not be paid (no debt: they take it out of their satisfaction instead).
+func pay_staff(amount: int, unpaid := 0) -> void:
+	amount = mini(amount, money)
+	money -= amount
+	today.staff += amount
+	today.unpaid += unpaid
 
 
 ## Someone read the menu and found no main they would eat. Not a strike.
