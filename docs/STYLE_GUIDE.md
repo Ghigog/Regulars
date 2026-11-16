@@ -173,6 +173,8 @@ or a later sheet, they win. What changed:
 | Player tag (PRD 4) | A disc in the player's trim colour, inked rim, the player's number in cream; a ticked cream disc beside it when that player is ready, an empty ring while waiting. On prompt bubbles, hint lines, build-slip rows, the receipt and under the door card. | The number makes two players differ by shape, not only trim colour. |
 | Co-op station cursor (PRD 4) | The amber frame becomes each chef's trim colour, with one small tab on its near corner per player number. | Amber stays with one chef. |
 | Door card, half turned (PRD 4) | With two chefs, the first to use the card turns it half way (edge-on to the street); the second turns it the rest. | |
+| Tools on counters (PRD 8.2) | A tool is a top on a counter and keeps its own body, so a stove, fryer or pot on a counter turns it steel and a board or slicer keeps the teal cupboard. A tool set on the pass replaces that length of the teal run; lifted off, the pass look comes back. | The tool replaces the counter's look rather than sitting on a separate worktop. |
+| Double counter (PRD 8.2) | One cell, same height: a column of three drawers with brass pulls down each side (one side shows from any turn), and a bare one swaps its two front doors for two rows of drawers. A tool on it keeps the side drawers. | More storage, said by drawers, not by height, so items still sit at worktop level. |
 
 **Not yet done:** Blender kit, hired staff, co-op chefs 3 and 4 (trim colours exist in
 `Peg.PLAYER_TRIM`), sheet 9's future dishes (steak, eggs, pasta), title screen, colour-blind

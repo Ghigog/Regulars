@@ -16,6 +16,8 @@ var type := ""
 var cell := Vector2i.ZERO
 var tier := 1
 var facing := 0       # quarter turns; 0 puts the front toward +z
+var base := ""        # the counter this piece is or stands on ("counter", "double_counter"); "" for the rest
+var pass_look := false  # a counter drawn as a length of the frame's long teal pass (the starting ones)
 var lamp: OmniLight3D # a table's lamp light, owned by the game
 var item := ""        # what is sitting on a counter or stove: an ingredient kind ("raw:patty") or "tray"
 var quality := 1.0    # how well prepped that item is (0..1)
@@ -71,13 +73,16 @@ static func patty_look(t: float) -> String:
 
 
 ## `facing` 0 puts the front toward +z; 1 turns it to face +x (for the left wall).
-func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0) -> void:
+## A tool (a top) and a bare counter always have a counter base; `base_` overrides it.
+func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0, base_ := "", pass_look_ := false) -> void:
 	type = type_
 	cell = cell_
 	tier = tier_
+	pass_look = pass_look_
+	base = base_ if base_ != "" else ("counter" if Kitchen.is_top(type) or Kitchen.is_counter(type) else "")
 	_vis = Node3D.new()
 	add_child(_vis)
-	Build.station(_vis, type, tier)
+	Build.station(_vis, type, tier, base, pass_look)
 	place_at(cell_, facing)
 	if type == "trays":
 		count = TRAYS
@@ -89,6 +94,20 @@ func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0) -> void:
 		show_widget("rack" if type == "fryer" else "boil")
 		widget.visible = false
 	refresh()
+
+
+## Changes the counter under (or of) this piece and redraws it: a counter stacked into
+## a double counter, a tool moved onto another counter.
+func set_base(base_: String, pass_look_ := pass_look) -> void:
+	base = base_
+	pass_look = pass_look_
+	for c in _vis.get_children():
+		_vis.remove_child(c)
+		c.queue_free()
+	Build.station(_vis, type, tier, base, pass_look)
+	if _ring:
+		_ring = _vis.get_node_or_null("ring")
+		_update_cooking_visuals()
 
 
 func _show_item(kind: String) -> void:

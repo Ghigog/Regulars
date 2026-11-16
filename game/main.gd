@@ -86,6 +86,7 @@ var _critic_rated := {}                # their ratings once they leave, printed 
 var ledger: Ledger
 var phase: int = Phase.SERVICE
 var stations := {}               # Vector2i -> Station
+var kitchen := Kitchen.new()     # the counters and the tools on them, kept in step with `stations` (PRD 8)
 var guests: Array[Guest] = []
 var queue: Array[Guest] = []
 var seat_taken := {}             # Vector2i -> Guest
@@ -483,6 +484,11 @@ func _apply_demo(demo: String) -> void:
 			ledger.record_sale(DEMO_BILL, 3)
 			arrivals.clear()
 			get_tree().create_timer(1.5).timeout.connect(confirm_receipt.bind(0))
+	elif demo == "counters":   # PRD 8: a double counter, a board on a double counter, a stove on the pass; shoot at 3
+		ledger.record_sale(DEMO_BILL, 5)
+		ledger.money = 300
+		arrivals.clear()
+		get_tree().create_timer(1.0).timeout.connect(_demo_counters)
 	elif demo.begins_with("build") or demo == "door":  # build (the shop), build_find (a search), build_no (refused spot), build_move, door
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.money = 300
@@ -594,6 +600,19 @@ func _demo_coop_build(two: Player) -> void:
 	two.look(Vector2i(-1, 0))
 	pick_catalog("counter", 1, two)
 	two.demo_hover = Vector3(6.5, 0, 1.5)
+
+
+## Tools on counters (PRD 8.2), placed through the build flow at night.
+func _demo_counters() -> void:
+	open_build()
+	for step: Array in [["counter", 2, 5], ["counter", 2, 5], ["board", 2, 5],
+			["counter", 3, 4], ["counter", 3, 4], ["stove", 4, 3]]:
+		pick_catalog(step[0])
+		place(Vector3i(step[1], step[2], 0))
+		cancel_hand()
+	find_station("board").set_item(Tray.kind("prep", "lemon" if Scenery.seaside() else "tomato"))   # a tool's surface still holds a thing
+	player.position = Grid.center(Vector2i(2, 4))
+	player.look(Vector2i(1, 0))
 
 
 func _demo_build(demo: String) -> void:
@@ -980,10 +999,13 @@ func _build_layout() -> void:
 		# The kitchen starts empty but for the sink, the bin, the tray stack and the
 		# counters: the player buys the first stations and writes the menu on night zero.
 		["trays", 2, 2], ["sink", 3, 2], ["bin", 0, 5, 1],
-		["pass", 4, 2], ["pass", 4, 3], ["pass", 4, 4], ["pass", 4, 5],
 		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], [fern(), 9, 0],
 	]:
 		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
+	# The pass: four real counters drawn as the frame's long teal run, each sellable,
+	# each able to take a tool (PRD 8).
+	for z in range(2, 6):
+		add_station("counter", Vector2i(4, z), 1, 0, "counter", true)
 	Build.register(stations[Vector2i(4, 2)])  # the till lives on the pass and moves with it
 	add_rug(Vector2i(8, 3))   # under the middle table, as in sheet 1
 
@@ -1058,14 +1080,63 @@ func opening_usable(e: Vector3i, seen := {}) -> bool:
 		and (seen.has(s[0]) or seen.has(s[1]))
 
 
-func add_station(type: String, cell: Vector2i, tier := 1, facing := 0) -> Station:
+## A tool (a top) added where a bare counter stands goes onto that counter.
+func add_station(type: String, cell: Vector2i, tier := 1, facing := 0, base := "", pass_look := false) -> Station:
 	var st := Station.new()
 	add_child(st)
-	st.setup(type, cell, tier, facing)
+	st.setup(type, cell, tier, facing, base, pass_look)
 	if Station.is_table(type) or type == "floor_lamp":
 		st.lamp = _add_lamp(st.position)
-	_register(st)
+	if Kitchen.is_top(type) and _bare_counter(cell) != null:
+		_onto_counter(st, cell, facing)
+	else:
+		_register(st)
 	return st
+
+
+## The counter at a cell with nothing on top, or null.
+func _bare_counter(cell: Vector2i) -> Station:
+	var st: Station = stations.get(cell)
+	return st if st != null and st.type == "counter" else null
+
+
+## Stands a tool (not registered yet) on the bare counter at a cell: the counter's
+## node gives way to the tool's, which takes over its base, look and the till.
+func _onto_counter(top: Station, cell: Vector2i, facing: int) -> void:
+	var under := _bare_counter(cell)
+	if under != null:
+		_unregister(under)
+		var till := under.get_node_or_null("till")
+		if till:
+			till.reparent(top, false)
+		top.set_base(under.base, under.pass_look)
+		under.queue_free()
+	top.place_at(cell, facing)
+	_register(top)
+
+
+## Lifts the tool off a counter: the bare counter is left standing in its place.
+func _off_counter(top: Station) -> void:
+	_unregister(top)
+	var under := Station.new()
+	add_child(under)
+	under.setup("counter", top.cell, 1, top.facing, top.base, top.pass_look)
+	var till := top.get_node_or_null("till")
+	if till:
+		till.reparent(under, false)
+	_register(under)
+
+
+## Whether the piece in hand can go onto the station at a cell: a tool onto a bare
+## counter, or a counter onto a bare counter (a double counter). Neither while
+## something sits on the counter below or on the counter carried.
+func _stacks_on(cell: Vector2i, h: Dictionary) -> bool:
+	var under := _bare_counter(cell)
+	if under == null or under.item != "" or not (Kitchen.is_top(h.id) or Kitchen.is_counter(h.id)):
+		return false
+	if h.get("moving", false) and (h.node as Station).item != "":
+		return false
+	return kitchen.can_place(cell, Kitchen.node_of(h.id))
 
 
 func _register(st: Station) -> void:
@@ -1073,11 +1144,14 @@ func _register(st: Station) -> void:
 	grid.blocked[st.cell] = true
 	for s in st.seats:
 		grid.reserved[s] = true
+	if st.base != "":
+		kitchen.set_cell(st.cell, st.base, Kitchen.node_of(st.type) if Kitchen.is_top(st.type) else "")
 	_update_racks()
 
 
 func _unregister(st: Station) -> void:
 	stations.erase(st.cell)
+	kitchen.set_cell(st.cell, "")
 	grid.blocked.erase(st.cell)
 	for s in st.seats:
 		grid.reserved.erase(s)
@@ -1538,7 +1612,17 @@ func pick_up(p: Vector3, ch: Player = null) -> bool:
 		return false
 	if stations.has(c):
 		var st: Station = stations[c]
-		_unregister(st)
+		if Kitchen.is_top(st.type):
+			_off_counter(st)   # the tool comes off first; its counter stays
+		elif Kitchen.unstacked(st.base) != "":
+			# One counter comes off a double counter; the other stays with what is on it.
+			st.set_base(Kitchen.unstacked(st.base))
+			kitchen.set_cell(c, st.base)
+			st = Station.new()
+			add_child(st)
+			st.setup("counter", c, 1, stations[c].facing)
+		else:
+			_unregister(st)
 		st.visible = false
 		ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
 			"node": st, "from": Vector3i(c.x, c.y, 0), "from_facing": st.facing}
@@ -1574,9 +1658,21 @@ func _put_down(h: Dictionary, spot: Vector3i, facing: int) -> void:
 		_place_on_edge(n, spot)
 	elif h.id == "rug":
 		_lay_rug(n, Vector2i(spot.x, spot.y), facing)
+	elif _bare_counter(Vector2i(spot.x, spot.y)) != null and Kitchen.is_top(h.id):
+		_onto_counter(n, Vector2i(spot.x, spot.y), facing)
+	elif _bare_counter(Vector2i(spot.x, spot.y)) != null and Kitchen.is_counter(h.id):
+		_stack_counter(Vector2i(spot.x, spot.y))
+		n.queue_free()
 	else:
 		(n as Station).place_at(Vector2i(spot.x, spot.y), facing)
 		_register(n)
+
+
+## A counter placed on a bare counter: the two make a double counter.
+func _stack_counter(cell: Vector2i) -> void:
+	var under := _bare_counter(cell)
+	kitchen.place(cell, "counter")
+	under.set_base(kitchen.get_piece(cell, "base"))
 
 
 ## Turns the piece in hand a quarter turn. Partitions turn by where you point.
@@ -1747,6 +1843,8 @@ func can_place(spot: Vector3i, ch: Player = null) -> bool:
 			return plan.can_open(spot, ch.hand.id)
 	if ch.hand.id == "screen":
 		return grid.can_place_wall(spot, LOT, DOOR, reach, touch) and not plan.is_wall(spot)
+	if stations.has(cell) or Kitchen.is_top(ch.hand.id):
+		return _stacks_on(cell, ch.hand)   # a tool needs a counter under it
 	return grid.can_place_block(cell, Station.seats_for(ch.hand.id, cell, int(ch.hand.facing)), LOT, DOOR, reach, touch)
 
 
@@ -1779,6 +1877,8 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		wall_nodes[spot] = n
 	elif ch.hand.id == "rug":
 		add_rug(cell, int(ch.hand.facing))
+	elif Kitchen.is_counter(ch.hand.id) and _bare_counter(cell) != null:
+		_stack_counter(cell)
 	else:
 		add_station(ch.hand.id, cell, int(ch.hand.tier), int(ch.hand.facing))
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
@@ -3291,6 +3391,8 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	var held_ing := Tray.parse(held)
 	var act := ""
 	var why := ""
+	if surface_first(st, held):
+		return _finish_use(st, _use_surface(st, dry_run, ch), dry_run, ch)
 	var ing := Catalog.ingredient_of(st.type)
 	if ing != "" and not st.stocked:
 		if held == "" or Tray.parse(held).get("id", "") == ing:
@@ -3386,45 +3488,9 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			elif not held_ing.is_empty():
 				why = "%s doesn't go on the %s" % [Pantry.name_of(held_ing.id), Pantry.TOOL_NAMES[tool]]
 		"counter", "pass":
-			if held == "tray" and st.item == "":
-				act = "Put tray down"
-				if not dry_run:
-					var t := ch.tray
-					ch.set_held("")
-					if t.ticket < 0 and t.is_empty():
-						var tk := _free_ticket()
-						if not tk.is_empty():
-							t.assign(int(tk.id), tk.items)
-					st.set_tray(t, tray_tag(t))
-					hud.refresh_tickets()
-			elif not held_ing.is_empty() and st.item == "tray":
-				why = st.tray.refusal(held)
-				if why == "":
-					act = "Add %s" % Pantry.name_of(held_ing.id).to_lower()
-					if not dry_run:
-						st.tray.add(held, q)
-						ch.set_held("")
-						st.show_tray()
-						hud.refresh_tickets()
-			elif not held_ing.is_empty() and held_ing.state != "burnt" and st.item == "":
-				act = "Put down"
-				if not dry_run:
-					st.set_item(held, q)
-					ch.set_held("")
-			elif held == "" and st.item == "tray":
-				var t := st.tray
-				if t.is_complete() or t.ticket < 0 or t.is_empty():
-					act = "Pick up tray"
-					if not dry_run:
-						ch.set_held("tray", 1.0, t, tray_tag(t))
-						st.set_item("")
-				else:
-					why = t.missing()
-			elif held == "" and st.item != "":
-				act = "Pick up"
-				if not dry_run:
-					ch.set_held(st.item, st.current_quality())
-					st.set_item("")
+			var r := _use_surface(st, dry_run, ch)
+			act = r[0]
+			why = r[1]
 		"trays":
 			if held == "" and st.count > 0:
 				act = "Take tray"
@@ -3513,6 +3579,18 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				act = "Free meal for %s" % g.info.name   # after half price, or for disgust
 				if not dry_run:
 					offer_comp(g)
+	if act == "" and held != "" and Kitchen.is_top(st.type) and not st.type in ["stove", "fryer", "pot"]:
+		var r := _use_surface(st, true, ch)   # a thing the tool cannot use goes down on its surface
+		if r[0] != "":
+			return _finish_use(st, _use_surface(st, dry_run, ch), dry_run, ch)
+	return _finish_use(st, [act, why], dry_run, ch)
+
+
+## Says a refusal, or plays what an action looks and sounds like. Returns the action,
+## else the refusal.
+func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
+	var act: String = r[0]
+	var why: String = r[1]
 	if act == "" and why != "":
 		if not dry_run:
 			hud.say(why + ".")
@@ -3527,6 +3605,67 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free") or act.begins_with("Take order") or act.ends_with(" orders")):
 			sfx("pickup" if ch.held != "" else "putdown")
 	return act
+
+
+## A counter's worktop, and the free surface of any tool on one: it holds one thing,
+## a tray to build on or a single item. Returns [action, refusal].
+func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
+	var held := ch.held
+	var q := ch.held_quality
+	var held_ing := Tray.parse(held)
+	var act := ""
+	var why := ""
+	if held == "tray" and st.item == "":
+		act = "Put tray down"
+		if not dry_run:
+			var t := ch.tray
+			ch.set_held("")
+			if t.ticket < 0 and t.is_empty():
+				var tk := _free_ticket()
+				if not tk.is_empty():
+					t.assign(int(tk.id), tk.items)
+			st.set_tray(t, tray_tag(t))
+			hud.refresh_tickets()
+	elif not held_ing.is_empty() and st.item == "tray":
+		why = st.tray.refusal(held)
+		if why == "":
+			act = "Add %s" % Pantry.name_of(held_ing.id).to_lower()
+			if not dry_run:
+				st.tray.add(held, q)
+				ch.set_held("")
+				st.show_tray()
+				hud.refresh_tickets()
+	elif not held_ing.is_empty() and held_ing.state != "burnt" and st.item == "":
+		act = "Put down"
+		if not dry_run:
+			st.set_item(held, q)
+			ch.set_held("")
+	elif held == "" and st.item == "tray":
+		var t := st.tray
+		if t.is_complete() or t.ticket < 0 or t.is_empty():
+			act = "Pick up tray"
+			if not dry_run:
+				ch.set_held("tray", 1.0, t, tray_tag(t))
+				st.set_item("")
+		else:
+			why = t.missing()
+	elif held == "" and st.item != "":
+		act = "Pick up"
+		if not dry_run:
+			ch.set_held(st.item, st.current_quality())
+			st.set_item("")
+	return [act, why]
+
+
+## Whether a tool's surface, rather than the tool, answers Use: empty hands take what
+## sits on it first, and a tray goes down on it or is built on it. A heat tool's own
+## item is its cooking, so only a tray rests there.
+static func surface_first(st: Station, held: String) -> bool:
+	if not Kitchen.is_top(st.type) or st.prep_by >= 0:
+		return false
+	if st.type in ["stove", "fryer", "pot"]:
+		return st.item == "tray" or (held == "tray" and st.item == "")
+	return (held == "" and st.item != "") or held == "tray" or st.item == "tray"
 
 
 # ---------------------------------------------------------------- prep minigames
