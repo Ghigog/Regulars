@@ -53,6 +53,17 @@ const ITEMS := {
 		"blurb": "Hangs on a wall over another piece. Stores one kind"},
 	"hood": {"name": "Hood", "price": 30, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Hangs on the wall over a stove and cuts its grease"},
+	# Cleaning (PRD 9.4): homes for the hand tools, and the robot sweeper's dock. The
+	# robot is the wringer bucket line's top in the PRD's tree; until those trees (9.5)
+	# its dock is sold here.
+	"mop_bucket": {"name": "Mop bucket", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Holds the mop and rinses it. Mop floor dirt a level a press"},
+	"hook": {"name": "Wall hook", "price": 5, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Hangs on a wall. Holds one small cleaning tool"},
+	"sponge": {"name": "Sponge", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Comes on its own wall hook. Quick spot cleaning, dirty after two"},
+	"robot_dock": {"name": "Robot sweeper", "price": 300, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Drifts to the nearest dirt and slowly cleans it, then docks. Anyone can trip on it"},
 	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3, "theme": "diner",
 		"joy": 0.2, "reach": 3, "blurb": "Cheers guests seated beside it, a little those who see it",
 		"up": "Cheers guests more, and further away"},

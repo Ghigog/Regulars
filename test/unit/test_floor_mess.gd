@@ -757,3 +757,339 @@ func test_the_end_of_the_day_gets_everyone_up():
 	game.floor_dirt.slip(game.player, game.player.cell())
 	game._end_day()
 	assert_false(game.floor_dirt.is_down(game.player))
+
+
+# ---------------------------------------------------------------- 9.4 cleaning tools (sim)
+
+func test_a_mop_clears_a_level_a_press_and_is_dirty_after_four():
+	var m := _room()
+	var c := Vector2i(2, 2)
+	for i in 4:
+		m.add_dirt(c)
+	var used := 0
+	for i in 4:
+		var r := CleanTools.press(m, c, "mop", used)
+		assert_eq(r.did, "clean")
+		used = r.used
+		assert_eq(m.level(c), 3 - i)
+	assert_true(CleanTools.is_dirty("mop", used), "dirty after 4 levels")
+	assert_false(CleanTools.is_dirty("mop", 3))
+
+
+func test_a_dirty_mop_spreads_instead_of_clearing():
+	var m := _room()
+	var c := Vector2i(2, 2)
+	m.add_dirt(c)
+	m.add_dirt(c)
+	var r := CleanTools.press(m, c, "mop", CleanTools.dirty_after("mop"))
+	assert_eq(r.did, "spread")
+	assert_eq(m.level(c), 2, "the cell keeps its dirt")
+	assert_eq(m.total(), 3, "and a level lands beside it")
+	assert_not_null(r.to)
+	assert_eq(maxi(absi(r.to.x - c.x), absi(r.to.y - c.y)), 1)
+
+
+func test_a_sponge_is_dirty_after_two_and_quicker_than_a_mop():
+	var m := _room()
+	var c := Vector2i(1, 1)
+	for i in 3:
+		m.add_dirt(c)
+	var used := 0
+	for i in 2:
+		used = CleanTools.press(m, c, "sponge", used).used
+	assert_true(CleanTools.is_dirty("sponge", used))
+	assert_eq(m.level(c), 1)
+	assert_lt(CleanTools.press_time("sponge"), CleanTools.press_time("mop"))
+
+
+func test_tools_do_nothing_on_clean_or_covered_cells():
+	var m := _room()
+	var c := Vector2i(2, 2)
+	assert_eq(CleanTools.press(m, c, "mop", 0).did, "", "nothing to clean")
+	m.add_dirt(c)
+	m.set_covered([c])
+	assert_eq(CleanTools.press(m, c, "mop", 0).did, "", "under furniture")
+	assert_eq(m.level(c), 1)
+	m.set_covered([])
+	assert_eq(CleanTools.press(m, c, "mop", 0).did, "clean", "once the furniture is moved")
+
+
+func test_where_each_tool_lives():
+	assert_true(CleanTools.fits("bucket", "mop"))
+	assert_false(CleanTools.fits("bucket", "sponge"))
+	assert_true(CleanTools.fits("hook", "sponge"))
+	assert_false(CleanTools.fits("hook", "mop"))
+	assert_true(CleanTools.fits(CleanTools.CLOSET, "mop"), "a closet holds either")
+	assert_true(CleanTools.fits(CleanTools.CLOSET, "sponge"))
+	assert_true(CleanTools.rinses("mop_bucket"))
+	assert_true(CleanTools.rinses("sink"))
+	for used in 5:
+		assert_eq(CleanTools.used_from("mop", CleanTools.cleanness("mop", used)), mini(used, 4))
+
+
+func test_the_robot_finds_the_nearest_dirt_round_walls_and_furniture():
+	var m := _room(6, 6)
+	var walk := {}
+	for c in m.floor_cells:
+		walk[c] = true
+	walk.erase(Vector2i(1, 0))   # furniture
+	var wall := Vector3i(1, 1, 1)   # a wall between (0, 1) and (1, 1)
+	var open := func(a: Vector2i, b: Vector2i) -> bool:
+		return not (a + b == Vector2i(1, 2) and absi(a.x - b.x) == 1)
+	m.add_dirt(Vector2i(2, 0))
+	m.add_dirt(Vector2i(5, 5))
+	var path := CleanTools.path_to_dirt(m, Vector2i(0, 0), walk, open)
+	assert_eq(path.back(), Vector2i(2, 0), "the nearest dirt")
+	assert_false(path.has(Vector2i(1, 0)), "round the furniture")
+	assert_eq(path.size(), 6, "and round the wall: down, along and back up")
+	assert_eq(CleanTools.path_to_dirt(m, Vector2i(2, 0), walk, open), [], "already on it")
+	var home := CleanTools.path_home(Vector2i(3, 0), Vector2i(1, 0), walk, open)
+	assert_eq(home.back(), Vector2i(1, 0), "the dock itself is furniture, but home")
+	assert_eq(wall.x, 1)
+
+
+func test_the_robot_or_a_tool_in_the_way_feels_like_level_two():
+	assert_eq(CleanTools.felt_level(0, true), CleanTools.ROBOT_LEVEL)
+	assert_eq(CleanTools.felt_level(3, true), 3)
+	assert_eq(CleanTools.felt_level(1, false), 1)
+
+
+# ---------------------------------------------------------------- 9.4 in the room
+
+## The chef stands at `c` looking along `dir`; returns the cell in front.
+func _stand(game, c: Vector2i, dir := Vector2i(0, 1)) -> Vector2i:
+	assert_false(game.grid.is_blocked(c), "the test needs open floor at %s" % c)
+	game.player.position = Grid.center(c)
+	game.player.look(dir)
+	return c + dir
+
+
+func _bucket(game, c: Vector2i) -> Station:
+	var st: Station = game.add_station("mop_bucket", c)
+	game.clean_kit.on_built(st, "mop_bucket")
+	game.step(0.01)
+	return st
+
+
+func _wall_cell(game) -> Vector2i:
+	for c: Vector2i in game.kitchen.wall_cells:
+		if not game.stations.has(c) and game.kitchen.can_hang(c, "hook"):
+			return c
+	return Vector2i(-99, -99)
+
+
+func test_the_shop_sells_the_cleaning_pieces():
+	for id in ["mop_bucket", "hook", "sponge", "robot_dock"]:
+		assert_eq(Catalog.ITEMS[id].category, "Kitchen", id)
+		assert_true(Catalog.sold_in(id, "diner") and Catalog.sold_in(id, "seaside"), id)
+	assert_eq(Catalog.price_of("mop_bucket"), 20)
+	assert_eq(Catalog.price_of("sponge"), 15)
+	assert_eq(Catalog.price_of("robot_dock"), 300)
+	assert_lt(Catalog.price_of("hook"), Catalog.price_of("sponge"), "a hook is cheap")
+
+
+func test_e_takes_the_mop_from_its_bucket_and_puts_it_back_rinsed():
+	var game = _game()
+	var c := Vector2i(7, 2)
+	var b := _bucket(game, c + Vector2i(-1, 0))
+	assert_eq(b.kit_tool, "mop", "a bucket comes with its mop")
+	_stand(game, c, Vector2i(-1, 0))
+	assert_eq(game.use_station(b, true), "Take mop")
+	game.act(0, "use")
+	assert_eq(game.player.held, "tool:mop")
+	assert_eq(b.kit_tool, "")
+	game.player.set_held("tool:mop", CleanTools.cleanness("mop", 3))
+	assert_eq(game.use_station(b, true), "Put mop back")
+	game.act(0, "use")
+	assert_eq(game.player.held, "")
+	assert_eq(b.kit_tool, "mop")
+	assert_eq(b.kit_used, 0, "the bucket rinses it")
+
+
+func test_hands_are_full_while_holding_a_tool():
+	var game = _game()
+	CleanKit.hold(game.player, "mop", 0)
+	for st: Station in game.stations.values():
+		assert_eq(game.use_station(st, true), "", "nothing at the %s" % st.type)
+
+
+func test_e_at_a_dirty_cell_in_front_clears_a_level_and_held_e_repeats():
+	var game = _game()
+	var front := _stand(game, Vector2i(7, 2))
+	for i in 3:
+		game.floor_dirt.mess.add_dirt(front)
+	CleanKit.hold(game.player, "mop", 0)
+	assert_eq(game.clean_kit.floor_action(game.player), "Mop")
+	game.act(0, "use")
+	assert_eq(game.floor_dirt.mess.level(front), 2)
+	game.act(0, "use")
+	assert_eq(game.floor_dirt.mess.level(front), 2, "a press takes 0.6 s")
+	game.clean_kit.tick(0.61)
+	game.clean_kit.hold_use(game.player, true)
+	assert_eq(game.floor_dirt.mess.level(front), 1, "held E goes again")
+	game.clean_kit.tick(0.3)
+	game.clean_kit.hold_use(game.player, true)
+	assert_eq(game.floor_dirt.mess.level(front), 1)
+	assert_eq(CleanKit.held_used(game.player), 2)
+
+
+func test_a_dirty_mop_spreads_until_rinsed_at_a_sink():
+	var game = _game()
+	var front := _stand(game, Vector2i(7, 2))
+	game.floor_dirt.mess.add_dirt(front)
+	CleanKit.hold(game.player, "mop", 4)
+	assert_string_contains(game.clean_kit.floor_action(game.player), "spreads")
+	var before: int = game.floor_dirt.mess.total()
+	game.act(0, "use")
+	assert_eq(game.floor_dirt.mess.level(front), 1)
+	assert_eq(game.floor_dirt.mess.total(), before + 1)
+	var sink: Station = game.find_station("sink")
+	assert_eq(game.use_station(sink, true), "Rinse mop")
+	game.use_station(sink)
+	assert_eq(CleanKit.held_used(game.player), 0)
+	assert_eq(game.player.held, "tool:mop", "still in hand, clean")
+
+
+func test_dirt_straight_ahead_beats_putting_the_mop_back():
+	var game = _game()
+	var c := Vector2i(7, 2)
+	var b := _bucket(game, c + Vector2i(-1, 0))
+	b.kit_tool = ""
+	var front := _stand(game, c)
+	game.floor_dirt.mess.add_dirt(front)
+	CleanKit.hold(game.player, "mop", 0)
+	game.act(0, "use")
+	assert_eq(game.floor_dirt.mess.level(front), 0)
+	assert_eq(game.player.held, "tool:mop")
+
+
+func test_a_sponge_hangs_on_its_hook():
+	var game = _game()
+	var w := _wall_cell(game)
+	assert_ne(w, Vector2i(-99, -99), "the test needs a free wall cell")
+	var h: Station = game.add_high("hook", w)
+	game.clean_kit.on_built(h, "sponge")
+	assert_eq(h.kit_tool, "sponge")
+	assert_eq(game.clean_kit.home_at(w), h)
+	assert_eq(game.use_station(h, true), "Take sponge")
+	game.use_station(h)
+	assert_eq(game.player.held, "tool:sponge")
+	CleanKit.hold(game.player, "mop", 0)
+	assert_eq(game.use_station(h, true), "", "a mop does not hang on a hook")
+	CleanKit.hold(game.player, "sponge", 2)
+	game.use_station(h)
+	assert_eq(h.kit_tool, "sponge")
+	assert_eq(h.kit_used, 2, "a hook does not rinse")
+
+
+func test_a_closet_holds_a_mop_or_a_sponge():
+	var game = _game()
+	var w := _wall_cell(game)
+	var low: Station = game.add_station("shelf", w)
+	var high: Station = game.add_high("shelf", w)
+	assert_true(game.kitchen.is_closet(w))
+	assert_eq(game.clean_kit.home_at(w), high)
+	CleanKit.hold(game.player, "mop", 1)
+	assert_eq(game.use_station(low, true), "Put mop back")
+	game.use_station(low)
+	assert_eq(high.kit_tool, "mop")
+	assert_eq(game.use_station(low, true), "Take mop")
+
+
+func test_a_tool_put_down_elsewhere_lies_in_the_way():
+	var game = _game()
+	var front := _stand(game, Vector2i(7, 2))
+	CleanKit.hold(game.player, "sponge", 1)
+	assert_eq(game.clean_kit.floor_action(game.player), "Put sponge down")
+	game.act(0, "use")
+	assert_eq(game.player.held, "")
+	assert_true(game.clean_kit.lying.has(front))
+	game.step(0.01)
+	assert_almost_eq(game.floor_speed(Grid.center(front)), FloorMess.speed_of(2), 0.001, "in the way")
+	assert_eq(game.clean_kit.floor_action(game.player), "Pick up sponge")
+	game.act(0, "use")
+	assert_eq(game.player.held, "tool:sponge")
+	assert_eq(CleanKit.held_used(game.player), 1, "as dirty as it was")
+	assert_false(game.clean_kit.lying.has(front))
+
+
+func test_at_night_moving_furniture_uncovers_dirt_to_mop():
+	var game = _game()
+	var table: Station = game.stations[Vector2i(6, 5)]
+	var under := table.cell
+	game.floor_dirt.mess.add_dirt(under)
+	game.arrivals.clear()
+	game.step(0.1)
+	game.open_build()
+	game.step(0.01)
+	_stand(game, under + Vector2i(0, -1))
+	CleanKit.hold(game.player, "mop", 0)
+	assert_false(game.floor_dirt.mess.can_clean(under), "covered while the table stands there")
+	game.build_interact()
+	assert_eq(game.floor_dirt.mess.level(under), 1)
+	assert_true(game.player.hand.is_empty(), "hands full: the table is not picked up with a mop in them")
+	assert_false(game.pick_up(Grid.center(under)))
+	game.player.set_held("")
+	assert_true(game.pick_up(Grid.center(under)))
+	game.step(0.01)
+	assert_true(game.floor_dirt.mess.can_clean(under))
+	game.player.hand = {}   # the table set aside for the test
+	CleanKit.hold(game.player, "mop", 0)
+	assert_eq(game._kit_action(game.player), "Mop")
+	game.build_interact()
+	assert_eq(game.floor_dirt.mess.level(under), 0)
+
+
+func test_the_robot_drifts_to_dirt_cleans_it_slowly_and_docks():
+	var game = _game()
+	var dock: Station = game.add_station("robot_dock", Vector2i(7, 2))
+	var dirt := Vector2i(7, 4)
+	game.floor_dirt.mess.add_dirt(dirt)
+	game.floor_dirt.mess.add_dirt(dirt)
+	game.step(0.01)
+	assert_true(game.clean_kit.is_docked(dock))
+	for i in 60:
+		game.step(0.05)   # 3 s: two cells at 0.7 m/s
+	var r: Dictionary = game.clean_kit.robots[dock]
+	assert_eq(Grid.to_cell(r.pos), dirt, "drifted to the dirt")
+	assert_true(game.floor_dirt.in_way.has(dirt), "anyone can trip on it")
+	assert_eq(game.floor_dirt.mess.level(dirt), 2)
+	for i in 70:
+		game.step(0.05)
+	assert_eq(game.floor_dirt.mess.level(dirt), 1, "a level every few seconds")
+	for i in 200:
+		game.step(0.05)
+	assert_eq(game.floor_dirt.mess.level(dirt), 0)
+	assert_true(game.clean_kit.is_docked(dock), "back to charge when done")
+
+
+func test_the_robot_goes_home_at_the_end_of_the_day():
+	var game = _game()
+	var dock: Station = game.add_station("robot_dock", Vector2i(7, 2))
+	game.floor_dirt.mess.add_dirt(Vector2i(7, 5))
+	for i in 30:
+		game.step(0.05)
+	assert_false(game.clean_kit.is_docked(dock))
+	game._end_day()
+	assert_true(game.clean_kit.is_docked(dock))
+
+
+func test_bought_at_night_a_sponge_hangs_on_its_own_hook_and_a_bucket_holds_a_mop():
+	var game = _game()
+	game.arrivals.clear()
+	game.step(0.1)
+	game.open_build()
+	game.ledger.money = 200
+	var w := _wall_cell(game)
+	assert_true(game.pick_catalog("sponge"))
+	assert_true(game.can_place(Vector3i(w.x, w.y, 0)), "a sponge goes on a wall")
+	assert_true(game.place(Vector3i(w.x, w.y, 0)))
+	var h: Station = game.highs[w]
+	assert_eq(h.type, "hook")
+	assert_eq(h.kit_tool, "sponge")
+	game.cancel_hand()
+	var spot := Vector2i(7, 2)
+	assert_true(game.pick_catalog("mop_bucket"))
+	assert_true(game.place(Vector3i(spot.x, spot.y, 0)))
+	assert_eq((game.stations[spot] as Station).kit_tool, "mop")
+	assert_eq(game.ledger.money, 200 - 15 - 20)

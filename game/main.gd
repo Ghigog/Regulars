@@ -163,6 +163,7 @@ var controls: Controls           # input per player: devices, touch buttons, pre
 var cam: Camera3D
 var _gross: Array[Dictionary] = []
 var floor_dirt: FloorDirt              # dirt on the floor (PRD 9)
+var clean_kit: CleanKit                # mops, sponges and robot sweepers (PRD 9.4)
 var _sfx := {}
 var music_id := ""               # which MUSIC track is playing
 var _music: AudioStreamPlayer
@@ -191,6 +192,9 @@ func _ready() -> void:
 	floor_dirt = FloorDirt.new()
 	add_child(floor_dirt)
 	floor_dirt.setup(self)
+	clean_kit = CleanKit.new()
+	add_child(clean_kit)
+	clean_kit.setup(self)
 	_load_sounds()
 	add_chef()
 	controls = Controls.new()
@@ -329,6 +333,63 @@ func _demo_slip() -> void:
 	floor_dirt.slip(g, c)
 
 
+## The cleaning demos (PRD 9.4). "mop": in service, a mop bucket and a sponge on its hook,
+## the chef mid-clean along a trail of dirt with a mop gone dirty (shoot at 3). "robot":
+## the robot sweeper drifting from its dock to a puddle (shoot at about 4).
+## "mop_night": at night a table moved off the dirt under it, the chef mopping it (shoot at 3).
+func _demo_mop(demo: String) -> void:
+	arrivals.assign([{"time": 99999.0, "idx": 0}])   # keeps the day open, nobody comes
+	floor_dirt.drops = false
+	floor_dirt.sync_room()
+	var m := floor_dirt.mess
+	var at := Vector2i(1, 6)
+	for c: Vector2i in [Vector2i(1, 6), Vector2i(2, 6), Vector2i(3, 6), Vector2i(1, 5), Vector2i(3, 5)]:
+		if not stations.has(c) and grid.can_place_block(c, [], LOT, DOOR, _reach(), _touch()):
+			at = c   # out of everyone's way
+			break
+	var bucket := add_station("mop_bucket", at)
+	clean_kit.on_built(bucket, "mop_bucket")
+	for c: Vector2i in kitchen.wall_cells:
+		if not stations.has(c) and kitchen.can_hang(c, "hook"):
+			clean_kit.on_built(add_high("hook", c), "sponge")
+			break
+	match demo:
+		"mop":
+			for d: Array in [[Vector2i(5, 3), 1], [Vector2i(5, 4), 3], [Vector2i(6, 4), 2], [Vector2i(7, 4), 4]]:
+				for i in d[1]:
+					m.add_dirt(d[0])
+			player.position = Grid.center(Vector2i(5, 3)) + Vector3(0.1, 0, -0.1)
+			player.look(Vector2i(0, 1))
+			clean_kit.keep(bucket, "", 0)   # the mop is out, in the chef's hands
+			CleanKit.hold(player, "mop", CleanTools.dirty_after("mop"))
+			clean_kit.put_down("sponge", 1, Vector2i(6, 3))   # left lying about, in the way
+		"robot":
+			add_station("robot_dock", Vector2i(5, 6))
+			for i in 3:
+				m.add_dirt(Vector2i(7, 4))
+			player.position = Grid.center(Vector2i(2, 4))
+		"mop_night":
+			ledger.record_sale(DEMO_BILL, 5)
+			for i in 3:
+				m.add_dirt(Vector2i(6, 5))   # under the table by the door: out of reach in service
+			m.add_dirt(Vector2i(6, 4))
+			arrivals.clear()
+			get_tree().create_timer(1.0).timeout.connect(func() -> void:
+				open_build()
+				pick_up(Grid.center(Vector2i(6, 5)))
+				var spots: Array = plan.floors.keys().filter(func(c: Vector2i) -> bool: return c.x >= 5 and c != Vector2i(6, 5))
+				spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+					return (a - Vector2i(6, 5)).length_squared() > (b - Vector2i(6, 5)).length_squared())   # well away
+				for c: Vector2i in spots:
+					if place(Vector3i(c.x, c.y, 0)):
+						break   # moved aside: the dirt under it can be reached
+				player.position = Grid.center(Vector2i(6, 4)) + Vector3(0, 0, -0.2)
+				player.look(Vector2i(0, 1))
+				clean_kit.keep(bucket, "", 0)
+				CleanKit.hold(player, "mop", 1)
+				hud.show_build())
+
+
 ## Dev aid for screenshots: REGULARS_DEMO=cook or =summary jumps to that moment.
 func _apply_demo(demo: String) -> void:
 	if demo == "cook":   # a patty on the grill, the chef with a tray for it
@@ -353,6 +414,8 @@ func _apply_demo(demo: String) -> void:
 		arrivals.resize(mini(arrivals.size(), 2))
 		for a in arrivals:
 			a.time = 0.5
+	elif demo in ["mop", "robot", "mop_night"]:  # PRD 9.4: see _demo_mop
+		_demo_mop(demo)
 	elif demo == "slip":  # a guest down on a level 4 cell, dizzy, a friend who saw it helping them up; shoot at about 7.5
 		arrivals.clear()
 		arrivals.append({"time": 0.2, "group": [0, 1]})
@@ -1460,6 +1523,8 @@ static func hand_node(h: Dictionary) -> String:
 	if h.get("node") is Station:
 		var st: Station = h.node
 		return st.base if st.type == "counter" and st.base != "" else st.node
+	if h.get("id", "") == "sponge":
+		return "hook"   # sold hanging on its own hook (PRD 9.4)
 	return Kitchen.node_of(str(h.get("id", "")))
 
 
@@ -2034,8 +2099,8 @@ static func piece_name(bp: Dictionary) -> String:
 ## Picks up the piece standing at a point on the floor, to move, turn or sell it.
 func pick_up(p: Vector3, ch: Player = null) -> bool:
 	ch = _me(ch)
-	if phase != Phase.BUILD or not ch.hand.is_empty() or Cleaning.carrying_mess(ch.held):
-		return false
+	if phase != Phase.BUILD or not ch.hand.is_empty() or Cleaning.carrying_mess(ch.held) or CleanKit.holding(ch):
+		return false   # hands full: a bag, a plate, a mop (PRD 9.4)
 	var c := Grid.to_cell(p)
 	var edge := snap_edge(p)
 	if stations.has(c) and needs_cleaning(stations[c]):
@@ -2378,10 +2443,10 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		add_rug(cell, int(ch.hand.facing))
 	elif Kitchen.is_counter(ch.hand.id) and _bare_counter(cell) != null:
 		_stack_counter(cell)
-	elif layer_for(cell, Kitchen.node_of(ch.hand.id)) == "high":
-		add_high(ch.hand.id, cell)
+	elif layer_for(cell, hand_node(ch.hand)) == "high":
+		clean_kit.on_built(add_high(hand_node(ch.hand) if ch.hand.id == "sponge" else ch.hand.id, cell), ch.hand.id)
 	else:
-		add_station(ch.hand.id, cell, int(ch.hand.tier), int(ch.hand.facing))
+		clean_kit.on_built(add_station(ch.hand.id, cell, int(ch.hand.tier), int(ch.hand.facing)), ch.hand.id)
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
 	sfx("putdown")
 	_after_building(ch)
@@ -2609,14 +2674,26 @@ func build_action(ch: Player = null) -> String:
 		if Catalog.is_box(ch.hand.id):
 			return "Put in"
 		return "Hang" if hand_layer(ch) == "high" else "Put down"
+	var kit := _kit_action(ch)
+	if kit != "":
+		return kit
 	var clean := night_clean_action(station_at(ch.target_cell()), ch)
 	if clean != "":
 		return clean
 	if desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
 		return "Use desk"
-	if not Cleaning.carrying_mess(ch.held) and _piece_in_front(ch) != Vector3.INF:
+	if not Cleaning.carrying_mess(ch.held) and not CleanKit.holding(ch) and _piece_in_front(ch) != Vector3.INF:
 		return "Pick up"
 	return door_action(ch)
+
+
+## What E does with cleaning tools at night (PRD 9.4): at a home or sink, else on the floor.
+func _kit_action(ch: Player) -> String:
+	if clean_kit.floor_first(ch):
+		return clean_kit.floor_action(ch)
+	var st: Station = station_at(ch.target_cell())
+	var kit := clean_kit.station_use(st, true, ch) if st != null else ""
+	return kit if kit != "" else clean_kit.floor_action(ch)
 
 
 ## The cleaning Use would do on this station at night, by its night name
@@ -2647,6 +2724,11 @@ func dirty_note() -> String:
 
 func build_interact(ch: Player = null) -> void:
 	ch = _me(ch)
+	if ch.hand.is_empty() and _kit_action(ch) != "":   # a cleaning tool (PRD 9.4)
+		var st: Station = station_at(ch.target_cell())
+		if clean_kit.floor_first(ch) or st == null or clean_kit.station_use(st, false, ch) == "":
+			clean_kit.floor_use(ch)
+		return
 	var action := build_action(ch)
 	if not ch.hand.is_empty():
 		action = "Put down"   # hung or stood, place() decides
@@ -2913,6 +2995,7 @@ func close_early() -> void:
 func _end_day() -> void:
 	_cancel_all_preps()
 	floor_dirt.clear_slips()   # a chef still down gets up for the night
+	clean_kit.end_day()   # robot sweepers go back to their docks
 	set_door(false)
 	shopper = null
 	upgrading = false
@@ -3423,6 +3506,7 @@ func _tick_floor(delta: float) -> void:
 		walkers.append([g, Grid.to_cell(g.position)])
 	floor_dirt.step_feet(walkers, phase == Phase.SERVICE)   # slips only while open (9.3)
 	floor_dirt.tick_slips(delta)
+	clean_kit.tick(delta)   # mop waits, the robot sweepers (PRD 9.4)
 	floor_dirt.redraw()
 
 
@@ -4274,6 +4358,14 @@ func _use_as(st: Station, held_ing: Dictionary) -> String:
 ## reason, and on a real use it is said and nothing changes.
 func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	ch = _me(ch)
+	var kit := clean_kit.station_use(st, dry_run, ch)   # cleaning tools first (PRD 9.4)
+	if kit != "" or CleanKit.holding(ch):
+		return kit   # a tool fills the hands: nothing else is done with it
+	return _use_station(st, dry_run, ch)
+
+
+func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
+	ch = _me(ch)
 	var held := ch.held
 	var q := ch.held_quality
 	var held_ing := Tray.parse(held)
@@ -4811,6 +4903,8 @@ func _process(delta: float) -> void:
 			if ch.aim_mouse:
 				ch.mouse_point = floor_point(get_viewport().get_mouse_position())
 			_paint_held(p)
+		if phase in [Phase.SERVICE, Phase.BUILD] and shopper != ch and not preps.has(p):
+			clean_kit.hold_use(ch, controls.holding(p, "use"))   # held E keeps mopping
 	if phase == Phase.BUILD:
 		_refresh_openings()
 	step(delta)
@@ -4843,10 +4937,19 @@ func _update_cursor(ch: Player = null) -> void:
 		ch.cursor.visible = false
 		hud.show_prompt(cam.unproject_position(fallen.position + Vector3(0, 1.9, 0)), "Help up", chefs.find(ch))
 		return
-	var st: Station = station_at(ch.target_cell())
+	var st: Station = null if clean_kit.floor_first(ch) else station_at(ch.target_cell())
 	var action := ""
 	if st != null:
 		action = prompt_for(st, ch) if phase == Phase.SERVICE else night_clean_action(st, ch)
+		if action == "" and phase == Phase.BUILD and shopper != ch and ch.hand.is_empty():
+			action = clean_kit.station_use(st, true, ch)   # a tool's home at night (PRD 9.4)
+	if action == "" and (phase == Phase.SERVICE or (phase == Phase.BUILD and shopper != ch and ch.hand.is_empty())):
+		var fl := clean_kit.floor_action(ch)
+		if fl != "":   # mopping, or a tool to put down or pick up
+			ch.cursor.visible = false
+			var fc: Vector2i = clean_kit.floor_cell(ch)
+			hud.show_prompt(cam.unproject_position(Grid.center(fc) + Vector3(0, 1.3, 0)), fl, chefs.find(ch))
+			return
 	var messy := _messy_at_mouse(ch)
 	if messy != null and messy != st:   # the mouse cannot clean: that is the chef's job
 		ch.cursor.visible = false
@@ -5213,8 +5316,12 @@ func act(p: int, action: String, echo := false) -> void:
 				ch.punch()
 			elif action == "use":
 				var st: Station = station_at(ch.target_cell())
-				if st != null and prompt_for(st, ch) != "":
+				if clean_kit.floor_first(ch):
+					clean_kit.floor_use(ch)   # dirt straight ahead, a tool in hand (PRD 9.4)
+				elif st != null and prompt_for(st, ch) != "":
 					use_station(st, false, ch)
+				elif clean_kit.floor_use(ch):
+					pass   # a mop or sponge on the floor (PRD 9.4)
 				elif not use_door(ch) and st != null:
 					use_station(st, false, ch)
 		Phase.SUMMARY:

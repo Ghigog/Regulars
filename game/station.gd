@@ -42,6 +42,8 @@ var count := 0        # clean trays in a tray stack; scraps in a bin
 var dirty := 0        # dirty trays left on a table, or soaking in a sink
 var dirty_age := 0.0  # seconds this piece has been messy (see `messy`)
 var seats: Array[Vector2i] = []
+var kit_tool := ""    # a home's cleaning tool kept here ("mop", "sponge"; PRD 9.4), drawn by CleanKit
+var kit_used := 0      # how many levels that tool has cleared since it was last rinsed
 var racked := false   # a sink: a dish rack stands beside it (see piled_at)
 var _item_node: Node3D
 var _stack: Node3D
