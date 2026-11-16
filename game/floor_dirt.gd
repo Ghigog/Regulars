@@ -23,6 +23,9 @@ var _last := {}    # instance id -> Vector2i: the cell each walker stood on last
 ## down, "helper": the Node helping them up or null, "help": seconds of help left, "mark":
 ## the dizzy stars and help bar over them}.
 var down := {}
+## Cells where something is in the way on the floor (the robot sweeper, a tool left lying,
+## PRD 9.4): Vector2i -> true. Walking over one feels like level 2 dirt. Set by CleanKit.
+var in_way := {}
 var _drawn := {}   # Vector2i -> the look key drawn there
 var _nodes := {}   # Vector2i -> Node3D
 static var _meshes := {}   # outline -> its flat mesh
@@ -47,7 +50,8 @@ func sync_room() -> void:
 
 ## How fast anyone moves standing at `p`.
 func speed_at(p: Vector3) -> float:
-	return mess.speed_at(Grid.to_cell(p))
+	var c := Grid.to_cell(p)
+	return FloorMess.speed_of(CleanTools.felt_level(mess.level(c), in_way.has(c)))
 
 
 ## One step of feet: each walker is [node, cell]. Stepping off a dirty cell onto the next

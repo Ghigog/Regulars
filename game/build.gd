@@ -875,12 +875,107 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 			cyl(n, Vector3(0.2, 0.03, -0.11), 0.06, 0.16, "#e9dcc8").rotation.z = 1.35
 			for c: Vector3 in [Vector3(0.1, 0.05, 0.12), Vector3(-0.2, 0.05, -0.12), Vector3(0.18, 0.05, 0.1)]:
 				box(n, c, Vector3(0.035, 0.02, 0.03), "#e0a850").rotation.y = c.x * 20.0
+		"tool:mop":   # held out at the side, head on the floor, the pole leaning out (PRD 9.4)
+			# Held items are tipped 25 degrees to the camera (Player.move); a pole stands
+			# back up so it reads at full length, leaning out a little.
+			var m := mop(n, quality)
+			m.basis = Basis(Vector3(1, 0, -1).normalized(), deg_to_rad(-25.0)) * Basis(Vector3(0, 0, 1), -0.2)
+			m.position = Vector3(0.45, -0.55, 0.1)
+		"tool:sponge":
+			sponge(n, quality).scale = Vector3.ONE * 1.4
 		"rubbish_bag":  # a fat knotted sack, for carrying out the front
 			ball(n, Vector3(0, 0.17, 0), 0.19, BAG).scale = Vector3(1, 0.95, 0.9)
 			ball(n, Vector3(0, 0.38, 0), 0.06, BAG)
 			for a: float in [-0.6, 0.6]:
 				ball(n, Vector3(sin(a) * 0.07, 0.45, 0), 0.04, BAG).scale = Vector3(0.7, 1.4, 0.7)
 	return n
+
+
+# ---------------------------------------------------------------- cleaning (PRD 9.4)
+
+const MOP_CLEAN := "#f3ead6"    # cotton strands
+const MOP_DIRTY := "#6b4e32"    # grey-brown once dirty: by shape too, the strands droop
+const SPONGE := "#ffd452"
+const SCOURER := "#4f9a5e"
+const BUCKET := "#ffd452"
+const ROBOT := "#f6efe0"
+const ROBOT_RIM := "#f07a63"
+
+
+## A mop standing upright from its foot: a wooden pole and a mop head of strands that
+## goes from cream to brown as it gets dirty (`clean` 1 to 0); a dirty head also droops.
+static func mop(parent: Node3D, clean := 1.0) -> Node3D:
+	var n := Node3D.new()
+	parent.add_child(n)
+	cyl(n, Vector3(0, 0.12, 0), 0.035, 1.15, WOOD, 0.0, R_WOOD)
+	ball(n, Vector3(0, 1.28, 0), 0.04, CORAL)   # the grip
+	var col := Color(MOP_DIRTY).lerp(Color(MOP_CLEAN), clean).to_html(false)
+	var droop := 1.0 - clean
+	box(n, Vector3(0, 0.13, 0), Vector3(0.1, 0.05, 0.1), STEEL_DARK)
+	for i in 7:
+		var a := TAU * i / 7.0
+		var strand := box(n, Vector3(cos(a) * 0.07, 0.02, sin(a) * 0.07), Vector3(0.045, 0.2, 0.045), col)
+		strand.rotation = Vector3(sin(a) * (0.5 - 0.3 * droop), 0, -cos(a) * (0.5 - 0.3 * droop))
+	if droop > 0.5:   # drips under a dirty mop
+		ball(n, Vector3(0.02, -0.08, 0.03), 0.03, MOP_DIRTY)
+	return n
+
+
+## A sponge: a yellow block with a green scourer on top, browner as it gets dirty.
+static func sponge(parent: Node3D, clean := 1.0) -> Node3D:
+	var n := Node3D.new()
+	parent.add_child(n)
+	var body := Color(MOP_DIRTY).lerp(Color(SPONGE), clean).to_html(false)
+	_add(n, bevel_mesh(Vector3(0.24, 0.1, 0.15), 0.03), Vector3(0, 0.05, 0), Color(body), 0.0)
+	_add(n, bevel_mesh(Vector3(0.24, 0.04, 0.15), 0.015), Vector3(0, 0.12, 0), Color(SCOURER), 0.0)
+	return n
+
+
+## Where a tool hangs off a hook drawn at height y0 against the wall.
+static func hook_spot(y0: float) -> Vector3:
+	return Vector3(0, y0 - 0.12, -0.5 + 0.2)
+
+
+## The mop bucket: a yellow pail on castors with a grey wringer box on one side.
+static func mop_bucket(n: Node3D) -> void:
+	for x: float in [-0.2, 0.2]:
+		for z: float in [-0.16, 0.16]:
+			ball(n, Vector3(x, 0.04, z), 0.04, STEEL_DARK)
+	_add(n, lathe_mesh([[0.0, 0.0], [0.26, 0.0], [0.33, 0.42], [0.31, 0.44], [0.27, 0.06], [0.0, 0.06]], 4), Vector3(0, 0.06, 0), Color(BUCKET), 0.0).rotation.y = PI / 4
+	_add(n, lathe_mesh([[0.0, 0.0], [0.27, 0.0], [0.27, 0.02], [0.0, 0.02]], 4), Vector3(0, 0.38, 0), Color("#8fb7bd"), 0.0, R_GLOSS).rotation.y = PI / 4   # water
+	_add(n, bevel_mesh(Vector3(0.2, 0.18, 0.34), 0.03), Vector3(0.24, 0.5, 0), Color("#9aa3a6"), 0.0, R_WOOD)
+	box(n, Vector3(0.36, 0.62, 0), Vector3(0.05, 0.3, 0.05), STEEL_DARK).rotation.z = -0.5   # the wringer's handle
+
+
+## Where the mop stands in its bucket, leaning on the rim.
+static func bucket_mop(n: Node3D, clean: float) -> Node3D:
+	var m := mop(n, clean)
+	m.position = Vector3(-0.08, 0.12, 0)
+	m.rotation.z = 0.22
+	return m
+
+
+## The robot's dock: a low ramp plate with a back post and a green charge light.
+static func robot_dock(n: Node3D) -> void:
+	_add(n, bevel_mesh(Vector3(0.86, 0.05, 0.86), 0.02), Vector3(0, 0.0, 0), Color(STEEL_DARK), 0.0)
+	_add(n, bevel_mesh(Vector3(0.5, 0.36, 0.14), 0.04), Vector3(0, 0.03, -0.36), Color(ROBOT), 0.0)
+	ball(n, Vector3(0, 0.3, -0.28), 0.045, GOOD, 0.8)
+
+
+## The robot sweeper: a flat cream disc with a coral bumper, a dark sensor dome and two
+## side brushes (the "brush" node spins while it works).
+static func robot(n: Node3D) -> void:
+	lathe(n, Vector3(0, 0.03, 0), [[0.0, 0.0], [0.3, 0.0], [0.32, 0.03], [0.32, 0.09], [0.29, 0.12], [0.0, 0.12]], ROBOT)
+	lathe(n, Vector3(0, 0.03, 0), [[0.315, 0.0], [0.335, 0.0], [0.335, 0.08], [0.315, 0.08]], ROBOT_RIM)
+	lathe(n, Vector3(0, 0.15, -0.08), [[0.0, 0.0], [0.08, 0.0], [0.07, 0.04], [0.0, 0.06]], STEEL_DARK, 0.0, R_GLOSS)
+	ball(n, Vector3(0, 0.16, 0.18), 0.03, GOOD, 0.8)
+	var brush := Node3D.new()
+	brush.name = "brush"
+	brush.position = Vector3(0.22, 0.02, 0.22)
+	n.add_child(brush)
+	for i in 3:
+		var a := TAU * i / 3.0
+		box(brush, Vector3(cos(a) * 0.08, 0, sin(a) * 0.08), Vector3(0.14, 0.012, 0.02), TRIM).rotation.y = -a
 
 
 ## The row of tags over a storage cell naming the kinds it holds (PRD 8.4): a cream
@@ -1324,6 +1419,11 @@ static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) ->
 					box(n, Vector3(sx * 0.475, -drop, back + 0.24), Vector3(0.05, top + drop, 0.48), CABINET)
 				box(n, Vector3(0, -drop, back + 0.02), Vector3(0.94, top + drop, 0.04), _shade(CABINET))
 				box(n, Vector3(0, top, back + 0.25), Vector3(1.02, 0.07, 0.52), WOOD, 0.0, R_WOOD)
+		"hook":
+			# A wooden plate on the wall with a brass hook bent up off it (PRD 9.4).
+			box(n, Vector3(0, y0 + 0.08, back + 0.03), Vector3(0.3, 0.36, 0.05), WOOD, 0.0, R_WOOD)
+			box(n, Vector3(0, y0 + 0.02, back + 0.12), Vector3(0.05, 0.05, 0.16), "#d9a441", 0.0, R_WOOD)
+			box(n, Vector3(0, y0 + 0.07, back + 0.19), Vector3(0.05, 0.12, 0.04), "#d9a441", 0.0, R_WOOD)
 		"hood":
 			# A sloped steel-blue canopy over the stove (sheet 1), a square frustum squashed
 			# to the wall's depth, with a duct up to the top of the wall.
@@ -1526,8 +1626,16 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 				box(n, Vector3(0, 0.04 + i * 0.78 / (boards - 1), -0.27), Vector3(0.84, 0.05, 0.44), WOOD, 0.0, R_WOOD)
 			for j in 2:   # a couple of tins on the lower board
 				cyl(n, Vector3(-0.2 + j * 0.36, 0.09, -0.27), 0.09, 0.2, [CORAL, TILE_TEAL][j], 0.0, R_GLOSS)
-		"cabinet", "hood":
+		"cabinet", "hood", "hook":
 			wall_piece(n, type, false, HIGH_Y0 - 0.3)
+		"sponge":   # sold on its own hook (PRD 9.4): seen in hand as both
+			wall_piece(n, "hook", false, HIGH_Y0 - 0.3)
+			var hung := sponge(n, 1.0)
+			hung.position = hook_spot(HIGH_Y0 - 0.3)
+		"mop_bucket":
+			mop_bucket(n)
+		"robot_dock":
+			robot_dock(n)
 		"bin":
 			# Sheet 8: a dark brown tub, wider at the top, with a steel rim.
 			_add(n, lathe_mesh([[0.0, 0.0], [0.34, 0.0], [0.43, 0.62], [0.0, 0.62]], 4), Vector3.ZERO, Color("#5a4034"), 0.0).rotation.y = PI / 4

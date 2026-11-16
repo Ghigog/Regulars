@@ -21,9 +21,10 @@ const SPECIALIST_STEP := "specialist"
 ## "shelf": storage, no top; a base, or a high piece on a wall cell.
 ## "tall": a base that also fills the high layer; no top.
 ## "cabinet", "hood": high layer only, on a wall cell.
+## "hook": a wall hook (PRD 9.4), high layer only; holds one small cleaning tool.
 const FITS := {
 	"top": ["top"], "counter": ["base"], "shelf": ["base", "high"], "tall": ["base"],
-	"cabinet": ["high"], "hood": ["high"],
+	"cabinet": ["high"], "hood": ["high"], "hook": ["high"],
 }
 
 ## The upgrade trees. A node with no "parent" is a root, bought in the shop; every other
@@ -101,6 +102,7 @@ const NODES := {
 		"slots": 2},
 	"cabinet": {"name": "Wall cabinet", "fit": "cabinet", "price": 20, "slots": 1},   # tunable price
 	"hood": {"name": "Hood", "fit": "hood", "price": 30},   # tunable price; a flag for PRD 9
+	"hook": {"name": "Wall hook", "fit": "hook", "price": 5},   # PRD 9.4: a sponge's home (tunable price)
 }
 
 ## Catalog pieces that are kitchen nodes under another id (none since the crates went, 8.4).
