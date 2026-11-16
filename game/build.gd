@@ -559,6 +559,8 @@ static func ingredient(n: Node3D, id: String, state: String, look := "", y := 0.
 					box(n, Vector3(-0.05 + (k % 3) * 0.05, y + 0.15, -0.02 + (k / 3) * 0.04), Vector3(0.025, 0.12, 0.025), col, 0.0, R_GLOSS).rotation.z = 0.2 * (k % 3 - 1)
 		"cob":
 			cyl(n, Vector3(0, y + 0.05, 0), 0.05, 0.24, col, 0.0, R_GLOSS).rotation.z = PI / 2
+			if state == "prep" and id == "steamed_corn":   # a melting pat of butter
+				box(n, Vector3(0.02, y + 0.105, 0), Vector3(0.07, 0.025, 0.05), "#fff3b0", 0.0, R_GLOSS).rotation.y = 0.4
 			if state == "raw":
 				for sx: float in [-1.0, 1.0]:
 					ball(n, Vector3(0.0, y + 0.06, sx * 0.04), 0.06, LEAF).scale = Vector3(2.0, 0.6, 0.6)
@@ -568,6 +570,97 @@ static func ingredient(n: Node3D, id: String, state: String, look := "", y := 0.
 			if state != "raw":
 				for f: Vector3 in [Vector3(-0.05, 0.095, -0.03), Vector3(0.05, 0.095, 0.05), Vector3(0.0, 0.09, 0.0), Vector3(0.04, 0.094, -0.04)]:
 					box(n, Vector3(f.x, y + f.y, f.z), Vector3(0.022, 0.008, 0.016), LEAF).rotation.y = f.x * 30.0
+		# PRD 8.6. Each reads by shape at 20 px: a holed block and a fluffy heap, a slashed
+		# loaf and a slice, a scoop in a tub, crumbs, shells, and four drinks' vessels.
+		"shreds":
+			if state == "raw":   # a block of cheese with holes
+				box(n, Vector3(0, y, 0), Vector3(0.22, 0.13, 0.15), col, 0.0, R_GLOSS)
+				for h: Vector3 in [Vector3(-0.05, 0.08, 0.076), Vector3(0.05, 0.05, 0.076), Vector3(0.112, 0.08, 0.02)]:
+					ball(n, Vector3(h.x, y + h.y, h.z), 0.022, "#d9a62a")
+			else:
+				lathe(n, Vector3(0, y, 0), [[0.0, 0.0], [0.12, 0.0], [0.08, 0.05], [0.0, 0.07]], _shade(col, 0.08))
+				for k in 12:   # a fluffy heap of strands
+					var a := TAU * k / 7.0
+					var r := 0.02 + 0.06 * float(k % 3) / 2.0
+					var strand := box(n, Vector3(cos(a) * r, y + 0.015 + (2 - k % 3) * 0.02, sin(a) * r), Vector3(0.11, 0.016, 0.016), col, 0.0, R_GLOSS)
+					strand.rotation = Vector3(0.3 * (k % 2), a * 1.7, 0.25 * (k % 3 - 1))
+		"loaf":
+			if state == "raw":   # a whole loaf, slashed on top
+				ball(n, Vector3(0, y + 0.08, 0), 0.12, col, 0.0, R_GLOSS).scale = Vector3(1.5, 0.75, 1.0)
+				for k in 3:
+					box(n, Vector3(-0.08 + k * 0.08, y + 0.165, 0), Vector3(0.025, 0.012, 0.14), _tint(col, 0.3)).rotation.y = 0.5
+			else:   # two thick slices leaning together, crust round the crumb
+				for k in 2:
+					var sl := Node3D.new()
+					sl.position = Vector3(-0.04 + k * 0.08, y + 0.1, 0)
+					sl.rotation.z = 0.25 if k == 0 else -0.25
+					n.add_child(sl)
+					box(sl, Vector3.ZERO, Vector3(0.04, 0.2, 0.22), str(info.colour), 0.0, R_GLOSS)
+					box(sl, Vector3(0, 0.005, 0), Vector3(0.046, 0.17, 0.18), col)
+		"scoop":
+			lathe(n, Vector3(0, y, 0), [[0.0, 0.0], [0.07, 0.0], [0.09, 0.09], [0.0, 0.09]], PAPER)
+			box(n, Vector3(0, y + 0.045, 0), Vector3(0.185, 0.03, 0.03), "#f4b3c4").rotation.y = 0.5
+			ball(n, Vector3(0, y + 0.13, 0), 0.075, col, 0.0, R_GLOSS)
+			ball(n, Vector3(0.0, y + 0.21, 0.0), 0.022, "#c8283a", 0.0, R_GLOSS)
+		"crumbs":
+			if state == "raw":   # a stale heel of bread
+				var heel := ball(n, Vector3(0, y + 0.03, 0), 0.11, col)
+				heel.scale = Vector3(1.0, 0.6, 1.0)
+				box(n, Vector3(0, y + 0.0, 0), Vector3(0.2, 0.04, 0.2), "#e8c48a")
+			else:   # a little heap of golden crumbs
+				lathe(n, Vector3(0, y, 0), [[0.0, 0.0], [0.13, 0.0], [0.07, 0.06], [0.0, 0.08]], col)
+				for k in 6:
+					var a := TAU * k / 6.0
+					box(n, Vector3(cos(a) * 0.12, y + 0.01, sin(a) * 0.12), Vector3(0.025, 0.02, 0.025), _shade(col, 0.15)).rotation.y = a
+		"mussels":
+			for k in 4:   # closed blue-black shells, or opened on orange meat
+				var a := TAU * k / 4.0 + 0.4
+				var sh := Node3D.new()
+				sh.position = Vector3(cos(a) * 0.065, y + 0.03 + (0.02 if k == 3 else 0.0), sin(a) * 0.065)
+				sh.rotation.y = a
+				n.add_child(sh)
+				if state == "raw":
+					ball(sh, Vector3.ZERO, 0.055, col, 0.0, R_GLOSS).scale = Vector3(1.4, 0.55, 0.8)
+				else:
+					for side: float in [-1.0, 1.0]:
+						var half := ball(sh, Vector3(0, 0.0, side * 0.03), 0.05, "#2f3a52", 0.0, R_GLOSS)
+						half.scale = Vector3(1.4, 0.3, 0.7)
+						half.rotation.x = side * 0.6
+					ball(sh, Vector3(0, 0.015, 0), 0.032, col, 0.0, R_GLOSS).scale = Vector3(1.3, 0.7, 0.9)
+		"juice":
+			if state == "raw":   # oranges (lemonade starts as a lemon, drawn as one)
+				ball(n, Vector3(0, y + 0.08, 0), 0.08, col, 0.0, R_GLOSS)
+				box(n, Vector3(0.0, y + 0.16, 0.0), Vector3(0.06, 0.012, 0.03), LEAF).rotation.y = 0.5
+			else:   # juice in a tumbler (a pale base and rim), a wheel of fruit on the rim
+				cyl(n, Vector3(0, y, 0), 0.064, 0.025, "#dff0f2", 0.0, R_GLOSS)
+				cyl(n, Vector3(0, y + 0.02, 0), 0.06, 0.16, col, 0.0, R_GLOSS)
+				lathe(n, Vector3(0, y + 0.17, 0), [[0.055, 0.0], [0.068, 0.0], [0.068, 0.03], [0.055, 0.03]], "#dff0f2", 0.0, R_GLOSS)
+				var wheel := cyl(n, Vector3(0.05, y + 0.2, 0), 0.04, 0.012, "#f28a1e" if id == "orange_juice" else "#f5d936")
+				wheel.rotation.x = PI / 2
+				cyl(n, Vector3(0.05, y + 0.2, 0.0), 0.03, 0.014, "#fbe3b0").rotation.x = PI / 2
+		"shake":
+			if state == "raw":   # berries
+				for k in 4:
+					var a := TAU * k / 4.0
+					ball(n, Vector3(cos(a) * 0.05, y + 0.05 + (0.04 if k == 0 else 0.0), sin(a) * 0.05), 0.05, col, 0.0, R_GLOSS)
+				box(n, Vector3(0.0, y + 0.13, 0.0), Vector3(0.05, 0.012, 0.025), LEAF)
+			else:   # a fluted glass, cream on top, a cherry and a straw
+				_add(n, lathe_mesh([[0.0, 0.0], [0.05, 0.0], [0.03, 0.04], [0.045, 0.08], [0.075, 0.2], [0.0, 0.2]], 16), Vector3(0, y, 0), Color(col), 0.0, R_GLOSS)
+				ball(n, Vector3(0, y + 0.21, 0), 0.065, PAPER, 0.0, R_GLOSS).scale = Vector3(1, 0.7, 1)
+				ball(n, Vector3(0, y + 0.27, 0), 0.022, "#c8283a", 0.0, R_GLOSS)
+				box(n, Vector3(0.035, y + 0.28, 0), Vector3(0.014, 0.16, 0.014), CORAL).rotation.z = 0.3
+		"mug":
+			cyl(n, Vector3(0, y, 0), 0.07, 0.15, PAPER, 0.0, R_GLOSS)
+			cyl(n, Vector3(0, y + 0.146, 0), 0.06, 0.008, col)
+			var handle := _ring(n, Vector3(0.078, y + 0.075, 0), PAPER)
+			handle.rotation.x = PI / 2
+			handle.scale = Vector3.ONE * 0.75
+			for k in 2:   # steam
+				ball(n, Vector3(-0.02 + k * 0.04, y + 0.2 + k * 0.04, 0), 0.022, "#ffffff").scale = Vector3(1, 1.4, 1)
+		"pint":
+			_add(n, lathe_mesh([[0.0, 0.0], [0.05, 0.0], [0.065, 0.2], [0.0, 0.2]], 16), Vector3(0, y, 0), Color(col), 0.0, R_GLOSS)
+			cyl(n, Vector3(0, y + 0.2, 0), 0.066, 0.045, PAPER, 0.0, R_GLOSS)
+			ball(n, Vector3(0.0, y + 0.245, 0.0), 0.05, PAPER).scale = Vector3(1.2, 0.5, 1.2)
 		"cup":
 			cyl(n, Vector3(0, y, 0), 0.07, 0.2, CORAL)
 			cyl(n, Vector3(0, y + 0.19, 0), 0.06, 0.012, col)
@@ -578,11 +671,44 @@ static func ingredient(n: Node3D, id: String, state: String, look := "", y := 0.
 			_add(n, lathe_mesh([[0.0, 0.0], [0.035, 0.0], [0.065, 0.06], [0.07, 0.13], [0.0, 0.13]], 16), Vector3(0, y + 0.12, 0), Color(col), 0.0, R_GLOSS)
 
 
-## How tall a stacked layer of this ingredient is on a plate.
-static func _layer(n: Node3D, id: String, y: float, first: bool, last: bool) -> float:
+## How tall a stacked layer of this ingredient is on a plate. `coat`: the stack is
+## breaded (fish and breadcrumbs, PRD 8.6): a fillet wears a crumb crust and the crumbs
+## themselves draw nothing.
+static func _layer(n: Node3D, id: String, y: float, first: bool, last: bool, coat := false) -> float:
 	var info: Dictionary = Pantry.ITEMS[id]
 	var col: String = info.prepped
 	match str(info.shape):
+		"shreds":
+			for k in 9:
+				var a := TAU * k / 9.0
+				box(n, Vector3(cos(a) * 0.06, y + 0.01 + (k % 2) * 0.008, sin(a) * 0.06), Vector3(0.12, 0.014, 0.014), col, 0.0, R_GLOSS).rotation.y = a * 1.3
+			return 0.025
+		"loaf":
+			box(n, Vector3(0, y, 0), Vector3(0.26, 0.045, 0.22), str(info.colour), 0.0, R_GLOSS)
+			box(n, Vector3(0, y + 0.004, 0), Vector3(0.22, 0.046, 0.18), col)
+			return 0.045
+		"crumbs":
+			if coat:
+				return 0.0
+			lathe(n, Vector3(0, y, 0), [[0.0, 0.0], [0.12, 0.0], [0.06, 0.04], [0.0, 0.05]], col)
+			return 0.04
+		"scoop":
+			for k in 2:
+				ball(n, Vector3(-0.05 + k * 0.1, y + 0.06, 0), 0.07, str(info.colour), 0.0, R_GLOSS)
+			return 0.1
+		"mussels":
+			for k in 5:
+				var a := TAU * k / 5.0
+				var sh := Node3D.new()
+				sh.position = Vector3(cos(a) * 0.08, y + 0.03, sin(a) * 0.08)
+				sh.rotation.y = a
+				n.add_child(sh)
+				for side: float in [-1.0, 1.0]:
+					var half := ball(sh, Vector3(0, 0, side * 0.03), 0.05, "#2f3a52", 0.0, R_GLOSS)
+					half.scale = Vector3(1.4, 0.3, 0.7)
+					half.rotation.x = side * 0.6
+				ball(sh, Vector3(0, 0.015, 0), 0.032, col, 0.0, R_GLOSS).scale = Vector3(1.3, 0.7, 0.9)
+			return 0.07
 		"bun":
 			if first and not last:
 				_puck(n, y, 0.13, 0.045, col)
@@ -607,6 +733,11 @@ static func _layer(n: Node3D, id: String, y: float, first: bool, last: bool) -> 
 			n.add_child(f)
 			f.rotation.y = 0.6
 			_add(f, bevel_mesh(Vector3(0.34, 0.05, 0.15), 0.02), Vector3(0, 0.025, 0), Color(col), 0.0, R_GLOSS)
+			if coat:   # a breaded fillet: a thick golden crumb crust, knobbly on top
+				_add(f, bevel_mesh(Vector3(0.36, 0.07, 0.17), 0.03), Vector3(0, 0.03, 0), Color("#e2a94e"), 0.0, R_MATTE)
+				for k in 6:
+					box(f, Vector3(-0.13 + k * 0.05, 0.07, 0.03 * (k % 2 * 2 - 1)), Vector3(0.03, 0.02, 0.03), "#c98a3a").rotation.y = k
+				return 0.08
 			_add(f, bevel_mesh(Vector3(0.32, 0.022, 0.13), 0.01), Vector3(0, 0.056, 0), Color(FISH_CRUST), 0.0, R_GLOSS)
 			return 0.07
 		"squid":
@@ -698,16 +829,29 @@ static func tray(t: Tray, tag := "", bitten := false) -> Node3D:
 		var wrap: bool = ings.size() > 1 and Pantry.is_bread(ings[0]) \
 			and ings.count(ings[0]) == 1 and float(l.have[0]) >= 0.0
 		var shown := 0
+		var coat := _breaded(ings, l.have)
 		for k in ings.size():
 			if float(l.have[k]) < 0.0:
 				continue
 			shown += 1
 			if bitten and course == "main" and shown > maxi(1, placed / 2):
 				break
-			y += _layer(spot, ings[k], y, k == 0, k == ings.size() - 1 and not wrap)
+			y += _layer(spot, ings[k], y, k == 0, k == ings.size() - 1 and not wrap, coat)
 		if wrap and not bitten:
 			_layer(spot, ings[0], y, false, true)
 	return n
+
+
+## Whether a stack is breaded: a fillet and a coating (breadcrumbs) both on it.
+static func _breaded(ings: Array, have: Array) -> bool:
+	var fillet := false
+	var crumbs := false
+	for k in ings.size():
+		if float(have[k]) < 0.0:
+			continue
+		fillet = fillet or str(Pantry.ITEMS[ings[k]].shape) == "fillet"
+		crumbs = crumbs or Pantry.ITEMS[ings[k]].get("coat", false)
+	return fillet and crumbs
 
 
 ## Anything that can be carried or put down. `look` overrides the grill look
@@ -909,13 +1053,13 @@ static func register(n: Node3D) -> void:
 static func _store_kind(id: String) -> String:
 	if Pantry.is_drink(id):
 		return "drink"
-	if id in ["fish", "calamari"]:
+	if id in ["fish", "calamari", "mussels"]:
 		return "ice"
-	if id in ["patty", "cheese"]:
+	if id in ["patty", "cheese", "shredded_cheese", "ice_cream"]:
 		return "cold"
 	if id in ["onion", "potato", "new_potato"]:
 		return "sack"
-	if id == "roll":
+	if id in ["roll", "sourdough", "crusty_loaf", "breadcrumbs"]:
 		return "basket"
 	return "crate"
 
@@ -1127,6 +1271,10 @@ static func _node_marks(n: Node3D, node: String) -> void:
 				box(n, Vector3(-0.2 + k * 0.1, 0.93, 0.02), Vector3(0.03, 0.03, 0.7), "#1f2224", 0.0, R_WOOD)
 		"twin_fryer":   # a second basket handle
 			box(n, Vector3(0.05, 1.02, -0.36), Vector3(0.04, 0.24, 0.04), STEEL_DARK)
+		"rotary_grater":   # a crank on the grater's side
+			cyl(n, Vector3(0.06, 1.15, -0.04), 0.05, 0.04, STEEL_DARK).rotation.z = PI / 2
+			box(n, Vector3(0.1, 1.22, -0.04), Vector3(0.03, 0.16, 0.03), STEEL_DARK)
+			ball(n, Vector3(0.1, 1.31, -0.04), 0.035, CORAL)
 		"two_tap_fountain", "wine_rack":   # a second tap
 			box(n, Vector3(0.22, 1.25, 0.2), Vector3(0.06, 0.16, 0.06), "#c9d0d1", 0.0, R_WOOD)
 			ball(n, Vector3(0.22, 1.36, 0.2), 0.05, CORAL if node == "two_tap_fountain" else "#7a2e3a")
@@ -1193,10 +1341,109 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 	if base == "double_counter":
 		_double(n, type == "counter")
 	var ing := Catalog.ingredient_of(type)
-	if ing != "":
+	if ing != "" and not type in ["coffee_machine", "beer_tap"]:
 		_ingredient_station(n, ing, Catalog.ITEMS[type].get("ready", false), Catalog.is_box(type))
 		return
 	match type:
+		# PRD 8.6: the new jobs' tools, each with a silhouette of its own at 20 px.
+		"grater":
+			# A tall steel box grater with a handle, a heap of shreds at its foot.
+			_counter(n, CABINET, WORKTOP)
+			_add(n, bevel_mesh(Vector3(0.6, 0.04, 0.44), 0.02), Vector3(0, 0.9, 0), Color("#e2b178"), 0.0, R_WOOD)
+			var g := _add(n, bevel_mesh(Vector3(0.24, 0.4, 0.2), 0.03), Vector3(-0.08, 0.92, -0.04), Color("#c9d0d1"), 0.0, R_WOOD)
+			g.scale = Vector3(1, 1, 1)
+			for k in 4:
+				for j in 2:
+					box(n, Vector3(-0.13 + j * 0.1, 1.0 + k * 0.07, 0.065), Vector3(0.05, 0.02, 0.015), STEEL_DARK)
+			box(n, Vector3(-0.08, 1.36, -0.04), Vector3(0.2, 0.04, 0.05), STEEL_DARK)
+			for x: float in [-0.17, 0.01]:
+				box(n, Vector3(x, 1.3, -0.04), Vector3(0.03, 0.08, 0.03), STEEL_DARK)
+			lathe(n, Vector3(0.2, 0.92, 0.12), [[0.0, 0.0], [0.11, 0.0], [0.05, 0.06], [0.0, 0.08]], "#f7d258")
+		"bread_knife":
+			# A long bread board with a loaf on it and a long serrated knife.
+			_counter(n, CABINET, WORKTOP)
+			_add(n, bevel_mesh(Vector3(0.76, 0.05, 0.42), 0.02), Vector3(0, 0.9, 0), Color("#a8703e"), 0.0, R_WOOD)
+			ball(n, Vector3(-0.08, 1.0, -0.04), 0.13, "#c98a4a", 0.0, R_GLOSS).scale = Vector3(1.5, 0.75, 1.0)
+			for k in 3:
+				box(n, Vector3(-0.16 + k * 0.08, 1.09, -0.04), Vector3(0.025, 0.012, 0.15), "#ead2a4").rotation.y = 0.5
+			box(n, Vector3(0.14, 0.94, 0.15), Vector3(0.48, 0.01, 0.06), "#dfe6e7", 0.0, R_WOOD).rotation.y = 0.15
+			for k in 8:
+				box(n, Vector3(-0.06 + k * 0.05, 0.94, 0.12 + k * 0.0075), Vector3(0.02, 0.012, 0.02), "#b8c2c4").rotation.y = 0.8
+			box(n, Vector3(-0.2, 0.95, 0.2), Vector3(0.16, 0.035, 0.05), WOOD_DARK).rotation.y = 0.15
+		"juicer":
+			# A citrus press: a coral base, a steel bowl and ribbed cone, the lever raised.
+			_counter(n, CABINET, WORKTOP)
+			_add(n, bevel_mesh(Vector3(0.44, 0.14, 0.44), 0.05), Vector3(0, 0.9, 0), Color(CORAL), 0.0)
+			lathe(n, Vector3(0, 1.04, 0), [[0.0, 0.0], [0.12, 0.0], [0.2, 0.08], [0.18, 0.08], [0.11, 0.02], [0.0, 0.02]], "#c9d0d1", 0.0, R_WOOD)
+			lathe(n, Vector3(0, 1.05, 0), [[0.0, 0.0], [0.08, 0.0], [0.0, 0.12]], "#eef3f4", 0.0, R_GLOSS)
+			box(n, Vector3(0, 1.15, -0.2), Vector3(0.06, 0.32, 0.06), STEEL_DARK)
+			var lever := box(n, Vector3(0, 1.36, -0.05), Vector3(0.08, 0.04, 0.4), STEEL_DARK)
+			lever.rotation.x = -0.5
+			ball(n, Vector3(0, 1.48, 0.12), 0.05, CORAL)
+			ball(n, Vector3(0.24, 0.98, 0.22), 0.07, "#f28a1e", 0.0, R_GLOSS)
+		"blender":
+			# A blender: a steel base with a dial and a tall glass jug, pink to the brim.
+			_counter(n, CABINET, WORKTOP)
+			_add(n, bevel_mesh(Vector3(0.3, 0.16, 0.3), 0.04), Vector3(0, 0.9, 0), Color(STEEL_DARK), 0.0)
+			cyl(n, Vector3(0, 0.97, 0.155), 0.035, 0.02, CORAL).rotation.x = PI / 2
+			_add(n, lathe_mesh([[0.0, 0.0], [0.1, 0.0], [0.15, 0.42], [0.0, 0.42]], 16), Vector3(0, 1.06, 0), Color("#dff0f2"), 0.0, R_GLOSS)
+			_add(n, lathe_mesh([[0.0, 0.0], [0.092, 0.0], [0.125, 0.28], [0.0, 0.28]], 16), Vector3(0, 1.08, 0), Color("#f4b3c4"), 0.0, R_GLOSS)
+			cyl(n, Vector3(0, 1.48, 0), 0.155, 0.04, "#2b2f31")
+			box(n, Vector3(0.17, 1.3, 0), Vector3(0.04, 0.2, 0.04), "#dff0f2", 0.0, R_GLOSS)
+		"steamer":
+			# Two bamboo baskets stacked on a pot, a domed lid, steam on top.
+			# Woven bands and upright slats so the baskets read as baskets, not a stack of
+			# pancakes; a wide steel pot under them, and a tall puff of steam.
+			_counter(n, STEEL, STEEL_DARK, false)
+			_add(n, lathe_mesh([[0.0, 0.0], [0.3, 0.0], [0.32, 0.02], [0.32, 0.16], [0.0, 0.16]], 24), Vector3(0, 0.9, 0), Color("#c9d0d1"), 0.0, R_WOOD)
+			for x: float in [-0.36, 0.36]:
+				box(n, Vector3(x, 1.0, 0), Vector3(0.08, 0.04, 0.06), STEEL_DARK)
+			for k in 2:
+				var y0 := 1.06 + k * 0.15
+				cyl(n, Vector3(0, y0, 0), 0.23, 0.14, "#d8cb9a", 0.0, R_WOOD)
+				for h: float in [0.015, 0.125]:
+					cyl(n, Vector3(0, y0 + h - 0.01, 0), 0.238, 0.022, "#7a6a3a", 0.0, R_WOOD)
+				for j in 12:
+					var a := TAU * j / 12.0
+					box(n, Vector3(cos(a) * 0.232, y0 + 0.02, sin(a) * 0.232), Vector3(0.016, 0.1, 0.016), "#9c8a52").rotation.y = -a
+			# A tall woven dome of a lid, a loop on top: a bamboo steamer by shape.
+			lathe(n, Vector3(0, 1.36, 0), [[0.0, 0.0], [0.24, 0.0], [0.22, 0.08], [0.14, 0.18], [0.04, 0.22], [0.0, 0.22]], "#d8cb9a", 0.0, R_WOOD)
+			for r: float in [0.2, 0.12]:
+				lathe(n, Vector3(0, 1.36 + (0.24 - r) * 0.9, 0), [[r, 0.0], [r + 0.012, 0.0], [r + 0.012, 0.014], [r, 0.014]], "#7a6a3a", 0.0, R_WOOD)
+			var loop := _ring(n, Vector3(0, 1.6, 0), "#7a6a3a")
+			loop.rotation.x = PI / 2
+			loop.scale = Vector3.ONE * 0.7
+		"coffee_machine":
+			# A cream espresso machine: a group head, a mug beneath, a gauge and cups on top.
+			_counter(n, CORAL, WORKTOP)
+			_add(n, bevel_mesh(Vector3(0.64, 0.5, 0.44), 0.06), Vector3(0, 0.9, -0.12), Color("#f3ecdc"), 0.0)
+			box(n, Vector3(0, 1.1, 0.12), Vector3(0.5, 0.06, 0.08), "#2b2f31")
+			cyl(n, Vector3(0, 1.04, 0.14), 0.06, 0.06, "#c9d0d1", 0.0, R_WOOD)
+			box(n, Vector3(0.12, 1.05, 0.22), Vector3(0.18, 0.025, 0.04), "#2b2f31").rotation.y = 0.3
+			box(n, Vector3(0, 0.9, 0.16), Vector3(0.4, 0.02, 0.2), STEEL_DARK)
+			var mug := Node3D.new()
+			mug.position = Vector3(0, 0.91, 0.16)
+			mug.scale = Vector3.ONE * 0.8
+			n.add_child(mug)
+			ingredient(mug, "coffee", "prep")
+			cyl(n, Vector3(-0.18, 1.22, 0.11), 0.06, 0.015, PAPER).rotation.x = PI / 2
+			cyl(n, Vector3(-0.18, 1.22, 0.115), 0.045, 0.015, "#2b2f31").rotation.x = PI / 2
+			for k in 3:
+				cyl(n, Vector3(-0.15 + k * 0.15, 1.4, -0.14), 0.05, 0.06, PAPER)
+		"beer_tap":
+			# A tap tower on a wooden bar: a brass pillar, two tall wooden handles, a drip
+			# tray and a pint.
+			_counter(n, WOOD, WORKTOP)
+			box(n, Vector3(0, 0.9, 0.14), Vector3(0.5, 0.03, 0.2), STEEL_DARK)
+			cyl(n, Vector3(0, 0.9, -0.12), 0.06, 0.38, "#d9a441", 0.0, R_WOOD)
+			box(n, Vector3(0, 1.27, -0.12), Vector3(0.44, 0.07, 0.07), "#d9a441", 0.0, R_WOOD)
+			for x: float in [-0.15, 0.15]:
+				box(n, Vector3(x, 1.22, -0.06), Vector3(0.025, 0.06, 0.07), "#d9a441", 0.0, R_WOOD)
+				_add(n, bevel_mesh(Vector3(0.06, 0.24, 0.06), 0.02), Vector3(x, 1.31, -0.12), Color(WOOD_DARK if x < 0 else "#d9962e"), 0.0, R_WOOD)
+			var pint := Node3D.new()
+			pint.position = Vector3(0.15, 0.92, 0.14)
+			n.add_child(pint)
+			ingredient(pint, "ale", "prep")
 		"fryer":
 			# A steel fryer: a deep well of golden oil, a basket hung on the back, and a
 			# drain rack on the right where fried food rests before it is picked up.

@@ -31,8 +31,7 @@ const FITS := {
 ## an efficient node with no "jobs" takes its parent's, each + EFFICIENT_STEP.
 ## "slots": kinds of stock it holds; "chilled": its slots take chilled kinds.
 ## "mess": floor mess factor for PRD 9 (1.0 when absent). Prices are first guesses.
-## New jobs and ingredients (grater, bread knife, juicer, blender, steamer, coffee,
-## beer tap, freezer) join in milestone 8.6.
+## The new jobs (grate, saw, juice, blend, steam) and their ingredients joined in 8.6.
 const NODES := {
 	# Cutting
 	"board": {"name": "Chopping board", "fit": "top", "price": 25,
@@ -43,6 +42,16 @@ const NODES := {
 		"jobs": {"slice": SPECIALIST, "chop": STAND_IN}},
 	"auto_slicer": {"name": "Auto slicer", "fit": "top", "price": 120, "parent": "slicer", "step": EFFICIENT,
 		"jobs": {"slice": SPECIALIST + EFFICIENT_STEP}, "auto": true},
+	"grater": {"name": "Grater", "fit": "top", "price": 70, "parent": "slicer", "step": SPECIALIST_STEP,
+		"jobs": {"grate": SPECIALIST, "slice": STAND_IN}},
+	"rotary_grater": {"name": "Rotary grater", "fit": "top", "price": 110, "parent": "grater", "step": EFFICIENT,
+		"jobs": {"grate": 1.8, "slice": STAND_IN + EFFICIENT_STEP}},
+	"bread_knife": {"name": "Bread knife", "fit": "top", "price": 45, "parent": "board", "step": SPECIALIST_STEP,
+		"jobs": {"saw": SPECIALIST, "chop": STAND_IN}},
+	"juicer": {"name": "Juicer", "fit": "top", "price": 90, "parent": "bread_knife", "step": SPECIALIST_STEP,
+		"jobs": {"juice": SPECIALIST}},
+	"blender": {"name": "Blender", "fit": "top", "price": 150, "parent": "juicer", "step": SPECIALIST_STEP,
+		"jobs": {"blend": SPECIALIST, "juice": STAND_IN}},
 	# Heat
 	"stove": {"name": "Stove", "fit": "top", "price": 50,
 		"jobs": {"grill": BASE, "boil": STAND_IN, "fry": STAND_IN}},
@@ -53,6 +62,8 @@ const NODES := {
 		"jobs": {"grill": SPECIALIST}, "tags": ["smoky"]},
 	"pot": {"name": "Stock pot", "fit": "top", "price": 60, "parent": "stove", "step": SPECIALIST_STEP,
 		"jobs": {"boil": SPECIALIST, "grill": STAND_IN_FAR}},
+	"steamer": {"name": "Steamer", "fit": "top", "price": 100, "parent": "pot", "step": SPECIALIST_STEP,
+		"jobs": {"steam": SPECIALIST}},
 	"fryer": {"name": "Fryer", "fit": "top", "price": 70, "parent": "stove", "step": SPECIALIST_STEP,
 		"jobs": {"fry": SPECIALIST, "grill": STAND_IN_FAR}},
 	"twin_fryer": {"name": "Twin fryer", "fit": "top", "price": 120, "parent": "fryer", "step": EFFICIENT,
@@ -62,10 +73,14 @@ const NODES := {
 		"jobs": {"pour": BASE}, "drinks": ["soda"]},
 	"two_tap_fountain": {"name": "Two-tap fountain", "fit": "top", "price": 70, "parent": "fountain",
 		"step": EFFICIENT, "drinks": ["soda", "cola"]},
+	"coffee_machine": {"name": "Coffee machine", "fit": "top", "price": 90, "parent": "fountain",
+		"step": SPECIALIST_STEP, "jobs": {"pour": SPECIALIST}, "drinks": ["coffee"]},
 	"wine_barrel": {"name": "Wine barrel", "fit": "top", "price": 45, "theme": "seaside",
 		"jobs": {"pour": BASE}, "drinks": ["wine"]},
 	"wine_rack": {"name": "Wine rack", "fit": "top", "price": 75, "parent": "wine_barrel",
 		"step": EFFICIENT, "drinks": ["wine", "red_wine"]},
+	"beer_tap": {"name": "Beer tap", "fit": "top", "price": 90, "parent": "wine_barrel",
+		"step": SPECIALIST_STEP, "jobs": {"pour": SPECIALIST}, "drinks": ["ale"]},
 	# Storage: the counter is the base; fridges are its specialist line.
 	"counter": {"name": "Counter", "fit": "counter", "price": 15, "slots": 1},
 	"double_counter": {"name": "Double counter", "fit": "counter", "price": 25, "parent": "counter",
@@ -78,8 +93,7 @@ const NODES := {
 		"step": SPECIALIST_STEP, "slots": 2, "chilled": true},
 	"glass_fridge": {"name": "Tall fridge, glass door", "fit": "tall", "price": 160, "parent": "tall_fridge",
 		"step": EFFICIENT, "slots": 3, "chilled": true},
-	# A freezer also takes frozen kinds (ice cream, 8.6). None exists yet, so for now it
-	# stores like a tall fridge.
+	# A freezer also takes frozen kinds (ice cream, 8.6).
 	"freezer": {"name": "Freezer", "fit": "tall", "price": 150, "parent": "tall_fridge",
 		"step": SPECIALIST_STEP, "slots": 2, "chilled": true, "frozen": true},
 	"shelf": {"name": "Wall shelf", "fit": "shelf", "price": 10, "slots": 1},
@@ -270,7 +284,7 @@ static func is_chilled(kind: String) -> bool:
 	return k != "" and Pantry.ITEMS[k].get("chilled", false)
 
 
-## Whether an ingredient must be kept in a freezer slot (none yet; ice cream in 8.6).
+## Whether an ingredient must be kept in a freezer slot (ice cream, PRD 8.6).
 static func is_frozen(kind: String) -> bool:
 	var k := Pantry.kind_of(kind)
 	return k != "" and Pantry.ITEMS[k].get("frozen", false)

@@ -247,6 +247,34 @@ static func icon(id: String) -> Array:
 			o.append([rect(0.0, -0.65, 1.6, 0.36), "#ee7560"])
 			o.append([ell(0.0, 0.15, 0.72), "#dfe6e7"])
 			o.append([ell(0.0, 0.15, 0.2), "#5a5f63"])
+		"job_grate":  # a box grater with its handle, rows of holes (PRD 8.6)
+			o.append([rect(0.0, 0.82, 0.8, 0.16), "#5a5f63"])
+			o.append([PackedVector2Array([Vector2(-0.62, -0.85), Vector2(0.62, -0.85), Vector2(0.42, 0.7), Vector2(-0.42, 0.7)]), "#c9d0d1"])
+			for r in 4:
+				for c in 3:
+					o.append([ell(-0.3 + c * 0.3, -0.55 + r * 0.36, 0.08), "#5a5f63"])
+		"job_saw":  # a long bread knife, its teeth down
+			o.append([rect(-0.15, 0.0, 1.5, 0.36), "#dfe6e7"])
+			for k in 6:
+				var x := -0.85 + k * 0.25
+				o.append([PackedVector2Array([Vector2(x, -0.17), Vector2(x + 0.25, -0.17), Vector2(x + 0.125, -0.36)]), "#dfe6e7"])
+			o.append([rect(0.82, 0.02, 0.42, 0.3), "#7a4a2a"])
+		"job_juice":  # half an orange on a reamer's cone
+			o.append([rect(0.0, -0.72, 1.6, 0.26), "#c9d0d1"])
+			o.append([PackedVector2Array([Vector2(-0.45, -0.58), Vector2(0.45, -0.58), Vector2(0.0, 0.0)]), "#eef3f4"])
+			o.append([ell(0.0, 0.05, 0.78, 0.78, 0, 180, 16), "#f28a1e"])
+			o.append([ell(0.0, 0.05, 0.6, 0.6, 0, 180, 16), "#f9c46b"])
+		"job_blend":  # a blender's jug on its base, pink to the top
+			o.append([rect(0.0, -0.72, 1.1, 0.4), "#3d4a4f"])
+			o.append([PackedVector2Array([Vector2(-0.38, -0.5), Vector2(0.38, -0.5), Vector2(0.6, 0.72), Vector2(-0.6, 0.72)]), "#dff0f2"])
+			o.append([PackedVector2Array([Vector2(-0.32, -0.42), Vector2(0.32, -0.42), Vector2(0.5, 0.45), Vector2(-0.5, 0.45)]), "#f4b3c4"])
+			o.append([rect(0.0, 0.8, 1.3, 0.18), "#2b2f31"])
+		"job_steam":  # a bamboo basket with puffs of steam over it
+			o.append([rect(0.0, -0.45, 1.6, 0.8), "#d8cb9a"])
+			for y: float in [-0.75, -0.15]:
+				o.append([rect(0.0, y, 1.64, 0.14), "#7a6a3a"])
+			for p_: Vector3 in [Vector3(-0.42, 0.25, 0.22), Vector3(0.05, 0.5, 0.28), Vector3(0.48, 0.3, 0.2)]:
+				o.append([ell(p_.x, p_.y, p_.z), "#ffffff"])
 		"job_pour":  # a glass with a drink in it
 			o.append([PackedVector2Array([Vector2(-0.6, 0.8), Vector2(0.6, 0.8), Vector2(0.42, -0.8), Vector2(-0.42, -0.8)]), "#dff0f2"])
 			o.append([PackedVector2Array([Vector2(-0.53, 0.25), Vector2(0.53, 0.25), Vector2(0.42, -0.8), Vector2(-0.42, -0.8)]), "#c0533a"])

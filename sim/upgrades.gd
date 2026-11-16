@@ -9,7 +9,8 @@ extends RefCounted
 const TIER_SEP := "@"
 ## What each job is called in a node's line.
 const JOB_WORDS := {"grill": "grilling", "fry": "frying", "boil": "boiling", "chop": "chopping",
-	"slice": "slicing", "pour": "pouring"}
+	"slice": "slicing", "grate": "grating", "saw": "sawing", "juice": "juicing", "blend": "blending",
+	"steam": "steaming", "pour": "pouring"}
 
 
 ## The key of a piece in the room: its kitchen node, or its tier in a tiered piece's

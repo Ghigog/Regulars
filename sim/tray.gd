@@ -69,7 +69,8 @@ func refusal(k: String) -> String:
 
 static func verb(tool: String) -> String:
 	return {"grill": "grilling", "fry": "frying", "boil": "boiling", "chop": "chopping",
-		"slice": "slicing", "pour": "pouring"}.get(tool, "prep")
+		"slice": "slicing", "grate": "grating", "saw": "sawing", "juice": "juicing", "blend": "blending",
+		"steam": "steaming", "pour": "pouring"}.get(tool, "prep")
 
 
 ## The first line still missing this ingredient, main first: {line, index} or {}.

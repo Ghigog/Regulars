@@ -48,11 +48,18 @@ static func price_of(item: Dictionary) -> int:
 	return maxi(1, roundi(worth * float(PRICE_MULT[item.get("price_level", "fair")])))
 
 
-## A made-up name from the ingredients, topping first ("Cheese Patty Bun").
+## A made-up name from the ingredients, topping first ("Cheese Patty Bun"). A fish
+## with a coating is a breaded fillet (PRD 8.6).
 static func default_name(ingredients: Array) -> String:
 	var words: Array[String] = []
+	var breaded := ingredients.has("fish") and ingredients.any(func(i: String) -> bool:
+		return Pantry.ITEMS.has(i) and Pantry.ITEMS[i].get("coat", false))
 	for k in range(ingredients.size() - 1, -1, -1):
 		var n := Pantry.name_of(ingredients[k])
+		if breaded and Pantry.ITEMS[ingredients[k]].get("coat", false):
+			continue
+		if breaded and ingredients[k] == "fish":
+			n = "Breaded fillet"
 		if not words.has(n):
 			words.append(n)
 	var name := " ".join(words)
