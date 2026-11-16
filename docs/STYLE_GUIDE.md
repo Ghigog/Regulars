@@ -85,10 +85,39 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   (`job_grill`, `job_fry`, `job_boil`, `job_chop`, `job_slice`, `job_pour`,
   `job_store`, `job_chill` in `icons.gd`). A departure from paper-and-wood, on purpose:
   blueprint says "plans for this piece", not "buy something new".
-- Tree steps on a tool get small marks until the art pass (8.7): a brass stud on the
+- Tree steps on a tool are marks on the parent's model, not new models (kept at the art
+  pass, 8.7, because each reads at 20 px and keeps the family look): a brass stud on the
   worktop edge per efficient step, grill bars on the char grill, a second pan on the
   two-hob range, a second basket handle on the twin fryer, a motor on the auto slicer,
-  an end-grain block for the butcher block, a white door for the under-counter fridge.
+  an end-grain block for the butcher block, a white door for the under-counter fridge,
+  a second tap on the two-tap fountain and the wine rack, and on the rotary grater a
+  steel drum with a long crank and a coral knob standing clear of the grater's top.
+- A tool on a counter is framed closer on its tree card than the shop's default (camera
+  size 1.45, not 2.6), so the part a step changes reads at card size; counters, wall and
+  tall pieces and tiered pieces keep the default.
+
+**New tools and food (PRD 8.6, art pass 8.7)**
+- Each new tool has its own silhouette at 20 px, on the counter it stands on: the grater
+  a tall steel box grater with a handle and a yellow heap at its foot; the bread knife a
+  long dark board, a scored loaf and a serrated knife; the juicer a citrus press (coral
+  base, steel bowl and ribbed cone, a raised lever with a coral knob, an orange beside
+  it); the blender a dark base with a coral dial and a tall glass jug; the steamer two
+  bamboo baskets (woven bands, upright slats) and a domed lid on a steel pot, on a steel
+  counter; the coffee machine a cream espresso body with a group head, a mug and cups on
+  top, on a coral counter; the beer tap a brass tower with two wooden handles and a pint,
+  on a wooden counter.
+- A drink's box follows how it is made: a poured drink (soda, wine) is its dispenser, but
+  a juiced or blended one (orange juice, fruit smoothie) is a crate of its fruit
+  (`Build._store_kind` uses `Pantry.is_poured`, not `is_drink`). Made-from kinds
+  (lemonade, milkshake, steamed corn) have no box of their own.
+- New food keeps the 20 px rule, raw and made reading by shape: cheese a holed block,
+  then a fluffy heap of strands; sourdough and the crusty loaf a slashed loaf, then two
+  thick slices leaning together; breadcrumbs a stale heel, then a golden heap; mussels
+  closed blue-black shells, then opened on orange meat; oranges (or a lemon), then juice
+  in a tumbler with a fruit wheel on the rim; berries, then a fluted glass with cream, a
+  cherry and a straw; ice cream a scoop in a tub; coffee a mug with steam; ale a pint.
+- Each new job has a flat icon (`job_grate`, `job_saw`, `job_juice`, `job_blend`,
+  `job_steam`) and a short gauge in the prep widget, in the same frame as the first five.
 
 **How it is made**
 - Nothing is modelled in Blender yet. Every mesh is generated in GDScript: chamfered

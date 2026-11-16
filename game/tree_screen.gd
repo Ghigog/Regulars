@@ -422,7 +422,8 @@ class Card extends Control:
 		add_child(view)
 		view.tree_entered.connect(func() -> void:
 			view.show_piece(screen.game, _blueprint())
-			view.lift(0.6), CONNECT_ONE_SHOT)
+			view.lift(0.6)
+			_frame(view), CONNECT_ONE_SHOT)
 		var name_l: Label = screen._text(self, 15, Upgrades.name_of(key), LINE)
 		name_l.position = Vector2(4, 112)
 		name_l.size = Vector2(CARD.x - 8, 20)
@@ -441,6 +442,16 @@ class Card extends Control:
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if screen.state_of(key) == "next" and not Upgrades.can_buy(screen.root_key, key, screen.game.ledger.money, screen.game.ledger.level()):
 			price.add_theme_color_override("font_color", NO)
+
+	## A tool on a counter is framed closer than the shop's default, so its top (the part
+	## a step changes: a crank, a second pan, grill bars) reads at card size.
+	func _frame(view) -> void:
+		if Upgrades.is_tiered(key) or not Kitchen.has_node(key) or Kitchen.fit_of(key) != "top":
+			return
+		for c in view.vp.get_children():
+			if c is Camera3D:
+				c.size = 1.45
+				c.position = Vector3(0, 1.0, 0) + Vector3(14, 15, 14)
 
 	## What ModelView draws for this node.
 	func _blueprint() -> Dictionary:
