@@ -85,6 +85,13 @@ const NODES := {
 	"hood": {"name": "Hood", "fit": "hood", "price": 30},   # tunable price; a flag for PRD 9
 }
 
+## Catalog pieces that are kitchen nodes under another id: the drink dispensers keep
+## their crate ids until storage replaces the crates (8.4).
+const CATALOG_IDS := {"crate_soda": "fountain", "crate_wine": "wine_barrel"}
+## A base that becomes another when one more of it is placed on it: a counter placed
+## on a counter is a double counter, still one cell (PRD 8, "Decided").
+const STACKS := {"counter": "double_counter"}
+
 ## Cells against a wall, which have a high layer: Vector2i -> true.
 var wall_cells := {}
 ## Vector2i -> {"base": id, "top": id, "high": id, "stock": {"base": [kinds], "high": [kinds]}}.
@@ -173,6 +180,36 @@ static func fit_of(id: String) -> String:
 	return str(NODES[id].fit)
 
 
+## The node a catalog piece is ("" if it is not a kitchen piece).
+static func node_of(catalog_id: String) -> String:
+	if CATALOG_IDS.has(catalog_id):
+		return CATALOG_IDS[catalog_id]
+	return catalog_id if NODES.has(catalog_id) else ""
+
+
+## A catalog piece that is a tool and goes on a counter.
+static func is_top(catalog_id: String) -> bool:
+	var n := node_of(catalog_id)
+	return n != "" and fit_of(n) == "top"
+
+
+## A catalog piece that is a counter-type base (a tool can stand on it).
+static func is_counter(catalog_id: String) -> bool:
+	var n := node_of(catalog_id)
+	return n != "" and fit_of(n) == "counter"
+
+
+## What a base becomes with `id` placed on it ("" if they do not stack).
+static func stacked(base: String, id: String) -> String:
+	return str(STACKS[id]) if STACKS.has(id) and base == id else ""
+
+
+## What a stacked base leaves behind when one piece comes off it ("" if it is not stacked).
+static func unstacked(base: String) -> String:
+	var lower: Variant = STACKS.find_key(base)
+	return str(lower) if lower != null else ""
+
+
 ## Whether an ingredient must be kept in a fridge slot.
 static func is_chilled(kind: String) -> bool:
 	return Pantry.ITEMS.has(kind) and Pantry.ITEMS[kind].get("chilled", false)
@@ -197,6 +234,17 @@ func _cell(cell: Vector2i) -> Dictionary:
 	return cells[cell]
 
 
+## Sets a cell's base and top outright (the game keeps its cells in step this way).
+## Stock already held there is kept. An empty base clears the cell.
+func set_cell(cell: Vector2i, base: String, top := "") -> void:
+	if base == "":
+		cells.erase(cell)
+		return
+	var c := _cell(cell)
+	c.base = base
+	c.top = top
+
+
 func get_piece(cell: Vector2i, layer: String) -> String:
 	return str(cells[cell][layer]) if cells.has(cell) else ""
 
@@ -208,6 +256,8 @@ func layer_for(cell: Vector2i, id: String) -> String:
 		return ""
 	var base := get_piece(cell, "base")
 	var fit := fit_of(id)
+	if fit == "counter" and stacked(base, id) != "" and get_piece(cell, "top") == "":
+		return "base"   # a counter on a bare counter: a double counter
 	for layer: String in FITS[fit]:
 		if get_piece(cell, layer) != "":
 			continue
@@ -232,8 +282,10 @@ func can_place(cell: Vector2i, id: String) -> bool:
 ## Puts a piece in the cell. Returns the layer it went into, or "" if it did not fit.
 func place(cell: Vector2i, id: String) -> String:
 	var layer := layer_for(cell, id)
-	if layer != "":
-		_cell(cell)[layer] = id
+	if layer == "":
+		return ""
+	var up := stacked(get_piece(cell, "base"), id) if layer == "base" else ""
+	_cell(cell)[layer] = up if up != "" else id
 	return layer
 
 

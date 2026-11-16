@@ -997,9 +997,39 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool) -> void:
 				ingredient(at, id, "raw", "raw")
 
 
+## The frame's long teal counter (the starting counters). Each piece runs a little past
+## its cell, so a row of them is one unbroken body under one unbroken worktop.
+static func _pass(n: Node3D) -> void:
+	box(n, Vector3.ZERO, Vector3(0.9, 0.15, 1.04), CORAL)
+	_add(n, bevel_mesh(Vector3(0.94, 0.7, 1.08), 0.03), Vector3(0, 0.47, 0), Color(CABINET), 0.0)
+	_add(n, bevel_mesh(Vector3(1.0, 0.13, 1.1), 0.03), Vector3(0, 0.835, 0), Color(WORKTOP), 0.0, R_WOOD)
+
+
+## A double counter (a counter placed on a counter, PRD 8): more storage, so it wears
+## stacked drawers, a column of three down each side with brass pulls, readable from
+## any turn; a bare one also swaps its front doors for two rows of drawers. The tool
+## on top, if any, draws over it as usual.
+static func _double(n: Node3D, front: bool) -> void:
+	var face := _tint(CABINET, 0.07)
+	for sx: float in [-1.0, 1.0]:
+		for k in 3:
+			var y := 0.18 + k * 0.19
+			box(n, Vector3(sx * 0.478, y, 0), Vector3(0.03, 0.16, 0.8), face)
+			box(n, Vector3(sx * 0.5, y + 0.065, 0), Vector3(0.03, 0.035, 0.18), "#d9a441", 0.0, R_WOOD)
+	if not front:
+		return
+	for k in 2:
+		var y := 0.2 + k * 0.28
+		for sx: float in [-1.0, 1.0]:
+			box(n, Vector3(sx * 0.225, y, 0.462), Vector3(0.4, 0.25, 0.03), face)
+			box(n, Vector3(sx * 0.225, y + 0.17, 0.48), Vector3(0.14, 0.035, 0.03), "#d9a441", 0.0, R_WOOD)
+
+
 ## Furniture visuals centred on a cell, front facing +z. Tier adds a gold trim.
 ## Shapes and heights are shared by every theme (sheets 8 and 10).
-static func station(n: Node3D, type: String, tier: int) -> void:
+static func station(n: Node3D, type: String, tier: int, base := "", pass_look := false) -> void:
+	if base == "double_counter":
+		_double(n, type == "counter")
 	var ing := Catalog.ingredient_of(type)
 	if ing != "":
 		_ingredient_station(n, ing, Catalog.ITEMS[type].get("ready", false))
@@ -1061,13 +1091,12 @@ static func station(n: Node3D, type: String, tier: int) -> void:
 			for i in 4:
 				ball(n, Vector3(-0.3 + i * 0.2, 0.79, 0.475), 0.04, "#2b2f31")
 		"counter":
-			_counter(n, CABINET, WORKTOP)
+			if pass_look:
+				_pass(n)
+			else:
+				_counter(n, CABINET, WORKTOP, base != "double_counter")
 		"pass":
-			# The frame's long teal counter. Each piece runs a little past its cell,
-			# so a row of them is one unbroken body under one unbroken worktop.
-			box(n, Vector3.ZERO, Vector3(0.9, 0.15, 1.04), CORAL)
-			_add(n, bevel_mesh(Vector3(0.94, 0.7, 1.08), 0.03), Vector3(0, 0.47, 0), Color(CABINET), 0.0)
-			_add(n, bevel_mesh(Vector3(1.0, 0.13, 1.1), 0.03), Vector3(0, 0.835, 0), Color(WORKTOP), 0.0, R_WOOD)
+			_pass(n)
 		"trays":
 			_counter(n, CABINET, WORKTOP)
 			_add(n, bevel_mesh(Vector3(0.74, 0.02, 0.54), 0.008), Vector3(0, 0.9, 0), Color(CORAL), 0.0)

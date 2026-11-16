@@ -2108,7 +2108,9 @@ func test_slicing_to_the_count_is_good_and_over_it_is_plain():
 func test_a_tool_refuses_what_it_does_not_prep():
 	var board := _tool("board", Vector2i(2, 5), "crate_cheese")
 	_use("crate_cheese")
-	assert_eq(game.use_station(board, true), "Cheese doesn't go on the chopping board")
+	assert_eq(game.use_station(board, true), "Put down", "a thing the tool cannot use rests on its surface")
+	board.set_item(Tray.kind("prep", "lettuce"))
+	assert_eq(game.use_station(board, true), "Cheese doesn't go on the chopping board", "the surface is taken")
 
 
 func test_pouring_into_the_top_band_is_good_and_overflowing_is_bad():
