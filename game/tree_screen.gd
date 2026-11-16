@@ -445,7 +445,7 @@ class Card extends Control:
 	## What ModelView draws for this node.
 	func _blueprint() -> Dictionary:
 		var id := Upgrades.catalog_id(key)
-		if Upgrades.is_tiered(key):
+		if Upgrades.is_tiered(key) or Upgrades.is_treatment(key):
 			return {"id": id, "tier": Upgrades.tier_of(key)}
 		var fit := Kitchen.fit_of(key)
 		return {"id": id, "tier": 1, "node": key, "base": key if fit == "counter" or fit == "tall" else ""}
@@ -478,6 +478,10 @@ class Card extends Control:
 			row.add_child(Hud.Icon.new("job_chill" if Kitchen.chills(key) else "job_store", 34))
 			var n: Label = screen._text(row, 16, "x%d" % Kitchen.slots_of(key), LINE)
 			n.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		if Upgrades.is_treatment(key):   # a floor treatment's box (PRD 9.5): what laying it costs
+			var each: Label = screen._text(row, 16, "$%d a cell" % Treatments.price_of(Treatments.key_of(key)), LINE)
+			each.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			return
 		var pans := int(Kitchen.NODES[key].get("pans", 1))
 		if pans > 1:
 			var n: Label = screen._text(row, 16, "x%d" % pans, LINE)

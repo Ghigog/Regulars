@@ -22,9 +22,11 @@ const SPECIALIST_STEP := "specialist"
 ## "tall": a base that also fills the high layer; no top.
 ## "cabinet", "hood": high layer only, on a wall cell.
 ## "hook": a wall hook (PRD 9.4), high layer only; holds one small cleaning tool.
+## "floor": stands on the floor outside the kitchen's cells (the mop bucket, the robot's
+## dock, PRD 9.5); in the trees only.
 const FITS := {
 	"top": ["top"], "counter": ["base"], "shelf": ["base", "high"], "tall": ["base"],
-	"cabinet": ["high"], "hood": ["high"], "hook": ["high"],
+	"cabinet": ["high"], "hood": ["high"], "hook": ["high"], "floor": [],
 }
 
 ## The upgrade trees. A node with no "parent" is a root, bought in the shop; every other
@@ -101,8 +103,34 @@ const NODES := {
 	"wide_shelf": {"name": "Wide shelf", "fit": "shelf", "price": 20, "parent": "shelf", "step": EFFICIENT,
 		"slots": 2},
 	"cabinet": {"name": "Wall cabinet", "fit": "cabinet", "price": 20, "slots": 1},   # tunable price
-	"hood": {"name": "Hood", "fit": "hood", "price": 30},   # tunable price; a flag for PRD 9
+	"hood": {"name": "Hood", "fit": "hood", "price": 30,   # tunable price; a flag for PRD 9
+		"blurb": "Hangs over a stove and cuts the grease it drops"},
+	"extractor": {"name": "Extractor", "fit": "hood", "price": 90, "parent": "hood", "step": EFFICIENT,
+		"blurb": "Cuts the stove's grease by more, and kitchen grease smells less far"},
 	"hook": {"name": "Wall hook", "fit": "hook", "price": 5},   # PRD 9.4: a sponge's home (tunable price)
+	# The cleaning trees (PRD 9.5). Each home names the tool it keeps ("tool", a
+	# CleanTools.TOOLS id); upgrading the home swaps that tool for the new one.
+	"mop_bucket": {"name": "Mop bucket", "fit": "floor", "price": 20, "tool": "mop",
+		"blurb": "Mop clears a level a press, dirty after 4"},
+	"sponge_mop": {"name": "Sponge-head mop", "fit": "floor", "price": 35, "parent": "mop_bucket",
+		"step": EFFICIENT, "tool": "sponge_mop", "blurb": "Clears a level a press, dirty after 6"},
+	"flat_mop": {"name": "Flat mop", "fit": "floor", "price": 60, "parent": "sponge_mop", "step": EFFICIENT,
+		"tool": "flat_mop", "blurb": "Clears a whole cell a press, dirty after 8"},
+	"scrubber": {"name": "Floor scrubber", "fit": "floor", "price": 180, "parent": "flat_mop", "step": EFFICIENT,
+		"tool": "scrubber", "blurb": "Push it along: clears every cell it passes. Never dirty, slow to walk"},
+	"wringer_bucket": {"name": "Wringer bucket", "fit": "floor", "price": 45, "parent": "mop_bucket",
+		"step": SPECIALIST_STEP, "tool": "wringer_mop", "blurb": "Rinses itself: the mop is never dirty. A level a press"},
+	"robot_dock": {"name": "Robot sweeper", "fit": "floor", "price": 300, "parent": "wringer_bucket",
+		"step": SPECIALIST_STEP, "blurb": "A dock. The robot drifts to the nearest dirt and slowly cleans it. Anyone can trip on it"},
+	"sponge": {"name": "Sponge", "fit": "hook", "price": 15, "tool": "sponge",
+		"blurb": "On its own wall hook. Clears a level fast, dirty after 2"},
+	"scourer": {"name": "Scourer", "fit": "hook", "price": 25, "parent": "sponge", "step": EFFICIENT,
+		"tool": "scourer", "blurb": "Clears a level fast, dirty after 4"},
+	"grease_scraper": {"name": "Grease scraper", "fit": "hook", "price": 40, "parent": "sponge",
+		"step": SPECIALIST_STEP, "tool": "grease_scraper",
+		"blurb": "Kitchen grease only: a whole cell a press, never dirty. No use on guest mess"},
+	"spill_kit": {"name": "Spill kit", "fit": "hook", "price": 30, "parent": "sponge", "step": SPECIALIST_STEP,
+		"tool": "spill_kit", "blurb": "A covered cell down to a puddle at once, three times a day. Helps a fallen guest up faster"},
 }
 
 ## Catalog pieces that are kitchen nodes under another id (none since the crates went, 8.4).
@@ -167,6 +195,11 @@ static func can_upgrade(from: String, to: String) -> bool:
 
 static func mess_of(id: String) -> float:
 	return float(NODES[id].get("mess", 1.0))
+
+
+## The cleaning tool a home node keeps (PRD 9.5), or "".
+static func tool_of(id: String) -> String:
+	return str(NODES[id].get("tool", "")) if NODES.has(id) else ""
 
 
 ## Quality per job. Efficient nodes without their own map take the parent's, + EFFICIENT_STEP.
@@ -420,7 +453,21 @@ func is_closet_with(cell: Vector2i, id: String) -> bool:
 
 ## Whether a hood hangs over this cell (PRD 9 reads it: a hood cuts a stove's grease).
 func has_hood(cell: Vector2i) -> bool:
-	return get_piece(cell, "high") == "hood"
+	return hood_at(cell) != ""
+
+
+## The hood over this cell: "hood", "extractor" (its tree step, PRD 9.5) or "".
+func hood_at(cell: Vector2i) -> String:
+	var h := get_piece(cell, "high")
+	return h if h != "" and fit_of(h) == "hood" else ""
+
+
+## Whether an extractor hangs anywhere.
+func has_extractor() -> bool:
+	for cell: Vector2i in cells:
+		if hood_at(cell) == "extractor":
+			return true
+	return false
 
 
 ## The cells with a high piece on the wall: Vector2i -> its node.
@@ -455,16 +502,74 @@ func stock(cell: Vector2i) -> Array:
 	return cells[cell].stock.base + cells[cell].stock.high
 
 
+## A cleaning kind (PRD 9.5): a treatment box. Never with food, never in a fridge.
+static func is_cleaning(box: String) -> bool:
+	return Treatments.is_box(box)
+
+
+## Whether a cell holds chemicals: a treatment box in any of its slots.
+func holds_cleaning(cell: Vector2i) -> bool:
+	for b: String in stock(cell):
+		if is_cleaning(b):
+			return true
+	return false
+
+
+## Whether a cell holds an ingredient in any of its slots.
+func holds_food(cell: Vector2i) -> bool:
+	for b: String in stock(cell):
+		if not is_cleaning(b):
+			return true
+	return false
+
+
+## Why a box cannot go in this cell, or "" if it can: the no-chemicals-with-food rule
+## (PRD 9.5) and the fridge rules, worded for the player.
+func store_refusal(cell: Vector2i, kind: String) -> String:
+	if can_store(cell, kind):
+		return ""
+	if slots(cell) == 0:
+		return "Nowhere to store it here"
+	if is_cleaning(kind):
+		if holds_food(cell):
+			return "No chemicals with food"
+		if stock(cell).has(kind):
+			return "One of each a cell"
+		var plain := false
+		for layer: String in ["base", "high"]:
+			plain = plain or (get_piece(cell, layer) != "" and slots_of(get_piece(cell, layer)) > 0 \
+				and not chills(get_piece(cell, layer)))
+		return "No chemicals in a fridge" if not plain else "No free slot"
+	if holds_cleaning(cell):
+		return "No food with chemicals"
+	if holds_kind(cell, Pantry.kind_of(kind)):
+		return "One of each a cell"
+	if is_frozen(kind):
+		return "Needs a freezer"
+	if is_chilled(kind):
+		return "Needs a fridge"
+	return "No free slot"
+
+
 ## The layer a kind would be stored in, or "" if there is no free slot that takes it.
-## Unchilled kinds prefer unchilled slots, to leave fridge room free.
+## Unchilled kinds prefer unchilled slots, to leave fridge room free. Chemicals and food
+## never share a cell, and chemicals never go in a fridge (PRD 9.5).
 func store_layer(cell: Vector2i, kind: String) -> String:
-	if not cells.has(cell) or holds_kind(cell, Pantry.kind_of(kind)):
+	if not cells.has(cell):
+		return ""
+	var cleaning := is_cleaning(kind)
+	if cleaning:
+		if holds_food(cell) or stock(cell).has(kind):
+			return ""
+	elif holds_cleaning(cell) or holds_kind(cell, Pantry.kind_of(kind)):
 		return ""
 	var chilled := is_chilled(kind) or is_frozen(kind)
 	var best := ""
 	for layer: String in ["base", "high"]:
 		var id := get_piece(cell, layer)
 		if id == "" or cells[cell].stock[layer].size() >= slots_of(id):
+			continue
+		if cleaning and chills(id):
 			continue
 		if is_frozen(kind) and not freezes(id):
 			continue
@@ -502,7 +607,7 @@ func unstore(cell: Vector2i, kind: String) -> bool:
 ## Whether a cell holds a box of this ingredient kind, ready-made or not.
 func holds_kind(cell: Vector2i, kind: String) -> bool:
 	for b: String in stock(cell):
-		if Pantry.kind_of(b) == kind:
+		if not is_cleaning(b) and Pantry.kind_of(b) == kind:
 			return true
 	return false
 

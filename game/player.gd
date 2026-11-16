@@ -151,7 +151,7 @@ func tick(delta: float) -> void:
 
 
 func speed() -> float:
-	return SPEED * boost_speed * game.floor_speed(position)
+	return SPEED * boost_speed * game.floor_speed(position) * CleanKit.walk_factor(self)   # a scrubber is slow (PRD 9.5)
 
 
 ## A quick squash and stretch whenever the chef does something.

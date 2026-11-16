@@ -641,6 +641,10 @@ class ModelView extends TextureRect:
 		spin.add_child(n)
 		if bp.id == "screen":
 			game._wall_visual(n, 0.9 + 0.1 * int(bp.tier))
+		elif Treatments.is_laying_tool(bp.id):   # a floor treatment (PRD 9.5): planks with its sheen
+			Scenery.tool_preview(n, "floor_planks")
+			for c: Vector2i in [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 0)]:
+				n.add_child(FloorDirt.sheen_look(c, Treatments.key_of(bp.id)))
 		elif Catalog.is_build_tool(bp.id):
 			Scenery.tool_preview(n, bp.id)
 		elif bp.id == "rug":
@@ -656,6 +660,11 @@ class ModelView extends TextureRect:
 			Build.box(n, Vector3(0, 0.25, 0.2), Vector3(0.44, 0.014, 0.1), Build.TILE_TEAL).rotation.y = -0.04
 		else:
 			Build.station(n, bp.id, int(bp.tier), str(bp.get("base", "")), false, str(bp.get("node", "")))
+			var tool := CleanTools.comes_with(str(bp.get("node", bp.id)))
+			if CleanTools.is_mop(tool):   # a bucket up its tree shows the mop it keeps (PRD 9.5)
+				Build.bucket_mop(n, 1.0)
+			if CleanTools.home_kind(bp.id) != "" or bp.id in ["mop_bucket", "robot_dock", "sponge"]:
+				n.scale = Vector3.ONE * 1.5   # small floor and wall pieces, shown at a piece's size
 			if Catalog.is_box(bp.id):   # a box is small: shown up close, at a piece's size
 				n.scale = Vector3.ONE * 1.9
 				n.position.y = 0.05
@@ -2253,6 +2262,17 @@ func _build_tip(p := 0) -> String:
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % game.ledger.day
 		return "%s walk      %s pick up      %s shop (Pantry for stock)      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
+	if Treatments.is_laying_tool(hand.id):   # a floor treatment (PRD 9.5): laid free, paid each night
+		var k := Treatments.key_of(hand.id)
+		var off: bool = game.treat_off.has(k)
+		var what := "%s, $%d a cell a night%s." % [Treatments.name_of(k), Treatments.price_of(k), " (switched off)" if off else ""]
+		var flip := "%s switch %s" % ["Turn" if m == "touch" else _g("turn", p), "on" if off else "off"]
+		match m:
+			"touch":
+				return "%s      Drag across the floor to lay      Erase, then drag, to lift      %s      Done" % [what, flip]
+			"pad":
+				return "%s      Hold A and walk to lay      X lift      %s      B done" % [what, flip]
+		return "%s      Hold E and walk, or drag, to lay      Right-drag lifts      %s      Esc done" % [what, flip]
 	if Catalog.is_build_tool(hand.id):
 		var floor: bool = game.floor_kind(hand.id) != ""
 		var what := "%s, $%d each." % [Catalog.label(hand), int(hand.price)]
@@ -2266,6 +2286,11 @@ func _build_tip(p := 0) -> String:
 		var drag := "drag for a row" if hand.id == "wall" or Catalog.is_finish(hand.id) else ("drag for a rectangle" if floor else "click to add")
 		return "%s      %s      Mouse: %s, right-drag removes      X remove      Esc done" % [what, how, drag]
 	var turn := _g("turn", p)
+	if Treatments.is_box(hand.id):   # PRD 9.5: chemicals, kept away from food
+		var k := Treatments.key_of(hand.id)
+		var what := "%s box.      Put it on a shelf or counter with no food, not a fridge" % Treatments.name_of(k)
+		var away := ("%s tree" % ("Shop" if m == "touch" else _g("shop", p))) if hand.get("moving", false) else "%s drop" % ("Drop" if m == "touch" else _g("back", p))
+		return "%s      %s put in      %s" % [what, "Tap the shelf" if m == "touch" else use, away]
 	if Catalog.is_box(hand.id):   # PRD 8.4: a box goes into a storage slot
 		var b := Pantry.station_ingredient(hand.id)
 		var where := "a fridge (pick up a counter, open the shop, upgrade it)" if Kitchen.is_chilled(hand.id) else "a counter or a fridge"
@@ -2546,7 +2571,11 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 	var tier: int = bp.tier
 	var locked := l.level() < Catalog.level_of(id, tier)
 	var price := "$%d" % Catalog.price_of(id, tier)
-	if Catalog.is_box(id):   # a box is free to take; its kind costs a fee each night (PRD 8.4)
+	if Treatments.is_box(id):   # free; laying it costs a price a cell each night (PRD 9.5)
+		price = "Free"
+	elif Treatments.is_laying_tool(id):
+		price = "$%d a cell a night" % Treatments.price_of(Treatments.key_of(id))
+	elif Catalog.is_box(id):   # a box is free to take; its kind costs a fee each night (PRD 8.4)
 		var b := Pantry.station_ingredient(id)
 		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
 	return {"name": Catalog.label(bp), "blurb": Catalog.blurb_of(id, tier), "locked": locked,

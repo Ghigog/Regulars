@@ -27,6 +27,7 @@ var down := {}
 ## PRD 9.4): Vector2i -> true. Walking over one feels like level 2 dirt. Set by CleanKit.
 var in_way := {}
 var _drawn := {}   # Vector2i -> the look key drawn there
+var _sheen := {}   # Vector2i -> [look key, Node3D]: a floor treatment's sheen (PRD 9.5)
 var _nodes := {}   # Vector2i -> Node3D
 static var _meshes := {}   # outline -> its flat mesh
 
@@ -51,7 +52,7 @@ func sync_room() -> void:
 ## How fast anyone moves standing at `p`.
 func speed_at(p: Vector3) -> float:
 	var c := Grid.to_cell(p)
-	return FloorMess.speed_of(CleanTools.felt_level(mess.level(c), in_way.has(c)))
+	return FloorMess.speed_of(CleanTools.felt_level(mess.level(c), in_way.has(c))) * mess.treat_speed(c)
 
 
 ## One step of feet: each walker is [node, cell]. Stepping off a dirty cell onto the next
@@ -86,7 +87,7 @@ func step_feet(walkers: Array, slips := false) -> void:
 ## (PRD 8.5): a hood cuts the grease it drops.
 func grease_factors(st: Station) -> Dictionary:
 	var m := Kitchen.mess_of(st.node) if st != null and Kitchen.has_node(st.node) else 1.0
-	var hood: bool = st != null and game != null and game.kitchen.has_hood(st.cell)
+	var hood: String = game.kitchen.hood_at(st.cell) if st != null and game != null else ""   # or an extractor (PRD 9.5)
 	return {"mess": m, "hood": hood}
 
 
@@ -215,7 +216,7 @@ func help_up(ch: Player) -> bool:
 	var who := help_target(ch)
 	if who == null:
 		return false
-	_start_help(who, ch, FloorMess.help_time(true))
+	_start_help(who, ch, FloorMess.help_time(true) * CleanTools.help_factor(CleanKit.held_tool(ch)))   # a spill kit is faster (PRD 9.5)
 	ch.look_at_cell(down[who].cell)
 	game.sfx("lift", 0.08)
 	return true
@@ -371,6 +372,7 @@ func _show_help(d: Dictionary, share: float) -> void:
 
 ## Redraws the cells whose dirt or footprints changed.
 func redraw() -> void:
+	_redraw_sheen()
 	for c: Vector2i in _drawn.keys():
 		if mess.level(c) <= 0:
 			_nodes[c].queue_free()
@@ -386,6 +388,105 @@ func redraw() -> void:
 		add_child(n)
 		_nodes[c] = n
 		_drawn[c] = key
+
+
+# ---------------------------------------------------------------- treatments (PRD 9.5)
+
+## Each treatment's film over the floor and how many glints run across it: a cleaner is
+## a cool wet film, a primer a dull matte one, a finish a warm shine with glint streaks.
+const SHEEN_LOOK := {
+	"cleaner": ["#62c6d4", 0.5, 0], "strong_cleaner": ["#3aa9c4", 0.55, 0],
+	"primer": ["#efe9dc", 0.6, 0], "sealing_primer": ["#d9cfb8", 0.68, 0],
+	"finish": ["#ffcf6b", 0.45, 1], "high_gloss": ["#ffe08a", 0.55, 2],
+}
+
+
+## The treated cells to draw, Vector2i -> [key, in force]: in service the day's; at night
+## what is laid, dimmed where it will not be re-laid (off, or no box stored).
+func sheen_cells() -> Dictionary:
+	var out := {}
+	if game == null or game.phase != game.Phase.BUILD:
+		for c: Vector2i in mess.treat:
+			out[c] = [mess.treat[c], true]
+		return out
+	var on: Dictionary = game.treat_active()
+	for c: Vector2i in game.treat_laid:
+		if game.plan.has_floor(c):
+			out[c] = [game.treat_laid[c], on.has(c)]
+	return out
+
+
+func _redraw_sheen() -> void:
+	var want := sheen_cells()
+	for c: Vector2i in _sheen.keys():
+		if not want.has(c) or _sheen[c][0] != "%s|%s" % want[c]:
+			(_sheen[c][1] as Node3D).queue_free()
+			_sheen.erase(c)
+	for c: Vector2i in want:
+		if _sheen.has(c):
+			continue
+		var n := sheen_look(c, want[c][0], want[c][1])
+		add_child(n)
+		_sheen[c] = ["%s|%s" % want[c], n]
+
+
+## One treated cell: a tinted film just under any dirt, with its glints.
+static func sheen_look(c: Vector2i, key: String, on := true) -> Node3D:
+	var look: Array = SHEEN_LOOK.get(key, SHEEN_LOOK.cleaner)
+	var root := Node3D.new()
+	root.name = "sheen_%d_%d" % [c.x, c.y]
+	root.position = Grid.center(c) + Vector3(0, Y - 0.003, 0)   # over the slab, under any dirt
+	var flat := Node3D.new()
+	flat.rotation.x = -PI / 2
+	root.add_child(flat)
+	var a: float = look[1] * (1.0 if on else 0.4)
+	_film(flat, _rounded_square(0.44, 0.06), Color(look[0], a), 0.0)
+	var rim := Color(1, 1, 1, 0.75 if on else 0.35)   # a pale rim: a treated cell reads by its edge too
+	for q in 4:
+		_film(flat, _rot(PackedVector2Array([Vector2(-0.44, 0.44), Vector2(0.44, 0.44), Vector2(0.4, 0.4), Vector2(-0.4, 0.4)]), PI / 2 * q), rim, 0.0005)
+	if key.contains("primer"):   # a primer: a matte grid of dots, the look of a sealed floor
+		for i in 3:
+			for j in 3:
+				_film(flat, _ellipse(0.03, 0.03, Vector2(-0.22 + 0.22 * i, -0.22 + 0.22 * j), 8), Color(look[0], minf(1.0, a + 0.3)).darkened(0.25), 0.001)
+	for i in int(look[2]):   # glint streaks along the diagonal, the way light runs over a shine
+		var off := Vector2(-0.12 + 0.24 * i, 0.12 - 0.24 * i) * (1.0 if look[2] > 1 else 0.0)
+		_film(flat, _rot(_ellipse(0.34, 0.035, off), PI / 4), Color(1, 1, 1, 0.55 * (1.0 if on else 0.5)), 0.001)
+	if key.contains("cleaner"):   # a cleaner: a little four-point sparkle
+		var star := PackedVector2Array()
+		for k in 8:
+			star.append(Vector2.from_angle(PI / 4 * k) * (0.11 if k % 2 == 0 else 0.03) + Vector2(0.2, -0.2))
+		_film(flat, star, Color(1, 1, 1, 0.7 * (1.0 if on else 0.5)), 0.001)
+	return root
+
+
+static func _film(parent: Node3D, pts: PackedVector2Array, col: Color, z: float) -> void:
+	var key := "film|%s" % [pts]
+	if not _meshes.has(key):
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var tris := Geometry2D.triangulate_polygon(pts)
+		for i in range(0, tris.size(), 3):
+			var a := pts[tris[i]]
+			var b := pts[tris[i + 1]]
+			var c := pts[tris[i + 2]]
+			if (b - a).cross(c - a) > 0.0:
+				var t := b
+				b = c
+				c = t
+			for p in [a, b, c]:
+				st.set_normal(Vector3(0, 0, 1))
+				st.add_vertex(Vector3(p.x, p.y, 0))
+		_meshes[key] = st.commit()
+	var mi := MeshInstance3D.new()
+	mi.mesh = _meshes[key]
+	mi.position.z = z
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED   # a flat film: its colour reads the same in any light
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
 
 
 ## One cell's dirt, lying flat. Each level is its own shape so it reads without colour:

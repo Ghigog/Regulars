@@ -195,6 +195,34 @@ const ITEMS := {
 		"ingredient": "courgette", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
 	"ready_pepper": {"name": "Chopped pepper tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "seaside",
 		"ingredient": "pepper", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
+	# Floor treatments (PRD 9.5). A box of each is kept in storage, never with food and
+	# never in a fridge; only the cleaner's is sold, the rest are steps in its tree. While
+	# a box is stored its laying tool is in the Build tab: free to lay, paid at the door each
+	# night ("treatment" names the Treatments key; prices a cell are Treatments').
+	"box_cleaner": {"name": "Floor cleaner", "price": 0, "level": 1, "category": "Pantry", "tiers": 1,
+		"box": true, "treatment": "cleaner", "blurb": "Chemicals: a shelf away from food. Lay it on the floor at night"},
+	"box_strong_cleaner": {"name": "Strong cleaner", "price": 0, "level": 1, "category": "Pantry", "tiers": 1,
+		"box": true, "treatment": "strong_cleaner", "blurb": "Chemicals: a shelf away from food. Lay it on the floor at night"},
+	"box_primer": {"name": "Primer", "price": 0, "level": 1, "category": "Pantry", "tiers": 1,
+		"box": true, "treatment": "primer", "blurb": "Chemicals: a shelf away from food. Lay it on the floor at night"},
+	"box_sealing_primer": {"name": "Sealing primer", "price": 0, "level": 1, "category": "Pantry", "tiers": 1,
+		"box": true, "treatment": "sealing_primer", "blurb": "Chemicals: a shelf away from food. Lay it on the floor at night"},
+	"box_finish": {"name": "Floor finish", "price": 0, "level": 1, "category": "Pantry", "tiers": 1,
+		"box": true, "treatment": "finish", "blurb": "Chemicals: a shelf away from food. Lay it on the floor at night"},
+	"box_high_gloss": {"name": "High gloss", "price": 0, "level": 1, "category": "Pantry", "tiers": 1,
+		"box": true, "treatment": "high_gloss", "blurb": "Chemicals: a shelf away from food. Lay it on the floor at night"},
+	"treat_cleaner": {"name": "Floor cleaner", "price": 0, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"treatment": "cleaner", "blurb": "Dirt mops off in one press, whatever the level"},
+	"treat_strong_cleaner": {"name": "Strong cleaner", "price": 0, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"treatment": "strong_cleaner", "blurb": "Mops off in one press, and feet do not track dirt off it"},
+	"treat_primer": {"name": "Primer", "price": 0, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"treatment": "primer", "blurb": "Two in five spills do not land on it"},
+	"treat_sealing_primer": {"name": "Sealing primer", "price": 0, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"treatment": "sealing_primer", "blurb": "Three in five spills do not land on it"},
+	"treat_finish": {"name": "Floor finish", "price": 0, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"treatment": "finish", "joy": 0.05, "blurb": "Everyone a little faster on it, and a little joy. Dirt shows more"},
+	"treat_high_gloss": {"name": "High gloss", "price": 0, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"treatment": "high_gloss", "joy": 0.1, "blurb": "Faster still and more joy. Dirt shows a lot more"},
 }
 
 var shelf: Array[Dictionary] = []
@@ -302,6 +330,8 @@ static func search(query := "", category := "", theme := "") -> Array[Dictionary
 		var node := Kitchen.node_of(id)
 		if node != "" and not Kitchen.is_root(node):
 			continue   # reached only through its tree (PRD 8.3)
+		if Treatments.is_laying_tool(id) or (Treatments.is_box(id) and not Treatments.is_root(Treatments.key_of(id))):
+			continue   # a laying tool is listed by the game while its box is stored (PRD 9.5)
 		var bp := {"id": id, "tier": 1}   # higher tiers are steps in the piece's tree now
 		var text := ("%s %s %s" % [label(bp), item.category, blurb_of(id, 1)]).to_lower()
 		var hit := true

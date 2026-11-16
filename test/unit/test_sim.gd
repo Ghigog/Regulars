@@ -428,15 +428,15 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 70, "one entry a piece: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; four cleaning pieces (PRD 9.4)")
+	assert_eq(Catalog.search().size(), 70, "one entry a piece: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5)")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen", "diner")
-	assert_eq(kitchen.size(), 14, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, stove, board, the soda fountain, a mop bucket, a hook, a sponge and the robot sweeper")
+	assert_eq(kitchen.size(), 13, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, stove, board, the soda fountain, a mop bucket, a hook and a sponge")
 	assert_eq(kitchen[0].id, "hook", "cheapest first, then by name")
 	var pantry := Catalog.search("", "Pantry", "diner")
-	assert_eq(pantry.size(), 16, "a box per boxed diner food kind and four ready-made (PRD 8.4, 8.6)")
+	assert_eq(pantry.size(), 17, "a box per boxed diner food kind, four ready-made (PRD 8.4, 8.6) and the floor cleaner (9.5)")
 	assert_eq(pantry[0].id, "box_bun", "boxes are free to take: by name")
 	assert_eq(Catalog.search("", "Kitchen", "seaside").filter(func(bp: Dictionary) -> bool:
 		return Catalog.ITEMS[bp.id].get("theme", "seaside") != "seaside").size(), 0, "only the run's theme")
@@ -1247,7 +1247,9 @@ func test_a_themed_search_lists_untagged_pieces_and_that_themes_own():
 			assert_ne(str(Catalog.ITEMS[bp.id].get("theme", theme)), other, "%s is not sold in the %s" % [bp.id, theme])
 		for id: String in Catalog.ITEMS:
 			var node := Kitchen.node_of(id)
+			var treat := Treatments.key_of(id)   # PRD 9.5: laying tools and later boxes are not in the catalog's list
 			if not Catalog.ITEMS[id].has("theme") and (node == "" or Kitchen.is_root(node)) \
+					and (treat == "" or (Treatments.is_box(id) and Treatments.is_root(treat))) \
 					and (Catalog.STAFF_ON_SALE or not Catalog.ITEMS[id].get("staff", false)):
 				assert_true(ids.has(id), "%s is sold everywhere" % id)
 	assert_true(Catalog.sold_in("jukebox", "diner"))
