@@ -60,6 +60,22 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+**The wall layer (PRD 8.5)**
+- The kitchen's fixed hood, wall cabinets and jar shelf are placed pieces now, one cell
+  each: two hoods side by side read as the one long canopy (a square frustum squashed to
+  0.56 m deep, with a duct to the top of the wall), two teal two-door cabinets, and an
+  open shelf of jars over the sink. High pieces hang between 1.38 m and 2.32 m, back on
+  the wall, on full-height back walls only (none behind a window or in a doorway).
+- The kitchen's sconce went with the fixtures (the PRD's "or goes"); the dining sconces stay.
+- A low shelf is half depth, open, on dark wooden sides; a high shelf over it adds teal
+  side panels to the floor, a back and a wooden cornice, so the two read as one closet.
+- A tall fridge, glass fridge or freezer is the white tall body from 8.3; nothing hangs
+  over it.
+- A wall piece's ghost hangs where it would go, with a pale green band (ruled top and
+  bottom) on the wall marking the layer it takes: the high band for a hung piece, the
+  low band for a shelf standing low, the whole height for a tall piece. The prompt reads
+  "Hang" and sits above it.
+
 **The upgrade tree (PRD 8.3)**
 - A wooden tray like the shop's, but the paper is blueprint blue (`#2c5c8c`) with a faint
   24 px grid and white lines and type; the chosen card is outlined in gold. Cards beyond

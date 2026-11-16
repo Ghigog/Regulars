@@ -89,6 +89,9 @@ var ledger: Ledger
 var phase: int = Phase.SERVICE
 var stations := {}               # Vector2i -> Station
 var kitchen := Kitchen.new()     # the counters and the tools on them, kept in step with `stations` (PRD 8)
+var highs := {}   # Vector2i -> Station: the pieces hung in a wall cell's high layer (PRD 8.5)
+var wall_facing := {}   # Vector2i -> facing: a wall cell, and which way a piece hung there looks
+var _glass := {}   # the wall edges with a window in them: no high piece hangs there
 var guests: Array[Guest] = []
 var queue: Array[Guest] = []
 var seat_taken := {}             # Vector2i -> Guest
@@ -184,6 +187,7 @@ func _ready() -> void:
 	order_rng.seed = seed_value
 	_build_layout()
 	_start_plan()
+	_hang_fixtures()
 	floor_dirt = FloorDirt.new()
 	add_child(floor_dirt)
 	floor_dirt.setup(self)
@@ -552,6 +556,11 @@ func _apply_demo(demo: String) -> void:
 		ledger.money = 300
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_storage.bind(demo))
+	elif demo in ["wall", "wall_build"]:   # PRD 8.5: hoods, cabinets, a closet, a tall fridge; a cabinet's ghost on the wall; shoot at 3
+		ledger.record_sale(DEMO_BILL, 5)
+		ledger.money = 300
+		arrivals.clear()
+		get_tree().create_timer(1.0).timeout.connect(_demo_wall.bind(demo))
 	elif demo == "counters":   # PRD 8: a double counter, a board on a double counter, a stove on the pass; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.money = 300
@@ -708,6 +717,32 @@ func _demo_storage(demo: String) -> void:
 	player.position = Grid.center(Vector2i(3, 3))
 	player.look(Vector2i(1, 0))
 	_demo_hover = Vector3(4.5, 0, 3.5)
+
+
+## The wall layer (PRD 8.5) at night. "wall": the start's hoods over the stoves and
+## cabinets by the back door (one holding a box), a low and a high shelf as one closet,
+## and the grill fridge turned into a tall fridge. "wall_build": a wall cabinet in hand,
+## its ghost hung over the tray stack with the high band lit behind it.
+func _demo_wall(demo: String) -> void:
+	open_build()
+	var sea := Scenery.seaside()
+	var corner := Vector2i(0, 2)
+	var fridge: Station = stations[corner]
+	fridge.set_base("tall_fridge")
+	kitchen.set_cell(corner, "tall_fridge")
+	stock_box("cheese" if not sea else "calamari", corner)
+	_show_boxes(corner)
+	add_station("shelf", Vector2i(1, 2))
+	add_high("shelf", Vector2i(1, 2))
+	stock_box("onion" if not sea else "lemon", Vector2i(1, 2))
+	stock_box("lettuce" if not sea else "courgette", Vector2i(1, 2))
+	_store_box(Vector2i(0, 5), Pantry.box_id("tomato" if not sea else "pepper"))   # into the cabinet over the bin
+	player.position = Grid.center(Vector2i(2, 4))
+	player.look(Vector2i(-1, 0))
+	if demo == "wall_build":
+		pick_catalog("cabinet")
+		_demo_hover = Vector3(2.5, 0, 2.5)
+	hud.show_build()
 
 
 ## The upgrade trees (PRD 8.3): a piece picked up at night and the shop opened.
@@ -1207,6 +1242,16 @@ func _build_layout() -> void:
 	add_rug(Vector2i(8, 3))   # under the middle table, as in sheet 1
 
 
+## The first room's wall pieces (PRD 8.5), real and sellable like the rest: the hood
+## over where the cooking line goes, the wall cabinets by the back door, and the jar
+## shelf over the sink.
+func _hang_fixtures() -> void:
+	for spot: Array in [["hood", 0, 3], ["hood", 0, 4], ["cabinet", 0, 5], ["cabinet", 0, 6], ["shelf", 3, 2]]:
+		var cell := Vector2i(spot[1], spot[2])
+		if kitchen.can_hang(cell, spot[0]):
+			add_high(spot[0], cell)
+
+
 ## The first room is an L (sheet 1): a tiled kitchen on the left, set forward of
 ## the planked dining room, with the front door in the right-hand wall.
 func _start_plan() -> void:
@@ -1246,6 +1291,7 @@ func _rebuild_room() -> void:
 	_room = Node3D.new()
 	add_child(_room)
 	var r: Dictionary = Scenery.build_room(_room, plan, DOOR)
+	_sync_walls(r.get("glass", {}))
 	_room_lights.assign(r.lights)
 	_sconces.append_array(_room_lights)
 	_openings = r.openings
@@ -1353,13 +1399,121 @@ func _register(st: Station) -> void:
 		grid.reserved[s] = true
 	if st.base != "":
 		kitchen.set_cell(st.cell, st.base, st.node if Kitchen.is_top(st.type) else "")
+	st.set_wall(false)
+	_refresh_wall(st.cell)
 	_update_racks()
 
 
-## Redraws the tags naming what a cell stores.
+## Redraws the tags naming what a cell stores: over the piece standing there, else over
+## the piece hung on the wall; above the high layer when the cell has one.
 func _show_boxes(cell: Vector2i) -> void:
+	var up := kitchen.get_piece(cell, "high") != "" or Kitchen.is_tall(kitchen.get_piece(cell, "base"))
+	var y := 2.62 if up else 1.6
 	if stations.has(cell):
-		(stations[cell] as Station).set_boxes(kitchen.stock(cell))
+		(stations[cell] as Station).set_boxes(kitchen.stock(cell), y)
+		if highs.has(cell):
+			(highs[cell] as Station).set_boxes([])
+	elif highs.has(cell):
+		(highs[cell] as Station).set_boxes(kitchen.stock(cell), y)
+
+
+# ---------------------------------------------------------------- the wall layer (PRD 8.5)
+
+## The back walls behind a cell that a piece can hang on: full height, with floor on
+## this side only and no door, archway or window in them. West first, then north.
+func _back_walls(c: Vector2i, glass := {}) -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	for e: Vector3i in [Vector3i(c.x, c.y, 1), Vector3i(c.x, c.y, 0)]:
+		if Scenery.wall_look(plan, e) == "tall" and not plan.openings.has(e) and not glass.has(e):
+			out.append(e)
+	return out
+
+
+## Marks the kitchen's wall cells from the plan, and which way a piece hung in each
+## faces: away from its wall (1 is +x, off the left wall; 0 is +z, off the back wall).
+func _sync_walls(glass := {}) -> void:
+	_glass = glass
+	kitchen.wall_cells.clear()
+	wall_facing.clear()
+	for c: Vector2i in plan.floors:
+		var e := _back_walls(c, glass)
+		if not e.is_empty():
+			kitchen.set_wall(c)
+			wall_facing[c] = 1 if e[0].z == 1 else 0
+
+
+## Whether taking away these wall edges (laying floor behind them, opening them up)
+## would leave a hung piece with no wall to hang on.
+func _strands_high(edges: Array[Vector3i]) -> bool:
+	for c: Vector2i in highs:
+		var left := _back_walls(c, _glass)
+		for e in edges:
+			left.erase(e)
+		if left.is_empty():
+			return true
+	return false
+
+
+## The kitchen node of a piece in hand: the counter's node for a counter (a fridge, a
+## tall fridge), else the piece's own.
+static func hand_node(h: Dictionary) -> String:
+	if h.get("node") is Station:
+		var st: Station = h.node
+		return st.base if st.type == "counter" and st.base != "" else st.node
+	return Kitchen.node_of(str(h.get("id", "")))
+
+
+## The layer a kitchen piece would take in a cell: "base", "high" or "" (no room). Over
+## anything standing there (a kitchen piece or not) only the high layer is left.
+func layer_for(cell: Vector2i, node: String) -> String:
+	if not Kitchen.has_node(node):
+		return ""
+	if stations.has(cell):
+		return "high" if kitchen.can_hang(cell, node) else ""
+	return kitchen.layer_for(cell, node)
+
+
+## The layer the piece in hand would take where it is held: "high", "base", or "" for
+## none (or a piece that is not a kitchen piece).
+func hand_layer(ch: Player = null) -> String:
+	ch = _me(ch)
+	var hn := hand_node(ch.hand)
+	var p := _hover_point(ch)
+	if not Kitchen.has_node(hn) or p == Vector3.INF:
+		return ""
+	var sp := snap(p, ch)
+	return layer_for(Vector2i(sp.x, sp.y), hn)
+
+
+## Hangs a new piece from the catalog on a wall cell's high layer.
+func add_high(id: String, cell: Vector2i) -> Station:
+	var st := Station.new()
+	add_child(st)
+	st.setup(id, cell, 1, int(wall_facing.get(cell, 0)))
+	_hang(st, cell)
+	return st
+
+
+## Hangs a piece (new or carried) in a cell's high layer, facing off the wall.
+func _hang(st: Station, cell: Vector2i) -> void:
+	st.visible = true
+	st.place_at(cell, int(wall_facing.get(cell, 0)))
+	kitchen.hang(cell, st.node)
+	highs[cell] = st
+	_refresh_wall(cell)
+	_show_boxes(cell)
+
+
+## Redraws a hung piece: a high shelf over a low one draws as one closet.
+func _refresh_wall(cell: Vector2i) -> void:
+	if highs.has(cell):
+		(highs[cell] as Station).set_wall(true, kitchen.is_closet(cell))
+
+
+## The piece a chef uses at a cell: what stands there, else what hangs on the wall above
+## bare floor (a cabinet's stock is reached from below or beside it).
+func station_at(cell: Vector2i) -> Station:
+	return stations.get(cell, highs.get(cell))
 
 
 func _unregister(st: Station) -> void:
@@ -1368,6 +1522,8 @@ func _unregister(st: Station) -> void:
 	grid.blocked.erase(st.cell)
 	for s in st.seats:
 		grid.reserved.erase(s)
+	_refresh_wall(st.cell)
+	_show_boxes(st.cell)
 	_update_racks()
 
 
@@ -1886,9 +2042,9 @@ func pick_up(p: Vector3, ch: Player = null) -> bool:
 		sfx("fail")   # a messy piece is not moved or sold until it is clean
 		hud.say(Cleaning.CLEAN_FIRST)
 		return false
-	if stations.has(c):
-		var st: Station = stations[c]
-		if Kitchen.is_top(st.type):
+	if stations.has(c) or highs.has(c):
+		var st: Station = stations.get(c)
+		if st != null and Kitchen.is_top(st.type):
 			_off_counter(st)   # the tool comes off first; its counter stays
 		elif not kitchen.stock(c).is_empty():
 			# Then the boxes, last in first; the counter only once it is empty (PRD 8.4).
@@ -1900,6 +2056,12 @@ func pick_up(p: Vector3, ch: Player = null) -> bool:
 			sfx("pickup")
 			menu_changed()
 			return true
+		elif highs.has(c):
+			# Then what hangs on the wall (PRD 8.5), before what stands under it.
+			st = highs[c]
+			highs.erase(c)
+			kitchen.remove(c, "high")
+			_show_boxes(c)
 		elif Kitchen.unstacked(st.base) != "" and st.stacked:
 			# One counter comes off a double counter; the other stays with what is on it.
 			st.set_base(Kitchen.unstacked(st.base))
@@ -1912,7 +2074,7 @@ func pick_up(p: Vector3, ch: Player = null) -> bool:
 			_unregister(st)
 		st.visible = false
 		ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
-			"node": st, "from": Vector3i(c.x, c.y, 0), "from_facing": st.facing}
+			"node": st, "from": Vector3i(c.x, c.y, 0), "from_facing": st.facing, "layer": "high" if st.high else ""}
 	elif wall_nodes.has(edge):
 		var n: Node3D = wall_nodes[edge]
 		wall_nodes.erase(edge)
@@ -1942,6 +2104,15 @@ func _put_down(h: Dictionary, spot: Vector3i, facing: int) -> void:
 		return
 	var n: Node3D = h.node
 	n.visible = true
+	var cell := Vector2i(spot.x, spot.y)
+	var hn := hand_node(h)
+	if n is Station and Kitchen.can_go_high(hn):
+		var layer := layer_for(cell, hn)
+		if h.get("from", Vector3i(0, 0, -1)) == spot and h.get("layer", "") == "high" and kitchen.can_hang(cell, hn):
+			layer = "high"   # put back where it hung
+		if layer == "high":
+			_hang(n, cell)
+			return
 	if h.id == "screen":
 		grid.walls[spot] = true
 		wall_nodes[spot] = n
@@ -1978,7 +2149,8 @@ func _stack_counter(cell: Vector2i) -> void:
 ## Turns the piece in hand a quarter turn. Partitions turn by where you point.
 func rotate_hand(ch: Player = null) -> void:
 	ch = _me(ch)
-	if not ch.hand.is_empty() and not on_edge(ch.hand.id) and not Catalog.is_build_tool(ch.hand.id):
+	if not ch.hand.is_empty() and not on_edge(ch.hand.id) and not Catalog.is_build_tool(ch.hand.id) \
+			and not Kitchen.is_high_only(hand_node(ch.hand)):   # a hung piece faces off its wall
 		ch.hand.facing = (int(ch.hand.facing) + 1) % 4
 		sfx("pickup")
 
@@ -2144,8 +2316,9 @@ func can_place(spot: Vector3i, ch: Player = null) -> bool:
 	var reach := _reach()
 	var touch := _touch()
 	match tool_kind(ch.hand.id):
-		"floor":
-			return plan.can_lay(cell, floor_kind(ch.hand.id))
+		"floor":   # floor laid behind a wall takes the wall away: not from under a hung piece
+			return plan.can_lay(cell, floor_kind(ch.hand.id)) \
+				and (plan.has_floor(cell) or not _strands_high(Floorplan.cell_edges(cell)))
 		"finish":
 			return plan.can_finish(spot, ch.hand.id)
 		"rug":
@@ -2153,9 +2326,16 @@ func can_place(spot: Vector3i, ch: Player = null) -> bool:
 		"wall":
 			return plan.can_build(spot) and grid.can_place_wall(spot, LOT, DOOR, reach, touch)
 		"door", "arch":
-			return plan.can_open(spot, ch.hand.id)
+			return plan.can_open(spot, ch.hand.id) and not _strands_high([spot])
 	if ch.hand.id == "screen":
 		return grid.can_place_wall(spot, LOT, DOOR, reach, touch) and not plan.is_wall(spot)
+	var hn := hand_node(ch.hand)
+	if Kitchen.can_go_high(hn):   # the wall layer (PRD 8.5): hung high, or a shelf low
+		var layer := layer_for(cell, hn)
+		if layer != "base":
+			return layer == "high"
+	elif Kitchen.is_tall(hn) and kitchen.get_piece(cell, "high") != "":
+		return false   # a tall piece fills both wall layers
 	if stations.has(cell) or Kitchen.is_top(ch.hand.id):
 		return _stacks_on(cell, ch.hand)   # a tool needs a counter under it
 	return grid.can_place_block(cell, Station.seats_for(ch.hand.id, cell, int(ch.hand.facing)), LOT, DOOR, reach, touch)
@@ -2198,6 +2378,8 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		add_rug(cell, int(ch.hand.facing))
 	elif Kitchen.is_counter(ch.hand.id) and _bare_counter(cell) != null:
 		_stack_counter(cell)
+	elif layer_for(cell, Kitchen.node_of(ch.hand.id)) == "high":
+		add_high(ch.hand.id, cell)
 	else:
 		add_station(ch.hand.id, cell, int(ch.hand.tier), int(ch.hand.facing))
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
@@ -2254,7 +2436,7 @@ func remove_at(spot: Vector3i, ch: Player = null) -> bool:
 	var cell := Vector2i(spot.x, spot.y)
 	match tool_kind(ch.hand.id):
 		"floor":
-			if not plan.has_floor(cell) or cell == ENTRANCE_CELL or stations.has(cell) \
+			if not plan.has_floor(cell) or cell == ENTRANCE_CELL or stations.has(cell) or highs.has(cell) \
 					or grid.reserved.has(cell) or chefs.any(func(o: Player) -> bool: return o.cell() == cell) or rug_at(cell) != null:
 				return false
 			for e in Floorplan.cell_edges(cell):
@@ -2424,8 +2606,10 @@ func build_action(ch: Player = null) -> String:
 				return "Add door"
 			"arch":
 				return "Add archway"
-		return "Put in" if Catalog.is_box(ch.hand.id) else "Put down"
-	var clean := night_clean_action(stations.get(ch.target_cell()), ch)
+		if Catalog.is_box(ch.hand.id):
+			return "Put in"
+		return "Hang" if hand_layer(ch) == "high" else "Put down"
+	var clean := night_clean_action(station_at(ch.target_cell()), ch)
 	if clean != "":
 		return clean
 	if desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
@@ -2465,9 +2649,9 @@ func build_interact(ch: Player = null) -> void:
 	ch = _me(ch)
 	var action := build_action(ch)
 	if not ch.hand.is_empty():
-		action = "Put down"
+		action = "Put down"   # hung or stood, place() decides
 	if action in Cleaning.NIGHT_ACTIONS.values():
-		use_station(stations[ch.target_cell()], false, ch)
+		use_station(station_at(ch.target_cell()), false, ch)
 		hud.show_build()   # the dirty note counts down
 		return
 	match action:
@@ -2490,6 +2674,16 @@ func _update_ghost(ch: Player = null) -> void:
 	ch = _me(ch)
 	_update_tool_ghost(ch)
 	var key := "%s:%s:%s" % [ch.hand.get("id", ""), ch.hand.get("tier", 0), hand_key(ch)] if phase == Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) else ""
+	# A wall-layer piece (PRD 8.5) shows the layer it would take where it points.
+	var hn := hand_node(ch.hand) if key != "" else ""
+	var layer := ""
+	var cell := Vector2i(-99, -99)
+	var hover := _hover_point(ch)
+	if (Kitchen.can_go_high(hn) or Kitchen.is_tall(hn)) and hover != Vector3.INF:
+		var sp := snap(hover, ch)
+		cell = Vector2i(sp.x, sp.y)
+		layer = layer_for(cell, hn) if Kitchen.can_go_high(hn) else "tall"
+		key += ":%s:%d:%s" % [layer, int(wall_facing.get(cell, -1)), kitchen.get_piece(cell, "base")]
 	if key != ch.ghost_key:
 		ch.ghost_key = key
 		if ch.ghost:
@@ -2502,12 +2696,17 @@ func _update_ghost(ch: Player = null) -> void:
 				_wall_visual(ch.ghost, 0.9 + 0.1 * int(ch.hand.tier))
 			elif ch.hand.id == "rug":
 				Scenery.rug(ch.ghost)
+			elif layer == "high":
+				var closet := hn.ends_with("shelf") and kitchen.is_closet_with(cell, hn)
+				Build.wall_piece(ch.ghost, hn, closet)
 			elif ch.hand.get("node") is Station:
 				var hs: Station = ch.hand.node
-				Build.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" else "", false, hs.node)
+				Build.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" else "", false, hs.node)
 			else:
 				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier))
-	var p := _hover_point(ch)
+			if layer != "" and wall_facing.has(cell):
+				_layer_band(ch.ghost, layer, int(wall_facing[cell]) - (0 if layer == "high" else int(ch.hand.facing)))
+	var p := hover
 	if ch.ghost == null or p == Vector3.INF:
 		ch.no_mark.visible = false
 		if ch.ghost:
@@ -2517,6 +2716,9 @@ func _update_ghost(ch: Player = null) -> void:
 	var ok := can_place(spot, ch)
 	if on_edge(ch.hand.id):
 		_place_on_edge(ch.ghost, spot)
+	elif layer == "high":
+		ch.ghost.position = Grid.center(Vector2i(spot.x, spot.y))
+		ch.ghost.rotation.y = int(wall_facing.get(cell, 0)) * PI / 2
 	else:
 		ch.ghost.position = Grid.center(Vector2i(spot.x, spot.y))
 		ch.ghost.rotation.y = int(ch.hand.facing) * PI / 2
@@ -2526,6 +2728,21 @@ func _update_ghost(ch: Player = null) -> void:
 	ch.ghost.visible = ok
 	ch.no_mark.visible = not ok
 	ch.no_mark.position = Vector3(ch.ghost.position.x, 0, ch.ghost.position.z)
+
+
+## A pale band on the wall behind a ghost marking the layer it takes (PRD 8.5): the
+## high band for a hung piece, the low band for a shelf standing low, both for a tall
+## piece. `turn` is the wall's facing in the ghost's own frame.
+func _layer_band(ghost: Node3D, layer: String, turn: int) -> void:
+	var band := Node3D.new()
+	band.rotation.y = turn * PI / 2
+	ghost.add_child(band)
+	var y0 := Build.HIGH_Y0 if layer == "high" else 0.0
+	var y1 := 0.92 if layer == "base" else Build.HIGH_Y1
+	var plate := Build.box(band, Vector3(0, y0, -0.48), Vector3(0.98, y1 - y0, 0.02), Build.GOOD)
+	plate.material_override = Build.overlay_mat(Color(Build.GOOD, 0.4), 2)
+	for y: float in [y0, y1]:   # a darker rule top and bottom, so the band reads by shape too
+		Build.box(band, Vector3(0, y - 0.015, -0.47), Vector3(0.98, 0.03, 0.03), Build.GOOD).material_override = Build.overlay_mat(Color(Build.GOOD, 0.85), 2)
 
 
 ## A build tool shows what it would do: pale squares for floor, bars along the
@@ -3370,6 +3587,17 @@ func test_kitchen() -> void:
 		stock_box(fm.bread, Vector2i(0, 6), false, 1)
 	write_test_menu()
 	menu_board.refresh(tonight_menu())
+
+
+## Takes every hung piece off the walls, unpaid, stock and all (tests of other
+## systems start with bare walls, as they did before PRD 8.5).
+func clear_walls() -> void:
+	for c: Vector2i in highs.keys():
+		var st: Station = highs[c]
+		highs.erase(c)
+		kitchen.remove(c, "high")
+		st.queue_free()
+		_show_boxes(c)
 
 
 ## A one-item menu for tests: the theme's fixed main (a Burger: bun, patty).
@@ -4615,7 +4843,7 @@ func _update_cursor(ch: Player = null) -> void:
 		ch.cursor.visible = false
 		hud.show_prompt(cam.unproject_position(fallen.position + Vector3(0, 1.9, 0)), "Help up", chefs.find(ch))
 		return
-	var st: Station = stations.get(ch.target_cell())
+	var st: Station = station_at(ch.target_cell())
 	var action := ""
 	if st != null:
 		action = prompt_for(st, ch) if phase == Phase.SERVICE else night_clean_action(st, ch)
@@ -4639,7 +4867,7 @@ func _update_cursor(ch: Player = null) -> void:
 			action = "Not ready"   # co-op: using the card again takes their ready back
 		var p := DOORWAY + Vector3(0, 2.9, 0)
 		if not ch.hand.is_empty() and _hover_point(ch) != Vector3.INF:
-			p = _hover_point(ch) + Vector3(0, 2.0, 0)
+			p = _hover_point(ch) + Vector3(0, 2.9 if hand_layer(ch) == "high" else 2.0, 0)
 		elif action == "Pick up":
 			p = _piece_in_front(ch) + Vector3(0, 2.0, 0)
 		elif action == "Use desk":
@@ -4984,7 +5212,7 @@ func act(p: int, action: String, echo := false) -> void:
 			elif action == "use" and floor_dirt.help_up(ch):
 				ch.punch()
 			elif action == "use":
-				var st: Station = stations.get(ch.target_cell())
+				var st: Station = station_at(ch.target_cell())
 				if st != null and prompt_for(st, ch) != "":
 					use_station(st, false, ch)
 				elif not use_door(ch) and st != null:

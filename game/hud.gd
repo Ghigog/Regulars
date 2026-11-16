@@ -2272,6 +2272,14 @@ func _build_tip(p := 0) -> String:
 		var what := "%s, $%d a night.      Put it in %s" % [Catalog.label(hand), Pantry.fee_of(b.id, b.ready), where]
 		var away := ("%s sell stops the fee" % ("Sell" if m == "touch" else _g("sell", p))) if hand.get("moving", false) else "%s drop" % ("Drop" if m == "touch" else _g("back", p))
 		return "%s      %s put in      %s" % [what, "Tap the counter" if m == "touch" else use, away]
+	if Kitchen.is_high_only(game.hand_node(hand)):   # PRD 8.5: it hangs on a wall, facing out
+		var lead := "%s, $%d when it is hung." % [Catalog.label(hand), int(hand.price)]
+		var tail := "%s drop" % ("Drop" if m == "touch" else _g("back", p))
+		if hand.get("moving", false):
+			var why: String = game.sell_block(ch)
+			lead = "Carrying the %s." % game.piece_name(hand).to_lower()
+			tail = ("%s for $%d" % ["Sell" if m == "touch" else _g("sell", p) + " sell", game.sell_value(ch)]) if why == "" else why
+		return "%s      %s hang it on a wall, over anything      %s" % [lead, "Tap a cell by a wall to" if m == "touch" else use, tail]
 	if hand.get("moving", false):
 		var why: String = game.sell_block(ch)
 		var sell := ("%s for $%d" % ["Sell" if m == "touch" else _g("sell", p) + " sell", game.sell_value(ch)]) if why == "" else why

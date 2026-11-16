@@ -45,6 +45,14 @@ const ITEMS := {
 		"blurb": "Blocks guests' view"},
 	"counter": {"name": "Counter", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Extra worktop"},
+	# The wall layer (PRD 8.5): a shelf stands low, or hangs high over another piece on a
+	# wall; a cabinet and a hood only hang. Prices match Kitchen.NODES.
+	"shelf": {"name": "Wall shelf", "price": 10, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Stores one kind. Low, or high on a wall over another piece"},
+	"cabinet": {"name": "Wall cabinet", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Hangs on a wall over another piece. Stores one kind"},
+	"hood": {"name": "Hood", "price": 30, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Hangs on the wall over a stove and cuts its grease"},
 	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3, "theme": "diner",
 		"joy": 0.2, "reach": 3, "blurb": "Cheers guests seated beside it, a little those who see it",
 		"up": "Cheers guests more, and further away"},

@@ -368,13 +368,27 @@ func test_a_bad_fry_always_drops_grease_beside_the_fryer():
 	assert_false(game.floor_dirt.mess.is_covered(landed))
 
 
-func test_tool_mess_and_the_hood_read_as_one_and_none_until_prd_8():
+func test_tool_mess_and_the_hood_come_from_the_kitchen():
 	var game = _game()
-	assert_eq(game.floor_dirt.grease_factors(game.find_station("stove")), {"mess": 1.0, "hood": false})
+	var stove: Station = game.stations[Vector2i(0, 3)]
+	assert_eq(game.floor_dirt.grease_factors(stove), {"mess": 1.0, "hood": true}, "the start's hood hangs over it (PRD 8.5)")
+	game.clear_walls()
+	assert_eq(game.floor_dirt.grease_factors(stove), {"mess": 1.0, "hood": false})
+
+
+func test_a_hood_cuts_a_stoves_grease():
+	var game = _game()
+	var stove: Station = game.stations[Vector2i(0, 3)]
+	var before: int = game.floor_dirt.mess.total()
+	for i in 40:
+		game._prep_done(0, stove, "fry", "bad")   # certain without a hood (the test below)
+	var hooded: int = game.floor_dirt.mess.total() - before
+	assert_lt(hooded, 30, "a hood drops grease about %d%% as often" % int(FloorMess.HOOD * 100))
 
 
 func test_a_finished_prep_rolls_grease_through_the_game():
 	var game = _game()
+	game.clear_walls()   # no hood over the stove
 	var stove: Station = game.find_station("stove")
 	var before: int = game.floor_dirt.mess.total()
 	for i in 40:

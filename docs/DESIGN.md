@@ -18,6 +18,21 @@ Survive as many days as you can; three walkouts in one day ends the run.
   fish fillet, calamari, lemon, courgette, pepper, new potatoes, green beans, white
   wine. Each has a tool, tags (meat, vegetable, bread, fish, fried, drink...), a worth
   (what it adds to a price) and a fee (what stocking it costs a night).
+- **Wall layer (PRD 8.5).** A cell against a full-height back wall (no window, door or
+  archway in it) has a high layer over whatever stands below, even bare floor. Wall
+  pieces in the shop's Kitchen tab: a wall shelf ($10, one kind; stands low on a free
+  cell, hangs high over anything else; its efficient step the wide shelf, two kinds), a
+  wall cabinet ($20, one kind, hangs only) and a hood ($30, hangs only; over a stove it
+  cuts that stove's grease, PRD 9's `FloorMess.HOOD`). A low and a high shelf on one
+  cell draw as one closet. The counter's tree goes on from the under-counter fridge to
+  the tall fridge (two kinds, fills both wall layers, no top), then the glass-door tall
+  fridge (three kinds) or the freezer (two kinds; takes frozen kinds, of which there are
+  none until 8.6). The first room starts with two hoods over the cooking line, two
+  cabinets by the back door and the jar shelf over the sink, each sellable; the kitchen
+  sconce is gone. At night E lifts the tool, then the boxes, then the wall piece, then
+  what stands below. High slots are storage like any other; a cabinet hung over bare
+  floor is reached from below or beside it. Floor laid behind a wall, or a door or
+  archway through it, is refused while a piece hangs on it alone.
 - **Storage (PRD 8.4).** Ingredients live in storage the player builds. The shop's
   Pantry tab has a box per food kind of the run's theme (free to take; its kind costs
   its nightly fee) and, from level 2, ready-made boxes of the chopped kinds and cheese

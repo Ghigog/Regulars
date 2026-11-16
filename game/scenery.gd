@@ -69,15 +69,16 @@ static func build_ground(root: Node3D, w: int, h: int) -> Array[OmniLight3D]:
 static func build_room(root: Node3D, plan: Floorplan, door: Vector2i) -> Dictionary:
 	var lights: Array[OmniLight3D] = []
 	var openings := {}
+	var glass := {}
 	_floors(root, plan)
 	var entrance := Vector3i(door.x, door.y, 1)
 	for axis in 2:
 		for run: Dictionary in _runs(plan, axis, "tall"):
-			_tall_run(root, plan, run, lights, openings)
+			_tall_run(root, plan, run, lights, openings, glass)
 		for run: Dictionary in _runs(plan, axis, "low"):
 			_low_run(root, plan, run, openings, entrance)
 	_fixtures(root, plan, lights)
-	return {"lights": lights, "openings": openings}
+	return {"lights": lights, "openings": openings, "glass": glass}
 
 
 ## How a wall edge is drawn: "tall", "low" or "" (not drawn).
@@ -160,7 +161,7 @@ static func _lx(axis: int, k: float) -> float:
 	return k if axis == 0 else -k
 
 
-static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Array[OmniLight3D], openings: Dictionary) -> void:
+static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Array[OmniLight3D], openings: Dictionary, glass := {}) -> void:
 	var axis: int = run.axis
 	var line: int = run.line
 	var from: int = run.from
@@ -203,6 +204,11 @@ static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Ar
 					clear = false
 			if clear:
 				windows.append(c)
+				for k in range(from, to):   # the wall cells behind the glass take no high piece
+					var u0 := minf(_lx(axis, k), _lx(axis, k + 1))
+					var u1 := maxf(_lx(axis, k), _lx(axis, k + 1))
+					if u1 > c - WIN_W / 2 and u0 < c + WIN_W / 2:
+						glass[_edge(axis, line, k)] = true
 				if not seaside():
 					holes.append([c - WIN_W / 2, c + WIN_W / 2, WIN_Y0, WIN_Y1])
 	# The wall itself: one slab per stretch between hole edges, overlapping a
@@ -547,37 +553,10 @@ static func _plain_tall(plan: Floorplan, edges: Array) -> bool:
 	return true
 
 
-## The first room's fixtures: the hood, cabinets and jar shelf in the kitchen
-## (sheet 1) and, by the sea, a life ring and a paddle on the dining wall.
+## The first room's fixed dressing: by the sea, a life ring and a paddle on the dining
+## wall. The kitchen's hood, wall cabinets and jar shelf are placed pieces now (PRD 8.5,
+## Main._build_layout), and its sconce went with them.
 static func _fixtures(root: Node3D, plan: Floorplan, lights: Array[OmniLight3D]) -> void:
-	if _plain_tall(plan, [Vector3i(0, 3, 1), Vector3i(0, 4, 1)]):
-		# A sloped hood over the two stoves.
-		var hood := "#7fa3a8"
-		var canopy := Build._add(root, Build.lathe_mesh([[0.0, 0.0], [1.36, 0.0], [1.36, 0.1], [0.62, 0.52], [0.0, 0.52]], 4), Vector3(0.37, 1.5, 4.0), Color(hood), 0.0, Build.R_WOOD)
-		canopy.rotation.y = PI / 4
-		var hold := Node3D.new()  # squash the square canopy to a 0.74 m deep, 1.9 m long one
-		root.add_child(hold)
-		canopy.reparent(hold)
-		hold.scale = Vector3(0.39, 1, 1)
-		hold.position.x = 0.37 - 0.37 * 0.39
-		_rb(root, Vector3(0.22, 2.2, 4.0), Vector3(0.44, 0.44, 0.7), hood, 0.04, Build.R_WOOD)
-	if _plain_tall(plan, [Vector3i(0, 5, 1), Vector3i(0, 6, 1)]):
-		# A run of tall wall cabinets, where they cannot hide a stove or a dial.
-		var z0 := 5.08
-		Build._add(root, Build.bevel_mesh(Vector3(0.42, 0.92, 1.9), 0.04), Vector3(0.21, 1.86, z0 + 0.93), Color(Build.CABINET), 0.0)
-		for i in 3:
-			Build._add(root, Build.bevel_mesh(Vector3(0.03, 0.8, 0.56), 0.012), Vector3(0.43, 1.86, z0 + 0.33 + i * 0.62), Color(Build._tint(Build.CABINET, 0.07)), 0.0)
-			Build._add(root, Build.bevel_mesh(Vector3(0.03, 0.16, 0.04), 0.012), Vector3(0.455, 1.6, z0 + 0.33 + i * 0.62 + (0.2 if i % 2 == 0 else -0.2)), Color("#d9a441"), 0.0, Build.R_WOOD)
-	var kz := float(KITCHEN_Z)
-	if _plain_tall(plan, [Vector3i(2, KITCHEN_Z, 0), Vector3i(3, KITCHEN_Z, 0)]):
-		# A shelf of jars over the worktop.
-		Build.box(root, Vector3(3.2, 1.5, kz + 0.12), Vector3(1.1, 0.06, 0.24), Build.WOOD, 0.0, Build.R_WOOD)
-		var jars := [Build.PAPER, Build.CORAL, Build.TILE_TEAL, Build.WARN]
-		for i in jars.size():
-			Build.cyl(root, Vector3(2.8 + i * 0.27, 1.56, kz + 0.12), 0.09, 0.18 + 0.05 * (i % 2), jars[i], 0.0, Build.R_GLOSS)
-			Build.cyl(root, Vector3(2.8 + i * 0.27, 1.74 + 0.05 * (i % 2), kz + 0.12), 0.07, 0.04, Build.WOOD_DARK)
-	if _plain_tall(plan, [Vector3i(0, KITCHEN_Z, 1)]):
-		_sconce(root, Vector3(0, 2.0, kz + 0.5), Vector3(1, 0, 0), lights)
 	if seaside() and _plain_tall(plan, [Vector3i(6, 0, 0), Vector3i(7, 0, 0)]):
 		var mid := 7.0
 		var ring := Build.lathe(root, Vector3(mid - 0.35, 1.5, 0.03), [[0.2, 0.0], [0.36, 0.0], [0.38, 0.04], [0.36, 0.09], [0.2, 0.09], [0.18, 0.04], [0.2, 0.0]], "#fbf7ee")

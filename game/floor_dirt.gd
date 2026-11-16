@@ -78,10 +78,12 @@ func step_feet(walkers: Array, slips := false) -> void:
 			_last.erase(id)
 
 
-## The tool's `mess` factor and whether a hood is over it. PRD 8's trees and hood light
-## these up (8.3, 8.5); until then every tool is 1.0 and there is no hood.
-func grease_factors(_st: Station) -> Dictionary:
-	return {"mess": 1.0, "hood": false}
+## The tool's `mess` factor (its tree node's, PRD 8.3) and whether a hood hangs over it
+## (PRD 8.5): a hood cuts the grease it drops.
+func grease_factors(st: Station) -> Dictionary:
+	var m := Kitchen.mess_of(st.node) if st != null and Kitchen.has_node(st.node) else 1.0
+	var hood: bool = st != null and game != null and game.kitchen.has_hood(st.cell)
+	return {"mess": m, "hood": hood}
 
 
 ## A prep finished: grease may drop on the chef's cell or a free floor cell beside the
