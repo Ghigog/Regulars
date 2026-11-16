@@ -119,6 +119,43 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 - Each new job has a flat icon (`job_grate`, `job_saw`, `job_juice`, `job_blend`,
   `job_steam`) and a short gauge in the prep widget, in the same frame as the first five.
 
+**Floor mess (PRD 9, art pass 9.6)**
+- Floor dirt: see "Floor dirt (PRD 9)" in the table below. Shape carries the level.
+- A guest who slips lies on their back across the cell, the puddle in front, with dizzy
+  stars going round over them and a help bar (hidden until someone helps) filling while
+  they are helped up. A guest helping stands beside the middle of the body on the side
+  away from the camera, bent over, so the one on the floor stays in view.
+- The mop bucket is a yellow pail on castors with water in it and a grey wringer box.
+  Its mop stands head up, handle down in the pail, leaning on the rim. A departure (9.6):
+  head down in the pail, every mop on the tree looked the same and its dirt was hidden.
+  The wringer bucket adds a big coral press with a long steel lever.
+- Each mop has its own head, told apart by shape at 20 px: the mop's cotton strands; the
+  sponge-head mop's yellow block in a steel clamp with a green stripe; the flat mop's
+  wide blue pad on a swivel; the wringer mop's strands under a coral collar. The floor
+  scrubber is a coral motor on a round grey deck with a T-handle, parked beside its
+  pail and pushed at the chef's side. A dirty head goes from its colour to grey-brown;
+  dirty strands also droop and drip.
+- The wall hook is a wooden plate with a bent brass hook. Its tool hangs off it: the
+  sponge (yellow, green scourer on top); the scourer (a steel-wool pad on a sponge); the
+  grease scraper (a wide steel blade on a wooden handle); the spill kit (a coral pouch
+  with a white band and a red cross). In a closet the mop stands in the corner and a
+  hand tool sits on the low shelf. A tool left on the floor lies flat, the scrubber
+  standing.
+- The robot sweeper is a flat cream disc with a coral bumper, a dark sensor dome, a
+  green light and a spinning side brush; its dock is a dark plate with a cream back post
+  and a green charge light.
+- The extractor (the hood's tree step) keeps the hood's canopy, adds a coral band at its
+  lip, and swaps the square duct for a dark fan box with its blades showing, under a
+  short round steel duct. A hood beside an extractor still reads as one line of canopy.
+- A treatment's box is a kraft crate of two jugs in the treatment's colour, with a white
+  diamond chemical label on the front. A treated cell has a film just under any dirt:
+  a cleaner a cool wet blue, a primer a dull matte grey, a finish a warm shine with
+  glint streaks (more on high gloss). At night a cell that will not be re-laid (switched
+  off, or no box stored) is dimmed.
+- Screenshots: `dirt`, `slip`, `mop`, `robot`, `mop_night`, `mop_line` (the whole bucket
+  tree in a row, the small tools on hooks, a hood beside an extractor, the chef pushing
+  the scrubber), `treat`, `treat_day`, `tree_box`, `tree_bucket`, `tree_sponge`.
+
 **How it is made**
 - Nothing is modelled in Blender yet. Every mesh is generated in GDScript: chamfered
   boxes (the 3 cm bevel), lathed shapes (bodies, plates, pots, hats) and flat cut-out

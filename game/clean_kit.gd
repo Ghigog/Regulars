@@ -131,12 +131,12 @@ func show_home(home: Station) -> void:
 	var clean := CleanTools.cleanness(home.kit_tool, home.kit_used)
 	match kind_of(home):
 		"bucket":
-			Build.bucket_mop(n, clean)
+			Build.bucket_mop(n, clean, home.kit_tool)
 		"hook":
 			Build.hand_tool(n, home.kit_tool, clean).position = Build.hook_spot(Build.HIGH_Y0)
 		_:   # a closet: the mop stands in the corner, a sponge sits on the low shelf
 			var mop := CleanTools.is_mop(home.kit_tool)
-			var t: Node3D = Build.mop(n, clean) if mop else Build.hand_tool(n, home.kit_tool, clean)
+			var t: Node3D = Build.mop(n, clean, home.kit_tool) if mop else Build.hand_tool(n, home.kit_tool, clean)
 			t.position = Vector3(0.28, 0.02, -0.28) if mop else Vector3(-0.2, 0.2, -0.28)
 
 
@@ -336,8 +336,8 @@ func put_down(tool: String, used: int, cell: Vector2i) -> void:
 	var n := Node3D.new()
 	add_child(n)
 	var clean := CleanTools.cleanness(tool, used)
-	var t: Node3D = Build.mop(n, clean) if CleanTools.is_mop(tool) else Build.hand_tool(n, tool, clean)
-	if CleanTools.is_mop(tool):
+	var t: Node3D = Build.mop(n, clean, tool) if CleanTools.is_mop(tool) else Build.hand_tool(n, tool, clean)
+	if CleanTools.is_mop(tool) and tool != "scrubber":   # a mop lies flat; the scrubber stands on its deck
 		t.rotation = Vector3(0, 0, PI / 2 - 0.04)
 		t.position = Vector3(0.6, 0.06, 0)
 	n.position = Grid.center(cell)

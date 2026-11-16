@@ -404,6 +404,47 @@ func _demo_mop(demo: String) -> void:
 				hud.show_build())
 
 
+## PRD 9.6: the mop bucket's tree in a row along the front, each with its own mop (plain,
+## sponge-head, flat, wringer, the scrubber parked by its pail, a little dirty where it
+## shows), the robot's dock; the small tools on hooks; a hood beside an extractor over the
+## stoves; the chef pushing a scrubber through a trail of dirt (shoot at 3).
+func _demo_mop_line() -> void:
+	arrivals.assign([{"time": 99999.0, "idx": 0}])   # keeps the day open, nobody comes
+	floor_dirt.drops = false
+	floor_dirt.sync_room()
+	var line: Array = [["mop_bucket", 2], ["sponge_mop", 3], ["flat_mop", 2], ["wringer_bucket", 0], ["scrubber", 0]]
+	var x := 4
+	for b: Array in line:
+		var c := Vector2i(x, 6)
+		x += 1
+		if stations.has(c) or not plan.floors.has(c):
+			continue
+		var st := add_station(b[0], c)
+		clean_kit.on_built(st, b[0])
+		clean_kit.keep(st, st.kit_tool, b[1])
+	if not stations.has(Vector2i(x, 6)) and plan.floors.has(Vector2i(x, 6)):
+		add_station("robot_dock", Vector2i(x, 6))
+	var hooks := 0
+	for c: Vector2i in kitchen.wall_cells:
+		if hooks >= 4 or stations.has(c) or highs.has(c) or not kitchen.can_hang(c, "hook"):
+			continue
+		clean_kit.keep(add_high("hook", c), ["sponge", "scourer", "grease_scraper", "spill_kit"][hooks], 0)
+		hooks += 1
+	var hood := Vector2i(0, 4)
+	if highs.has(hood) and kitchen.hood_at(hood) == "hood":   # the second hood, up its tree
+		kitchen.remove(hood, "high")
+		(highs[hood] as Station).queue_free()
+		highs.erase(hood)
+		add_high("extractor", hood)
+	for d: Array in [[Vector2i(7, 4), 2], [Vector2i(7, 3), 3], [Vector2i(7, 2), 4]]:
+		for i in d[1]:
+			floor_dirt.mess.add_dirt(d[0])
+	player.position = Grid.center(Vector2i(7, 5))
+	player.look(Vector2i(1, 0))
+	CleanKit.hold(player, "scrubber", 0)
+	floor_dirt.redraw()
+
+
 ## Dev aid for screenshots: REGULARS_DEMO=cook or =summary jumps to that moment.
 func _apply_demo(demo: String) -> void:
 	if demo == "cook":   # a patty on the grill, the chef with a tray for it
@@ -432,6 +473,8 @@ func _apply_demo(demo: String) -> void:
 			a.time = 0.5
 	elif demo in ["mop", "robot", "mop_night"]:  # PRD 9.4: see _demo_mop
 		_demo_mop(demo)
+	elif demo == "mop_line":  # PRD 9.6: see _demo_mop_line
+		_demo_mop_line()
 	elif demo in ["treat", "treat_day", "tree_box", "tree_bucket", "tree_sponge"]:  # PRD 9.5: see _demo_treat
 		ledger.record_sale(DEMO_BILL, 5)
 		arrivals.clear()
