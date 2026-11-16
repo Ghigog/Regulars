@@ -18,13 +18,29 @@ Survive as many days as you can; three walkouts in one day ends the run.
   fish fillet, calamari, lemon, courgette, pepper, new potatoes, green beans, white
   wine. Each has a tool, tags (meat, vegetable, bread, fish, fried, drink...), a worth
   (what it adds to a price) and a fee (what stocking it costs a night).
-- **Stations.** Every ingredient comes from its own station in the room (a crate,
-  sack, fridge, icebox, basket, barrel or the soda fountain, $15 to $45 in the shop's
-  Kitchen tab), so a bigger menu needs a bigger kitchen. Each prep tool is its own
-  station too: stove (grill, $50), fryer ($50), stock pot (boil, $35), chopping board
-  ($25), slicer ($30). Pour happens at the drink's own station. Chopped ingredients
-  and cheese can be bought ready-made (a steel tub of the prepped food, always plain,
-  1.5x the fee: `READY_FEE`). Every station can be sold, the last stove included.
+- **Storage (PRD 8.4).** Ingredients live in storage the player builds. The shop's
+  Pantry tab has a box per food kind of the run's theme (free to take; its kind costs
+  its nightly fee) and, from level 2, ready-made boxes of the chopped kinds and cheese
+  (prepped, always plain, 1.5x the fee: `READY_FEE`). A box goes into a free slot: a
+  counter holds one kind, a double counter two, a long counter three (`Kitchen.NODES`
+  "slots"); chilled kinds (patty, cheese, fish, calamari, and ready cheese) only in a
+  fridge slot, the under-counter fridge reached through the counter's tree. One box of a
+  kind a cell. A kind in any slot is stocked and charged once a night; picking its box
+  up stops it, and selling it (for nothing) stops the fee. A drink dispenser (the soda
+  fountain, the wine barrel) holds its own drink, no slot needed. At night, E at a cell
+  lifts the tool first, then the boxes (last in first), then the counter; a tool goes
+  on a counter with boxes and they stay below. In service, E with empty hands takes what
+  is on the top first, else the cell's first kind; holding a kind as it came out, each
+  tap swaps it for the next kind there, or with one kind puts it back. A tool wins for
+  what it can use (a raw patty on a stove over a fridge is grilled). A row of tags over
+  the cell names its kinds. The menu greys an item whose kind has no box ("Patty: needs
+  a fridge" when there is no fridge, "Patty: needs a box" otherwise); the restock note
+  and `kitchen_stock()` read the slots. The crate stations are gone. Night zero: a stove
+  on a pass counter, a pass counter upgraded to a fridge, two boxes and a menu leave
+  money for the stock (tested for both themes).
+- **Tools.** Each prep tool stands on a counter: stove (grill, $50), chopping board
+  ($25), the fryer, stock pot and slicer reached in their trees (PRD 8.3). Pour happens
+  at the drink's own dispenser. Every piece can be sold, the last stove included.
 - **Tickets and trays** (`sim/tray.gd`). Taking a table's order puts a ticket for each
   guest who ordered on the rail along the top of the screen (oldest on the left, five
   shown, more counted on a last tab; each in the guest's shirt colour). The chef takes
@@ -286,7 +302,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   piece turns into it, still in hand. A piece with no tree (sink, bin) says so and the
   shop stays shut; a new, unpaid piece in hand opens the shop as before. Trees: the
   board, stove, soda fountain, wine barrel and the counter (double, long counter;
-  under-counter fridge, tall fridge, glass fridge; storage itself arrives in 8.4). Tiered
+  under-counter fridge, tall fridge, glass fridge; storage, 8.4, is above). Tiered
   catalog pieces (fern, palm, jukebox, aquarium, tables, booth, stool) get a short tree of
   their tiers, priced and levelled as before. The shop sells tier 1 and tree roots only:
   the fryer, pot and slicer are reached from the stove and board. Selling pays half the

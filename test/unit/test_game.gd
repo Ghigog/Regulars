@@ -54,12 +54,12 @@ func _the_pass() -> Station:
 func _cook_burger(grill := Station.COOK_TIME + 0.5) -> void:
 	_use("trays")
 	game.use_station(_the_pass())        # the tray goes down and takes the ticket
-	_use("crate_patty")
+	game.use_station(game.storage_of("patty"))
 	_use("stove")
 	_run(grill)
 	_use("stove")
 	game.use_station(_the_pass())        # patty on
-	_use("crate_bun")
+	game.use_station(game.storage_of("bun"))
 	game.use_station(_the_pass())        # bun on
 	game.use_station(_the_pass())        # picked up, finished
 
@@ -83,7 +83,7 @@ func test_cooking_fills_a_tray_for_the_ticket():
 
 
 func test_patty_left_on_stove_burns():
-	_use("crate_patty")
+	game.use_station(game.storage_of("patty"))
 	_use("stove")
 	_run(Station.BURN_TIME + 1.0)
 	assert_eq(game.find_station("stove").item, "burnt:patty")
@@ -227,7 +227,7 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	game.hud.shop_move(-1)
 	assert_eq(game.hud._shop_index, kitchen - 1, "left from the first wraps to the last")
 	game.hud.shop_category(1)
-	assert_eq(game.hud._category, "Dining")
+	assert_eq(game.hud._category, "Pantry")
 	game.close_shop()
 	assert_null(game.hud._shop)
 	game.start_day()
@@ -405,7 +405,7 @@ func test_moving_a_piece_is_free_and_cancel_puts_it_back():
 
 func test_carried_piece_goes_back_when_the_day_opens():
 	_to_build()
-	var crate: Station = game.find_station("crate_patty")
+	var crate: Station = game.storage_of("patty")
 	assert_true(game.pick_up(Vector3(0.5, 0, 2.5)))
 	game.start_day()
 	assert_eq(game.stations[Vector2i(0, 2)], crate)
@@ -679,7 +679,7 @@ func test_guests_enjoy_watching_the_stove_unless_it_is_burning():
 	if g == null:
 		return
 	var joy: float = g.mood.joy
-	_use("crate_patty")
+	game.use_station(game.storage_of("patty"))
 	_use("stove")
 	_run(2.0)
 	assert_gt(g.mood.joy, joy)
@@ -734,13 +734,13 @@ func test_overcooked_meat_is_worth_less():
 
 
 func test_prompt_names_the_action_without_doing_it():
-	var crate: Station = game.find_station("crate_patty")
+	var crate: Station = game.storage_of("patty")
 	assert_eq(game.prompt_for(crate), "Take patty")
 	assert_eq(game.player.held, "")
-	_use("crate_patty")
+	game.use_station(game.storage_of("patty"))
 	assert_eq(game.prompt_for(crate), "Put back")
 	assert_eq(game.prompt_for(game.find_station("stove")), "Grill")
-	assert_eq(game.prompt_for(game.find_station("crate_bun")), "", "hands are full")
+	assert_eq(game.prompt_for(game.storage_of("bun")), "Put down", "hands are full: it goes on the counter's top")
 
 
 func test_music_follows_day_night_and_closing():
@@ -838,7 +838,7 @@ func test_chef_can_serve_from_beside_the_guest_without_facing_the_table():
 
 func test_chef_aims_at_the_station_most_in_front():
 	# Holding meat at (1, 3): stoves at (0, 3) and, diagonally, (0, 4) can both take it.
-	_use("crate_patty")
+	game.use_station(game.storage_of("patty"))
 	game.player.position = Grid.center(Vector2i(1, 3))
 	game.player.look(Vector2i(-1, 0))
 	assert_eq(game.player.target_cell(), Vector2i(0, 3), "the nearer one")
@@ -1917,7 +1917,7 @@ func test_a_one_item_tray_goes_from_ticket_to_paid_bill():
 
 
 func test_a_three_item_tray_is_one_bill():
-	game.add_station("crate_soda", Vector2i(2, 5))
+	game.add_station("fountain", Vector2i(2, 5))
 	var side: Dictionary = game.menu.add("side", ["bun"], "Bread")
 	var drink: Dictionary = game.menu.add("drink", ["soda"], "Soda")
 	game.town.people[0].likes = ["bun", "soda"]
@@ -1928,14 +1928,14 @@ func test_a_three_item_tray_is_one_bill():
 	_use("trays")
 	game.use_station(_the_pass())
 	var t: Tray = _the_pass().tray
-	for k in ["crate_bun", "crate_soda", "crate_bun"]:
-		if k == "crate_soda":
+	for k in ["bun", "fountain", "bun"]:
+		if k == "fountain":
 			_pour(game.find_station(k), Prep.POUR_GOOD + 0.05)
 		else:
-			_use(k)
+			game.use_station(game.storage_of(k))
 		game.use_station(_the_pass())
 	assert_eq(game.use_station(_the_pass(), true), "Needs patty")
-	_use("crate_patty")
+	game.use_station(game.storage_of("patty"))
 	_use("stove")
 	_run(Station.COOK_TIME + 0.5)
 	_use("stove")
@@ -1968,7 +1968,7 @@ func test_an_incomplete_tray_cannot_be_picked_up():
 	_ordered_guest()
 	_use("trays")
 	game.use_station(_the_pass())
-	_use("crate_bun")
+	game.use_station(game.storage_of("bun"))
 	game.use_station(_the_pass())
 	assert_eq(game.use_station(_the_pass()), "Needs patty")
 	assert_eq(game.player.held, "")
@@ -1996,7 +1996,7 @@ func test_a_ticket_is_torn_off_when_its_guest_walks_out():
 	var g := _ordered_guest()
 	_use("trays")
 	game.use_station(_the_pass())
-	_use("crate_bun")
+	game.use_station(game.storage_of("bun"))
 	game.use_station(_the_pass())
 	g.mood.patience = 0.0
 	_run(0.5)
@@ -2048,13 +2048,13 @@ func _chop(hits: int) -> void:
 
 
 func _tool(type: String, cell: Vector2i, crate: String) -> Station:
-	game.add_station(crate, cell + Vector2i(0, 1))
+	game.stock_box(crate.trim_prefix("crate_"), cell + Vector2i(0, 1))
 	return game.add_station(type, cell)
 
 
 func test_chopping_all_three_on_the_notch_is_good_and_speeds_the_chef():
 	var board := _tool("board", Vector2i(2, 5), "crate_lettuce")
-	_use("crate_lettuce")
+	game.use_station(game.storage_of("lettuce"))
 	assert_eq(game.player.held, "raw:lettuce")
 	assert_eq(game.use_station(board), "Chop")
 	assert_eq(game.player.held, "", "the lettuce goes on the board")
@@ -2070,7 +2070,7 @@ func test_chopping_all_three_on_the_notch_is_good_and_speeds_the_chef():
 
 func test_a_bad_chop_slows_the_chef_and_a_plain_one_does_neither():
 	var board := _tool("board", Vector2i(2, 5), "crate_onion")
-	_use("crate_onion")
+	game.use_station(game.storage_of("onion"))
 	game.use_station(board)
 	_chop(0)
 	assert_eq(game.player.held_quality, Prep.BAD)
@@ -2078,7 +2078,7 @@ func test_a_bad_chop_slows_the_chef_and_a_plain_one_does_neither():
 	_run(Prep.BOOST_TIME + 0.1)
 	assert_eq(game.player.speed(), Player.SPEED)
 	game.player.set_held("")
-	_use("crate_onion")
+	game.use_station(game.storage_of("onion"))
 	game.use_station(board)
 	_chop(2)
 	assert_eq(game.player.held_quality, Prep.PLAIN)
@@ -2087,7 +2087,7 @@ func test_a_bad_chop_slows_the_chef_and_a_plain_one_does_neither():
 
 func test_the_chef_stands_still_and_back_gives_the_ingredient_back_raw():
 	var board := _tool("board", Vector2i(2, 5), "crate_tomato")
-	_use("crate_tomato")
+	game.use_station(game.storage_of("tomato"))
 	game.use_station(board)
 	var at: Vector3 = game.player.position
 	_axis(JOY_AXIS_LEFT_X, 1.0)
@@ -2105,7 +2105,7 @@ func test_slicing_to_the_count_is_good_and_over_it_is_plain():
 	var slicer := _tool("slicer", Vector2i(2, 5), "crate_cheese")
 	for presses: int in [Prep.SLICE_COUNT, Prep.SLICE_COUNT + 2, Prep.SLICE_COUNT - 1]:
 		game.player.set_held("")
-		_use("crate_cheese")
+		game.use_station(game.storage_of("cheese"))
 		assert_eq(game.use_station(slicer), "Slice")
 		for k in presses:
 			game.act(0, "use")
@@ -2117,14 +2117,14 @@ func test_slicing_to_the_count_is_good_and_over_it_is_plain():
 
 func test_a_tool_refuses_what_it_does_not_prep():
 	var board := _tool("board", Vector2i(2, 5), "crate_patty")
-	_use("crate_patty")
+	game.use_station(game.storage_of("patty"))
 	assert_eq(game.use_station(board, true), "Put down", "a thing the tool cannot use rests on its surface")
 	board.set_item(Tray.kind("prep", "lettuce"))
 	assert_eq(game.use_station(board, true), "Patty doesn't go on the chopping board", "the surface is taken")
 
 
 func test_pouring_into_the_top_band_is_good_and_overflowing_is_bad():
-	var fountain: Station = game.add_station("crate_soda", Vector2i(2, 5))
+	var fountain: Station = game.add_station("fountain", Vector2i(2, 5))
 	_pour(fountain, 0.9)
 	assert_eq(game.player.held, "prep:soda")
 	assert_eq(game.player.held_quality, Prep.GOOD)
@@ -2138,7 +2138,7 @@ func test_pouring_into_the_top_band_is_good_and_overflowing_is_bad():
 
 func test_fries_rest_on_the_rack_before_they_can_be_picked_up():
 	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
-	_use("crate_potato")
+	game.use_station(game.storage_of("potato"))
 	assert_eq(game.use_station(fryer), "Fry")
 	_run(Prep.FRY_GOOD + 0.5)
 	assert_eq(game.use_station(fryer), "Lift basket")
@@ -2153,7 +2153,7 @@ func test_fries_rest_on_the_rack_before_they_can_be_picked_up():
 
 func test_fries_left_in_burn_and_slow_the_chef():
 	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
-	_use("crate_potato")
+	game.use_station(game.storage_of("potato"))
 	game.use_station(fryer)
 	_run(Prep.heat_times("fry", fryer.q("fry"))[3] + 0.5)   # a fryer is a specialist: slower to burn
 	game.use_station(fryer)
@@ -2164,7 +2164,7 @@ func test_fries_left_in_burn_and_slow_the_chef():
 
 func test_boiling_waits_when_done_and_never_gives_a_burst():
 	var pot := _tool("pot", Vector2i(2, 5), "crate_corn")
-	_use("crate_corn")
+	game.use_station(game.storage_of("corn"))
 	assert_eq(game.use_station(pot), "Boil")
 	assert_eq(game.use_station(pot, true), "Still boiling")
 	_run(Prep.BOIL_TIME + 20.0)
@@ -2175,7 +2175,7 @@ func test_boiling_waits_when_done_and_never_gives_a_burst():
 
 
 func test_a_good_grill_gives_a_burst():
-	_use("crate_patty")
+	game.use_station(game.storage_of("patty"))
 	_use("stove")
 	_run(Prep.GRILL_DONE + 0.5)
 	_use("stove")
@@ -2200,9 +2200,10 @@ func test_door_card_will_not_flip_with_no_makeable_main():
 	game.menu.add("side", ["bun"], "Bread")
 	assert_false(game.use_door(), "a side alone is not enough")
 	game.write_test_menu()
-	game.find_station("crate_patty").stocked = false
+	game.kitchen.unstore(Vector2i(0, 2), "box_patty")
+	game.menu_changed()
 	assert_false(game.use_door(), "the Burger is off: no patty stocked")
-	game.find_station("crate_patty").stocked = true
+	game.stock_box("patty", Vector2i(0, 2))
 	assert_true(game.use_door())
 	assert_eq(game.phase, game.Phase.SERVICE)
 
@@ -2222,7 +2223,7 @@ func test_door_card_will_not_flip_when_the_stock_cannot_be_paid():
 
 func test_opening_charges_the_night_cost_as_a_stock_line():
 	assert_eq(game.night_cost(), Pantry.fee_of("patty") + Pantry.fee_of("bun"))
-	game.add_station("ready_cheese", Vector2i(1, 6))
+	game.stock_box("cheese", Vector2i(1, 6), true)
 	assert_eq(game.night_cost(), Pantry.fee_of("patty") + Pantry.fee_of("bun") + roundi(Pantry.fee_of("cheese") * 1.5),
 		"ready-made at half as much again")
 	_to_build()
@@ -2237,22 +2238,28 @@ func test_opening_charges_the_night_cost_as_a_stock_line():
 	assert_eq(game.last_day.stock, cost, "the receipt has a Stock line")
 
 
-func test_using_a_crate_at_night_switches_its_stock_and_takes_it_off_the_menu():
+func test_picking_up_a_box_at_night_takes_it_off_the_menu_and_selling_it_stops_the_fee():
 	_to_build()
-	game.player.position = Grid.center(Vector2i(1, 2))
-	game.player.look(Vector2i(-1, 0))
-	var crate: Station = game.find_station("crate_patty")
-	assert_eq(game.stock_station_in_front(), crate)
+	var fridge: Station = game.storage_of("patty")
 	var full: int = game.night_cost()
-	game.act(0, "turn")
-	assert_false(crate.stocked)
-	assert_eq(game.night_cost(), full - Pantry.fee_of("patty"), "an unstocked station costs nothing")
+	assert_true(game.pick_up(Vector3(0.5, 0, 2.5)), "the box comes out before the fridge it is in")
+	assert_eq(game.player.hand.id, "box_patty")
+	assert_eq(game.stations[Vector2i(0, 2)], fridge, "the fridge stays")
+	assert_true(fridge.boxes.is_empty(), "its tag goes")
+	assert_eq(game.night_cost(), full - Pantry.fee_of("patty"), "out of its slot, it costs nothing")
 	assert_true(game.tonight_menu().is_empty(), "the Burger is not offered")
-	assert_eq(Menu.off_reason(game.menu.items[0], game.kitchen_stock(), game.kitchen_tools()), "Patty not stocked")
+	assert_eq(game.item_off_reason(game.menu.items[0]), "Patty: needs a box")
 	assert_true(game.menu_board.names.is_empty(), "the board by the door follows")
-	game.act(0, "turn")
-	assert_true(crate.stocked)
+	game.cancel_hand()
+	assert_eq(fridge.boxes, ["box_patty"], "put back where it came from")
 	assert_eq(game.menu_board.names, ["Burger"])
+	assert_true(game.pick_up(Vector3(0.5, 0, 2.5)))
+	var money: int = game.ledger.money
+	assert_eq(game.sell_block(), "")
+	assert_true(game.sell_hand())
+	assert_eq(game.ledger.money, money, "a box is free, so selling it pays nothing back")
+	assert_eq(game.night_cost(), full - Pantry.fee_of("patty"), "and its fee stops")
+	assert_true(game.player.hand.is_empty())
 
 
 func test_an_item_with_no_tool_is_off_the_menu():
@@ -2266,11 +2273,11 @@ func test_an_item_with_no_tool_is_off_the_menu():
 	assert_true(game.order_for(g).main.is_empty(), "nothing is offered")
 
 
-func test_an_unstocked_crate_gives_nothing_in_service():
-	game.find_station("crate_patty").stocked = false
-	_use("crate_patty")
+func test_an_empty_fridge_gives_nothing_in_service():
+	game.kitchen.unstore(Vector2i(0, 2), "box_patty")
+	game.use_station(game.stations[Vector2i(0, 2)])
 	assert_eq(game.player.held, "")
-	assert_eq(game.prompt_for(game.find_station("crate_patty")), "Not stocked today")
+	assert_eq(game.prompt_for(game.stations[Vector2i(0, 2)]), "")
 
 
 func test_the_menu_screen_opens_at_night_only():
@@ -2285,7 +2292,7 @@ func test_the_menu_screen_opens_at_night_only():
 
 func test_writing_an_item_on_the_menu_screen():
 	_to_build()
-	game.add_station("crate_cheese", Vector2i(1, 6))
+	game.stock_box("cheese", Vector2i(1, 6))
 	game.add_station("slicer", Vector2i(2, 6))
 	assert_true(game.open_menu())
 	var ms: MenuScreen = game.hud.menu
@@ -2366,7 +2373,7 @@ func test_night_zero_hints_come_one_at_a_time():
 	_to_build()
 	game.ledger.history.clear()   # as on the night before day 1
 	assert_eq(game.night_hint(), game.NIGHT_HINTS[0])
-	game.add_station("crate_bun", Vector2i(0, 6), 1, 1)
+	game.stock_box("bun", Vector2i(0, 6), 1, 1)
 	assert_eq(game.night_hint(), game.NIGHT_HINTS[0], "a tool too")
 	game.add_station("board", Vector2i(0, 3), 1, 1)
 	assert_eq(game.night_hint(), game.NIGHT_HINTS[1])
@@ -2390,18 +2397,18 @@ func test_seaside_fish_roll_from_ticket_to_bill():
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
 	_neutral_tastes()
 	game.test_kitchen()
-	assert_null(game.find_station("crate_patty"), "no diner stations by the sea")
+	assert_null(game.storage_of("patty"), "no diner stations by the sea")
 	var g := _ordered_guest()
 	assert_eq(g.order.main.name, "Fish roll")
 	_use("trays")
 	game.use_station(_the_pass())
-	_use("crate_fish")
+	game.use_station(game.storage_of("fish"))
 	assert_eq(game.player.held, "raw:fish")
 	_use("stove")
 	_run(Station.COOK_TIME + 0.5)
 	_use("stove")
 	game.use_station(_the_pass())
-	_use("crate_roll")
+	game.use_station(game.storage_of("roll"))
 	game.use_station(_the_pass())
 	game.use_station(_the_pass())
 	assert_true(game.player.tray.is_complete())

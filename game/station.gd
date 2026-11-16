@@ -30,7 +30,7 @@ var item := ""        # what is sitting on a counter or stove: an ingredient kin
 var quality := 1.0    # how well prepped that item is (0..1)
 var tray: Tray        # the tray on a counter or the pass, when item is "tray"
 var tray_tag := ""    # the colour of that tray's ticket slip ("" for none)
-var stocked := true   # an ingredient station: stocked for tomorrow (switched at night)
+var boxes: Array = []   # the boxes of stock in this cell's storage, as the kitchen holds them (PRD 8.4)
 var cook := 0.0       # seconds the piece has been on the heat (stove, fryer, pot)
 var rest := 0.0       # a fryer: seconds left draining on the rack before it can be picked up
 var result := ""      # a fryer: how the piece on the rack came out (good, plain)
@@ -49,6 +49,7 @@ var _ring: MeshInstance3D
 var _shown_look := ""
 var _vis: Node3D
 var _fx := {}
+var _tags: Node3D
 
 
 static func quality_at(t: float) -> float:
@@ -484,8 +485,6 @@ func refresh() -> void:
 			var t := Build.item("tray")
 			t.position = Vector3(0, 0.916 + i * 0.04, 0)
 			_stack.add_child(t)
-	elif Catalog.ingredient_of(type) != "" and not stocked:
-		Build.unstocked(_stack)
 	elif is_table(type):
 		for i in dirty:
 			var d := Build.item("dirty_tray")
@@ -501,6 +500,20 @@ func refresh() -> void:
 		elif not overflowing() and _fx.has("wisps"):
 			_fx.wisps.queue_free()
 			_fx.erase("wisps")
+
+
+## Shows which kinds this cell stores: a row of tags over it (PRD 8.4).
+func set_boxes(b: Array) -> void:
+	boxes = b.duplicate()
+	if _tags:
+		_tags.queue_free()
+		_tags = null
+	if boxes.is_empty():
+		return
+	_tags = Node3D.new()
+	_tags.name = "box_tags"
+	add_child(_tags)
+	Build.box_tags(_tags, boxes)
 
 
 ## A little show when the chef uses the station: a door swings open.

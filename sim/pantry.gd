@@ -105,18 +105,26 @@ static func fee_of(id: String, ready := false) -> int:
 	return roundi(fee * READY_FEE) if ready else fee
 
 
-## The catalog id of the station that hands this ingredient out.
-static func station_id(id: String, ready := false) -> String:
-	return ("ready_" if ready else "crate_") + id
+## The catalog id of the box of this ingredient (PRD 8.4): "box_patty", or "ready_cheese"
+## for the ready-made one.
+static func box_id(id: String, ready := false) -> String:
+	return ("ready_" if ready else "box_") + id
 
 
-## The ingredient a station hands out and whether it is ready-made, or {} if the
-## catalog id is not an ingredient station.
-static func station_ingredient(station: String) -> Dictionary:
-	for prefix in ["crate_", "ready_"]:
-		if station.begins_with(prefix) and ITEMS.has(station.trim_prefix(prefix)):
-			return {"id": station.trim_prefix(prefix), "ready": prefix == "ready_"}
+## The ingredient a box (or a plain kind) holds and whether it is ready-made, or {}
+## if it is neither.
+static func station_ingredient(box: String) -> Dictionary:
+	if ITEMS.has(box):
+		return {"id": box, "ready": false}
+	for prefix in ["box_", "ready_"]:
+		if box.begins_with(prefix) and ITEMS.has(box.trim_prefix(prefix)):
+			return {"id": box.trim_prefix(prefix), "ready": prefix == "ready_"}
 	return {}
+
+
+## The ingredient kind of a box id or a kind ("" if neither).
+static func kind_of(box: String) -> String:
+	return str(station_ingredient(box).get("id", ""))
 
 
 ## The tool a tool station gives, or "" if the catalog id is not one.

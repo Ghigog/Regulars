@@ -85,16 +85,16 @@ const NODES := {
 	"hood": {"name": "Hood", "fit": "hood", "price": 30},   # tunable price; a flag for PRD 9
 }
 
-## Catalog pieces that are kitchen nodes under another id: the drink dispensers keep
-## their crate ids until storage replaces the crates (8.4).
-const CATALOG_IDS := {"crate_soda": "fountain", "crate_wine": "wine_barrel"}
+## Catalog pieces that are kitchen nodes under another id (none since the crates went, 8.4).
+const CATALOG_IDS := {}
 ## A base that becomes another when one more of it is placed on it: a counter placed
 ## on a counter is a double counter, still one cell (PRD 8, "Decided").
 const STACKS := {"counter": "double_counter"}
 
 ## Cells against a wall, which have a high layer: Vector2i -> true.
 var wall_cells := {}
-## Vector2i -> {"base": id, "top": id, "high": id, "stock": {"base": [kinds], "high": [kinds]}}.
+## Vector2i -> {"base": id, "top": id, "high": id, "stock": {"base": [boxes], "high": [boxes]}}.
+## A box is a kind ("patty") or a box id ("box_patty", "ready_cheese"); one of a kind a cell.
 ## Empty layers are "".
 var cells := {}
 
@@ -239,9 +239,11 @@ static func unstacked(base: String) -> String:
 	return str(lower) if lower != null else ""
 
 
-## Whether an ingredient must be kept in a fridge slot.
+## Whether an ingredient (a kind, or a box id: "box_patty", "ready_cheese") must be
+## kept in a fridge slot. A ready-made box keeps the chill of its ingredient.
 static func is_chilled(kind: String) -> bool:
-	return Pantry.ITEMS.has(kind) and Pantry.ITEMS[kind].get("chilled", false)
+	var k := Pantry.kind_of(kind)
+	return k != "" and Pantry.ITEMS[k].get("chilled", false)
 
 
 # ---------- Cells ----------
@@ -370,7 +372,7 @@ func stock(cell: Vector2i) -> Array:
 ## The layer a kind would be stored in, or "" if there is no free slot that takes it.
 ## Unchilled kinds prefer unchilled slots, to leave fridge room free.
 func store_layer(cell: Vector2i, kind: String) -> String:
-	if not cells.has(cell) or stock(cell).has(kind):
+	if not cells.has(cell) or holds_kind(cell, Pantry.kind_of(kind)):
 		return ""
 	var chilled := is_chilled(kind)
 	var best := ""
@@ -409,7 +411,45 @@ func unstore(cell: Vector2i, kind: String) -> bool:
 	return false
 
 
-## Every kind stocked anywhere in the kitchen.
+## Whether a cell holds a box of this ingredient kind, ready-made or not.
+func holds_kind(cell: Vector2i, kind: String) -> bool:
+	for b: String in stock(cell):
+		if Pantry.kind_of(b) == kind:
+			return true
+	return false
+
+
+## The cells with a box of this kind (or box id) in them.
+func cells_with(box: String) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in cells:
+		if stock(cell).has(box):
+			out.append(cell)
+	return out
+
+
+## Whether any piece in the kitchen has fridge slots.
+func has_fridge() -> bool:
+	for cell: Vector2i in cells:
+		if chilled_slots(cell) > 0:
+			return true
+	return false
+
+
+## The stock of a cell, to carry over while its pieces are swapped in the room.
+func take_stock(cell: Vector2i) -> Dictionary:
+	if not cells.has(cell):
+		return {}
+	return (cells[cell].stock as Dictionary).duplicate(true)
+
+
+## Puts stock taken with take_stock back in a cell.
+func give_stock(cell: Vector2i, held: Dictionary) -> void:
+	if cells.has(cell) and not held.is_empty():
+		cells[cell].stock = held
+
+
+## Every box stocked anywhere in the kitchen, each once.
 func stocked() -> Array[String]:
 	var out: Array[String] = []
 	for cell: Vector2i in cells:

@@ -108,8 +108,6 @@ func _list() -> void:
 	cols.add_theme_constant_override("separation", 24)
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_content.add_child(cols)
-	var stations: Array = game.kitchen_stock()
-	var tools: Array = game.kitchen_tools()
 	for course in Menu.COURSES:
 		var col := VBoxContainer.new()
 		col.custom_minimum_size = Vector2(330, 300)
@@ -118,7 +116,7 @@ func _list() -> void:
 		_label(col, 30, Menu.COURSE_NAMES[course])
 		var items: Array[Dictionary] = game.menu.in_course(course)
 		for it in items:
-			var why := Menu.off_reason(it, stations, tools)
+			var why: String = game.item_off_reason(it)
 			var b := _paper_button(col, "item:%d" % it.id, _open.bind(it))
 			var box := VBoxContainer.new()
 			box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -152,22 +150,12 @@ func _list() -> void:
 	chips.add_theme_constant_override("h_separation", 10)
 	chips.add_theme_constant_override("v_separation", 8)
 	srow.add_child(chips)
-	var types: Array[String] = []
-	for st: Station in game.stations.values():
-		if Catalog.ingredient_of(st.type) != "" and not types.has(st.type):
-			types.append(st.type)
-	types.sort()
-	for type in types:
-		var on: bool = game.stations_of(type)[0].stocked
-		var ing := Catalog.ingredient_of(type)
-		var ready: bool = Catalog.ITEMS[type].get("ready", false)
-		var label := "%s%s  $%d" % [Pantry.name_of(ing), " (ready)" if ready else "", Pantry.fee_of(ing, ready)] if on \
-			else "%s: not stocked" % Pantry.name_of(ing)
-		var chip := _paper_button(chips, "stock:" + type, _switch.bind(type), label, 20)
-		if not on:
-			chip.modulate.a = 0.55
-	if types.is_empty():
-		var none := _label(chips, 20, "No ingredient stations yet: buy them in the shop.")
+	# Read only: a kind is stocked by putting its box in a slot, and stopped by selling it (PRD 8.4).
+	var lines: Array[Dictionary] = game.stock_lines()
+	for l in lines:
+		_label(chips, 20, "%s  $%d" % [l.name, int(l.fee)])
+	if lines.is_empty():
+		var none := _label(chips, 20, "No boxes yet: buy them in the shop's Pantry.")
 		none.modulate.a = 0.6
 	var done: Button = hud._button(srow, "Done", game.close_menu)
 	done.size_flags_horizontal = Control.SIZE_SHRINK_END
@@ -206,7 +194,7 @@ func _page() -> void:
 	else:
 		_label(price, 30, "$%d" % Menu.price_of(it))
 		price.add_child(_coins(it.price_level, 24))
-	var why := Menu.off_reason(it, game.kitchen_stock(), game.kitchen_tools()) if not it.ingredients.is_empty() else ""
+	var why: String = game.item_off_reason(it) if not it.ingredients.is_empty() else ""
 	if why != "":
 		var off := _label(left, 20, "Off tonight: " + why)
 		off.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -257,7 +245,7 @@ func _page() -> void:
 			b.modulate.a = 0.45
 			_targets.erase(b)
 	if not any:
-		var none := _label(right, 20, "No %s in the kitchen yet: buy one in the shop." % ("drinks" if it.course == "drink" else "food"))
+		var none := _label(right, 20, "No %s in the kitchen yet: buy %s in the shop." % (["drinks", "a soda fountain or a wine barrel"] if it.course == "drink" else ["food", "a box in the Pantry"]))
 		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		none.modulate.a = 0.6
 	# Name, price level, off tonight, delete, done.
@@ -582,13 +570,6 @@ func _delete() -> void:
 	_sel_key = "add:" + course
 	game.sfx("rip")
 	_changed()
-
-
-func _switch(type: String) -> void:
-	var st: Array = game.stations_of(type)
-	if not st.is_empty():
-		game.set_stocked(type, not (st[0] as Station).stocked)
-	render()
 
 
 func _start_name() -> void:
