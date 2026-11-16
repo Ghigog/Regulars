@@ -218,7 +218,7 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	var kitchen: int = Catalog.search("", "Kitchen", Scenery.theme_id).size()
 	assert_eq(game.hud._cards.get_child_count(), kitchen)
 	game.hud.set_search("fern")
-	assert_eq(game.hud._cards.get_child_count(), 3, "a search looks through every category")
+	assert_eq(game.hud._cards.get_child_count(), 1, "a search looks through every category")
 	game.hud.set_search("zzz")
 	assert_eq(game.hud._cards.get_child_count(), 1, "only the nothing-matches line")
 	game.hud._set_category("Kitchen")
@@ -1133,7 +1133,7 @@ func test_booth_and_table_for_four_are_sold_under_dining():
 	assert_false(cat.can_buy("table4", 500, 2), "a table for four needs level 3")
 	assert_true(cat.can_buy("table4", 500, 3))
 	assert_true(cat.can_buy("booth", 500, 2))
-	assert_eq(Catalog.search("four").size(), 3, "every tier of the table for four turns up")
+	assert_eq(Catalog.search("four").size(), 1, "the table for four turns up (its tiers are its upgrade tree)")
 
 
 func test_seats_of_a_booth_turn_and_a_table_for_four_has_one_each_side():
@@ -2110,17 +2110,17 @@ func test_slicing_to_the_count_is_good_and_over_it_is_plain():
 		for k in presses:
 			game.act(0, "use")
 			game.step(0.05)
-		_run(Prep.SLICE_TIME)
+		_run(Prep.slice_time(slicer.q("slice")))   # a slicer is a specialist: more time (PRD 8.3)
 		assert_eq(game.player.held, "prep:cheese")
 		assert_eq(game.player.held_quality, {Prep.SLICE_COUNT: Prep.GOOD, Prep.SLICE_COUNT + 2: Prep.PLAIN}.get(presses, Prep.BAD), "%d presses" % presses)
 
 
 func test_a_tool_refuses_what_it_does_not_prep():
-	var board := _tool("board", Vector2i(2, 5), "crate_cheese")
-	_use("crate_cheese")
+	var board := _tool("board", Vector2i(2, 5), "crate_patty")
+	_use("crate_patty")
 	assert_eq(game.use_station(board, true), "Put down", "a thing the tool cannot use rests on its surface")
 	board.set_item(Tray.kind("prep", "lettuce"))
-	assert_eq(game.use_station(board, true), "Cheese doesn't go on the chopping board", "the surface is taken")
+	assert_eq(game.use_station(board, true), "Patty doesn't go on the chopping board", "the surface is taken")
 
 
 func test_pouring_into_the_top_band_is_good_and_overflowing_is_bad():
@@ -2155,7 +2155,7 @@ func test_fries_left_in_burn_and_slow_the_chef():
 	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
 	_use("crate_potato")
 	game.use_station(fryer)
-	_run(Prep.FRY_BURN + 0.5)
+	_run(Prep.heat_times("fry", fryer.q("fry"))[3] + 0.5)   # a fryer is a specialist: slower to burn
 	game.use_station(fryer)
 	assert_eq(game.player.held, "burnt:potato")
 	game.floor_dirt.mess.dirt.clear()   # a bad fry may drop grease, which slows the chef too (PRD 9)

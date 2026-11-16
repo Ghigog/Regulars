@@ -1,7 +1,8 @@
 class_name Catalog
 extends RefCounted
 ## Everything you can buy for the restaurant. A blueprint is {"id": String, "tier": int}.
-## The game sells every tier straight from the catalog. The nightly crate and the shelf
+## The shop sells tier 1 and roots only; higher tiers and tree nodes are bought in a
+## piece's upgrade tree (Upgrades). The nightly crate and the shelf
 ## (offer, shelve, collect_ready) are parked: tested, but nothing in the game calls them.
 
 const MAX_TIER := 3
@@ -79,16 +80,16 @@ const ITEMS := {
 		"blurb": "Beside a sink: it takes two more trays before it looks piled"},
 	"sink": {"name": "Sink", "price": 70, "level": 3, "category": "Kitchen", "tiers": 1,
 		"blurb": "Another place to wash up"},
-	"stove": {"name": "Stove", "price": 50, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "grill",
-		"blurb": "Grills patties and fish", "up": "Grills faster  burns faster"},
-	"fryer": {"name": "Fryer", "price": 50, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "fry",
-		"blurb": "Fries potatoes and calamari", "up": "Fries faster  burns faster"},
-	"pot": {"name": "Stock pot", "price": 35, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "boil",
-		"blurb": "Boils corn, potatoes and beans", "up": "Boils faster"},
-	"board": {"name": "Chopping board", "price": 25, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "chop",
-		"blurb": "Chops vegetables", "up": "A slower, kinder knife"},
-	"slicer": {"name": "Slicer", "price": 30, "level": 1, "category": "Kitchen", "tiers": 3, "tool_of": "slice",
-		"blurb": "Slices cheese and lemons", "up": "More time to slice"},
+	"stove": {"name": "Stove", "price": 50, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "grill",
+		"blurb": "Grills patties and fish. Boils and fries at a pinch. Upgrade it in hand"},
+	"fryer": {"name": "Fryer", "price": 70, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "fry",
+		"blurb": "Fries potatoes and calamari"},
+	"pot": {"name": "Stock pot", "price": 60, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "boil",
+		"blurb": "Boils corn, potatoes and beans"},
+	"board": {"name": "Chopping board", "price": 25, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "chop",
+		"blurb": "Chops vegetables. Slices at a pinch. Upgrade it in hand"},
+	"slicer": {"name": "Slicer", "price": 60, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "slice",
+		"blurb": "Slices cheese and lemons"},
 	"crate_bun": {"name": "Bun crate", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
 		"ingredient": "bun", "blurb": "Hands out ingredients. Stocked each night"},
 	"crate_patty": {"name": "Patty fridge", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "diner",
@@ -234,14 +235,16 @@ static func search(query := "", category := "", theme := "") -> Array[Dictionary
 			continue
 		if not sold_in(id, theme):
 			continue
-		for tier in range(1, int(item.tiers) + 1):
-			var bp := {"id": id, "tier": tier}
-			var text := ("%s %s %s" % [label(bp), item.category, blurb_of(id, tier)]).to_lower()
-			var hit := true
-			for w in words:
-				hit = hit and text.contains(w)
-			if hit:
-				found.append(bp)
+		var node := Kitchen.node_of(id)
+		if node != "" and not Kitchen.is_root(node):
+			continue   # reached only through its tree (PRD 8.3)
+		var bp := {"id": id, "tier": 1}   # higher tiers are steps in the piece's tree now
+		var text := ("%s %s %s" % [label(bp), item.category, blurb_of(id, 1)]).to_lower()
+		var hit := true
+		for w in words:
+			hit = hit and text.contains(w)
+		if hit:
+			found.append(bp)
 	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var pa := price_of(a.id, a.tier)
 		var pb := price_of(b.id, b.tier)

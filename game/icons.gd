@@ -222,6 +222,42 @@ static func icon(id: String) -> Array:
 			for x0: float in [-0.3, 0.02, 0.34]:
 				for k in 5:
 					o.append([ell(x0 + 0.06 * sin(k * 1.4), -0.22 + k * 0.11, 0.05), "#4c8f3f"])
+		# The jobs a tool does (PRD 8.3), each its own silhouette for the upgrade tree.
+		"job_grill":  # a frying pan, handle to the right
+			o.append([rect(0.62, 0.0, 0.8, 0.18), "#7a4a2a"])
+			o.append([ell(-0.22, 0.0, 0.66), "#2b2f31"])
+			o.append([ell(-0.22, 0.03, 0.5), "#5a5f63"])
+		"job_fry":  # a wire basket in golden oil, its handle up
+			o.append([rect(0.0, -0.5, 1.6, 0.42), "#e8b04e"])
+			o.append([rect(0.0, -0.12, 1.2, 0.86), "#c9d0d1"])
+			for x: float in [-0.3, 0.0, 0.3]:
+				o.append([rect(x, -0.12, 0.08, 0.7), "#5a5f63"])
+			o.append([rect(0.0, 0.48, 0.14, 0.5), "#2b2f31"])
+		"job_boil":  # a stock pot with two handles, bubbles rising
+			o.append([rect(0.0, -0.25, 1.3, 1.0), "#c9d0d1"])
+			o.append([rect(0.0, 0.28, 1.5, 0.14), "#7d8a8f"])
+			for x: float in [-0.82, 0.82]:
+				o.append([rect(x, 0.05, 0.22, 0.14), "#5a5f63"])
+			for b_: Array in [[-0.25, 0.6, 0.14], [0.15, 0.75, 0.1], [0.35, 0.55, 0.12]]:
+				o.append([ell(b_[0], b_[1], b_[2]), "#8fc3cf"])
+		"job_chop":  # a big kitchen knife on the slant
+			o.append([PackedVector2Array([Vector2(-0.85, -0.55), Vector2(0.25, 0.25), Vector2(0.4, 0.05), Vector2(-0.6, -0.75)]), "#dfe6e7"])
+			o.append([rect(0.6, 0.38, 0.6, 0.24, 0.65), "#7a4a2a"])
+		"job_slice":  # a slicer's round blade on its coral foot
+			o.append([rect(0.0, -0.65, 1.6, 0.36), "#ee7560"])
+			o.append([ell(0.0, 0.15, 0.72), "#dfe6e7"])
+			o.append([ell(0.0, 0.15, 0.2), "#5a5f63"])
+		"job_pour":  # a glass with a drink in it
+			o.append([PackedVector2Array([Vector2(-0.6, 0.8), Vector2(0.6, 0.8), Vector2(0.42, -0.8), Vector2(-0.42, -0.8)]), "#dff0f2"])
+			o.append([PackedVector2Array([Vector2(-0.53, 0.25), Vector2(0.53, 0.25), Vector2(0.42, -0.8), Vector2(-0.42, -0.8)]), "#c0533a"])
+		"job_store":  # a slatted crate
+			o.append([rect(0.0, 0.0, 1.6, 1.2), "#a8713f"])
+			for y: float in [-0.35, 0.05, 0.42]:
+				o.append([rect(0.0, y, 1.44, 0.24), "#d9a46a"])
+		"job_chill":  # a snowflake: three crossed bars
+			for k in 3:
+				o.append([rect(0.0, 0.0, 1.7, 0.22, PI * k / 3.0), "#5aa4c4"])
+			o.append([ell(0.0, 0.0, 0.24), "#ffffff"])
 		"heart":  # a coral heart with a cream rim
 			for pass_: Array in [[1.2, CREAM], [1.0, CORAL]]:
 				var k: float = pass_[0]

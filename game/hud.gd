@@ -78,6 +78,7 @@ var _dirty_label: Label
 var menu: MenuScreen           # the menu screen, while it is open
 var menu_notes: MenuScreen.BuildNotes   # night zero's hint and the restock note, over the slip
 var _shop: Control             # the shop's sliding tray; null while the shop is shut
+var _tree: TreeScreen          # the upgrade tree of the piece in hand (PRD 8.3); null while shut
 var _info: Label
 var _info_blurb: Label
 var _shop_items: Array[Dictionary] = []
@@ -653,7 +654,7 @@ class ModelView extends TextureRect:
 			Build.box(n, Vector3(0, 0.25, -0.14), Vector3(0.44, 0.014, 0.34), Build.CORAL).rotation.y = -0.04
 			Build.box(n, Vector3(0, 0.25, 0.2), Vector3(0.44, 0.014, 0.1), Build.TILE_TEAL).rotation.y = -0.04
 		else:
-			Build.station(n, bp.id, int(bp.tier))
+			Build.station(n, bp.id, int(bp.tier), str(bp.get("base", "")), false, str(bp.get("node", "")))
 		if not live:
 			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
@@ -2019,12 +2020,13 @@ func close_menu() -> void:
 
 
 func hide_build() -> void:
-	for n: Control in [build_bar, _shop]:
+	for n: Control in [build_bar, _shop, _tree]:
 		if n:
 			n.queue_free()
 	_drop_row()
 	build_bar = null
 	_shop = null
+	_tree = null
 	hint.visible = true
 
 
@@ -2633,6 +2635,54 @@ func shop_buy() -> void:
 	var no := item.create_tween()
 	for dx: float in [-12.0, 10.0, -6.0, 0.0]:
 		no.tween_property(item, "position:x", x + dx, 0.05)
+
+
+## The upgrade tree of the piece in the shopper's hand, on blueprint paper, instead
+## of the shop (PRD 8.3).
+func show_tree(key: String) -> void:
+	if _tree:
+		return
+	build_bar.visible = false
+	var p: int = maxi(game.chefs.find(game.shopper), 0)
+	var keys := "%s buy      %s choose      %s close" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p)]
+	if _mode(p) == "touch":
+		keys = "Tap a step, then tap it again to buy"
+	_tree = TreeScreen.new(game, self, key, keys)
+	root.add_child(_tree)
+	root.move_child(_tree, center.get_index())
+
+
+func hide_tree() -> void:
+	if _tree == null:
+		return
+	var t := _tree
+	_tree = null
+	var tw := t.create_tween()
+	tw.tween_property(t, "position:y", TreeScreen.DROP, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_callback(t.queue_free)
+	if build_bar:
+		build_bar.visible = true
+
+
+func tree_open() -> bool:
+	return _tree != null
+
+
+## The node chosen on the open tree ("" when shut).
+func tree_selected() -> String:
+	return _tree.selected if _tree else ""
+
+
+func tree_move(action: String) -> void:
+	if _tree:
+		_tree.move(action)
+
+
+func tree_buy() -> void:
+	if _tree:
+		_tree.buy()
+	else:
+		game.sfx("fail")
 
 
 func toggle_town() -> void:

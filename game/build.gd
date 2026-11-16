@@ -1026,8 +1026,69 @@ static func _double(n: Node3D, front: bool) -> void:
 
 
 ## Furniture visuals centred on a cell, front facing +z. Tier adds a gold trim.
-## Shapes and heights are shared by every theme (sheets 8 and 10).
-static func station(n: Node3D, type: String, tier: int, base := "", pass_look := false) -> void:
+## Shapes and heights are shared by every theme (sheets 8 and 10). `node` is the
+## piece's place in its upgrade tree (PRD 8.3): a step adds its own marks.
+static func station(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "") -> void:
+	_station_body(n, type, tier, base, pass_look)
+	_base_marks(n, base)
+	if node != "" and node != base:
+		_node_marks(n, node)
+
+
+## What an upgraded counter adds under whatever stands on it: a third row of drawers
+## (long counter), a white fridge front with a frost-blue badge (under-counter fridge),
+## or a whole tall fridge (its top is then not a worktop).
+static func _base_marks(n: Node3D, base: String) -> void:
+	match base:
+		"long_counter":
+			_double(n, false)
+			for sx: float in [-1.0, 1.0]:
+				box(n, Vector3(sx * 0.225, 0.06, 0.47), Vector3(0.4, 0.08, 0.03), _tint(CABINET, 0.07))
+				box(n, Vector3(sx * 0.225, 0.07, 0.49), Vector3(0.14, 0.03, 0.03), "#d9a441", 0.0, R_WOOD)
+		"fridge":
+			box(n, Vector3(0, 0.13, 0.47), Vector3(0.9, 0.62, 0.04), "#eef3f4", 0.0, R_GLOSS)
+			box(n, Vector3(0, 0.66, 0.5), Vector3(0.6, 0.045, 0.04), "#c9d0d1", 0.0, R_WOOD)
+			cyl(n, Vector3(0.3, 0.32, 0.49), 0.07, 0.02, "#8fc3cf").rotation.x = PI / 2
+		"tall_fridge", "glass_fridge":
+			box(n, Vector3(0, 0.0, 0), Vector3(0.96, 2.1, 0.94), "#eef3f4", 0.0, R_GLOSS)
+			box(n, Vector3(0, 1.32, 0.48), Vector3(0.86, 0.04, 0.02), "#c9d0d1")
+			box(n, Vector3(0.36, 0.9, 0.5), Vector3(0.05, 0.6, 0.04), "#c9d0d1", 0.0, R_WOOD)
+			if base == "glass_fridge":
+				box(n, Vector3(-0.04, 0.2, 0.485), Vector3(0.66, 1.0, 0.02), "#8fc3cf", 0.0, R_GLOSS)
+			cyl(n, Vector3(-0.3, 1.7, 0.49), 0.08, 0.02, "#8fc3cf").rotation.x = PI / 2
+
+
+## The marks a tree step puts on its tool. An efficient step shows as brass studs on
+## the front (one a step), so it reads by shape at 20 px; a specialist has its own part.
+static func _node_marks(n: Node3D, node: String) -> void:
+	var steps := 0
+	var up := node
+	while Kitchen.has_node(up) and not Kitchen.is_root(up) and Kitchen.step_of(up) == Kitchen.EFFICIENT:
+		steps += 1
+		up = Kitchen.parent_of(up)
+	for i in steps:
+		ball(n, Vector3(-0.38 + i * 0.1, 0.83, 0.5), 0.035, "#d9a441", 0.0, R_WOOD)
+	match node:
+		"sharp_knife", "butcher_block":
+			if node == "butcher_block":   # an end-grain block, thick and dark
+				_add(n, bevel_mesh(Vector3(0.7, 0.12, 0.52), 0.02), Vector3(0, 0.9, 0), Color("#b07a45"), 0.0, R_WOOD)
+			box(n, Vector3(-0.16, 0.97 if node == "butcher_block" else 0.94, -0.12), Vector3(0.3, 0.012, 0.06), "#f4f8f8", 0.0, R_GLOSS).rotation.y = -0.4
+		"auto_slicer":   # a motor housing with a lit coral switch
+			_add(n, bevel_mesh(Vector3(0.2, 0.18, 0.2), 0.03), Vector3(-0.2, 0.98, -0.14), Color(STEEL_DARK), 0.0)
+			ball(n, Vector3(-0.2, 1.17, -0.14), 0.04, CORAL, 1.2)
+		"two_hob_range":   # a second pan on the front burner
+			lathe(n, Vector3(-0.22, 0.905, 0.22), [[0.0, 0.0], [0.13, 0.0], [0.16, 0.035], [0.15, 0.035], [0.12, 0.018], [0.0, 0.018]], "#34383b", 0.0, R_WOOD)
+		"char_grill":   # black grill bars across the cooking side
+			for k in 5:
+				box(n, Vector3(-0.2 + k * 0.1, 0.93, 0.02), Vector3(0.03, 0.03, 0.7), "#1f2224", 0.0, R_WOOD)
+		"twin_fryer":   # a second basket handle
+			box(n, Vector3(0.05, 1.02, -0.36), Vector3(0.04, 0.24, 0.04), STEEL_DARK)
+		"two_tap_fountain", "wine_rack":   # a second tap
+			box(n, Vector3(0.22, 1.25, 0.2), Vector3(0.06, 0.16, 0.06), "#c9d0d1", 0.0, R_WOOD)
+			ball(n, Vector3(0.22, 1.36, 0.2), 0.05, CORAL if node == "two_tap_fountain" else "#7a2e3a")
+
+
+static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false) -> void:
 	if base == "double_counter":
 		_double(n, type == "counter")
 	var ing := Catalog.ingredient_of(type)

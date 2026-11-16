@@ -187,6 +187,35 @@ static func node_of(catalog_id: String) -> String:
 	return catalog_id if NODES.has(catalog_id) else ""
 
 
+## The catalog piece whose behaviour a node has in the room: a sharp knife works as a
+## board, a range as a stove, a two-tap fountain as the soda fountain, a fridge as a
+## counter. Pieces with their own catalog entry (slicer, fryer, pot) are their own.
+static func family_of(id: String) -> String:
+	while true:
+		var c: Variant = CATALOG_IDS.find_key(id)
+		if c != null:
+			return str(c)
+		if Catalog.ITEMS.has(id) or not NODES.has(id) or is_root(id):
+			return id
+		id = parent_of(id)
+	return id
+
+
+## A piece that plays its minigame itself (the auto slicer).
+static func is_auto(id: String) -> bool:
+	return NODES.has(id) and NODES[id].get("auto", false)
+
+
+## Every job any tool in the trees does, as "grill", "chop" and so on.
+static func jobs_known() -> Array[String]:
+	var out: Array[String] = []
+	for n: String in NODES:
+		for job: String in jobs_of(n):
+			if not out.has(job):
+				out.append(job)
+	return out
+
+
 ## A catalog piece that is a tool and goes on a counter.
 static func is_top(catalog_id: String) -> bool:
 	var n := node_of(catalog_id)

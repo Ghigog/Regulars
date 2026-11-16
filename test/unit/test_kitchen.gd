@@ -1,5 +1,6 @@
 extends GutTest
-## Unit tests for PRD 8's kitchen: cells and layers, storage slots, chilled kinds, trees.
+## Unit tests for PRD 8's kitchen: cells and layers, storage slots, chilled kinds, trees,
+## and (8.3) the upgrade trees: buying steps, quality in the minigames, the tree screen.
 
 const C := Vector2i(1, 1)
 const W := Vector2i(0, 0)
@@ -297,7 +298,9 @@ func test_set_cell_keeps_stock_and_clears():
 var game
 
 
-func _game() -> void:
+## The test kitchen at night, in the build phase; `night` false keeps it open for
+## service, where cooking and the minigames run.
+func _game(night := true) -> void:
 	game = load("res://game/main.tscn").instantiate()
 	game.first_night = false
 	add_child_autofree(game)
@@ -306,11 +309,16 @@ func _game() -> void:
 	game.theme_path = "user://regulars_theme_test.cfg"
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
 	game.test_kitchen()
-	game.arrivals.clear()
+	if night:
+		game.arrivals.clear()   # the day ends at once, into the night
 	for i in 2:
 		game.step(0.1)
-	game.open_build()
+	if night:
+		game.open_build()
 	game.ledger.money = 500
+	for person in game.town.people:   # no new random rules in these tests
+		person.tolerance = {"food": 3, "service": 3, "clean": 3}
+	game.floor_dirt.drops = false
 
 
 func _at(x: int, z: int) -> Vector3:
@@ -442,3 +450,242 @@ func test_a_tops_surface_holds_one_thing_and_empty_hands_take_it_first():
 	assert_eq(game.use_station(stove), "Put tray down", "a tray rests on a stove")
 	assert_false(stove.is_cooking())
 	assert_eq(game.use_station(stove), "Pick up tray")
+
+
+# ---------- 8.3: upgrade trees (sim) ----------
+
+func test_a_node_behaves_as_the_catalog_piece_it_grew_from():
+	for pair: Array in [["range", "stove"], ["two_hob_range", "stove"], ["char_grill", "stove"], ["fryer", "fryer"],
+			["twin_fryer", "fryer"], ["sharp_knife", "board"], ["auto_slicer", "slicer"], ["two_tap_fountain", "crate_soda"],
+			["wine_rack", "crate_wine"], ["fridge", "counter"], ["long_counter", "counter"]]:
+		assert_eq(Kitchen.family_of(pair[0]), pair[1], pair[0])
+
+
+func test_tree_keys_for_kitchen_pieces_and_tiered_pieces():
+	assert_eq(Upgrades.key_of("stove"), "stove")
+	assert_eq(Upgrades.key_of("crate_soda"), "fountain")
+	assert_eq(Upgrades.key_of("stove", 1, "range"), "range", "a station's own node wins")
+	assert_eq(Upgrades.key_of("plant", 2), "plant@2")
+	assert_eq(Upgrades.key_of("table"), "table@1")
+	assert_eq(Upgrades.key_of("bin"), "", "a bin has no tree")
+	for key: String in ["board", "stove", "counter", "fountain", "wine_barrel", "plant@1", "jukebox@2", "booth@1"]:
+		assert_true(Upgrades.has_tree(key), key)
+	for key: String in ["", "cabinet", "hood"]:
+		assert_false(Upgrades.has_tree(key), key + " has nowhere to go")
+	assert_eq(Upgrades.catalog_id("jukebox@3"), "jukebox")
+	assert_eq(Upgrades.children("plant@3"), [] as Array[String], "three tiers in all")
+
+
+func test_efficient_steps_run_along_a_row_and_specialists_fork_below():
+	var board := Upgrades.layout("board")
+	assert_eq(board, {"board": Vector2i(0, 0), "sharp_knife": Vector2i(1, 0), "butcher_block": Vector2i(2, 0),
+		"slicer": Vector2i(1, 1), "auto_slicer": Vector2i(2, 1)})
+	var stove := Upgrades.layout("stove")
+	assert_eq(stove.range, Vector2i(1, 0))
+	assert_eq(stove.two_hob_range, Vector2i(2, 0))
+	assert_eq([stove.char_grill, stove.pot, stove.fryer, stove.twin_fryer], [Vector2i(1, 1), Vector2i(1, 2), Vector2i(1, 3), Vector2i(2, 3)])
+	assert_eq(Upgrades.extent(stove), Vector2i(3, 4))
+	var counter := Upgrades.layout("counter")
+	assert_eq([counter.double_counter, counter.long_counter, counter.fridge, counter.tall_fridge, counter.glass_fridge],
+		[Vector2i(1, 0), Vector2i(2, 0), Vector2i(1, 1), Vector2i(2, 2), Vector2i(3, 2)], "fridge nodes are in the counter's tree")
+	assert_eq(Upgrades.layout("slicer").keys().size(), 2, "a tree is drawn from the held piece on")
+	assert_eq(Upgrades.layout("plant@1"), {"plant@1": Vector2i(0, 0), "plant@2": Vector2i(1, 0), "plant@3": Vector2i(2, 0)})
+
+
+func test_a_step_costs_the_new_price_less_the_old_and_only_from_its_parent():
+	assert_eq(Upgrades.step_price("slicer"), 35)
+	assert_eq(Upgrades.step_price("auto_slicer"), 60)
+	assert_eq(Upgrades.step_price("fridge"), 35)
+	assert_eq(Upgrades.step_price("plant@2"), Catalog.price_of("plant", 2) - Catalog.price_of("plant"))
+	assert_true(Upgrades.can_buy("board", "slicer", 35, 1))
+	assert_false(Upgrades.can_buy("board", "slicer", 34, 1), "not enough money")
+	assert_false(Upgrades.can_buy("board", "auto_slicer", 999, 9), "no skipping steps")
+	assert_false(Upgrades.can_buy("slicer", "sharp_knife", 999, 9), "no going sideways")
+	assert_false(Upgrades.can_buy("plant@1", "plant@2", 999, 1), "a tier still needs its level")
+	assert_true(Upgrades.can_buy("plant@1", "plant@2", 999, 2))
+	assert_eq(Upgrades.price("butcher_block"), 65, "a piece's whole price, for selling")
+
+
+func test_tools_lose_their_catalog_tiers_and_later_nodes_leave_the_shop():
+	for id: String in ["stove", "fryer", "pot", "board", "slicer"]:
+		assert_eq(int(Catalog.ITEMS[id].tiers), 1, id)
+	var ids := Catalog.search("", "Kitchen", "diner").map(func(bp: Dictionary) -> String: return bp.id)
+	assert_has(ids, "stove")
+	assert_has(ids, "board")
+	for id: String in ["fryer", "pot", "slicer"]:
+		assert_does_not_have(ids, id, id + " is reached through the stove or board")
+
+
+func test_quality_is_the_minigames_difficulty():
+	assert_lt(Prep.chop_notch(Kitchen.STAND_IN), Prep.CHOP_NOTCH, "a stand-in's notch is narrower")
+	assert_gt(Prep.chop_notch(Kitchen.SPECIALIST), Prep.CHOP_NOTCH)
+	assert_lt(Prep.chop_sweep(Kitchen.STAND_IN), Prep.CHOP_SWEEP_TIME, "and its marker faster")
+	assert_lt(Prep.slice_time(Kitchen.STAND_IN), Prep.SLICE_TIME)
+	assert_gt(Prep.slice_time(Kitchen.SPECIALIST), Prep.SLICE_TIME)
+	assert_eq(Prep.slice_slack(1.0), Prep.SLICE_SLACK)
+	assert_lt(Prep.pour_good(Kitchen.SPECIALIST), Prep.POUR_GOOD, "a better tap leaves a wider good band")
+	assert_eq(Prep.heat_times("grill"), [Prep.GRILL_NEARLY, Prep.GRILL_DONE, Prep.GRILL_PERFECT, Prep.GRILL_BURN], "1.0 is the old timing")
+	var narrow := Prep.heat_times("fry", Kitchen.STAND_IN)
+	var wide := Prep.heat_times("fry", Kitchen.SPECIALIST)
+	assert_lt(narrow[2] - narrow[1], Prep.FRY_LATE - Prep.FRY_GOOD)
+	assert_gt(wide[2] - wide[1], Prep.FRY_LATE - Prep.FRY_GOOD)
+	assert_eq(Prep.fry(Prep.FRY_GOOD + 1.5, Kitchen.STAND_IN).result, "plain", "late for a stand-in")
+	assert_eq(Prep.fry(Prep.FRY_GOOD + 1.5).result, "good")
+	assert_lt(Prep.boil_time(Kitchen.SPECIALIST), Prep.BOIL_TIME)
+	assert_eq(Prep.reward("slice", "good", true), "", "a piece that plays itself gives no burst")
+
+
+# ---------- 8.3: upgrade trees (in the game) ----------
+
+func test_the_shop_with_a_piece_in_hand_opens_its_tree():
+	_game()
+	game.open_shop()
+	assert_true(game.shopping and not game.upgrading, "empty hands: the shop")
+	game.close_shop()
+	game.add_station("counter", Vector2i(2, 5))
+	game.add_station("board", Vector2i(2, 5))
+	assert_true(game.pick_up(_at(2, 5)))
+	assert_eq(game.hand_key(), "board")
+	game.open_shop()
+	assert_true(game.upgrading)
+	assert_true(game.hud.tree_open())
+	assert_false(game.hud._shop != null, "not the shop")
+	assert_eq(game.hud._tree.root_key, "board", "the held piece on the left")
+	assert_eq(game.hud.tree_selected(), "sharp_knife", "the straight-on step first")
+	game.act(0, "down")
+	assert_eq(game.hud.tree_selected(), "slicer", "down to the fork")
+	game.act(0, "right")
+	assert_eq(game.hud.tree_selected(), "auto_slicer")
+	game.act(0, "back")
+	assert_false(game.shopping)
+	assert_false(game.hud.tree_open())
+	assert_eq(game.hand_key(), "board", "still in hand")
+
+
+func test_a_piece_with_no_tree_does_not_open_the_shop():
+	_game()
+	assert_true(game.pick_up(_at(3, 2)), "the sink")
+	game.open_shop()
+	assert_false(game.shopping)
+
+
+func test_buying_a_step_turns_the_held_piece_into_it():
+	_game()
+	game.add_station("counter", Vector2i(2, 5))
+	game.add_station("board", Vector2i(2, 5))
+	assert_true(game.pick_up(_at(2, 5)))
+	game.open_shop()
+	assert_false(game.buy_upgrade("auto_slicer"), "not before the slicer")
+	assert_eq(game.ledger.money, 500)
+	game.act(0, "down")
+	game.act(0, "use")   # buys the slicer
+	assert_eq(game.ledger.money, 500 - 35)
+	assert_eq(game.hand_key(), "slicer")
+	assert_eq(game.hand.id, "slicer", "it works as a slicer now")
+	assert_eq(game.hud._tree.root_key, "slicer", "the tree is drawn on from it")
+	assert_eq(game.hud.tree_selected(), "auto_slicer")
+	game.close_shop()
+	assert_true(game.place(Vector3i(2, 5, 0)), "back onto its counter")
+	var st: Station = game.stations[Vector2i(2, 5)]
+	assert_eq([st.type, st.node], ["slicer", "slicer"])
+	assert_eq(game.kitchen.get_piece(Vector2i(2, 5), "top"), "slicer")
+	assert_true(game.pick_up(_at(2, 5)))
+	assert_eq(game.sell_value(), Kitchen.price_of("slicer") / 2, "sold for its whole price, as before: half")
+
+
+func test_an_upgraded_counter_becomes_a_fridge_and_does_not_stack():
+	_game()
+	game.add_station("counter", Vector2i(2, 5))
+	game.add_station("counter", Vector2i(3, 5))
+	assert_true(game.pick_up(_at(2, 5)))
+	game.open_shop()
+	assert_true(game.buy_upgrade("fridge"))
+	game.close_shop()
+	assert_eq((game.hand.node as Station).base, "fridge")
+	assert_false(game.can_place(Vector3i(3, 5, 0)), "a fridge is not a counter to stack")
+	assert_true(game.place(Vector3i(2, 5, 0)))
+	assert_eq(game.kitchen.get_piece(Vector2i(2, 5), "base"), "fridge")
+	assert_eq(game.kitchen.chilled_slots(Vector2i(2, 5)), 1)
+	game.add_station("stove", Vector2i(2, 5))
+	assert_eq(game.stations[Vector2i(2, 5)].type, "stove", "a tool still goes on its top")
+	assert_eq(game.stations[Vector2i(2, 5)].base, "fridge")
+
+
+func test_a_tree_bought_double_counter_lifts_off_whole():
+	_game()
+	game.add_station("counter", Vector2i(2, 5))
+	assert_true(game.pick_up(_at(2, 5)))
+	game.open_shop()
+	assert_true(game.buy_upgrade("double_counter"))
+	game.close_shop()
+	assert_true(game.place(Vector3i(2, 5, 0)))
+	assert_true(game.pick_up(_at(2, 5)))
+	assert_eq((game.hand.node as Station).base, "double_counter")
+	assert_false(game.stations.has(Vector2i(2, 5)), "nothing is left behind")
+
+
+func test_a_fern_climbs_its_short_tree():
+	_game()
+	game.ledger.xp = 1000
+	game.add_station("plant", Vector2i(5, 5))
+	assert_true(game.pick_up(_at(5, 5)))
+	game.open_shop()
+	assert_eq(game.hud._tree.root_key, "plant@1")
+	assert_true(game.buy_upgrade("plant@2"))
+	assert_eq((game.hand.node as Station).tier, 2)
+	assert_eq(int(game.hand.tier), 2)
+	assert_eq(game.ledger.money, 500 - (Catalog.price_of("plant", 2) - Catalog.price_of("plant")))
+	assert_eq(game.sell_value(), Catalog.price_of("plant", 2) / 2)
+
+
+func test_the_board_slices_as_a_stand_in():
+	_game(false)
+	game.add_station("crate_cheese", Vector2i(2, 6))
+	game.add_station("counter", Vector2i(2, 5))
+	var board: Station = game.add_station("board", Vector2i(2, 5))
+	assert_has(game.kitchen_tools(), "slice", "a menu can offer cheese with only a board")
+	game.use_station(game.find_station("crate_cheese"))
+	assert_eq(game.use_station(board), "Slice")
+	assert_almost_eq(float(game.prep_of(0).q), Kitchen.STAND_IN, 0.001)
+	for k in Prep.SLICE_COUNT:
+		game.act(0, "use")
+		game.step(0.05)
+	for i in int(Prep.slice_time(Kitchen.STAND_IN) / 0.1) + 1:
+		game.step(0.1)
+	assert_eq(game.player.held, "prep:cheese")
+
+
+func test_a_stove_fries_as_a_stand_in_with_a_narrower_window():
+	_game(false)
+	game.add_station("crate_potato", Vector2i(2, 6))
+	game.add_station("counter", Vector2i(2, 5))
+	var stove: Station = game.add_station("stove", Vector2i(2, 5))
+	assert_has(game.kitchen_tools(), "fry")
+	assert_has(game.kitchen_tools(), "boil")
+	game.use_station(game.find_station("crate_potato"))
+	assert_eq(game.use_station(stove), "Fry")
+	assert_eq(stove.mode(), "fryer", "a stove frying works as a fryer")
+	for i in int((Prep.FRY_GOOD + 0.5) / 0.1):
+		game.step(0.1)
+	assert_eq(game.use_station(stove), "Lift basket")
+	for i in int((Prep.FRY_REST + 0.2) / 0.1):
+		game.step(0.1)
+	assert_eq(game.use_station(stove), "Pick up")
+	assert_eq(game.player.held, "prep:potato")
+	assert_eq(stove.heat, "", "an empty stove is a stove again")
+	assert_eq(stove.mode(), "stove")
+
+
+func test_an_auto_slicer_plays_itself():
+	_game(false)
+	game.add_station("crate_cheese", Vector2i(2, 6))
+	game.add_station("counter", Vector2i(2, 5))
+	var auto: Station = game.add_station("auto_slicer", Vector2i(2, 5))
+	assert_eq([auto.type, auto.node], ["slicer", "auto_slicer"])
+	game.use_station(game.find_station("crate_cheese"))
+	assert_eq(game.use_station(auto), "Slice")
+	for i in int(Prep.AUTO_TIME / 0.1) + 2:
+		game.step(0.1)
+	assert_eq(game.player.held, "prep:cheese")
+	assert_eq(game.player.held_quality, Prep.GOOD)
+	assert_almost_eq(game.player.speed(), Player.SPEED, 0.01, "no burst for a piece that plays itself")
