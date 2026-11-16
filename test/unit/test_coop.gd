@@ -13,6 +13,9 @@ func before_each():
 	game.theme_path = "user://regulars_theme_test.cfg"
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])   # keeps the day open
 	game.test_kitchen()
+	for p in game.town.people:   # middling tolerances and no floor dirt (PRDs 9, 10): not what these test
+		p.tolerance = {"food": 3, "service": 3, "clean": 3}
+	game.floor_dirt.drops = false
 
 
 func _run(seconds: float) -> void:

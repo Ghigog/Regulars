@@ -17,9 +17,19 @@ func before_each():
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
 	game.test_kitchen()   # the old burger line and a one-Burger menu; a run starts empty
 	_neutral_tastes()
+	_neutral_tolerance_and_dirt()
 
 
 ## Nobody dislikes anything, so every guest orders from the test menu.
+## Tolerances (PRD 10) and floor dirt (PRD 9) are random; tests of other systems
+## start every guest middling and with no dirt dropped. Their own tests live in
+## test_staff.gd and test_floor_mess.gd.
+func _neutral_tolerance_and_dirt() -> void:
+	for p in game.town.people:
+		p.tolerance = {"food": 3, "service": 3, "clean": 3}
+	game.floor_dirt.drops = false
+
+
 func _neutral_tastes() -> void:
 	for p in game.town.people:
 		p.likes = []

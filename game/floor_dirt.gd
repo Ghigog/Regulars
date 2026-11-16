@@ -16,6 +16,7 @@ const SIDES: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1),
 
 var game
 var mess := FloorMess.new()
+var drops := true   # false: preps and meals drop no dirt (tests of other systems turn it off)
 var prints := {}   # Vector2i -> Vector2i: the way someone walked onto a cell they tracked dirt onto
 var _last := {}    # instance id -> Vector2i: the cell each walker stood on last step
 var _drawn := {}   # Vector2i -> the look key drawn there
@@ -76,6 +77,8 @@ func grease_factors(_st: Station) -> Dictionary:
 ## A prep finished: grease may drop on the chef's cell or a free floor cell beside the
 ## station. Returns the cell that grew, or null.
 func prep_grease(tool: String, result: String, chef_cell: Vector2i, st: Station) -> Variant:
+	if not drops:
+		return null
 	var cells := []
 	if mess.is_floor(chef_cell) and not mess.is_covered(chef_cell):
 		cells.append(chef_cell)
@@ -90,6 +93,8 @@ func prep_grease(tool: String, result: String, chef_cell: Vector2i, st: Station)
 ## A guest finished eating: a chance of mess near their seat, more if they were annoyed
 ## or ate something greasy (fried or meat).
 func meal_mess(g: Guest) -> Variant:
+	if not drops:
+		return null
 	return mess.drop_guest_mess(g.seat, annoyance(g), false, greasy(g._meal_tray))
 
 
