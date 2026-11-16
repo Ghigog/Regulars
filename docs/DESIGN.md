@@ -353,6 +353,54 @@ Survive as many days as you can; three walkouts in one day ends the run.
   dispenser; the rotary grater's crank is bigger; a tool's tree card is framed closer;
   `jobs` shows all eight new tools with the chef stood clear. Details in the style
   guide's "As built".
+- **Floor dirt (PRD 9).** Dirt on the floor, apart from the plates, sink and bin. Each
+  floor cell holds a level from 0 to 4 (a few drops, a puddle, a big puddle, the whole
+  cell); a level landing on a full cell overflows to a neighbour, under furniture too.
+  Rules in `sim/floor_mess.gd`, the room side in `game/floor_dirt.gd`; all tunable.
+  - *Where it comes from.* Each prep may drop grease on the chef's cell or one beside
+    the station (a chance per tool, x2 for a bad play, x0.5 for a good one, x the tool's
+    tree `mess`, x0.3 under a hood, x0.15 under an extractor). A guest finishing a meal
+    may drop mess within two cells of the seat (0.15, x2 for a messy townsperson, x1.5 for
+    a fried or meat dish, more when fed up).
+  - *Feet.* Stepping off a dirty cell carries a level onto the next one, with footprints.
+    Speed on a cell by level: 1, 0.9, 0.8, 0.65, 0.5. Guests see dirty cells (sight
+    disgust by level, through `GuestMood`'s sightlines) and smell level 3 and 4 within
+    two cells, seen or not; the critic notices it in their thoughts.
+  - *Slipping (9.3).* Stepping onto a level 4 cell: a 25% chance for a guest, 15% for a
+    chef. A guest down loses patience and joy and every guest within a cell who saw it
+    a little. A chef pressing E beside them helps them up in 1 s; a free guest nearby
+    walks over and takes 6 s; alone they get up after 20 s (a chef after 4), angrier.
+    On getting up a guest may walk out: 90% for one who hates the place, 10% for one
+    who loves it.
+  - *Cleaning tools (9.4).* A mop bucket comes with a mop (a level a press, dirty after
+    4); a sponge comes on its own wall hook (fast, dirty after 2). Hold E on a dirty cell
+    with the tool in hand. A dirty tool spreads dirt to a cell beside instead of clearing
+    it; rinse it at its bucket or a sink. Tools left lying about, and the robot sweeper,
+    count as level 2 underfoot. Dirt under furniture can't be reached until the piece is
+    moved at night. The robot sweeper (a dock) drifts to the nearest dirt at 0.7 m/s and
+    clears a level every 3 s. Rules in `sim/clean_tools.gd`, the scene in
+    `game/clean_kit.gd`.
+  - *Trees (9.5).* Mop bucket: sponge-head mop (dirty after 6), flat mop (a whole cell a
+    press, dirty after 8), floor scrubber (push it: clears every cell walked over, never
+    dirty, slow to walk); or the wringer bucket (never dirty), then the robot's dock.
+    Sponge: scourer (dirty after 4); or the grease scraper (kitchen grease only, a whole
+    cell, never dirty); or the spill kit (a covered cell to a puddle, three times a day,
+    faster help up). Hood: extractor (less grease, and kitchen grease smells a cell less
+    far).
+  - *Treatments (9.5).* Boxes from the Pantry tab, kept in storage (never with food, never
+    in a fridge), laid a cell at a time with the floor drag at night and re-laid every
+    night for their price a cell, paid at the door with the stock. Floor cleaner ($3:
+    dirt mops off in one press), strong cleaner ($5: and feet don't track it off), primer
+    ($6: 40% of spills don't land), sealing primer ($10: 60%), floor finish ($8: x1.1
+    speed, a little joy, dirt shows x1.25), high gloss ($15: x1.2, more joy, x1.5). The
+    turn key with a laying tool in hand switches one off. Rules in `sim/treatments.gd`.
+  - *Demos:* `dirt`, `slip`, `mop`, `robot`, `mop_night`, `mop_line`, `treat`,
+    `treat_day`, `tree_box`, `tree_bucket`, `tree_sponge` (see `CLAUDE.md`).
+- **Art pass (PRD 9.6).** Every PRD 9 visual checked in both themes. Changes: each mop
+  on the bucket's tree has its own head (it all drew as the plain mop before), a mop
+  stands head up in its bucket so its kind and dirt show, the wringer bucket has a coral
+  press, the extractor its own fan box, and every tool on the trees draws in the chef's
+  hands. Details in the style guide's "As built".
 - **Tier effects:** a fern that gives more and is seen from further, a tier 2+ table gives seated guests
   +0.05 joy per tier. Counters and partitions gain nothing but looks.
 - **Guest card.** Click a guest during service to see their standing, visit number, the

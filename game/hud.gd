@@ -662,7 +662,7 @@ class ModelView extends TextureRect:
 			Build.station(n, bp.id, int(bp.tier), str(bp.get("base", "")), false, str(bp.get("node", "")))
 			var tool := CleanTools.comes_with(str(bp.get("node", bp.id)))
 			if CleanTools.is_mop(tool):   # a bucket up its tree shows the mop it keeps (PRD 9.5)
-				Build.bucket_mop(n, 1.0)
+				Build.bucket_mop(n, 1.0, tool)
 			if CleanTools.home_kind(bp.id) != "" or bp.id in ["mop_bucket", "robot_dock", "sponge"]:
 				n.scale = Vector3.ONE * 1.5   # small floor and wall pieces, shown at a piece's size
 			if Catalog.is_box(bp.id):   # a box is small: shown up close, at a piece's size

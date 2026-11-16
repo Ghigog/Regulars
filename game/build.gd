@@ -875,14 +875,17 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 			cyl(n, Vector3(0.2, 0.03, -0.11), 0.06, 0.16, "#e9dcc8").rotation.z = 1.35
 			for c: Vector3 in [Vector3(0.1, 0.05, 0.12), Vector3(-0.2, 0.05, -0.12), Vector3(0.18, 0.05, 0.1)]:
 				box(n, c, Vector3(0.035, 0.02, 0.03), "#e0a850").rotation.y = c.x * 20.0
-		"tool:mop":   # held out at the side, head on the floor, the pole leaning out (PRD 9.4)
-			# Held items are tipped 25 degrees to the camera (Player.move); a pole stands
-			# back up so it reads at full length, leaning out a little.
-			var m := mop(n, quality)
+		"tool:mop", "tool:sponge_mop", "tool:flat_mop", "tool:wringer_mop", "tool:scrubber":
+			# Held out at the side, head on the floor, the pole leaning out (PRD 9.4). Held
+			# items are tipped 25 degrees to the camera (Player.move); a pole stands back
+			# up so it reads at full length, leaning out a little. The scrubber is pushed.
+			var m := mop(n, quality, kind.trim_prefix("tool:"))
 			m.basis = Basis(Vector3(1, 0, -1).normalized(), deg_to_rad(-25.0)) * Basis(Vector3(0, 0, 1), -0.2)
 			m.position = Vector3(0.45, -0.55, 0.1)
-		"tool:sponge":
-			sponge(n, quality).scale = Vector3.ONE * 1.4
+			if kind == "tool:scrubber":
+				m.position = Vector3(0.5, -0.55, 0.35)
+		"tool:sponge", "tool:scourer", "tool:grease_scraper", "tool:spill_kit":
+			hand_tool(n, kind.trim_prefix("tool:"), quality).scale = Vector3.ONE * 1.4
 		"rubbish_bag":  # a fat knotted sack, for carrying out the front
 			ball(n, Vector3(0, 0.17, 0), 0.19, BAG).scale = Vector3(1, 0.95, 0.9)
 			ball(n, Vector3(0, 0.38, 0), 0.06, BAG)
@@ -897,21 +900,44 @@ const MOP_CLEAN := "#f3ead6"    # cotton strands
 const MOP_DIRTY := "#6b4e32"    # grey-brown once dirty: by shape too, the strands droop
 const SPONGE := "#ffd452"
 const SCOURER := "#4f9a5e"
+const FLAT_PAD := "#5b8fc7"   # the flat mop's microfibre pad
 const BUCKET := "#ffd452"
 const ROBOT := "#f6efe0"
 const ROBOT_RIM := "#f07a63"
 
 
-## A mop standing upright from its foot: a wooden pole and a mop head of strands that
-## goes from cream to brown as it gets dirty (`clean` 1 to 0); a dirty head also droops.
-static func mop(parent: Node3D, clean := 1.0) -> Node3D:
+## A mop standing upright from its foot: a wooden pole and a head that goes from its
+## clean colour to brown as it gets dirty (`clean` 1 to 0). Each mop on the bucket's tree
+## (PRD 9.5) has its own head, told apart by shape at 20 px: the plain mop's cotton
+## strands (a dirty head droops); the sponge-head mop's yellow block in a steel clamp;
+## the flat mop's wide blue pad; the wringer mop's strands under a coral collar (it
+## never gets dirty); the floor scrubber, a coral motor on a round deck with a T-handle.
+static func mop(parent: Node3D, clean := 1.0, tool := "mop") -> Node3D:
 	var n := Node3D.new()
 	parent.add_child(n)
+	if tool == "scrubber":
+		_scrubber(n)
+		return n
 	cyl(n, Vector3(0, 0.12, 0), 0.035, 1.15, WOOD, 0.0, R_WOOD)
 	ball(n, Vector3(0, 1.28, 0), 0.04, CORAL)   # the grip
+	match tool:
+		"sponge_mop":
+			var body := Color(MOP_DIRTY).lerp(Color(SPONGE), clean).to_html(false)
+			box(n, Vector3(0, 0.12, 0), Vector3(0.3, 0.05, 0.08), STEEL, 0.0, R_GLOSS)   # the clamp
+			_add(n, bevel_mesh(Vector3(0.32, 0.1, 0.12), 0.03), Vector3(0, 0.02, 0), Color(body), 0.0)
+			box(n, Vector3(0, 0.01, 0.061), Vector3(0.3, 0.025, 0.01), SCOURER)
+			return n
+		"flat_mop":
+			var pad := Color(MOP_DIRTY).lerp(Color(FLAT_PAD), clean).to_html(false)
+			box(n, Vector3(0, 0.08, 0), Vector3(0.08, 0.05, 0.08), STEEL_DARK)   # the swivel
+			box(n, Vector3(0, 0.05, 0), Vector3(0.46, 0.025, 0.16), STEEL, 0.0, R_GLOSS)
+			_add(n, bevel_mesh(Vector3(0.5, 0.05, 0.2), 0.02), Vector3(0, 0.0, 0), Color(pad), 0.0)
+			return n
 	var col := Color(MOP_DIRTY).lerp(Color(MOP_CLEAN), clean).to_html(false)
 	var droop := 1.0 - clean
 	box(n, Vector3(0, 0.13, 0), Vector3(0.1, 0.05, 0.1), STEEL_DARK)
+	if tool == "wringer_mop":
+		cyl(n, Vector3(0, 0.15, 0), 0.075, 0.07, CORAL)
 	for i in 7:
 		var a := TAU * i / 7.0
 		var strand := box(n, Vector3(cos(a) * 0.07, 0.02, sin(a) * 0.07), Vector3(0.045, 0.2, 0.045), col)
@@ -919,6 +945,19 @@ static func mop(parent: Node3D, clean := 1.0) -> Node3D:
 	if droop > 0.5:   # drips under a dirty mop
 		ball(n, Vector3(0.02, -0.08, 0.03), 0.03, MOP_DIRTY)
 	return n
+
+
+## The floor scrubber, standing from its deck: a round grey deck on a dark brush ring, a
+## coral motor housing on top, a steel pole up to a T-handle with coral grips.
+static func _scrubber(n: Node3D) -> void:
+	lathe(n, Vector3(0, 0.0, 0), [[0.0, 0.0], [0.24, 0.0], [0.24, 0.03], [0.0, 0.03]], STEEL_DARK)   # the brush
+	lathe(n, Vector3(0, 0.03, 0), [[0.0, 0.0], [0.27, 0.0], [0.27, 0.06], [0.22, 0.09], [0.0, 0.09]], "#9aa3a6", 0.0, R_GLOSS)
+	_add(n, bevel_mesh(Vector3(0.24, 0.16, 0.2), 0.04), Vector3(0, 0.12, -0.02), Color(CORAL), 0.0)
+	ball(n, Vector3(0.0, 0.2, 0.09), 0.025, GOOD, 0.8)   # the power light
+	cyl(n, Vector3(0, 0.26, -0.04), 0.03, 0.95, STEEL, 0.0, R_GLOSS)
+	box(n, Vector3(0, 1.22, -0.04), Vector3(0.36, 0.04, 0.04), STEEL, 0.0, R_GLOSS)
+	for x: float in [-0.17, 0.17]:
+		box(n, Vector3(x, 1.22, -0.04), Vector3(0.08, 0.06, 0.06), CORAL)
 
 
 ## A sponge: a yellow block with a green scourer on top, browner as it gets dirty.
@@ -988,7 +1027,7 @@ static func hook_spot(y0: float) -> Vector3:
 
 
 ## The mop bucket: a yellow pail on castors with a grey wringer box on one side.
-static func mop_bucket(n: Node3D) -> void:
+static func mop_bucket(n: Node3D, node := "") -> void:
 	for x: float in [-0.2, 0.2]:
 		for z: float in [-0.16, 0.16]:
 			ball(n, Vector3(x, 0.04, z), 0.04, STEEL_DARK)
@@ -996,13 +1035,21 @@ static func mop_bucket(n: Node3D) -> void:
 	_add(n, lathe_mesh([[0.0, 0.0], [0.27, 0.0], [0.27, 0.02], [0.0, 0.02]], 4), Vector3(0, 0.38, 0), Color("#8fb7bd"), 0.0, R_GLOSS).rotation.y = PI / 4   # water
 	_add(n, bevel_mesh(Vector3(0.2, 0.18, 0.34), 0.03), Vector3(0.24, 0.5, 0), Color("#9aa3a6"), 0.0, R_WOOD)
 	box(n, Vector3(0.36, 0.62, 0), Vector3(0.05, 0.3, 0.05), STEEL_DARK).rotation.z = -0.5   # the wringer's handle
+	if node == "wringer_bucket":   # PRD 9.5: a big coral press on top, its long lever up
+		_add(n, bevel_mesh(Vector3(0.26, 0.12, 0.38), 0.03), Vector3(0.24, 0.66, 0), Color(CORAL), 0.0)
+		box(n, Vector3(0.3, 0.98, 0), Vector3(0.06, 0.5, 0.06), STEEL, 0.0, R_GLOSS).rotation.z = -0.25
+		ball(n, Vector3(0.36, 1.22, 0), 0.05, CORAL)
 
 
-## Where the mop stands in its bucket, leaning on the rim.
-static func bucket_mop(n: Node3D, clean: float) -> Node3D:
-	var m := mop(n, clean)
-	m.position = Vector3(-0.08, 0.12, 0)
-	m.rotation.z = 0.22
+## Where the mop stands in its bucket: head up, handle down in the pail, leaning on the
+## rim (PRD 9.6), so which mop it is and how dirty it is both show at 20 px.
+static func bucket_mop(n: Node3D, clean: float, tool := "mop") -> Node3D:
+	var m := mop(n, clean, tool)
+	m.position = Vector3(0.22, 1.42, 0)
+	m.rotation.z = PI - 0.2
+	if tool == "scrubber":   # too big for the pail: parked beside it
+		m.position = Vector3(-0.2, 0.0, 0.3)
+		m.rotation.z = 0.0
 	return m
 
 
@@ -1485,17 +1532,32 @@ static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) ->
 			box(n, Vector3(0, y0 + 0.08, back + 0.03), Vector3(0.3, 0.36, 0.05), WOOD, 0.0, R_WOOD)
 			box(n, Vector3(0, y0 + 0.02, back + 0.12), Vector3(0.05, 0.05, 0.16), "#d9a441", 0.0, R_WOOD)
 			box(n, Vector3(0, y0 + 0.07, back + 0.19), Vector3(0.05, 0.12, 0.04), "#d9a441", 0.0, R_WOOD)
-		"hood":
+		"hood", "extractor":
 			# A sloped steel-blue canopy over the stove (sheet 1), a square frustum squashed
-			# to the wall's depth, with a duct up to the top of the wall.
+			# to the wall's depth, with a duct up to the top of the wall. The extractor
+			# (PRD 9.5) swaps the square duct for a round steel one with a fan box on it,
+			# its blades showing, and a coral trim band along the canopy's lip.
 			var hold := Node3D.new()
 			hold.position = Vector3(0, y0, back + 0.37)
 			hold.scale = Vector3(1, 1, 0.76)
 			n.add_child(hold)
 			var canopy := _add(hold, lathe_mesh([[0.0, 0.0], [0.69, 0.0], [0.69, 0.1], [0.34, 0.46], [0.0, 0.46]], 4), Vector3.ZERO, Color(HOOD_COL), 0.0, R_WOOD)
 			canopy.rotation.y = PI / 4
-			_add(n, bevel_mesh(Vector3(0.46, 0.5, 0.36), 0.03), Vector3(0, y0 + 0.68, back + 0.19), Color(_shade(HOOD_COL, 0.08)), 0.0, R_WOOD)
 			box(n, Vector3(0, y0 - 0.005, back + 0.38), Vector3(0.8, 0.02, 0.56), "#4a5a5e")   # the filter
+			if node == "hood":
+				_add(n, bevel_mesh(Vector3(0.46, 0.5, 0.36), 0.03), Vector3(0, y0 + 0.68, back + 0.19), Color(_shade(HOOD_COL, 0.08)), 0.0, R_WOOD)
+			else:
+				box(hold, Vector3(0, 0.07, 0), Vector3(0.99, 0.05, 0.99), CORAL)   # the trim band
+				_add(n, bevel_mesh(Vector3(0.5, 0.34, 0.36), 0.05), Vector3(0, y0 + 0.4, back + 0.2), Color(STEEL_DARK), 0.0, R_WOOD)
+				cyl(n, Vector3(0, y0 + 0.74, back + 0.2), 0.14, 0.3, STEEL, 0.0, R_GLOSS)
+				var fan := Node3D.new()   # the fan face, turned to the room
+				fan.position = Vector3(0, y0 + 0.57, back + 0.39)
+				fan.rotation.x = PI / 2
+				n.add_child(fan)
+				cyl(fan, Vector3.ZERO, 0.14, 0.02, "#3a4548")
+				for i in 3:
+					box(fan, Vector3(0, 0.025, 0), Vector3(0.24, 0.01, 0.06), STEEL, 0.0, R_GLOSS).rotation.y = TAU * i / 3.0
+				ball(fan, Vector3(0, 0.03, 0), 0.03, CORAL)
 
 
 static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "") -> void:
@@ -1697,7 +1759,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			var hung := hand_tool(n, Kitchen.tool_of(node) if Kitchen.tool_of(node) != "" else "sponge", 1.0)
 			hung.position = hook_spot(HIGH_Y0 - 0.3)
 		"mop_bucket":
-			mop_bucket(n)
+			mop_bucket(n, node)
 		"robot_dock":
 			robot_dock(n)
 		"bin":
