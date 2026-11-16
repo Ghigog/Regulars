@@ -1182,7 +1182,7 @@ func test_a_themed_search_lists_untagged_pieces_and_that_themes_own():
 			ids[bp.id] = true
 			assert_ne(str(Catalog.ITEMS[bp.id].get("theme", theme)), other, "%s is not sold in the %s" % [bp.id, theme])
 		for id: String in Catalog.ITEMS:
-			if not Catalog.ITEMS[id].has("theme"):
+			if not Catalog.ITEMS[id].has("theme") and (Catalog.STAFF_ON_SALE or not Catalog.ITEMS[id].get("staff", false)):
 				assert_true(ids.has(id), "%s is sold everywhere" % id)
 	assert_true(Catalog.sold_in("jukebox", "diner"))
 	assert_false(Catalog.sold_in("jukebox", "seaside"))

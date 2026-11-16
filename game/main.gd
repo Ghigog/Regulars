@@ -79,6 +79,8 @@ const CLOSE_FOCUS := Vector3(W / 2.0 + 0.3, 0, H / 2.0 - 0.2)
 
 var grid: Grid
 var town: Town
+var staff: Staff                       # PRD 10: job posts, the CV pile and the hires
+var applicants := {}                   # PRD 10.3: person -> peg standing in line outside tonight
 var critic: Critic                     # PRD 2: who eats as the critic, and the last review
 var critic_guest: Guest                # the critic, while they are here on a critic day
 var _critic_seen := {}                 # what the critic saw as their tray arrived: {patience, quality}
@@ -173,6 +175,7 @@ func _ready() -> void:
 	grid = Grid.new(W + 2 - LOT.position.x, LOT.size.y, LOT.position)   # columns W and W + 1 are the pavement outside
 	town = Town.new(seed_value)
 	critic = Critic.new(seed_value, town.people.size())
+	staff = Staff.new(seed_value)
 	ledger = Ledger.new()
 	catalog = Catalog.new(seed_value)
 	_build_scenery()
@@ -502,6 +505,10 @@ func _apply_demo(demo: String) -> void:
 			ledger.record_sale(DEMO_BILL, 3)
 			arrivals.clear()
 			get_tree().create_timer(1.5).timeout.connect(confirm_receipt.bind(0))
+	elif demo.begins_with("desk_"):   # PRD 10.3: desk_line, desk_post, desk_cvs, desk_haggle; shoot at 3
+		ledger.record_sale(DEMO_BILL, 5)
+		arrivals.clear()
+		get_tree().create_timer(1.0).timeout.connect(_demo_desk.bind(demo))
 	elif demo == "counters":   # PRD 8: a double counter, a board on a double counter, a stove on the pass; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.money = 300
@@ -631,6 +638,35 @@ func _demo_counters() -> void:
 	find_station("board").set_item(Tray.kind("prep", "lemon" if Scenery.seaside() else "tomato"))   # a tool's surface still holds a thing
 	player.position = Grid.center(Vector2i(2, 4))
 	player.look(Vector2i(1, 0))
+
+
+## PRD 10.3. Two desks along the front wall and a grill cook's post up; the town warmed
+## up so applicants come. desk_line: the room, the line outside, the pile on the desk and
+## the chef at the desk. desk_post: writing a post. desk_cvs: the pile, the top CV half
+## dragged right. desk_haggle: a low offer refused.
+func _demo_desk(demo: String) -> void:
+	for c: Vector2i in [Vector2i(8, 6), Vector2i(9, 6)]:
+		add_station("desk", c)
+	staff.add_post("Grill cook", ["grill", "fetch", "assemble"], 1, 1, desk_count())
+	for p in town.people:
+		p.affinity = 0.5
+	open_build()
+	if demo == "desk_line":
+		player.position = Grid.center(Vector2i(7, 6))
+		player.look(Vector2i(1, 0))
+		return
+	open_desk()
+	if demo == "desk_post":
+		hud.desk.draft_post("Dish washer", ["wash_up", "empty_bin", "clear_tables"], 2, 1)
+		hud.desk.select("duty:take_orders")
+	elif demo == "desk_cvs":
+		hud.desk.show_tab("cvs")
+		get_tree().create_timer(0.6).timeout.connect(hud.desk.drag_to.bind(120.0))
+	elif demo == "desk_haggle":
+		hud.desk.show_tab("cvs")
+		hud.desk.start_haggle()
+		staff.rng.seed = 3
+		hud.desk.make_offer(maxi(1, int(staff.cvs[0].ask) / 2))
 
 
 func _demo_build(demo: String) -> void:
@@ -1378,12 +1414,15 @@ func start_day() -> void:
 	shopper = null
 	set_door(true)
 	hud.close_menu()
+	close_desk()
+	_clear_applicants()
 	hud.hide_card()
 	hud.hide_build()
 	ledger.pay_stock(night_cost())   # the door checked it can be paid (tests may skip the door)
 	menu_board.refresh(tonight_menu())
 	town.new_day()
 	var coming := town.roll_guests(ledger.day, (Town.FLYER_BOOST if flyers_out else 0.0) + critic.visit_boost(ledger.day))
+	coming = coming.filter(func(i: int) -> bool: return staff.may_visit(i, ledger.day))   # staff work; they eat out only on a day off
 	var critic_day := critic.visits_on(ledger.day)
 	if critic_day:   # they come alone, whatever the dice or a grudge say
 		coming.erase(critic.critic_idx)
@@ -1531,6 +1570,7 @@ func open_build() -> void:
 	phase = Phase.BUILD
 	ready_chefs.clear()
 	hud.hide_card()
+	roll_applicants()
 	hud.show_build()
 
 
@@ -1718,6 +1758,8 @@ func sell_block(ch: Player = null) -> String:
 		return "The %s is not for sale" % piece_name(ch.hand).to_lower()
 	if ch.hand.id in ["table", "sink", "bin"] and find_station(ch.hand.id) == null:
 		return "Your last %s" % ch.hand.id
+	if ch.hand.id == "desk" and not staff.can_sell_desk(desk_count() + 1):
+		return "Every desk has a post or a hire"
 	return ""
 
 
@@ -2127,6 +2169,8 @@ func build_action(ch: Player = null) -> String:
 	var clean := night_clean_action(stations.get(ch.target_cell()), ch)
 	if clean != "":
 		return clean
+	if desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
+		return "Use desk"
 	if not Cleaning.carrying_mess(ch.held) and _piece_in_front(ch) != Vector3.INF:
 		return "Pick up"
 	return door_action(ch)
@@ -2174,6 +2218,8 @@ func build_interact(ch: Player = null) -> void:
 				sfx("fail")
 		"Pick up":
 			pick_up(_piece_in_front(ch), ch)
+		"Use desk":
+			open_desk(ch)
 		"Open up", "Take out rubbish":
 			use_door(ch)
 			hud.show_build()
@@ -3080,7 +3126,7 @@ func open_menu(ch: Player = null) -> bool:
 			hud.say("The menu can't change during service.")
 			sfx("fail")
 		return false
-	if Cleaning.carrying_mess(ch.held) or hud.menu_open():
+	if Cleaning.carrying_mess(ch.held) or hud.card_open():
 		return false
 	if shopping:
 		close_shop()
@@ -3096,6 +3142,166 @@ func close_menu() -> void:
 		hud.close_menu()
 		sfx("slide", 0.0, 0.8)
 		menu_changed()
+
+
+# ---------------------------------------------------------------- the desk (PRD 10.3)
+
+## Desks in the room: one for each post and each hire.
+func desk_count() -> int:
+	return stations_of("desk").size()
+
+
+## The desk the chef faces, or null.
+func desk_in_front(ch: Player = null) -> Station:
+	ch = _me(ch)
+	var st: Station = stations.get(ch.target_cell())
+	return st if st != null and st.type == "desk" else null
+
+
+## The duties a post can hold tonight, by kind, read from the room (`Staff.room_duties`).
+func room_duties() -> Dictionary:
+	var pieces := []
+	for st: Station in stations.values():
+		pieces.append(st.type)
+	return Staff.room_duties(kitchen_tools(), pieces)
+
+
+## The desk screen, at night only, from either chef. Everything about staff is done here.
+func open_desk(ch: Player = null) -> bool:
+	ch = _me(ch)
+	if phase != Phase.BUILD or desk_count() == 0 or hud.card_open() or Cleaning.carrying_mess(ch.held):
+		return false
+	if shopping:
+		close_shop()
+	if not ch.hand.is_empty():
+		cancel_hand(ch)
+	hud.open_desk()
+	sfx("slide")
+	return true
+
+
+func close_desk() -> void:
+	if hud.desk_open():
+		hud.close_desk()
+		sfx("slide", 0.0, 0.8)
+		_refresh_desks()
+
+
+## Puts up a post. Refused (-1) when every desk is taken.
+func desk_post(post_name: String, duties: Array, breaks: int, days_off: int) -> int:
+	var id := staff.add_post(post_name, duties, breaks, days_off, desk_count())
+	sfx("page" if id >= 0 else "fail")
+	return id
+
+
+func desk_take_down(id: int) -> void:
+	for c in staff.cvs:
+		if c.post == id:
+			_send_home(int(c.person))
+	staff.remove_post(id)
+	sfx("page")
+	_refresh_desks()
+
+
+## Hires a CV at its ask (or `wage`). The post is filled: its other applicants go home.
+func desk_hire(cv_id: int, wage := -1) -> bool:
+	var c := staff.cv(cv_id)
+	if c.is_empty():
+		return false
+	var others := staff.cvs.filter(func(o: Dictionary) -> bool: return o.post == c.post)
+	if staff.hire(cv_id, wage, ledger.day) < 0:
+		return false
+	for o in others:
+		_send_home(int(o.person), int(o.person) == int(c.person))
+	sfx("coin")
+	_refresh_desks()
+	return true
+
+
+func desk_dismiss(cv_id: int) -> void:
+	var c := staff.cv(cv_id)
+	if c.is_empty():
+		return
+	staff.dismiss(cv_id)
+	_send_home(int(c.person))
+	sfx("slide", 0.0, 0.8)
+	_refresh_desks()
+
+
+## Haggling at hire (section 5): "accept", "refuse", "take_last" or "walk".
+func desk_haggle(cv_id: int, offer: int) -> String:
+	var c := staff.cv(cv_id)
+	if c.is_empty():
+		return ""
+	var others := staff.cvs.filter(func(o: Dictionary) -> bool: return o.post == c.post)
+	var r := staff.haggle_hire(cv_id, offer, ledger.day)
+	match r:
+		"accept", "take_last":
+			for o in others:
+				_send_home(int(o.person), int(o.person) == int(c.person))
+			sfx("coin")
+		"refuse":
+			sfx("fail")
+		"walk":
+			_send_home(int(c.person))
+			sfx("fail")
+	_refresh_desks()
+	return r
+
+
+## The start of the build phase: tonight's applicants send their CVs to the pile and
+## stand in a line outside the door. Earlier CVs stay in the pile; their people do not
+## queue again.
+func roll_applicants() -> Array[Dictionary]:
+	var fresh := staff.roll_applicants(Staff.candidates(town, ledger.day))
+	_clear_applicants()
+	for i in fresh.size():
+		var person := int(fresh[i].person)
+		var peg := Peg.guest(town.people[person].name)
+		var rig := Peg.rigged(peg)
+		add_child(rig)
+		rig.position = queue_spot(i)
+		rig.rotation.y = PI / 2   # facing the door
+		applicants[person] = rig
+	if not fresh.is_empty():
+		hud.say("%s outside: %s in the pile at the desk." % [
+			"An applicant is" if fresh.size() == 1 else "%d applicants are" % fresh.size(),
+			"a CV" if fresh.size() == 1 else "their CVs"])
+	_refresh_desks()
+	return fresh
+
+
+## Someone in tonight's line leaves it: hired (they come back to work, 10.6) or sent home.
+func _send_home(person: int, hired := false) -> void:
+	if not applicants.has(person):
+		return
+	var rig: Node3D = applicants[person]
+	applicants.erase(person)
+	burst(rig.position + Vector3(0, 1.2, 0), "stars" if hired else "puff", 0.4)
+	rig.queue_free()
+
+
+func _clear_applicants() -> void:
+	for rig: Node3D in applicants.values():
+		rig.queue_free()
+	applicants.clear()
+
+
+## The CV pile on each desk: a sheet of paper per CV, up to a handful.
+func _refresh_desks() -> void:
+	for st in stations_of("desk"):
+		var old := st.get_node_or_null("pile")
+		if old:
+			old.free()
+		var n := staff.cvs.size()
+		if n == 0:
+			continue
+		var pile := Node3D.new()
+		pile.name = "pile"
+		st.add_child(pile)
+		for k in mini(n, 6):
+			Build.box(pile, Vector3(0.12, 0.775 + k * 0.012, 0.08), Vector3(0.3, 0.008, 0.38), Build.PAPER) \
+				.rotation.y = [0.0, 0.12, -0.08, 0.2, -0.15, 0.05][k]
 
 
 ## What this guest orders: {main, side, drink}. Chosen at the door with their group
@@ -3883,7 +4089,7 @@ func _process(delta: float) -> void:
 		var input := Vector2.ZERO
 		if hud.options_open():
 			pass   # paused anyway; the arrows belong to the options screen
-		elif phase == Phase.SERVICE or (phase == Phase.BUILD and shopper != ch and not hud.menu_open() \
+		elif phase == Phase.SERVICE or (phase == Phase.BUILD and shopper != ch and not hud.card_open() \
 				and not (hud.typing() and controls.owner_of("keys") == p)):
 			input = controls.move(p)
 		if preps.has(p):
@@ -3950,6 +4156,8 @@ func _update_cursor(ch: Player = null) -> void:
 			p = _hover_point(ch) + Vector3(0, 2.0, 0)
 		elif action == "Pick up":
 			p = _piece_in_front(ch) + Vector3(0, 2.0, 0)
+		elif action == "Use desk":
+			p = desk_in_front(ch).position + Vector3(0, 1.9, 0)
 		at = cam.unproject_position(p)
 	hud.show_prompt(at, action, chefs.find(ch))
 
@@ -4253,6 +4461,9 @@ func act(p: int, action: String, echo := false) -> void:
 			hud.toggle_options()
 		else:
 			hud.title.action(action, echo)
+		return
+	if hud.desk_open():
+		hud.desk.action(action, echo)
 		return
 	if hud.menu_open():
 		hud.menu.action(action, echo)

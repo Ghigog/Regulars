@@ -427,3 +427,98 @@ func test_training_raises_skill_and_lowers_tolerance():
 		s.train(1, "clean")
 	assert_eq(s.employee(1).skills.clean, 5.0, "capped at five stars")
 	assert_eq(Staff.stars(s.employee(1).skills.clean), 5)
+
+
+# ---------- The desk (PRD 10.3) ----------
+
+func test_room_duties_list_tool_kinds_in_the_room_and_the_fixed_tasks():
+	var room := Staff.room_duties(["grill", "chop", "pour"], ["stove", "stove", "sink", "bin", "mop"])
+	assert_eq(room.food, ["grill", "board", "tap", "fetch", "assemble"] as Array[String])
+	assert_eq(room.service, ["take_orders", "carry_trays", "clear_tables", "help_up"] as Array[String])
+	assert_eq(room.clean, ["mop", "wash_up", "empty_bin"] as Array[String], "a cleaning tool by its piece")
+	var empty := Staff.room_duties([], [])
+	assert_eq(empty.food, ["fetch", "assemble"] as Array[String], "no prep tools: only the fixed tasks")
+	assert_false((empty.clean as Array).has("mop"))
+
+
+func test_every_listed_duty_has_words_and_a_kind():
+	var room := Staff.room_duties(Staff.TOOL_DUTIES.keys(), Staff.CLEAN_TOOLS)
+	var s := _staff()
+	for k in Staff.KINDS:
+		for d: String in room[k]:
+			assert_eq(s.duty_kind(d), k, d)
+			assert_true(Staff.DUTY_WORDS.has(d), "%s has words" % d)
+
+
+func test_a_duty_whose_tool_left_the_room_is_missing():
+	var room := Staff.room_duties(["chop"], [])
+	assert_eq(Staff.missing_duties(["board", "grill", "fetch"], room), ["grill"] as Array[String])
+	assert_eq(Staff.missing_duties(["wash_up"], room), [] as Array[String])
+
+
+func test_like_follows_affinity():
+	assert_almost_eq(Staff.like_of(0.0), Staff.LIKE_AT_NEUTRAL, 0.0001)
+	assert_eq(Staff.like_of(1.0), 1.0)
+	assert_eq(Staff.like_of(-1.0), 0.0)
+	assert_gt(Staff.like_of(0.3), Staff.like_of(0.1))
+
+
+func test_candidates_carry_tolerances_rating_and_who_stays_away():
+	var town := Town.new(4)
+	town.people[2].away_until = 5
+	town.people[3].gone = true
+	town.people[1].affinity = 0.4
+	var c := Staff.candidates(town, 3)
+	assert_eq(c.size(), town.people.size())
+	assert_eq(c[0].tolerance, town.people[0].tolerance)
+	assert_eq(c[0].rating, town.rating(0))
+	assert_true(c[2].away, "a grudge keeps them away")
+	assert_true(c[3].away)
+	assert_false(c[0].away)
+	assert_almost_eq(float(c[1].like), Staff.like_of(0.4), 0.0001)
+	var was: int = town.people[0].tolerance.food
+	c[0].tolerance.food = 9
+	assert_eq(town.people[0].tolerance.food, was, "a copy, not the town's own")
+
+
+func test_the_town_applies_to_a_post_from_its_candidates():
+	var town := Town.new(9)
+	for p in town.people:
+		p.affinity = 0.5
+	var s := _staff()
+	s.add_post("Grill cook", ["grill", "fetch"], 1, 1, 2)
+	var cvs := s.roll_applicants(Staff.candidates(town, 1))
+	assert_between(cvs.size(), 1, Staff.MAX_NEW_CVS)
+	for cv in cvs:
+		assert_eq(cv.rating, town.rating(cv.person))
+		assert_eq(cv.skills.food, float(town.skill(cv.person, "food")))
+
+
+func test_everyone_has_a_rating_from_one_to_five_fixed_by_the_seed():
+	var a := Town.new(21)
+	var b := Town.new(21)
+	var seen := {}
+	for i in a.people.size():
+		assert_between(a.rating(i), 1, 5)
+		assert_eq(a.rating(i), b.rating(i))
+		seen[a.rating(i)] = true
+	assert_gt(seen.size(), 1, "ratings vary")
+
+
+func test_ratings_leave_tolerances_and_tastes_alone():
+	var a := Town.new(5)
+	var tol: Array = a.people.map(func(p: Dictionary) -> Dictionary: return p.tolerance.duplicate())
+	var likes: Array = a.people.map(func(p: Dictionary) -> Array: return p.likes)
+	a.make_ratings()
+	assert_eq(a.people.map(func(p: Dictionary) -> Dictionary: return p.tolerance), tol)
+	assert_eq(a.people.map(func(p: Dictionary) -> Array: return p.likes), likes)
+
+
+func test_the_desk_is_a_one_cell_catalog_piece_kept_off_sale():
+	assert_true(Catalog.ITEMS.has("desk"))
+	assert_eq(int(Catalog.ITEMS.desk.tiers), 1)
+	assert_eq(Catalog.STAFF_ON_SALE, false, "on sale with helpers (10.6)")
+	assert_false(Catalog.sold_in("desk", "diner"))
+	assert_false(Catalog.sold_in("desk", ""))
+	for bp in Catalog.search("desk"):
+		assert_ne(bp.id, "desk")

@@ -662,3 +662,78 @@ func train(person: int, kind: String) -> float:
 func tolerance(person: int, kind: String) -> float:
 	var e := employee(person)
 	return 6.0 - float(e.skills[kind]) if not e.is_empty() else 0.0
+
+
+# ---------- The desk's duty list (PRD 10.3) ----------
+
+## What each duty is called on the desk screen.
+const DUTY_WORDS := {
+	"grill": "Grill", "fryer": "Fryer", "pot": "Stock pot", "board": "Chopping board",
+	"slicer": "Slicer", "tap": "Pour drinks", "fetch": "Fetch ingredients", "assemble": "Assemble trays",
+	"take_orders": "Take orders", "carry_trays": "Carry trays to tables", "clear_tables": "Clear tables",
+	"help_up": "Help fallen people up", "mop": "Mop", "sponge": "Sponge", "scraper": "Scraper",
+	"spill_kit": "Spill kit", "wash_up": "Wash up", "empty_bin": "Empty the bin",
+}
+## A prep tool (as `Catalog.tool_of` names it) and its duty. Tools are listed by kind:
+## ticking the grill covers every stove.
+const TOOL_DUTIES := {"grill": "grill", "fry": "fryer", "boil": "pot", "chop": "board", "slice": "slicer", "pour": "tap"}
+## Cleaning tools: the piece's id is the duty's (PRD 9.4 adds them to the room).
+const CLEAN_TOOLS: Array[String] = ["mop", "sponge", "scraper", "spill_kit"]
+## Duties listed whatever is in the room.
+const FIXED_DUTIES := {"food": ["fetch", "assemble"], "service": ["take_orders", "carry_trays", "clear_tables", "help_up"],
+	"clean": ["wash_up", "empty_bin"]}
+const MAX_POST_NAME := 18
+const LIKE_AT_NEUTRAL := 0.5   # how much someone with no opinion yet likes the restaurant, for applying
+
+
+## The duties a post can hold tonight, by kind: one line per tool kind in the room (prep
+## tools as `Catalog.tool_of` names them, cleaning tools by piece id), then the fixed
+## tasks. {"food": [...], "service": [...], "clean": [...]}, each in `DUTIES` order.
+static func room_duties(tools: Array, pieces: Array) -> Dictionary:
+	var have := {}
+	for t in tools:
+		if TOOL_DUTIES.has(t):
+			have[TOOL_DUTIES[t]] = true
+	for p in pieces:
+		if CLEAN_TOOLS.has(p):
+			have[p] = true
+	var out := {}
+	for k in KINDS:
+		var list: Array[String] = []
+		for id: String in DUTIES:
+			if DUTIES[id].kind == k and (have.has(id) or (FIXED_DUTIES[k] as Array).has(id)):
+				list.append(id)
+		out[k] = list
+	return out
+
+
+## A post's duties whose tool is no longer in the room (greyed on the desk).
+static func missing_duties(duties: Array, room: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for d in duties:
+		var found := false
+		for k in room:
+			found = found or (room[k] as Array).has(d)
+		if not found:
+			out.append(String(d))
+	return out
+
+
+static func duty_word(id: String) -> String:
+	return str(DUTY_WORDS.get(id, id.capitalize()))
+
+
+## How much someone likes the restaurant, 0 to 1, from their affinity (-1 to 1).
+static func like_of(affinity: float) -> float:
+	return clampf(LIKE_AT_NEUTRAL + affinity, 0.0, 1.0)
+
+
+## The town as `roll_applicants` wants it on `day`: everyone, with their tolerances,
+## rating and liking; anyone holding a grudge or gone for good is staying away.
+static func candidates(town: Town, day: int) -> Array:
+	var out := []
+	for i in town.people.size():
+		var p: Dictionary = town.people[i]
+		out.append({"id": i, "tolerance": (p.tolerance as Dictionary).duplicate(), "rating": town.rating(i),
+			"like": like_of(float(p.affinity)), "away": town.holds_grudge(i, day) or p.gone})
+	return out

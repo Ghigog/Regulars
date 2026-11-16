@@ -76,6 +76,7 @@ var _shop_tag: Control                  # "Chef 1 is shopping", over the shop in
 var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, over the slip
 var _dirty_label: Label
 var menu: MenuScreen           # the menu screen, while it is open
+var desk: DeskScreen           # the desk screen (PRD 10.3), while it is open
 var menu_notes: MenuScreen.BuildNotes   # night zero's hint and the restock note, over the slip
 var _shop: Control             # the shop's sliding tray; null while the shop is shut
 var _info: Label
@@ -2002,6 +2003,29 @@ const TRAY_DROP := 260.0   # how far below its place the shop tray waits
 
 func menu_open() -> bool:
 	return menu != null
+
+
+func desk_open() -> bool:
+	return desk != null
+
+
+## A full-screen card (the menu or the desk) is over the room: nobody walks or builds.
+func card_open() -> bool:
+	return menu != null or desk != null
+
+
+func open_desk() -> void:
+	if desk != null:
+		return
+	desk = DeskScreen.new()
+	root.add_child(desk)
+	desk.setup(game, self)
+
+
+func close_desk() -> void:
+	if desk != null:
+		desk.queue_free()
+		desk = null
 
 
 func open_menu() -> void:

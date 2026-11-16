@@ -67,6 +67,7 @@ func _init(seed_value := 1) -> void:
 			_befriend(i, (i + 5) % NAMES.size())
 	make_tastes(theme)
 	make_tolerances()
+	make_ratings()
 
 
 # ---------------------------------------------------------------- tolerances (PRD 10.1)
@@ -98,6 +99,20 @@ static func skill_for(tol: int) -> int:
 
 func skill(i: int, topic: String) -> int:
 	return skill_for(tolerance(i, topic))
+
+
+## Everyone's overall rating as a worker, 1 to 5 stars (PRD 10.3, section 1): how fast
+## they walk and work, and the base of their asking wage. Seeded like tolerances, from
+## its own generator, so nothing else in the town moves. Two dice averaged.
+func make_ratings() -> void:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("%d:rating" % taste_seed)
+	for p in people:
+		p.rating = roundi((r.randi_range(TOL_MIN, TOL_MAX) + r.randi_range(TOL_MIN, TOL_MAX)) / 2.0)
+
+
+func rating(i: int) -> int:
+	return int(people[i].get("rating", 3))
 
 
 # ---------------------------------------------------------------- tastes
