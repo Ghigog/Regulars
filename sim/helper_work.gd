@@ -50,7 +50,7 @@ const IDLE_CHAT_AFTER := 1.0    # seconds idle before a helper is free to chat
 
 ## The kind of work each task is, for training and for the tolerance it wears on.
 const TASK_KIND := {
-	"prep": "food", "fetch": "food", "assemble": "food",
+	"prep": "food", "fetch": "food", "assemble": "food", "tray": "food", "scrap": "food",
 	"order": "service", "carry": "service", "clear": "service", "help_up": "service",
 	"dirt": "clean", "wash": "clean", "bin": "clean",
 }
@@ -77,9 +77,18 @@ static func press_seconds(quality: float, rating: int, satisfaction: float) -> f
 	return work_time(PRESS_SECONDS / clampf(quality, 0.5, 2.0), rating, satisfaction)
 
 
-## How many levels of dirt one wipe clears, from cleaning skill (1 to 5).
-static func wipe_levels(skill: float) -> int:
-	return 2 if skill >= GOOD_WIPE_FROM else 1
+## How many levels of dirt one wipe clears, from cleaning skill (1 to 5), with `tool` (a
+## flat mop clears a whole cell, PRD 9.5) and on a cell laid with cleaner (`one_press`:
+## whatever its level).
+static func wipe_levels(skill: float, tool := "", one_press := false) -> int:
+	var levels := 2 if skill >= GOOD_WIPE_FROM else 1
+	if CleanTools.TOOLS.has(tool):
+		levels = maxi(levels, int(CleanTools.TOOLS[tool].levels))
+		if one_press and CleanTools.uses_of(tool) == 0:
+			return FloorMess.MAX_LEVEL
+	elif one_press:
+		return FloorMess.MAX_LEVEL
+	return levels
 
 
 ## The joy (or letdown, below three stars) a guest gets from being served by them.
@@ -106,27 +115,35 @@ static func steps(task: Dictionary, duties: Array, dest_duty := "") -> Array:
 	var may_assemble := duties.has("assemble")
 	match str(task.get("type", "")):
 		"fetch":
-			var out: Array = [{"do": "take", "at": task.cell, "kind": task.kind}]
+			var kind := str(task.kind)
+			var hold := hold_for(kind)
+			var out: Array = [{"do": "take", "at": task.cell, "kind": str(task.get("source", kind)),
+				"ready": task.get("ready", false)}]
 			var job := str(task.get("job", ""))
 			if job == "" or job == "none":
 				out.append({"do": "deliver", "ticket": task.ticket, "assemble": may_assemble})
 			elif dest_duty != "" and duties.has(dest_duty):
-				out.append({"do": "cook", "at": task.dest, "job": job, "kind": task.kind, "ticket": task.ticket})
+				out.append({"do": "cook", "at": task.dest, "job": job, "kind": kind, "hold": hold, "ticket": task.ticket})
 				out.append({"do": "deliver", "ticket": task.ticket, "assemble": may_assemble})
 			else:
 				out.append({"do": "leave", "at": task.dest})
 			return out
 		"prep":
 			var at: Vector2i = task.get("station", task.cell)
+			var hold := str(task.get("hold", hold_for(str(task.kind))))
 			var deliver := {"do": "deliver", "ticket": task.ticket, "assemble": may_assemble}
 			if str(task.get("job", "")) == "pour" and task.get("item") == null:
 				return [{"do": "pour", "at": at, "kind": task.kind}, deliver]
 			if task.cell == at:
-				return [{"do": "cook", "at": at, "job": task.job, "kind": task.kind, "in_place": true, "ticket": task.ticket}, deliver]
-			return [{"do": "pick", "at": task.cell, "kind": task.kind},
-				{"do": "cook", "at": at, "job": task.job, "kind": task.kind, "ticket": task.ticket}, deliver]
+				return [{"do": "cook", "at": at, "job": task.job, "kind": task.kind, "hold": hold, "in_place": true, "ticket": task.ticket}, deliver]
+			return [{"do": "pick", "at": task.cell, "kind": task.kind, "hold": hold},
+				{"do": "cook", "at": at, "job": task.job, "kind": task.kind, "hold": hold, "ticket": task.ticket}, deliver]
 		"assemble":
 			return [{"do": "assemble", "ticket": task.ticket}]
+		"tray":
+			return [{"do": "start_tray", "ticket": task.ticket}]
+		"scrap":
+			return [{"do": "pick", "at": task.cell, "kind": task.kind, "state": "burnt"}, {"do": "bin"}]
 		"carry":
 			return [{"do": "pick_tray", "at": task.cell, "ticket": task.tray}, {"do": "serve", "at": task.table}]
 		"order":
@@ -142,6 +159,16 @@ static func steps(task: Dictionary, duties: Array, dest_duty := "") -> Array:
 		"bin":
 			return [{"do": "empty_bin", "at": task.cell}, {"do": "to_door"}]
 	return []
+
+
+## What a helper holds to make `kind` at its tool (PRD 10.7): its own raw form, or for a
+## kind made from another's stock that stock as it comes out of the box (a raw lemon for
+## lemonade, a scoop of ice cream, which needs no prep, for a milkshake).
+static func hold_for(kind: String) -> String:
+	var src := Pantry.source_of(kind)
+	if src != kind and not Pantry.needs_prep(src):
+		return Tray.kind("prep", src)
+	return Tray.kind("raw", src)
 
 
 ## The cleaning tool a helper wipes with: their first cleaning duty, a mop before a sponge.

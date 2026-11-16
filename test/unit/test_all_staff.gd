@@ -1,0 +1,227 @@
+extends GutTest
+## PRD 10.7: the all-staff run. Hired helpers run a whole day with no chef, in a room
+## with every tool, every cleaning tree, ready-made boxes and the floor treated. Any task
+## nobody can do shows up here as a stuck ticket, an unserved table or dirt left lying.
+## Guests are kept patient, so slowness is never mistaken for a task nobody does.
+
+const STEP := 0.1
+const MAX_SECONDS := 900.0   # a whole day with the slowest crew is well under this
+const STUCK_AFTER := 120.0   # a ticket (or a table waiting to order) unchanged this long is stuck
+const SEEDS := [11, 2026, 4242]
+
+var game
+
+
+func after_each():
+	Scenery.theme_id = "diner"
+
+
+func _start(theme: String, seed_value: int, day := 1) -> void:
+	Scenery.theme_id = theme
+	game = load("res://game/main.tscn").instantiate()
+	game.first_night = false
+	add_child_autofree(game)
+	game.set_process(false)
+	game.best_path = "user://regulars_best_test.json"
+	game.theme_path = "user://regulars_theme_test.cfg"
+	game.town = Town.new(seed_value)
+	game.town.make_tastes(theme)
+	var all: Array = Pantry.for_theme(theme)
+	for p in game.town.people:   # everyone eats, and orders sides and drinks (a liked kind in them)
+		p.likes = all.duplicate()
+		p.dislikes = []
+	game.staff = Staff.new(seed_value)
+	game.critic = Critic.new(seed_value, game.town.people.size())
+	game.order_rng.seed = seed_value
+	game.floor_dirt.mess.rng.seed = seed_value
+	game.ledger.day = day
+	game.flyers_out = day > 1   # a busy day: a long line at the door
+	assert_not_null(game.crew, "the game loaded")
+	if game.crew != null:
+		game.crew.staff_only()
+
+
+## Runs the day out. Returns what went wrong: stuck tickets, tables nobody served.
+func _run_day() -> Dictionary:
+	var first := {}      # ticket id -> [when it last changed, how it stood then]
+	var sat := {}        # guest -> when they sat down to order
+	var stuck := []
+	var ordered := {}    # kinds on tickets
+	var chores := {}     # an open chore -> when it was first seen
+	var t := 0.0
+	while game.phase == game.Phase.SERVICE and t < MAX_SECONDS:
+		game.step(STEP)
+		t += STEP
+		for g: Guest in game.guests:
+			g.mood.patience = 1.0
+			if g.state == "ordering" and not sat.has(g):
+				sat[g] = t
+			elif g.state != "ordering":
+				sat.erase(g)
+		for tk: Dictionary in game.tickets:
+			var now := _state_of(tk)
+			if not first.has(tk.id):
+				first[tk.id] = [t, now]
+				for it: Dictionary in tk.items:
+					for k: String in it.ingredients:
+						ordered[k] = true
+			elif first[tk.id][1] != now:
+				first[tk.id] = [t, now]
+			elif t - float(first[tk.id][0]) > STUCK_AFTER:
+				stuck.append(_why(tk))
+				first[tk.id] = [INF, now]
+		var open := _chores()
+		for k: String in chores.keys():
+			if not open.has(k):
+				chores.erase(k)
+		for k: String in open:
+			if not chores.has(k):
+				chores[k] = t
+			elif t - float(chores[k]) > STUCK_AFTER:
+				stuck.append("%s left undone" % k)
+				chores[k] = INF
+		for g: Guest in sat:
+			if t - float(sat[g]) > STUCK_AFTER:
+				stuck.append("a table nobody took the order of at %s" % str(g.table.cell))
+				sat[g] = INF
+	return {"stuck": stuck, "ordered": ordered, "t": t}
+
+
+## The chores open now, each one a task on the board for someone: dirt worth cleaning,
+## a dirty table, dishes in the sink, a full bin, burnt food on a tool.
+func _chores() -> Dictionary:
+	var out := {}
+	var mess: FloorMess = game.floor_dirt.mess
+	for c: Vector2i in mess.dirt:
+		if mess.level(c) >= JobBoard.DIRT_FROM and mess.can_clean(c) and game.grid.in_bounds(c):
+			out["dirt at %s" % str(c)] = true
+	for st: Station in game.stations.values():
+		if Station.is_table(st.type) and st.dirty > 0:
+			out["a dirty table at %s" % str(st.cell)] = true
+		elif st.type == "sink" and st.dirty > 0:
+			out["the washing up"] = true
+		elif st.type == "bin" and st.count >= Crew.BIN_FULL:
+			out["the full bin"] = true
+		if st.item.begins_with("burnt:"):
+			out["burnt food on the %s" % st.type] = true
+	return out
+
+
+## How a ticket stands: what its tray still needs, where the tray is, who holds it.
+## Any change is progress.
+func _state_of(tk: Dictionary) -> String:
+	var tray: Tray = game.tray_for_ticket(int(tk.id))
+	if tray == null:
+		var on := []
+		for h: Player in game.hands():
+			on.append(h.held)
+		return "no tray " + str(on)
+	var st: Station = game._station_with_tray(tray)
+	var by := ""
+	for h: Player in game.hands():
+		if h.tray == tray:
+			by = h.name
+	return "%s at %s by %s" % [str(Crew._tray_needs(tray)), str(st.cell) if st != null else "-", by]
+
+
+func _why(tk: Dictionary) -> String:
+	var tray: Tray = game.tray_for_ticket(int(tk.id))
+	var tasks := []
+	for task: Dictionary in game.crew.board.tasks.values():
+		if task.get("ticket", null) == int(tk.id) or task.get("tray", null) == int(tk.id):
+			tasks.append("%s by %s" % [task.type, str(task.duties)])
+	return "ticket %d (%s) stuck: needs %s; tray %s; board %s" % [tk.id, str(tk.items.map(func(i: Dictionary) -> String: return i.name)),
+		str(Crew._tray_needs(tray) if tray != null else "no tray"), "complete" if tray != null and tray.is_complete() else "-", str(tasks)]
+
+
+func _check(theme: String, seed_value: int, day := 1) -> Dictionary:
+	_start(theme, seed_value, day)
+	if is_failing():
+		return {}
+	assert_eq(game.crew.helpers.size(), Crew.STAFF_CREW.size(), "the whole crew came in")
+	var r := _run_day()
+	var tag := "%s seed %d day %d" % [theme, seed_value, day]
+	for line: String in r.stuck:
+		gut.p(line)
+	assert_eq(r.stuck, [], "%s: nothing stuck" % tag)
+	assert_eq(game.phase, game.Phase.SUMMARY, "%s: the day ended (%.0f s)" % [tag, r.t])
+	var rec: Dictionary = game.last_day
+	assert_gt(int(rec.get("served", 0)), 0, "%s: guests were served" % tag)
+	assert_eq(int(rec.get("walkouts", 0)), 0, "%s: nobody walked out" % tag)
+	gut.p("%s: served %d in %.0f s, ordered %s" % [tag, int(rec.get("served", 0)), r.t, str(r.ordered.keys())])
+	return r.ordered
+
+
+func test_helpers_run_a_whole_diner_day_with_no_chef():
+	var seen := {}
+	for s: int in SEEDS:
+		seen.merge(_check("diner", s))
+		if is_failing():
+			return
+	_every_kind_ordered("diner", seen)
+
+
+func test_helpers_run_a_whole_seaside_day_with_no_chef():
+	var seen := {}
+	for s: int in SEEDS:
+		seen.merge(_check("seaside", s))
+		if is_failing():
+			return
+	_every_kind_ordered("seaside", seen)
+
+
+func _every_kind_ordered(theme: String, seen: Dictionary) -> void:
+	for it: Array in Crew.STAFF_MENU[theme]:
+		for k: String in it[1]:
+			assert_true(seen.has(k), "%s: %s was ordered and made on some day" % [theme, k])
+
+
+## Every tool, box and home in the room has a free side someone can walk to.
+func test_every_piece_in_the_all_staff_room_can_be_reached():
+	for theme in ["diner", "seaside"]:
+		_start(theme, 1)
+		if is_failing():
+			return
+		for st: Station in game.stations.values():
+			if st.type in ["table", "fern", "desk"] or Station.is_table(st.type):
+				continue
+			var ok := false
+			for d: Vector2i in Grid.DIRS:
+				var c: Vector2i = st.cell + d
+				if game.grid.in_bounds(c) and not game.grid.is_blocked(c) and game.grid.edge_open(c, st.cell) \
+						and not game.grid.find_path(game.ENTRANCE_CELL, c).is_empty():
+					ok = true
+			assert_true(ok, "%s: the %s at %s can be reached" % [theme, st.type, str(st.cell)])
+
+
+## A rush on a later day, with flyers out: many tickets at once is where worktops run
+## short and trays have nowhere to go.
+func test_helpers_run_a_busy_day_in_both_themes():
+	for theme in ["diner", "seaside"]:
+		for s: int in [7, 99]:
+			_check(theme, s, 8)
+			if is_failing():
+				return
+
+
+## The crew's duties are the room's: none greyed out for want of a tool, and every duty
+## the desk offers for this room is somebody's. The treatments are in force.
+func test_the_crew_covers_every_duty_the_room_gives():
+	for theme in ["diner", "seaside"]:
+		_start(theme, 1)
+		if is_failing():
+			return
+		var room: Dictionary = game.room_duties()
+		var offered := []
+		for k: String in room:
+			offered.append_array(room[k])
+		var held := []
+		for row: Array in Crew.STAFF_CREW:
+			held.append_array(row[2])
+			assert_eq(Staff.missing_duties(row[2], room), [] as Array[String], "%s: %s has every tool" % [theme, row[1]])
+		for d: String in offered:
+			assert_true(held.has(d), "%s: someone has %s" % [theme, d])
+		for d: String in ["mop", "sponge", "scraper", "spill_kit"]:
+			assert_true(offered.has(d), "%s: the cleaning trees give %s" % [theme, d])
+		assert_eq(game.floor_dirt.mess.treat.size(), game.treat_laid.size(), "%s: every laid cell treated today" % theme)
+		assert_eq(game.treat_boxed().size(), 3, "%s: cleaner, primer and finish boxed apart from food" % theme)

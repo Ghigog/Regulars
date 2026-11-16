@@ -896,3 +896,106 @@ func test_other_tasks_roll_mistakes_from_satisfaction():
 	for i in 400:
 		slips += int(not JobBoard.roll_task(s, 1).ok)
 	assert_gt(slips, 60)
+
+
+# ---------- The all-staff run's duties (PRD 10.7) ----------
+
+func test_a_kind_made_from_another_s_stock_is_fetched_as_its_source():
+	var b := _board({
+		"stations": [{"id": "j", "cell": Vector2i(1, 0), "tool": "juicer"},
+			{"id": "bl", "cell": Vector2i(2, 0), "tool": "blender"}],
+		"storage": [{"cell": Vector2i(0, 0), "kinds": ["lemon", "ice_cream"]}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["lemonade", "milkshake"]}],
+	})
+	var lemonade: Dictionary = b.tasks["fetch:1:0"]
+	assert_eq(lemonade.source, "lemon", "lemonade has no box: a lemon is fetched")
+	assert_eq(lemonade.dest, Vector2i(1, 0), "to the juicer")
+	assert_eq(b.tasks["fetch:1:1"].dest, Vector2i(2, 0), "ice cream to the blender")
+	var steps := HelperWork.steps(lemonade, ["fetch", "juicer"], "juicer")
+	assert_eq(steps[0].kind, "lemon", "the lemon's box")
+	assert_eq(steps[1].hold, "raw:lemon")
+	assert_eq(steps[1].kind, "lemonade")
+	assert_eq(HelperWork.hold_for("milkshake"), "prep:ice_cream", "ice cream needs no prep of its own")
+	assert_eq(HelperWork.hold_for("steamed_corn"), "raw:corn")
+	assert_eq(HelperWork.hold_for("patty"), "raw:patty")
+
+
+func test_a_source_on_its_tool_or_lying_loose_is_worked_into_the_kind():
+	var b := _board({
+		"stations": [{"id": Vector2i(1, 0), "cell": Vector2i(1, 0), "tool": "juicer"}],
+		"items": [{"id": 4, "kind": "lemon", "cell": Vector2i(5, 0), "state": "raw"}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["lemonade"]}],
+	})
+	var prep: Dictionary = b.tasks["prep:4"]
+	assert_eq(prep.hold, "raw:lemon")
+	assert_eq(prep.duties, ["juicer"])
+	var steps := HelperWork.steps(b.best_for(["juicer"], Vector2i(0, 0)), ["juicer"])
+	assert_eq(steps.map(func(s: Dictionary) -> String: return str(s.do)), ["pick", "cook", "deliver"])
+	assert_eq(steps[0].hold, "raw:lemon")
+
+
+func test_a_ready_made_box_needs_no_tool():
+	var b := _board({
+		"stations": [{"id": "b", "cell": Vector2i(1, 0), "tool": "board"}],
+		"storage": [{"cell": Vector2i(0, 0), "kinds": [], "ready": ["onion"]}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["onion"]}],
+	})
+	var f: Dictionary = b.tasks["fetch:1:0"]
+	assert_true(f.ready)
+	assert_eq(f.dest, Vector2i(3, 0), "straight to the ticket, not the board")
+	var steps := HelperWork.steps(f, ["fetch", "board"], "board")
+	assert_eq(steps.map(func(s: Dictionary) -> String: return str(s.do)), ["take", "deliver"])
+	assert_true(steps[0].ready)
+
+
+func test_a_ticket_s_tray_is_started_first_when_there_is_room():
+	var w := {"storage": [{"cell": Vector2i(0, 0), "kinds": ["bun"]}], "tray_room": 1,
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["bun"], "tray": false},
+			{"id": 2, "cell": Vector2i(3, 0), "lacks": ["bun"], "tray": false}]}
+	var b := _board(w)
+	assert_eq(b.tasks["tray:1"].duties, ["assemble"])
+	assert_gt(b.tasks["tray:1"].urgency, b.tasks["fetch:1:0"].urgency, "the tray before its food")
+	assert_false(b.tasks.has("tray:2"), "one worktop, one tray")
+	assert_false(b.tasks.has("fetch:2:0"), "no tray and nowhere for its food: it waits")
+	assert_eq(HelperWork.steps(b.tasks["tray:1"], ["assemble"]), [{"do": "start_tray", "ticket": 1}])
+	w.tray_room = 0
+	assert_eq(_board(w).tasks.size(), 0)
+
+
+func test_burnt_food_on_a_tool_is_scraped_by_whoever_works_it():
+	var b := _board({"burnt": [{"cell": Vector2i(1, 0), "kind": "patty", "duty": "grill"}]})
+	var t: Dictionary = b.tasks["scrap:1,0"]
+	assert_eq(t.duties, ["grill"])
+	assert_eq(HelperWork.steps(t, ["grill"]).map(func(s: Dictionary) -> String: return str(s.do)), ["pick", "bin"])
+	assert_eq(HelperWork.TASK_KIND.scrap, "food")
+
+
+func test_each_cleaning_tool_takes_the_dirt_it_works_on():
+	var b := _board({"dirt": {Vector2i(0, 0): 2, Vector2i(1, 0): 4, Vector2i(2, 0): 3},
+		"grease": {Vector2i(2, 0): true}})
+	assert_eq(b.tasks["dirt:0,0"].duties, ["mop", "sponge"])
+	assert_eq(b.tasks["dirt:1,0"].duties, ["mop", "sponge", "spill_kit"], "the spill kit on a puddle only")
+	assert_eq(b.tasks["dirt:2,0"].duties, ["mop", "sponge", "scraper"], "the scraper on grease only")
+	assert_eq(b.best_for(["scraper"], Vector2i(0, 0)).key, "dirt:2,0")
+
+
+func test_the_cleaning_trees_bring_their_line_s_duty():
+	assert_eq(Staff.clean_duty("flat_mop"), "mop")
+	assert_eq(Staff.clean_duty("wringer_mop"), "mop")
+	assert_eq(Staff.clean_duty("scrubber"), "mop")
+	assert_eq(Staff.clean_duty("scourer"), "sponge")
+	assert_eq(Staff.clean_duty("grease_scraper"), "scraper")
+	assert_eq(Staff.clean_duty("spill_kit"), "spill_kit")
+	assert_eq(Staff.clean_duty("robot_dock"), "")
+	var room := Staff.room_duties([], ["flat_mop", "hook", "scourer", "grease_scraper", "spill_kit", "robot_dock"])
+	assert_eq(room.clean, ["mop", "sponge", "scraper", "spill_kit", "wash_up", "empty_bin"] as Array[String])
+	assert_eq(Staff.room_duties([], ["wringer_bucket"]).clean, ["mop", "wash_up", "empty_bin"] as Array[String])
+
+
+func test_a_wipe_clears_what_the_tool_and_a_cleaner_allow():
+	assert_eq(HelperWork.wipe_levels(2.0, "mop"), 1)
+	assert_eq(HelperWork.wipe_levels(5.0, "mop"), 2, "skill still counts")
+	assert_eq(HelperWork.wipe_levels(2.0, "flat_mop"), FloorMess.MAX_LEVEL, "a flat mop clears the cell")
+	assert_eq(HelperWork.wipe_levels(2.0, "spill_kit"), 2)
+	assert_eq(HelperWork.wipe_levels(2.0, "mop", true), FloorMess.MAX_LEVEL, "laid with cleaner: one press")
+	assert_eq(HelperWork.wipe_levels(2.0, "spill_kit", true), 2, "the spill kit's uses are its own")

@@ -92,7 +92,9 @@ func tick(delta: float) -> void:
 
 func _tick_helper(h: Helper, delta: float) -> void:
 	var at_work := JobBoard.at_work(game.staff, h.person, game.ledger.day, game.clock, game.day_length())
-	if not at_work and not h.resting:
+	if not at_work and not h.resting and _on_the_heat(h):
+		pass   # what is on the heat is seen to before the break (PRD 10.7): it would burn
+	elif not at_work and not h.resting:
 		h.resting = true
 		if not h.task.is_empty() or _working(h):
 			_drop(h)
@@ -109,6 +111,14 @@ func _tick_helper(h: Helper, delta: float) -> void:
 		_run(h, delta)
 	h.walk(delta)
 	_wear(h, delta)
+
+
+## Whether they are cooking something on a heat tool right now.
+func _on_the_heat(h: Helper) -> bool:
+	if h.steps.is_empty() or str(h.steps[0].do) != "cook" or not h.step_started or h.work_left < 0.0:
+		return false
+	var st: Station = game.station_at(h.steps[0].get("at", Vector2i(-999, -999)))
+	return st != null and st.is_heat_tool()
 
 
 ## Whether they are in the middle of steps of their own (stashing counts).
@@ -245,8 +255,17 @@ func _start(h: Helper, s: Dictionary) -> bool:
 					return false
 				s.at = c
 				s.mode = "put"
-		"leave", "stash", "put_tray":
-			var c: Variant = _free_surface(s.get("at", h.cell()), h)
+		"leave":
+			# Raw food for a cook goes on the press tool itself, where it is worked in
+			# place; else (a heat tool, or it is in use) on a worktop beside it.
+			var tool: Station = game.station_at(s.at)
+			if not (tool != null and _free_tool_top(tool, h)):
+				var c: Variant = _free_surface(s.get("at", h.cell()), h)
+				if c == null:
+					return false
+				s.at = c
+		"stash", "put_tray":
+			var c: Variant = _free_surface(s.get("at", h.cell()), h, false, s.do == "put_tray" or h.held == "tray")
 			if c == null:
 				return false
 			s.at = c
@@ -265,6 +284,19 @@ func _start(h: Helper, s: Dictionary) -> bool:
 			return h.go_to(game.ENTRANCE_CELL)
 		"drop":
 			return h.go_to(h.cell())
+		"start_tray":
+			var tk: Dictionary = game.find_ticket(int(s.ticket))
+			var stack: Station = game.find_station("trays")
+			if tk.is_empty() or h.held != "" or stack == null or stack.count <= 0 or game.tray_for_ticket(int(s.ticket)) != null:
+				return false
+			var spot: Variant = _free_surface(stack.cell, h, true, true)
+			if spot == null:
+				return false
+			h.steps.pop_front()
+			h.steps.push_front({"do": "put_tray", "at": spot})
+			h.steps.push_front({"do": "take_tray", "at": stack.cell, "ticket": int(s.ticket)})
+			h.step_started = false
+			return _start_next(h)
 		"assemble":
 			var steps: Variant = _assemble_steps(h, int(s.ticket))
 			if steps == null:
@@ -331,17 +363,17 @@ func _work(h: Helper, s: Dictionary) -> float:
 	var st: Station = game.station_at(s.at) if s.has("at") else null
 	match str(s.do):
 		"take":
-			if h.held != "" or _box_with(s.at, s.kind) == "":
+			if h.held != "" or _box_with(s.at, s.kind, s.get("ready", false)) == "":
 				return -1.0
 			return HelperWork.task_seconds("take", h.rating, sat)
 		"pick":
-			if st == null or h.held != "" or st.item != Tray.kind(str(s.get("state", "raw")), s.kind) or st.prep_by >= 0 or st.draining():
+			if st == null or h.held != "" or st.item != _pick_form(s) or st.prep_by >= 0 or st.draining():
 				return -1.0
 			return HelperWork.task_seconds("pick", h.rating, sat)
 		"cook":
 			if st == null:
 				return -1.0
-			var raw := Tray.kind("raw", s.kind)
+			var raw := str(s.get("hold", Tray.kind("raw", s.kind)))
 			if s.get("in_place", false):
 				if st.item != raw or st.prep_by >= 0:
 					return -1.0
@@ -403,6 +435,7 @@ func _work(h: Helper, s: Dictionary) -> float:
 		"wipe":
 			if game.floor_dirt.mess.level(s.at) <= 0:
 				return -1.0
+			s.tool = _room_clean_tool(e.duties, s.at, str(s.tool))
 			if CleanTools.TOOLS.has(str(s.tool)) and h.held == "":
 				CleanKit.hold(h, s.tool, 0)
 			return HelperWork.task_seconds("wipe", h.rating, sat)
@@ -418,13 +451,14 @@ func _poll(h: Helper, s: Dictionary) -> String:
 	match str(s.do):
 		"cook":
 			var st: Station = game.station_at(s.at)
+			var raw := str(s.get("hold", Tray.kind("raw", s.kind)))
 			if st == null:
 				return "fail"
 			if st.is_heat_tool():
 				if st.item == Tray.kind("prep", s.kind):
 					return "now"
-				return "" if st.item == Tray.kind("raw", s.kind) else "fail"
-			return "" if st.item == Tray.kind("raw", s.kind) and st.prep_by == HELPER_PREP else "fail"
+				return "" if st.item == raw else "fail"
+			return "" if st.item == raw and st.prep_by == HELPER_PREP else "fail"
 		"help":
 			return "wait" if game.floor_dirt.helping(h) != null else ""
 	return ""
@@ -436,7 +470,7 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 	var st: Station = game.station_at(s.at) if s.has("at") else null
 	match str(s.do):
 		"take":
-			var box := _box_with(s.at, s.kind)
+			var box := _box_with(s.at, s.kind, s.get("ready", false))
 			if box == "":
 				return null
 			game._hold_from_box(h, box)
@@ -565,7 +599,8 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 		"wipe":
 			var mess: FloorMess = game.floor_dirt.mess
 			if JobBoard.roll_task(game.staff, h.person).ok:
-				mess.clean(s.at, HelperWork.wipe_levels(float(game.staff.employee(h.person).skills.clean)))
+				mess.clean(s.at, HelperWork.wipe_levels(float(game.staff.employee(h.person).skills.clean),
+					str(s.tool), mess.one_press(s.at)))
 			game.sfx("step", 0.2)
 			if mess.level(s.at) > 0:
 				return [s.duplicate()]
@@ -575,6 +610,21 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			pass
 	h.punch()
 	return []
+
+
+## The room's cleaning tool a helper wipes `cell` with: of the tools kept in homes here
+## (the mop line in a bucket, the sponge line on a hook, PRD 9.5) one their duties cover
+## that works on this dirt, the one clearing most a press; else `fallback`.
+func _room_clean_tool(duties: Array, cell: Vector2i, fallback: String) -> String:
+	var mess: FloorMess = game.floor_dirt.mess
+	var best := ""
+	for st: Station in game.stations.values() + game.highs.values():
+		var t: String = st.kit_tool
+		if t == "" or not duties.has(Staff.clean_duty(t)) or CleanTools.refusal(mess, cell, t, 0) != "":
+			continue
+		if best == "" or int(CleanTools.TOOLS[t].levels) > int(CleanTools.TOOLS[best].levels):
+			best = t
+	return best if best != "" else fallback
 
 
 ## A ticket's tray built from what is made: a tray from the stack put down first if it
@@ -591,7 +641,7 @@ func _assemble_steps(h: Helper, ticket: int) -> Variant:
 		var stack: Station = game.find_station("trays")
 		if stack == null or stack.count <= 0:
 			return null
-		var spot: Variant = _free_surface(stack.cell, h, true)
+		var spot: Variant = _free_surface(stack.cell, h, true, true)
 		if spot == null:
 			return null
 		out.append({"do": "take_tray", "at": stack.cell, "ticket": ticket})
@@ -711,6 +761,133 @@ func demo(which: String) -> void:
 	game.arrivals.assign([{"time": t + 0.5, "group": [0, 1]}, {"time": t + 2.0, "group": [4]}, {"time": t + 5.0, "group": [6, 7]}])
 
 
+# ---------------------------------------------------------------- the all-staff run (PRD 10.7)
+
+## A late-game kitchen with every tool, per theme: [cell, top ("" for none), base, boxes].
+## The kitchen is grown back to the dining room's back wall, so (0..3, 0..1) is kitchen
+## too and its back row opens round the top of the pass. The theme's fixed line (the
+## grilled kind's fridge, a stove, the bread's box) is `Main.test_kitchen`'s; its second
+## stove makes way for the slicer. Drinks (and the diner's freezer) are a bar by the door.
+const STAFF_ROOM := {
+	"diner": [
+		[Vector2i(0, 1), "board", "long_counter", ["box_lettuce", "box_tomato", "ready_onion"]],
+		[Vector2i(1, 0), "pot", "counter", []],
+		[Vector2i(2, 0), "steamer", "counter", []],
+		[Vector2i(3, 0), "fryer", "double_counter", ["box_potato", "box_corn"]],
+		[Vector2i(0, 4), "slicer", "fridge", ["box_cheese"]],
+		[Vector2i(2, 6), "grater", "fridge", ["box_shredded_cheese"]],
+		[Vector2i(3, 6), "bread_knife", "double_counter", ["box_sourdough", "box_orange_juice"]],
+		[Vector2i(4, 4), "juicer", "", []],
+		[Vector2i(4, 5), "blender", "", []],
+		[Vector2i(9, 1), "two_tap_fountain", "counter", []],
+		[Vector2i(9, 2), "", "freezer", ["box_ice_cream"]],
+	],
+	"seaside": [
+		[Vector2i(0, 1), "board", "double_counter", ["box_courgette", "ready_pepper"]],
+		[Vector2i(1, 0), "pot", "double_counter", ["box_new_potato", "box_beans"]],
+		[Vector2i(2, 0), "steamer", "fridge", ["box_mussels"]],
+		[Vector2i(3, 0), "fryer", "fridge", ["box_calamari"]],
+		[Vector2i(0, 4), "slicer", "counter", ["box_lemon"]],
+		[Vector2i(2, 6), "grater", "double_counter", ["box_breadcrumbs"]],
+		[Vector2i(3, 6), "bread_knife", "double_counter", ["box_crusty_loaf"]],
+		[Vector2i(4, 4), "juicer", "", []],
+		[Vector2i(4, 5), "blender", "", []],
+		[Vector2i(9, 1), "wine_rack", "double_counter", ["box_fruit_smoothie"]],
+	],
+}
+## Tonight's menu in the all-staff room: every kind of the theme in something.
+const STAFF_MENU := {
+	"diner": [["main", ["bun", "patty", "cheese", "lettuce", "onion"], "Burger"],
+		["main", ["sourdough", "shredded_cheese", "tomato"], "Deli melt"],
+		["side", ["potato"], "Fries"], ["side", ["steamed_corn"], "Steamed corn"],
+		["side", ["corn"], "Corn cob"], ["side", ["ice_cream"], "Ice cream"],
+		["drink", ["soda"], "Soda"], ["drink", ["cola"], "Cola"],
+		["drink", ["orange_juice"], "Orange juice"], ["drink", ["milkshake"], "Milkshake"]],
+	"seaside": [["main", ["roll", "fish", "lemon"], "Fish roll"],
+		["main", ["crusty_loaf", "calamari", "pepper", "breadcrumbs"], "Calamari loaf"],
+		["side", ["mussels"], "Mussels"], ["side", ["new_potato", "beans", "courgette"], "Garden plate"],
+		["drink", ["wine"], "White wine"], ["drink", ["red_wine"], "Red wine"],
+		["drink", ["lemonade"], "Lemonade"], ["drink", ["fruit_smoothie"], "Smoothie"]],
+}
+## The crew: [person, post, duties, breaks]. Between them every duty the room gives.
+## Breaks fall evenly through the day and equal counts break together (PRD 10.2), so the
+## cooks' two never meet the floor's one, and the drinks hand takes orders meanwhile.
+const STAFF_CREW := [
+	[2, "Line cook", ["fetch", "grill", "fryer", "pot", "assemble"], 2],
+	[5, "Prep cook", ["fetch", "board", "slicer", "grater", "bread_knife", "steamer", "assemble"], 2],
+	[7, "Drinks", ["fetch", "tap", "juicer", "blender", "assemble", "take_orders", "carry_trays"], 0],
+	[9, "Server", ["take_orders", "carry_trays", "clear_tables", "help_up"], 1],
+	[11, "Cleaner", ["wash_up", "empty_bin", "clear_tables", "mop", "sponge", "scraper", "spill_kit", "help_up"], 1],
+]
+const STAFF_TREAT := {"cleaner": Rect2i(5, 2, 3, 2), "primer": Rect2i(8, 5, 2, 2), "finish": Rect2i(5, 4, 1, 3)}
+
+
+## The all-staff run (PRD 10.7): the room above, its menu, a crew hired at the desks, the
+## floor treated, and the chef gone home: helpers run the whole day. The day is then
+## started again so everything is in force (guests, the treatments, the crew).
+func staff_only() -> void:
+	var theme: String = Scenery.theme_id if STAFF_ROOM.has(Scenery.theme_id) else "diner"
+	game.test_kitchen()
+	game.clear_walls()
+	game.plan.fill(Rect2i(0, 0, Scenery.KITCHEN_W, Scenery.KITCHEN_Z), "tile")
+	game._sync_grid()
+	game._rebuild_room()
+	var stove: Station = game.stations.get(Vector2i(0, 4))
+	if stove != null:
+		game._unregister(stove)
+		stove.queue_free()
+	for row: Array in STAFF_ROOM[theme]:
+		var c: Vector2i = row[0]
+		if not game.stations.has(c):
+			game.add_station("counter", c, 1, 0, row[2])
+		if row[1] != "":
+			game.add_station(row[1], c)
+		for b: String in row[3]:
+			game._store_box(c, b)
+	for spot: Array in [["hood", Vector2i(0, 3)], ["extractor", Vector2i(1, 0)], ["hood", Vector2i(2, 0)],
+			["hood", Vector2i(3, 0)], ["cabinet", Vector2i(0, 5)]]:
+		if game.kitchen.can_hang(spot[1], spot[0]):
+			game.add_high(spot[0], spot[1])
+	# Chemicals apart from food: the cleaner over the bin, primer and finish by the door.
+	game._store_box(Vector2i(0, 5), "box_cleaner")
+	game.add_station("counter", Vector2i(9, 6), 1, 0, "double_counter")
+	game._store_box(Vector2i(9, 6), "box_primer")
+	game._store_box(Vector2i(9, 6), "box_finish")
+	for k: String in STAFF_TREAT:
+		var r: Rect2i = STAFF_TREAT[k]
+		for x in range(r.position.x, r.end.x):
+			for y in range(r.position.y, r.end.y):
+				if game.plan.has_floor(Vector2i(x, y)):
+					game.treat_laid[Vector2i(x, y)] = k
+	# The cleaning trees: a flat mop's bucket; a scourer, a grease scraper and a spill kit on hooks.
+	var bucket: Station = game.add_station("flat_mop", Vector2i(8, 6))
+	game.clean_kit.on_built(bucket, "flat_mop")
+	var hooks := 0
+	for c: Vector2i in game.kitchen.wall_cells:
+		if hooks < 3 and not game.highs.has(c) and game.kitchen.can_hang(c, "hook"):
+			game.clean_kit.keep(game.add_high("hook", c), ["scourer", "grease_scraper", "spill_kit"][hooks], 0)
+			hooks += 1
+	for c: Vector2i in [Vector2i(5, 6), Vector2i(7, 6)]:
+		if not game.stations.has(c):
+			game.add_station("desk", c)
+	game.menu.items.clear()
+	for it: Array in STAFF_MENU[theme]:
+		game.menu.add(it[0], it[1], it[2])
+	for row: Array in STAFF_CREW:
+		var pid: int = game.staff.add_post(row[1], row[2], row[3], 0, 99)
+		var person: int = row[0]
+		var cv: Dictionary = game.staff._make_cv(person, Staff.skills_from(game.town.people[person].tolerance),
+			game.town.rating(person), 1.0, pid)
+		game.staff.cvs.append(cv)
+		game.staff.hire(cv.id, -1, game.ledger.day)
+	# Nobody cooks: the chef is not in today.
+	for ch: Player in game.chefs:
+		ch.visible = false
+		ch.position = Grid.center(game.LOT.position)
+	game.ledger.money = maxi(game.ledger.money, 2000)
+	game.start_day()
+
+
 # ---------------------------------------------------------------- the room, for the board
 
 ## The room as the task board reads it (see the top of sim/jobs.gd).
@@ -738,17 +915,29 @@ func world() -> Dictionary:
 				if not drinks.is_empty():
 					row.drinks = drinks
 			tools.append(row)
-		var boxes: Array = game.kitchen.stock(c)
-		if not boxes.is_empty():
-			var kinds := []
-			for b: String in boxes:
-				kinds.append(Pantry.station_ingredient(b).id)
-			storage.append({"cell": c, "kinds": kinds})
+		var kinds := []
+		var ready := []
+		for b: String in game.kitchen.stock(c):
+			if Kitchen.is_cleaning(b):
+				continue   # chemicals: nothing to cook (PRD 9.5)
+			var si := Pantry.station_ingredient(b)
+			(ready if si.ready else kinds).append(si.id)
+		if not kinds.is_empty() or not ready.is_empty():
+			storage.append({"cell": c, "kinds": kinds, "ready": ready})
 		var p := Tray.parse(st.item)
 		if not p.is_empty():
-			if p.state == "raw":
+			# On a tool, what it is being made into: a lemon on a juicer is lemonade, a scoop
+			# of ice cream in a blender a milkshake (PRD 8.6).
+			var into: String = p.id
+			if is_tool and p.state in ["raw", "prep"]:
+				var pj: Array = game.press_job(st, p)
+				if str(pj[1]) != "":
+					into = str(pj[1])
+			if p.state == "raw" or into != p.id:
 				var cooking: bool = st.is_heat_tool() or st.prep_by >= 0
-				var it := {"id": "c:%d,%d" % [c.x, c.y], "kind": p.id, "cell": c, "state": "cooking" if cooking else "raw"}
+				var it := {"id": "c:%d,%d" % [c.x, c.y], "kind": into, "cell": c, "state": "cooking" if cooking else "raw"}
+				if into != p.id or p.state != "raw":
+					it.form = st.item
 				if is_tool:
 					it.station = c
 				items.append(it)
@@ -778,7 +967,12 @@ func world() -> Dictionary:
 		var p := Tray.parse(hand.held)
 		if p.is_empty():
 			continue
-		if p.state == "raw":
+		# A helper fetching or working for a ticket holds what it will be made into.
+		var task: Dictionary = (hand as Helper).task if hand is Helper else {}
+		if str(task.get("type", "")) in ["fetch", "prep"] and task.has("kind") and str(task.get("job", "none")) != "none" \
+				and hand.held == str(task.get("hold", HelperWork.hold_for(str(task.kind)))):
+			items.append({"id": "h:%d" % hand.get_instance_id(), "kind": str(task.kind), "cell": hand.cell(), "state": "held"})
+		elif p.state == "raw":
 			items.append({"id": "h:%d" % hand.get_instance_id(), "kind": p.id, "cell": hand.cell(), "state": "held"})
 		elif p.state == "prep":
 			made.append(p.id)
@@ -794,25 +988,38 @@ func world() -> Dictionary:
 				needs.append_array(it.ingredients)
 		rows.append({"id": int(tk.id), "needs": needs})
 	var lacks := HelperWork.ticket_lacks(rows, made)
+	var burnt := []
+	for st: Station in game.stations.values():
+		var p := Tray.parse(st.item)
+		if not p.is_empty() and p.state == "burnt" and Kitchen.has_node(st.node):
+			burnt.append({"cell": st.cell, "kind": p.id, "duty": Staff.duty_of_tool(st.node)})
 	var tickets := []
 	for tk: Dictionary in game.tickets:
 		var tray: Tray = game.tray_for_ticket(int(tk.id))
 		var on: Station = game._station_with_tray(tray) if tray != null else null
 		var cell: Vector2i = on.cell if on != null else _assembly_cell()
+		# What a helper is carrying over to it is on its way: nobody else assembles it meanwhile.
+		var coming := false
+		for h in helpers:
+			coming = coming or (Tray.parse(h.held).get("state", "") == "prep" and int(h.task.get("ticket", -1)) == int(tk.id))
 		tickets.append({"id": int(tk.id), "cell": cell, "lacks": lacks[int(tk.id)], "wait": _wait_of(tk.guest),
-			"assembled": tray != null and (tray.is_complete() or on == null)})
+			"assembled": (tray != null and (tray.is_complete() or on == null)) or coming, "tray": tray != null})
 	var fallen := []
 	var down: Dictionary = game.floor_dirt.down
 	for who in down:
 		if is_instance_valid(who) and not (down[who].helper is Player):
 			fallen.append({"id": who.get_instance_id(), "cell": down[who].cell, "wait": float(down[who].t)})
 	var dirt := {}
+	var grease := {}
 	var mess: FloorMess = game.floor_dirt.mess
 	for c: Vector2i in mess.dirt:
 		if mess.can_clean(c) and game.grid.in_bounds(c):
 			dirt[c] = mess.dirt[c]
+			if mess.is_grease(c):
+				grease[c] = true
 	return {"stations": tools, "storage": storage, "items": items, "tickets": tickets, "trays": trays,
-		"tables": tables, "dirt": dirt, "fallen": fallen, "sinks": sinks, "bins": bins}
+		"tables": tables, "dirt": dirt, "grease": grease, "fallen": fallen, "sinks": sinks, "bins": bins,
+		"burnt": burnt, "tray_room": _free_surfaces()}
 
 
 static func _wait_of(g: Guest) -> float:
@@ -843,21 +1050,48 @@ func _assembly_cell() -> Vector2i:
 	return best
 
 
-func _box_with(cell: Vector2i, kind: String) -> String:
+## The box of `kind` stored at `cell` (a ready-made one with `ready`), or "". A treatment's
+## box is chemicals, never food (PRD 9.5).
+func _box_with(cell: Vector2i, kind: String, ready := false) -> String:
 	for b: String in game.kitchen.stock(cell):
-		if Pantry.station_ingredient(b).id == kind:
+		if Kitchen.is_cleaning(b):
+			continue
+		var si := Pantry.station_ingredient(b)
+		if si.get("id", "") == kind and bool(si.get("ready", false)) == ready:
 			return b
 	return ""
 
 
+## What a pick step expects to find: a made thing, or what is to be worked.
+static func _pick_form(s: Dictionary) -> String:
+	if s.has("hold") and str(s.get("state", "raw")) == "raw":
+		return str(s.hold)
+	return Tray.kind(str(s.get("state", "raw")), s.kind)
+
+
+## Whether a press tool's own top is free for something to be worked on it (PRD 10.7):
+## nothing on it, nobody working it or on their way to it.
+func _free_tool_top(st: Station, h: Helper) -> bool:
+	if not Kitchen.is_top(st.type) or st.is_heat_tool() or st.item != "" or st.prep_by >= 0:
+		return false
+	return not (_claims.has(st.cell) and _claims[st.cell] != h)
+
+
 ## The nearest free worktop (a counter or the pass) to `near`: nothing on it, nobody
-## else heading there. With `pass_first`, the pass wins where it is free.
-func _free_surface(near: Vector2i, h: Helper, pass_first := false) -> Variant:
+## else heading there. With `pass_first`, the pass wins where it is free. Food (not
+## `for_tray`) never takes the last free worktop while a ticket waits for its tray to be
+## started (PRD 10.7): one ticket's food lying about could otherwise fill every worktop
+## and leave nowhere to build its tray.
+func _free_surface(near: Vector2i, h: Helper, pass_first := false, for_tray := false) -> Variant:
 	var best: Variant = null
 	var best_d := INF
 	for st: Station in game.stations.values():
 		if not st.type in ["counter", "pass"] or st.item != "" or st.prep_by >= 0:
 			continue
+		if Kitchen.has_node(st.base) and Kitchen.fit_of(st.base) == "tall":
+			continue   # a tall fridge or freezer has no worktop
+		if game.kitchen.holds_cleaning(st.cell):
+			continue   # no food set down on chemicals (PRD 9.5)
 		if _claims.has(st.cell) and _claims[st.cell] != h:
 			continue
 		var d := float(absi(st.cell.x - near.x) + absi(st.cell.y - near.y))
@@ -866,7 +1100,31 @@ func _free_surface(near: Vector2i, h: Helper, pass_first := false) -> Variant:
 		if d < best_d:
 			best_d = d
 			best = st.cell
+	if best != null and not for_tray and _free_surfaces() <= 1 and _tray_wanted():
+		return null
 	return best
+
+
+## Whether a ticket has no tray yet and the stack has one to start it with.
+func _tray_wanted() -> bool:
+	var stack: Station = game.find_station("trays")
+	if stack == null or stack.count <= 0:
+		return false
+	for tk: Dictionary in game.tickets:
+		if game.tray_for_ticket(int(tk.id)) == null:
+			return true
+	return false
+
+
+## How many worktops are free for a tray, nobody on their way to them.
+func _free_surfaces() -> int:
+	var n := 0
+	for st: Station in game.stations.values():
+		if st.type in ["counter", "pass"] and st.item == "" and st.prep_by < 0 and not _claims.has(st.cell) \
+				and not (Kitchen.has_node(st.base) and Kitchen.fit_of(st.base) == "tall") \
+				and not game.kitchen.holds_cleaning(st.cell):
+			n += 1
+	return n
 
 
 ## The nearest piece holding the prepped `kind` loose (not on a tray), not in `taken`.
