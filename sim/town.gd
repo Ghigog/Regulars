@@ -224,6 +224,17 @@ func record_found_nothing(i: int) -> float:
 	return -NOTHING_LIKED_DROP
 
 
+## Staff member `i` was fired (PRD 10.4): their opinion drops by `drop`; without
+## severance their friends hear it and drop by `friend_drop`. Returns the change.
+func record_fired(i: int, drop: float, friend_drop := 0.0) -> float:
+	var before: float = people[i].affinity
+	_nudge(i, -drop)
+	if friend_drop > 0.0:
+		for f: int in people[i].friends:
+			_nudge(f, -friend_drop)
+	return float(people[i].affinity) - before
+
+
 func _befriend(a: int, b: int) -> void:
 	if a == b or are_friends(a, b):
 		return

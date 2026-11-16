@@ -1896,6 +1896,12 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_row(box, "", "TIPS:", "$%d" % rec.tips)
 	_row(box, "", "WALKOUTS:", str(rec.walkouts))
 	_row(box, "", "STOCK:", "-$%d" % int(rec.get("stock", 0)))
+	if int(rec.get("staff", 0)) > 0 or int(rec.get("unpaid", 0)) > 0:   # wages, paid with the stock (PRD 10.4)
+		_row(box, "", "STAFF:", "-$%d" % int(rec.get("staff", 0)))
+		var unpaid := int(rec.get("unpaid", 0))
+		if unpaid > 0:
+			var ul := _label(box, 15, "%s not paid: no debt, but they mind." % ("1 wage" if unpaid == 1 else "%d wages" % unpaid))
+			ul.add_theme_color_override("font_color", CORAL.darkened(0.25))
 	var nothing := int(rec.get("found_nothing", 0))
 	if nothing > 0:
 		var nl := _label(box, 15, "%d %s nothing they liked." % [nothing, "person found" if nothing == 1 else "people found"])

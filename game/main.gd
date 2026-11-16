@@ -1491,6 +1491,7 @@ func start_day() -> void:
 	hud.hide_card()
 	hud.hide_build()
 	ledger.pay_stock(night_cost())   # the door checked it can be paid (tests may skip the door)
+	pay_staff()
 	menu_board.refresh(tonight_menu())
 	town.new_day()
 	var coming := town.roll_guests(ledger.day, (Town.FLYER_BOOST if flyers_out else 0.0) + critic.visit_boost(ledger.day))
@@ -1642,6 +1643,8 @@ func open_build() -> void:
 	phase = Phase.BUILD
 	ready_chefs.clear()
 	hud.hide_card()
+	if Staff.week_day(ledger.day) == 0:   # a new week: everyone picks their days off (PRD 10.4)
+		staff.start_week(ledger.day)
 	roll_applicants()
 	hud.show_build()
 
@@ -3426,6 +3429,93 @@ func _clear_applicants() -> void:
 	for rig: Node3D in applicants.values():
 		rig.queue_free()
 	applicants.clear()
+
+
+# ---------------------------------------------------------------- the staff list (PRD 10.4)
+
+## Tonight's wages, for the restock note.
+func staff_wages() -> int:
+	return staff.wages_due()
+
+
+## The night ends as the door opens: wages are paid with the stock, a STAFF line on the
+## receipt. A wage that cannot be paid is not owed later; that employee takes the hit
+## instead. Satisfaction moves, and anyone at the bottom too long quits.
+func pay_staff() -> Dictionary:
+	if staff.employees.is_empty():
+		return {}
+	var night := staff.end_night(ledger.money)
+	ledger.pay_staff(int(night.paid), (night.unpaid as Array).size())
+	var words: Array[String] = []
+	for p: int in night.unpaid:
+		if not (night.quit as Array).has(p):
+			words.append("%s wasn't paid" % town.people[p].name)
+	for p: int in night.quit:
+		words.append("%s quit" % town.people[p].name)
+	if not words.is_empty():
+		hud.say(". ".join(words) + ".")
+	return night
+
+
+## Offers a hire a new duty. {ok: true} when taken, else {ok: false, raise} and the
+## raise waits on the desk for an answer (`desk_answer_raise`).
+func desk_add_duty(person: int, duty: String) -> Dictionary:
+	var r := staff.propose_duty(person, duty)
+	sfx("page" if r.ok else "fail")
+	return r
+
+
+## "withdraw", "approve", "deny" (they quit) or "haggle" with a smaller raise `offer`.
+## Returns "added", "withdrawn", "refuse" or "quit".
+func desk_answer_raise(person: int, choice: String, offer := 0) -> String:
+	var r := staff.answer_raise(person, choice, offer)
+	match r:
+		"added":
+			sfx("coin")
+		"refuse", "quit":
+			sfx("fail")
+		"withdrawn":
+			sfx("page")
+	_refresh_desks()
+	return r
+
+
+func desk_remove_duty(person: int, duty: String) -> void:
+	staff.remove_duty(person, duty)
+	sfx("tick")
+
+
+func desk_add_break(person: int) -> bool:
+	var ok := staff.add_break(person)
+	sfx("tick" if ok else "fail")
+	return ok
+
+
+func desk_add_day_off(person: int) -> bool:
+	var ok := staff.add_day_off(person)
+	sfx("tick" if ok else "fail")
+	return ok
+
+
+## Whether a day's wage can be paid as severance now.
+func can_pay_severance(person: int) -> bool:
+	var e := staff.employee(person)
+	return not e.is_empty() and int(e.wage) <= ledger.money
+
+
+## Fires a hire, with severance (a day's wage, paid now) or without (their opinion drops
+## more and their friends hear it). False if the severance cannot be paid.
+func desk_fire(person: int, severance: bool) -> bool:
+	if staff.employee(person).is_empty() or (severance and not can_pay_severance(person)):
+		sfx("fail")
+		return false
+	var r := staff.fire(person, severance)
+	if int(r.cost) > 0:
+		ledger.spend(int(r.cost))
+	town.record_fired(person, float(r.drop), float(r.friend_drop))
+	sfx("putdown")
+	_refresh_desks()
+	return true
 
 
 ## The CV pile on each desk: a sheet of paper per CV, up to a handful.

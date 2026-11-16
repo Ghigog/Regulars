@@ -414,6 +414,18 @@ func wages_due() -> int:
 	return sum
 
 
+## Satisfaction in a word for the staff list, from the top: at or above each bound.
+## The last, "Fed up", is the bottom fifth, where nights count toward quitting.
+const MOOD_WORDS := [[0.8, "Happy"], [0.6, "Content"], [0.4, "So-so"], [BOTTOM + 0.0001, "Unhappy"], [-1.0, "Fed up"]]
+
+
+static func mood_word(satisfaction: float) -> String:
+	for m: Array in MOOD_WORDS:
+		if satisfaction >= float(m[0]):
+			return m[1]
+	return "Fed up"
+
+
 ## 0 at `LOW_FROM` satisfaction and above, 1 at none.
 static func low_factor(satisfaction: float) -> float:
 	return clampf((LOW_FROM - satisfaction) / LOW_FROM, 0.0, 1.0)
@@ -497,27 +509,42 @@ func answer_raise(person: int, choice: String, offer := 0) -> String:
 	return ""
 
 
-## Removing a duty is free (and, through the target, raises satisfaction).
+## Removing a duty is free and raises satisfaction: now, by as much as it raises the
+## target (the same "after the change" `propose_duty` reads), and so every night after.
 func remove_duty(person: int, duty: String) -> void:
 	var e := employee(person)
-	if not e.is_empty():
-		e.duties.erase(duty)
+	if e.is_empty() or not e.duties.has(duty):
+		return
+	var before := target(person)
+	e.duties.erase(duty)
+	_lift(e, before)
 
 
+## A break a day more, free; satisfaction rises as `remove_duty`'s does.
 func add_break(person: int) -> bool:
 	var e := employee(person)
 	if e.is_empty() or e.breaks >= MAX_BREAKS:
 		return false
+	var before := target(person)
 	e.breaks += 1
+	_lift(e, before)
 	return true
 
 
+## A day off a week more, free; worth more than a break. The days are picked next week.
 func add_day_off(person: int) -> bool:
 	var e := employee(person)
 	if e.is_empty() or e.days_off >= MAX_DAYS_OFF:
 		return false
+	var before := target(person)
 	e.days_off += 1
+	_lift(e, before)
 	return true
+
+
+## Satisfaction moves now by as much as the change moved the target.
+func _lift(e: Dictionary, target_before: float) -> void:
+	e.satisfaction = clampf(e.satisfaction + target(e.person) - target_before, 0.0, 1.0)
 
 
 ## A raise the player gives unasked. Wages are never cut: fire and rehire.
@@ -596,6 +623,27 @@ static func _day_sets(n: int) -> Array:
 		for a in WEEK:
 			for b in range(a + 2, WEEK):
 				out.append([a, b])
+	return out
+
+
+## The first day of the week `day` falls in.
+static func week_first(day: int) -> int:
+	return week_of(day) * WEEK + 1
+
+
+## Whether they have picked days off for the week `day` falls in (someone hired mid-week,
+## or since the week began, has not: they start next week).
+func picked_week(person: int, day: int) -> bool:
+	var e := employee(person)
+	return not e.is_empty() and e.has("week_start") and week_of(int(e.week_start)) == week_of(day)
+
+
+## The staff list's week: five {day, off} for the week `day` falls in.
+func week_boxes(person: int, day: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var first := week_first(day)
+	for k in WEEK:
+		out.append({"day": first + k, "off": is_day_off(person, first + k)})
 	return out
 
 
