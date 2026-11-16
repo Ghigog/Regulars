@@ -9,6 +9,9 @@ const MAX_TIER := 3
 const SHELF_DAYS := 2
 const CATEGORIES: Array[String] = ["Kitchen", "Dining", "Decor", "Build"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
+## PRD 10: the desk is kept out of the shop until helpers can work (10.6). The one
+## switch that puts every "staff" piece on sale.
+const STAFF_ON_SALE := false
 const TIER_JOY := 0.1   # joy a decor piece gains for each tier above the first
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
 ## A "tool" builds the room itself and is priced per tile or per wall; a "finish"
@@ -74,6 +77,8 @@ const ITEMS := {
 		"blurb": "Seats a group of four", "up": "Four comfier seats"},
 	"stool": {"name": "Counter stool", "price": 25, "level": 1, "category": "Dining", "tiers": 3,
 		"blurb": "One seat, for guests who come alone", "up": "A comfier seat"},
+	"desk": {"name": "Desk", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1, "staff": true,
+		"blurb": "Write job posts and read CVs. One desk per employee"},
 	"bin": {"name": "Bin", "price": 30, "level": 2, "category": "Kitchen", "tiers": 1,
 		"blurb": "Another bin. The chef uses the nearest"},
 	"dish_rack": {"name": "Dish rack", "price": 50, "level": 3, "category": "Kitchen", "tiers": 1,
@@ -192,7 +197,7 @@ static func is_finish(id: String) -> bool:
 ## Whether a theme sells this piece: an entry with no "theme" is sold in every theme,
 ## and an empty theme matches everything. The theme id is passed in, never looked up.
 static func sold_in(id: String, theme: String) -> bool:
-	if not ITEMS.has(id):
+	if not ITEMS.has(id) or (ITEMS[id].get("staff", false) and not STAFF_ON_SALE):
 		return false
 	return theme == "" or not ITEMS[id].has("theme") or ITEMS[id].theme == theme
 

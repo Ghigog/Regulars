@@ -375,13 +375,13 @@ func buttons() -> Array:
 	var y := r.size.y - 112.0
 	var hand := _hand_of(owner_of("touch"))
 	var build: bool = game.phase == game.Phase.BUILD
-	if _options() or game.hud.menu_open():   # the card's own buttons are big enough to tap
+	if _options() or game.hud.card_open():   # the card's own buttons are big enough to tap
 		pass
 	elif game.phase == game.Phase.SERVICE or (build and not _touch_shops()):
 		var word: String = game.hud.last_action if game.hud.last_action != "" else "Use"
 		out.append(["use", word, Vector2(x, y), USE_R])
 		y -= USE_R + BTN_R + 16.0
-	if build and not _touch_shops() and not game.hud.menu_open():
+	if build and not _touch_shops() and not game.hud.card_open():
 		if not hand.is_empty():
 			out.append(["back", "Done" if Catalog.is_build_tool(hand.id) else "Drop", Vector2(x, y), BTN_R])
 			y -= BTN_R * 2 + 14.0
@@ -439,7 +439,7 @@ func _options() -> bool:
 
 func _stick_shown() -> bool:
 	return _touch_who().mode == "touch" and not _options() and (game.phase == game.Phase.SERVICE \
-		or (game.phase == game.Phase.BUILD and not _touch_shops() and not game.hud.menu_open()))
+		or (game.phase == game.Phase.BUILD and not _touch_shops() and not game.hud.card_open()))
 
 
 ## What a touch at this point would press: "stick", a button id, or "".

@@ -1216,6 +1216,28 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			for f: Array in [[0.0, 0.1, PAPER], [-0.14, 0.0, WARN], [0.14, 0.04, CORAL_DARK], [0.05, -0.13, WARN], [-0.06, 0.14, CORAL], [0.1, 0.15, PAPER]]:
 				ball(n, Vector3(f[0], 1.1 + absf(f[1]) * 0.3, f[1]), 0.075, f[2], 0.0, R_GLOSS)
 				ball(n, Vector3(f[0], 1.13 + absf(f[1]) * 0.3, f[1]), 0.03, "#f6c445")
+		"desk":
+			# PRD 10: a small wooden writing desk. A drawer pedestal on the left, two legs on
+			# the right, a blotter, a pencil pot and a coral-tabbed "HIRING" card standing up
+			# at the back so it reads as the staff desk, not another counter. The CV pile is
+			# added on top by the game (`pile`).
+			_add(n, bevel_mesh(Vector3(0.92, 0.07, 0.62), 0.03), Vector3(0, 0.72, 0), Color(WOOD), 0.0, R_WOOD)
+			_add(n, bevel_mesh(Vector3(0.32, 0.7, 0.56), 0.03), Vector3(-0.27, 0.35, 0), Color(WOOD_DARK), 0.0, R_WOOD)
+			for y: float in [0.2, 0.46]:
+				box(n, Vector3(-0.27, y, 0.285), Vector3(0.26, 0.2, 0.02), WOOD, 0.0, R_WOOD)
+				ball(n, Vector3(-0.27, y, 0.3), 0.025, Scenery.BRASS, 0.0, R_WOOD)
+			for z: float in [-0.25, 0.25]:
+				box(n, Vector3(0.39, 0.35, z), Vector3(0.07, 0.7, 0.07), WOOD_DARK, 0.0, R_WOOD)
+			box(n, Vector3(0.39, 0.12, 0), Vector3(0.05, 0.05, 0.46), WOOD_DARK, 0.0, R_WOOD)
+			box(n, Vector3(0.05, 0.765, 0.04), Vector3(0.5, 0.012, 0.36), CABINET)
+			cyl(n, Vector3(0.36, 0.755, -0.18), 0.06, 0.14, CORAL)
+			for k in 3:
+				box(n, Vector3(0.34 + k * 0.025, 0.93, -0.18 + (k - 1) * 0.02), Vector3(0.018, 0.16, 0.018), [WARN, PAPER, STEEL_DARK][k]).rotation.z = (k - 1) * 0.2
+			var card := box(n, Vector3(-0.12, 0.92, -0.25), Vector3(0.42, 0.26, 0.03), PAPER)
+			card.rotation.x = -0.18
+			box(card, Vector3(0, 0.08, 0.018), Vector3(0.42, 0.08, 0.01), CORAL)
+			for k in 2:
+				box(card, Vector3(-0.04 + k * 0.05, -0.03 - k * 0.06, 0.018), Vector3(0.28 - k * 0.1, 0.025, 0.01), TRIM)
 		"coat_stand":
 			# A dark wooden coat stand on a cross foot, a coral coat and a hat hung on it.
 			for turn: float in [0.0, PI / 2]:

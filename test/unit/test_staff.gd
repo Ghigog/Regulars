@@ -141,3 +141,270 @@ func test_hint_lines_never_show_numbers():
 		for line: String in GuestMood.TOL_HINTS[topic]:
 			for d in "0123456789":
 				assert_false(line.contains(d), line)
+
+
+# ================================================================ 10.3 the desk and CVs
+# These drive the game scene, set up as in test_game.gd (middling tolerances, no dirt).
+
+var game
+
+
+func _game() -> void:
+	game = load("res://game/main.tscn").instantiate()
+	game.first_night = false
+	add_child_autofree(game)
+	game.set_process(false)
+	game.best_path = "user://regulars_best_test.json"
+	game.theme_path = "user://regulars_theme_test.cfg"
+	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
+	game.test_kitchen()
+	for p in game.town.people:
+		p.likes = []
+		p.dislikes = []
+		p.tolerance = {"food": 3, "service": 3, "clean": 3}
+	game.floor_dirt.drops = false
+
+
+## Into the night with `desks` desks along the front wall, the chef at the first.
+func _night(desks := 1) -> void:
+	_game()
+	game.arrivals.clear()
+	for i in 20:
+		game.step(0.1)
+	game.open_build()
+	for i in desks:
+		game.add_station("desk", Vector2i(8 + i, 6))
+	game.player.position = Grid.center(Vector2i(7, 6))
+	game.player.look(Vector2i(1, 0))
+
+
+## Applicants for the open posts, with everyone keen so some come.
+func _applicants() -> Array[Dictionary]:
+	for p in game.town.people:
+		p.affinity = 0.5
+	var fresh: Array[Dictionary] = []
+	for tries in 10:
+		fresh = game.roll_applicants()
+		if not fresh.is_empty():
+			break
+	return fresh
+
+
+func test_either_chef_opens_the_desk_at_night_only():
+	_night()
+	assert_eq(game.build_action(), "Use desk")
+	game.build_interact()
+	assert_true(game.hud.desk_open())
+	assert_true(game.hud.card_open())
+	game.close_desk()
+	assert_false(game.hud.desk_open())
+	game.start_day()
+	assert_false(game.open_desk(), "not during service")
+
+
+func test_no_desk_no_desk_screen():
+	_night(0)
+	assert_false(game.open_desk())
+
+
+func test_post_duties_come_from_the_room():
+	_night()
+	var room: Dictionary = game.room_duties()
+	assert_true((room.food as Array).has("grill"), "the test kitchen has stoves")
+	assert_false((room.food as Array).has("fryer"), "no fryer in the room")
+	assert_true((room.clean as Array).has("wash_up"))
+	game.add_station("fryer", Vector2i(1, 6))
+	assert_true((game.room_duties().food as Array).has("fryer"))
+
+
+func test_posts_plus_hires_are_capped_by_desks():
+	_night(1)
+	assert_eq(game.desk_post("Grill cook", ["grill"], 1, 0), 1)
+	assert_eq(game.desk_post("Server", ["take_orders"], 0, 0), -1, "one desk, one opening")
+	game.add_station("desk", Vector2i(9, 5))
+	assert_ne(game.desk_post("Server", ["take_orders"], 0, 0), -1)
+
+
+func test_writing_a_post_on_the_desk_screen():
+	_night()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	assert_eq(desk.tab, "posts", "an empty pile opens on the posts")
+	assert_true(desk.select("write"))
+	desk.press()
+	assert_false(desk.drafting().is_empty())
+	assert_true(desk.select("duty:grill"))
+	desk.press()
+	assert_true(desk.select("breaks:2"))
+	desk.press()
+	assert_true(desk.select("days_off:0"))
+	desk.press()
+	assert_true(desk.select("put_up"))
+	desk.press()
+	assert_true(desk.drafting().is_empty())
+	assert_eq(game.staff.posts.size(), 1)
+	var p: Dictionary = game.staff.posts.values()[0]
+	assert_eq(p.name, DeskScreen.DEFAULT_NAME)
+	assert_eq(p.duties, ["grill"] as Array[String])
+	assert_eq(p.breaks, 2)
+	assert_eq(p.days_off, 0)
+	assert_true(desk.select("write"))
+	desk.press()
+	assert_true(desk.drafting().is_empty(), "the one desk is taken: Write a post is greyed")
+
+
+func test_a_post_with_no_duties_cannot_go_up():
+	_night()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	desk.draft_post("Nobody", [])
+	desk.put_up()
+	assert_true(game.staff.posts.is_empty())
+
+
+func test_applicants_line_up_outside_and_their_cvs_go_in_the_pile():
+	_night()
+	game.desk_post("Grill cook", ["grill", "fetch"], 1, 1)
+	var fresh := _applicants()
+	assert_false(fresh.is_empty())
+	assert_eq(game.applicants.size(), fresh.size())
+	for cv in fresh:
+		var rig: Node3D = game.applicants[cv.person]
+		assert_gt(rig.position.x, float(game.W), "outside, on the pavement")
+	assert_not_null(game.find_station("desk").get_node_or_null("pile"), "the pile on the desk")
+	game.start_day()
+	assert_true(game.applicants.is_empty(), "the line goes home for the day")
+	assert_eq(game.staff.cvs.size(), fresh.size(), "unread CVs stay in the pile")
+
+
+func test_applicants_come_at_the_start_of_the_build_phase():
+	_game()
+	game.add_station("desk", Vector2i(8, 6))
+	game.staff.add_post("Grill cook", ["grill"], 0, 0, 1)
+	for p in game.town.people:
+		p.affinity = 1.0
+	game.arrivals.clear()
+	for i in 20:
+		game.step(0.1)
+	assert_true(game.staff.cvs.is_empty(), "not on the receipt")
+	game.open_build()
+	assert_false(game.staff.cvs.is_empty())
+
+
+func test_swipe_right_hires_at_the_ask():
+	_night()
+	game.desk_post("Grill cook", ["grill"], 1, 1)
+	_applicants()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	assert_eq(desk.tab, "cvs", "a pile opens on the CVs")
+	var cv: Dictionary = game.staff.cvs[0]
+	desk.drag_to(DeskScreen.SWIPE + 20)
+	desk.hire_top()
+	var e: Dictionary = game.staff.employee(cv.person)
+	assert_false(e.is_empty())
+	assert_eq(e.wage, cv.ask)
+	assert_eq(e.post_name, "Grill cook")
+	assert_true(game.staff.posts.is_empty(), "the opening is filled")
+	assert_true(game.staff.cvs.is_empty(), "the post's other CVs go")
+	assert_true(game.applicants.is_empty(), "everyone in its line goes")
+
+
+func test_swipe_left_dismisses_and_a_mouse_drag_swipes():
+	_night()
+	game.desk_post("Grill cook", ["grill"], 1, 1)
+	var fresh := _applicants()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	var first: Dictionary = game.staff.cvs[0]
+	desk.dismiss_top()
+	assert_true(game.staff.cv(first.id).is_empty())
+	assert_false(game.applicants.has(first.person))
+	assert_true(game.staff.employees.is_empty())
+	if fresh.size() > 1:
+		var down := InputEventMouseButton.new()
+		down.button_index = MOUSE_BUTTON_LEFT
+		down.pressed = true
+		down.global_position = Vector2(500, 300)
+		desk._cv_input(down)
+		var up := InputEventMouseButton.new()
+		up.button_index = MOUSE_BUTTON_LEFT
+		up.pressed = false
+		up.global_position = Vector2(500 + DeskScreen.SWIPE + 30, 300)
+		desk._cv_input(up)
+		assert_eq(game.staff.employees.size(), 1, "dragged right: hired")
+
+
+func test_hire_and_dismiss_buttons_from_keys_or_pad():
+	_night()
+	game.desk_post("Grill cook", ["grill"], 1, 1)
+	_applicants()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	assert_eq(desk.selected(), "hire")
+	game.act(0, "use")
+	assert_eq(game.staff.employees.size(), 1)
+
+
+func test_haggling_at_hire():
+	_night()
+	game.desk_post("Grill cook", ["grill"], 1, 1)
+	_applicants()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	var cv: Dictionary = game.staff.cvs[0]
+	desk.start_haggle()
+	assert_eq(desk.selected(), "offer")
+	assert_eq(desk.make_offer(int(cv.ask)), "accept", "the full ask is always taken")
+	assert_eq(game.staff.employee(cv.person).wage, cv.ask)
+
+
+func test_a_haggle_far_below_the_ask_is_refused_then_decided():
+	_night()
+	game.desk_post("Grill cook", ["grill"], 1, 1)
+	_applicants()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	var cv: Dictionary = game.staff.cvs[0]
+	desk.start_haggle()
+	assert_eq(desk.make_offer(1), "refuse", "a coin a day: never")
+	var r := desk.make_offer(1)
+	assert_true(r in ["take_last", "walk"], "after two refusals they decide")
+	if r == "walk":
+		assert_true(game.staff.cv(cv.id).is_empty())
+		assert_true(game.staff.employees.is_empty())
+	else:
+		assert_eq(game.staff.employee(cv.person).wage, 1)
+
+
+func test_taking_a_post_down_clears_its_cvs_and_line():
+	_night()
+	var id: int = game.desk_post("Grill cook", ["grill"], 1, 1)
+	_applicants()
+	game.desk_take_down(id)
+	assert_true(game.staff.posts.is_empty())
+	assert_true(game.staff.cvs.is_empty())
+	assert_true(game.applicants.is_empty())
+	assert_null(game.find_station("desk").get_node_or_null("pile"))
+
+
+func test_a_desk_in_use_cannot_be_sold():
+	_night(1)
+	game.desk_post("Grill cook", ["grill"], 1, 1)
+	assert_true(game.pick_up(Grid.center(Vector2i(8, 6))))
+	assert_ne(game.sell_block(), "", "the post needs its desk")
+	assert_false(game.sell_hand())
+
+
+func test_staff_do_not_come_as_guests():
+	_night()
+	game.desk_post("Grill cook", ["grill"], 1, 1)
+	_applicants()
+	var person := int(game.staff.cvs[0].person)
+	game.desk_hire(int(game.staff.cvs[0].id))
+	for p in game.town.people:
+		p.affinity = 1.0
+	game.start_day()
+	for a in game.arrivals:
+		if a.has("group"):
+			assert_false((a.group as Array).has(person), "they work here now")
