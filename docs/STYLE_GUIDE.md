@@ -156,6 +156,49 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   tree in a row, the small tools on hooks, a hood beside an extractor, the chef pushing
   the scrubber), `treat`, `treat_day`, `tree_box`, `tree_bucket`, `tree_sponge`.
 
+**Staff (PRD 10, art pass 10.8)**
+- No concept sheet draws the desk, the CVs or staff at work; sheet 5's three staff roles
+  were a guess at a feature that turned out differently. Departure (10.6, kept in 10.8):
+  a hire is a townsperson in their own look, not a teal-and-brown role uniform, because
+  the player hires *people* (Mabel, Otis) and has to tell them apart. A white work apron
+  wrapped round the barrel, with a coral waist tie and a small bib, says "staff" from any
+  side at 60 px; nothing else changes with the post. The row "Hired staff" under "Rules
+  so far" is replaced by this.
+- The desk is a small wooden writing desk: a dark drawer pedestal on the left with brass
+  pulls, two legs on the right, a teal blotter, a coral pencil pot and a coral-tabbed card
+  standing at the back, so it reads as the staff desk and not another counter. The CV
+  pile sits on the blotter, a cream sheet per CV up to six, each a little askew.
+- Applicants stand in the street's line outside the door at night, like guests waiting,
+  so the player sees who applied before reading the pile.
+- The desk screen is the menu screen's paper on wood, with coral tabs (CVs, Job posts,
+  Staff). A CV is a cream card pinned at two corners: the face as a peg portrait, the
+  name, the post, three rows of stars (Cooking, Serving, Cleaning) and the overall
+  rating, and the ask with a coin. Dragged, it tilts and fades toward pale green (hire)
+  or pale coral (dismiss) as it nears the swipe point. Haggling swaps the buttons for minus, the figure,
+  plus and Offer, with a coral line when an offer is refused.
+- The staff list: one paper row per hire with a small face, the post and wage, the
+  duties in words, the week as five numbered boxes (a day off crossed in coral), a
+  satisfaction meter with a face (happy, flat, cross) in green, tan or coral and a word,
+  and the three skills as stars. A named raise is a yellow note with a coin; firing
+  turns the footer into two fire buttons beside "Keep them".
+- In service a helper chatting shows a cream speech balloon with three dots; one alone
+  on a break shows a coral mug. They slip like anyone (lying across the cell, dazed
+  stars, the help bar) and a helper with the help-up duty bends over them, as a guest
+  does. Helpers carry, cook and clean with the chef's hands and held items, so nothing
+  new had to be drawn for their work.
+- Wages show as a STAFF line on the restock note (in "more") and on the receipt, with a
+  small coral line under it when a wage went unpaid.
+- Guests' tolerances (10.1) have no art of their own: the guest card adds a hint line in
+  coral ("Hates to wait") or plain ink ("Doesn't mind a mess") once a strong reaction
+  reveals it. No numbers are shown.
+- Art pass 10.8: every PRD 10 visual checked in both themes at 60 px (people) and 20 px
+  (icons). Nothing needed redrawing. Two demos added: `desk_fire` (the fire buttons out)
+  and `helpers_slip` (a helper down and another helping them up). `desk_haggle` and
+  `desk_restock` already existed and are now listed in `CLAUDE.md`.
+- Screenshots: `tolerance`, `desk_line`, `desk_post`, `desk_cvs`, `desk_haggle`,
+  `desk_staff`, `desk_raise`, `desk_fire`, `desk_restock`, `desk_wages`, `helpers`,
+  `helpers_break`, `helpers_slip`, `staff_only` (run each once per theme).
+
 **How it is made**
 - Nothing is modelled in Blender yet. Every mesh is generated in GDScript: chamfered
   boxes (the 3 cm bevel), lathed shapes (bodies, plates, pots, hats) and flat cut-out
@@ -302,7 +345,7 @@ support.
 | Guest outfits | Cool, muted colours only: blues, teals, purples, browns, creams, charcoal. Never coral, green, yellow or red on guests. | locked | Sheet 4 |
 | Player chef | Only playable chefs wear the tall puffy toque (about 25% taller silhouette) and a bright white jacket and hat, so the player is always the lightest, tallest thing in a crowd. | locked | Sheet 5 |
 | Co-op colours | Four players differ by trim only (toque band, neck scarf, jacket trim, buttons): P1 coral, P2 teal, P3 yellow, P4 green. Jackets stay white. | locked | Sheet 5 |
-| Hired staff | Server, dishwasher and host use the kitchen's deep teal and dark brown, flat-topped silhouettes and one role prop each. | locked | Sheet 5 |
+| Hired staff | Hires keep their own townsperson look and wear a white work apron with a coral tie (PRD 10.6). Sheet 5's teal-and-brown role uniforms are not used; see "Staff" under "As built". | as built | Sheet 5 (departed) |
 | Posing | Emotion and action are carried by tilting the whole body (lean 20-25 degrees into a run, slump when bored, pitch back in disgust), squash and stretch, and floating hands. | locked | Sheet 6 |
 | State tells | Negative states pair motion with a cue: steam or flame for panic, hand-blur arcs for tapping, full-head tint (red storming out, green disgust). | locked | Sheet 6 |
 | Social | Friends at a table turn heads inward and wave with their outer hands. | locked | Sheet 6 |
@@ -698,7 +741,7 @@ colour variants on the bottom row.
 | Chef hat | Game: small dome hat | Tall puffed toque, 25% taller | New hat model, new silhouette |
 | Chef body | Game: white peg | Double-breasted jacket, scarf, trousers and shoes | New outfit; shoes and legs conflict with sheet 2 |
 | Co-op colours | Brief: four colour variants | Coral, teal, yellow, green on trim | Four materials for trim |
-| Staff roles | Brief: server, dishwasher, host | Same three, one with two designs | Roles ready for later |
+| Staff roles | Brief: server, dishwasher, host | Same three, one with two designs | Not used: hires are townspeople in an apron, any mix of duties (PRD 10) |
 | Server tray | Not in game | Held out to one side | Fits the sheet 2 "tilted item" rule |
 
 

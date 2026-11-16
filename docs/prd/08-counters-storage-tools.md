@@ -1,6 +1,6 @@
 # PRD 8: Counters, storage and the tool tree
 
-**Status:** agreed, not built (16 November 2026).
+**Status:** built, all seven milestones (16 November 2026). What it built is in `docs/DESIGN.md` section 1.
 **Size:** very large; build it in the seven milestones at the end (8.1 to 8.7), each mergeable.
 **Needs:** nothing. **Touches:** `sim/catalog.gd`, `sim/pantry.gd`, `sim/menu.gd`,
 `sim/prep.gd`, a new `sim/kitchen.gd` (cells, layers, slots), `game/main.gd`,
