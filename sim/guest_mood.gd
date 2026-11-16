@@ -16,6 +16,72 @@ const COMP_PATIENCE := 0.6   # patience a free meal buys back (half price: 0.35)
 const COMP_JOY := 0.25       # joy it adds (half price: 0.1)
 const COMP_CALM := 0.2       # disgust it takes away: they forgive a little
 
+# ---------------------------------------------------------------- tolerances (PRD 10.1)
+## How much a guest minds each topic, 1 to 5 (low means they care), from Town. A 3 is
+## today's guest exactly. Each topic's effect is scaled: food the joy from the food,
+## service how fast patience drains, clean how fast disgust rises.
+const TOL_TOPICS: Array[String] = ["food", "service", "clean"]
+const TOL_FUSSY_SCALE := 1.6   # tunable: effect at tolerance 1
+const TOL_EASY_SCALE := 0.4    # tunable: effect at tolerance 5 (3 is always 1.0)
+## A strong reaction, which lets the card hint at the tolerance behind it.
+## Each is measured before tolerance, so a fussy and an easy-going guest meet the same event.
+const REACT_WAIT := 0.5        # tunable: share of a full patience bar's wait that counts as long
+const REACT_FOOD_GOOD := 0.8   # tunable: food quality at or above which it was felt
+const REACT_FOOD_POOR := 0.4   # tunable: food quality at or below which it was felt
+
+var tolerance := {"food": 3, "service": 3, "clean": 3}
+var reacted: Array[String] = []   # topics they have reacted strongly to, in order
+var waited := 0.0                 # waiting so far, as a share of a full bar at tolerance 3
+
+## Hint lines for the card, by topic: [fussy (1-2), easy-going (4-5)]. No numbers shown.
+const TOL_HINTS := {
+	"food": ["Fussy about the food", "Not fussy about food"],
+	"service": ["Hates to wait", "Happy to wait"],
+	"clean": ["Can't stand a mess", "Doesn't mind a mess"],
+}
+## What they think as the hint is revealed, by topic: [fussy, easy-going].
+const TOL_THOUGHTS := {
+	"food": ["I'm particular about my food", "Food's food, I'm not fussy"],
+	"service": ["I hate waiting around", "No rush, I've got all day"],
+	"clean": ["I can't stand a mess", "A bit of mess never hurt anyone"],
+}
+
+
+## The effect scale for a tolerance: 1.6 at 1, 1.0 at 3, 0.4 at 5, straight lines between.
+static func tolerance_scale(tol: int) -> float:
+	var t := clampi(tol, 1, 5)
+	if t <= 3:
+		return lerpf(TOL_FUSSY_SCALE, 1.0, (t - 1) / 2.0)
+	return lerpf(1.0, TOL_EASY_SCALE, (t - 3) / 2.0)
+
+
+func scale_for(topic: String) -> float:
+	return tolerance_scale(int(tolerance.get(topic, 3)))
+
+
+## Notes a strong reaction to `topic`. The first time, for a guest who is not middling
+## about it, they think a line that hints at their tolerance. Returns that line or "".
+func react(topic: String) -> String:
+	if reacted.has(topic):
+		return ""
+	reacted.append(topic)
+	var tol := int(tolerance.get(topic, 3))
+	if tol == 3:
+		return ""
+	var line: String = TOL_THOUGHTS[topic][0 if tol < 3 else 1]
+	think(line)
+	return line
+
+
+## The card's hint lines, in the order they were revealed. Middling topics give none.
+func tolerance_hints() -> Array[String]:
+	var out: Array[String] = []
+	for topic in reacted:
+		var tol := int(tolerance.get(topic, 3))
+		if tol != 3:
+			out.append(TOL_HINTS[topic][0 if tol < 3 else 1])
+	return out
+
 
 func think(t: String) -> bool:
 	if thoughts.has(t):
@@ -29,7 +95,10 @@ func latest_thought() -> String:
 
 
 func wait(delta: float, seconds_to_snap: float) -> void:
-	patience = maxf(0.0, patience - delta / seconds_to_snap)
+	patience = maxf(0.0, patience - delta / seconds_to_snap * scale_for("service"))
+	waited += delta / seconds_to_snap
+	if waited >= REACT_WAIT:
+		react("service")
 
 
 const NOTICE := 0.005   # disgust per second below which a guest has not really noticed
@@ -63,9 +132,12 @@ static func gross_rate(base: float, age: float, doubling: float, cap: float) -> 
 
 
 func see_gross(strength: float, delta: float, thought: String) -> void:
-	disgust = minf(1.0, disgust + strength * delta)
-	if strength >= NOTICE:   # they notice at once; it only starts to matter at the first stage
+	var felt := strength * scale_for("clean")
+	disgust = minf(1.0, disgust + felt * delta)
+	if felt >= NOTICE:   # they notice at once; it only starts to matter at the first stage
 		think(thought)
+	if strength >= NOTICE:   # a mess anyone would see: an easy-going guest shrugs it off
+		react("clean")
 
 
 func delight(amount: float, thought := "") -> void:
@@ -170,7 +242,9 @@ func bill_for(price: int) -> int:
 
 func taste(quality: float) -> void:
 	savour = clampf(quality, 0.0, 1.0)
-	joy = clampf(joy + 0.15 * savour, 0.0, 1.0)
+	joy = clampf(joy + 0.15 * savour * scale_for("food"), 0.0, 1.0)
+	if savour >= REACT_FOOD_GOOD or savour <= REACT_FOOD_POOR:
+		react("food")
 
 
 func walked_out() -> bool:

@@ -1644,6 +1644,8 @@ func test_a_rush_never_walks_guests_through_one_another():
 	game.arrivals.assign([{"time": 0.3, "group": [0, 1]}, {"time": 0.6, "idx": 2},
 		{"time": 0.9, "group": [3, 4, 5]}, {"time": 1.2, "idx": 6}, {"time": 1.5, "group": [7, 8]},
 		{"time": 1.8, "group": [9, 10, 11, 12]}, {"time": 2.1, "idx": 13}])
+	for p in game.town.people:   # middling, so the line clears by walkouts in time (PRD 10.1)
+		p.tolerance = {"food": 3, "service": 3, "clean": 3}
 	var worst := 99.0
 	for i in 900:
 		game.step(0.1)

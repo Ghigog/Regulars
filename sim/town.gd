@@ -58,6 +58,7 @@ func _init(seed_value := 1) -> void:
 			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
 			"likes": [], "dislikes": [], "liked_tags": [], "orders": {},
 			"opinion": {"speed": 0.0, "clean": 0.0, "quality": 0.0, "variety": 0.0, "other": 0.0},
+			"tolerance": {"food": 3, "service": 3, "clean": 3},
 		})
 	# A ring of friendships plus a few long-distance ones, so gossip travels.
 	for i in NAMES.size():
@@ -65,6 +66,38 @@ func _init(seed_value := 1) -> void:
 		if i % 3 == 0:
 			_befriend(i, (i + 5) % NAMES.size())
 	make_tastes(theme)
+	make_tolerances()
+
+
+# ---------------------------------------------------------------- tolerances (PRD 10.1)
+
+const TOL_MIN := 1
+const TOL_MAX := 5
+
+## Gives everyone a tolerance for food, service and clean, 1 to 5 (low means they
+## care), from the town's seed. Its own generator, so tastes and guest rolls are
+## untouched. Two dice averaged: middling is common, the extremes rarer.
+func make_tolerances() -> void:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("%d:tolerance" % taste_seed)
+	for p in people:
+		var tol := {}
+		for topic in GuestMood.TOL_TOPICS:
+			tol[topic] = roundi((r.randi_range(TOL_MIN, TOL_MAX) + r.randi_range(TOL_MIN, TOL_MAX)) / 2.0)
+		p.tolerance = tol
+
+
+func tolerance(i: int, topic: String) -> int:
+	return int((people[i].tolerance as Dictionary).get(topic, 3))
+
+
+## Skill is 6 minus tolerance: someone who cares about food cooks it well (for CVs).
+static func skill_for(tol: int) -> int:
+	return 6 - clampi(tol, TOL_MIN, TOL_MAX)
+
+
+func skill(i: int, topic: String) -> int:
+	return skill_for(tolerance(i, topic))
 
 
 # ---------------------------------------------------------------- tastes

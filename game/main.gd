@@ -382,6 +382,18 @@ func _apply_demo(demo: String) -> void:
 					g.mood.think("Nobody has cleared that table")
 					inspect(g)
 					return)
+	elif demo == "tolerance":  # a seated guest who hates to wait and doesn't mind a mess, card open; shoot at 10
+		for a in arrivals:
+			a.time = 0.2
+		get_tree().create_timer(9.0).timeout.connect(func() -> void:
+			for g in guests:
+				if g.seated_waiting():
+					g.mood.tolerance = {"food": 3, "service": 1, "clean": 5}
+					g.mood.patience = 1.0
+					g.mood.wait(0.5 * Guest.QUEUE_PATIENCE, Guest.QUEUE_PATIENCE)   # a long wait, felt hard
+					g.mood.see_gross(0.05, 0.5, "Nobody has cleared that table")   # shrugged off
+					inspect(g)
+					return)
 	elif demo == "walkon":  # a pair who find nothing they like turn away at the door; shoot at about 7
 		for i in [0, 1]:
 			(town.people[i].dislikes as Array).append("patty")
