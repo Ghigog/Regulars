@@ -537,7 +537,13 @@ func _apply_demo(demo: String) -> void:
 		ledger.record_sale(DEMO_BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_tree.bind(demo))
-	elif demo.begins_with("desk_"):   # PRD 10.3: desk_line, desk_post, desk_cvs, desk_haggle; shoot at 3
+	elif demo == "desk_wages":   # PRD 10.4: the receipt with a STAFF line, one wage unpaid; shoot at 3
+		ledger.record_sale(DEMO_BILL, 5)
+		arrivals.clear()
+		_demo_hires()
+		ledger.money = 40
+		pay_staff()
+	elif demo.begins_with("desk_"):   # PRD 10.3/10.4: desk_line, desk_post, desk_cvs, desk_haggle, desk_staff, desk_raise, desk_restock; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_desk.bind(demo))
@@ -715,6 +721,27 @@ func _demo_tree(demo: String) -> void:
 func _demo_desk(demo: String) -> void:
 	for c: Vector2i in [Vector2i(8, 6), Vector2i(9, 6)]:
 		add_station("desk", c)
+	if demo in ["desk_staff", "desk_raise", "desk_restock"]:   # PRD 10.4: three hires, the week of days 6 to 10
+		for c: Vector2i in [Vector2i(7, 6), Vector2i(6, 6)]:
+			add_station("desk", c)
+		_demo_hires()
+		ledger.day = 6   # a new week: everyone picks their days off as the build phase opens
+		open_build()
+		if demo == "desk_restock":
+			hud.menu_notes.open = true
+			player.position = Grid.center(Vector2i(1, 5))
+			player.look(Vector2i(0, 1))
+			hud.show_build()
+			return
+		open_desk()
+		hud.desk.show_tab("staff")
+		if demo == "desk_raise":
+			var person: int = staff.employees.keys()[0]
+			hud.desk.open_person(person)
+			var e: Dictionary = staff.employee(person)
+			e.pending = {"duty": "wash_up", "raise": 3, "haggle": staff._new_haggle(int(e.wage) + 3)}
+			hud.desk.render()
+		return
 	staff.add_post("Grill cook", ["grill", "fetch", "assemble"], 1, 1, desk_count())
 	for p in town.people:
 		p.affinity = 0.5
@@ -735,6 +762,20 @@ func _demo_desk(demo: String) -> void:
 		hud.desk.start_haggle()
 		staff.rng.seed = 3
 		hud.desk.make_offer(maxi(1, int(staff.cvs[0].ask) / 2))
+
+
+## Three hires for the staff demos: a happy grill cook, a so-so server and a fed-up
+## washer two nights from quitting.
+func _demo_hires() -> void:
+	for h: Array in [[2, "Grill cook", ["grill", "fetch", "assemble"], 1, 1, 0.85, 0],
+			[5, "Server", ["take_orders", "carry_trays", "clear_tables"], 2, 2, 0.5, 0],
+			[9, "Washer", ["wash_up", "empty_bin"], 0, 1, 0.12, 2]]:
+		var pid := staff.add_post(h[1], h[2], h[3], h[4], 99)
+		var cv := staff._make_cv(h[0], Staff.skills_from(town.people[h[0]].tolerance), town.rating(h[0]), 1.0, pid)
+		staff.cvs.append(cv)
+		staff.hire(cv.id, -1, 1)
+		staff.employee(h[0]).satisfaction = h[5]
+		staff.employee(h[0]).bottom_nights = h[6]
 
 
 func _demo_build(demo: String) -> void:

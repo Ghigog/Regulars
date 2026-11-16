@@ -410,3 +410,209 @@ func test_staff_do_not_come_as_guests():
 	for a in game.arrivals:
 		if a.has("group"):
 			assert_false((a.group as Array).has(person), "they work here now")
+
+
+# ================================================================ 10.4 the staff list
+
+## A hire straight into the staff, at their ask, as if swiped right.
+func _hire_one(person := 3, duties := ["grill", "fetch"], breaks := 1, days_off := 1) -> int:
+	var pid: int = game.staff.add_post("Grill cook", duties, breaks, days_off, 99)
+	var cv: Dictionary = game.staff._make_cv(person, Staff.skills_from(game.town.people[person].tolerance), 3, 1.0, pid)
+	game.staff.cvs.append(cv)
+	game.staff.hire(cv.id, -1, game.ledger.day)
+	return person
+
+
+func test_the_staff_tab_lists_each_hire_with_manage():
+	_night(2)
+	var p := _hire_one()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	assert_eq(desk.tab, "staff", "an empty pile with staff opens on the staff")
+	assert_true(desk.select("manage:%d" % p))
+	desk.press()
+	assert_eq(desk.managing(), p)
+	desk.back()
+	assert_eq(desk.managing(), -1)
+	assert_eq(desk.selected(), "manage:%d" % p)
+
+
+func test_ticking_a_duty_offers_it_and_unticking_takes_it_off():
+	_night()
+	var p := _hire_one()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	desk.open_person(p)
+	var e: Dictionary = game.staff.employee(p)
+	e.satisfaction = 1.0
+	game.staff.rng.seed = 1
+	assert_true(desk.select("duty:wash_up"))
+	desk.press()
+	assert_true((e.duties as Array).has("wash_up"), "a happy hire takes it on")
+	e.satisfaction = 0.5
+	var sat: float = e.satisfaction
+	assert_true(desk.select("duty:wash_up"))
+	desk.press()
+	assert_false((e.duties as Array).has("wash_up"))
+	assert_gt(e.satisfaction, sat, "free, and they are glad")
+
+
+func _refused(p: int) -> Dictionary:
+	var e: Dictionary = game.staff.employee(p)
+	e.satisfaction = 0.0
+	for tries in 20:
+		if not game.desk_add_duty(p, "wash_up").ok:
+			break
+		game.staff.remove_duty(p, "wash_up")
+		e.satisfaction = 0.0
+	return e
+
+
+func test_a_refused_duty_names_a_raise_to_approve():
+	_night()
+	var p := _hire_one()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	desk.open_person(p)
+	var e := _refused(p)
+	assert_false((e.pending as Dictionary).is_empty())
+	desk.render()
+	assert_true(desk.select("approve"))
+	var wage := int(e.wage) + int(e.pending.raise)
+	desk.press()
+	assert_eq(int(e.wage), wage)
+	assert_true((e.duties as Array).has("wash_up"))
+
+
+func test_a_raise_can_be_withdrawn_or_denied():
+	_night()
+	var p := _hire_one()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	desk.open_person(p)
+	var e := _refused(p)
+	var wage := int(e.wage)
+	assert_eq(desk.answer_raise("withdraw"), "withdrawn")
+	assert_eq(int(e.wage), wage)
+	assert_false((e.duties as Array).has("wash_up"))
+	_refused(p)
+	assert_eq(desk.answer_raise("deny"), "quit")
+	assert_true(game.staff.employee(p).is_empty(), "denied, they quit")
+	assert_eq(desk.managing(), -1)
+
+
+func test_a_raise_haggled_is_refused_then_decided():
+	_night()
+	var p := _hire_one()
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	desk.open_person(p)
+	var e := _refused(p)
+	desk.start_raise_haggle(0)
+	assert_eq(desk.selected(), "raise_offer")
+	var r := desk.answer_raise("haggle", 0)
+	if r == "refuse":
+		r = desk.answer_raise("haggle", 0)
+	assert_true(r in ["added", "quit"], "after two refusals they take it or go")
+
+
+func test_breaks_and_days_off_are_added_at_the_desk():
+	_night()
+	var p := _hire_one(3, ["grill"], 0, 0)
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	desk.open_person(p)
+	assert_true(desk.select("break"))
+	desk.press()
+	assert_true(desk.select("day_off"))
+	desk.press()
+	assert_eq(int(game.staff.employee(p).breaks), 1)
+	assert_eq(int(game.staff.employee(p).days_off), 1)
+
+
+func test_firing_with_severance_pays_a_day_and_without_friends_hear():
+	_night(2)
+	var a := _hire_one(3)
+	var b := _hire_one(4)
+	for x in game.town.people:
+		x.affinity = 0.5
+	game.ledger.money = 100
+	var wage := int(game.staff.employee(a).wage)
+	game.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	desk.open_person(a)
+	assert_true(desk.select("fire"))
+	desk.press()
+	assert_true(desk.select("fire_pay"))
+	desk.press()
+	assert_true(game.staff.employee(a).is_empty())
+	assert_eq(game.ledger.money, 100 - wage)
+	assert_almost_eq(float(game.town.people[a].affinity), 0.5 - Staff.FIRE_DROP, 0.0001)
+	assert_true(game.desk_fire(b, false))
+	assert_eq(game.ledger.money, 100 - wage, "nothing paid")
+	assert_almost_eq(float(game.town.people[b].affinity), 0.5 - Staff.FIRE_DROP_HARSH, 0.0001)
+	for f: int in game.town.people[b].friends:
+		if f != a:
+			assert_lt(float(game.town.people[f].affinity), 0.5, "friends hear it")
+
+
+func test_severance_needs_the_money():
+	_night()
+	var p := _hire_one()
+	game.ledger.money = 0
+	assert_false(game.desk_fire(p, true))
+	assert_false(game.staff.employee(p).is_empty())
+
+
+func test_wages_are_paid_as_the_door_opens_on_the_receipt():
+	_night()
+	var p := _hire_one()
+	var wage := int(game.staff.employee(p).wage)
+	game.ledger.money = 500
+	assert_eq(game.staff_wages(), wage)
+	game.start_day()
+	assert_eq(game.ledger.today.staff, wage)
+	game.arrivals.clear()
+	for i in 20:
+		game.step(0.1)
+	assert_eq(int(game.last_day.staff), wage)
+	var found: bool = game.hud.find_children("*", "Label", true, false).any(
+		func(l: Label) -> bool: return l.text == "STAFF:")
+	assert_true(found, "a STAFF line on the receipt")
+
+
+func test_an_unpaid_wage_is_a_hit_not_a_debt():
+	_night()
+	var p := _hire_one()
+	var e: Dictionary = game.staff.employee(p)
+	game.ledger.money = game.night_cost()   # the stock, and nothing for wages
+	var sat: float = e.satisfaction
+	game.start_day()
+	assert_eq(game.ledger.today.staff, 0)
+	assert_eq(game.ledger.today.unpaid, 1)
+	assert_lt(float(e.satisfaction), sat - Staff.UNPAID_HIT + 0.05)
+
+
+func test_staff_quit_after_nights_at_the_bottom():
+	_night()
+	var p := _hire_one()
+	var e: Dictionary = game.staff.employee(p)
+	e.satisfaction = 0.0
+	e.bottom_nights = Staff.QUIT_NIGHTS - 1
+	e.wage = 999   # far more than there is: unpaid, and at the bottom
+	game.ledger.money = game.night_cost()
+	game.start_day()
+	assert_true(game.staff.employee(p).is_empty(), "they quit")
+
+
+func test_days_off_are_picked_as_a_week_starts():
+	_game()
+	game.arrivals.clear()
+	_hire_one(3, ["grill"], 0, 2)
+	for i in 20:
+		game.step(0.1)
+	game.ledger.day = 6
+	game.open_build()
+	assert_true(game.staff.picked_week(3, 6))
+	var off: Array = game.staff.week_boxes(3, 6).filter(func(b: Dictionary) -> bool: return b.off)
+	assert_eq(off.size(), 2)

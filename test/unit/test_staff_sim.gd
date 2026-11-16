@@ -522,3 +522,72 @@ func test_the_desk_is_a_one_cell_catalog_piece_kept_off_sale():
 	assert_false(Catalog.sold_in("desk", ""))
 	for bp in Catalog.search("desk"):
 		assert_ne(bp.id, "desk")
+
+
+# ---------- The staff list (PRD 10.4) ----------
+
+func test_mood_words_run_from_happy_to_fed_up():
+	assert_eq(Staff.mood_word(0.9), "Happy")
+	assert_eq(Staff.mood_word(0.65), "Content")
+	assert_eq(Staff.mood_word(0.45), "So-so")
+	assert_eq(Staff.mood_word(0.3), "Unhappy")
+	assert_eq(Staff.mood_word(Staff.BOTTOM), "Fed up", "the bottom fifth, where quitting nights count")
+	assert_eq(Staff.mood_word(0.0), "Fed up")
+
+
+func test_week_boxes_show_the_five_days_and_days_off():
+	var s := _staff()
+	_hire(s, 1, ["grill"], EVEN, 3, 0, 2)
+	assert_eq(Staff.week_first(8), 6)
+	assert_false(s.picked_week(1, 6), "not picked until the week starts")
+	s.start_week(6)
+	assert_true(s.picked_week(1, 8))
+	assert_false(s.picked_week(1, 11), "next week is picked afresh")
+	var boxes := s.week_boxes(1, 7)
+	assert_eq(boxes.map(func(b: Dictionary) -> int: return b.day), [6, 7, 8, 9, 10])
+	assert_eq(boxes.filter(func(b: Dictionary) -> bool: return b.off).size(), 2)
+
+
+func test_removing_a_duty_or_adding_rest_lifts_satisfaction_now():
+	var s := _staff()
+	_hire(s, 1, ["grill", "mop"])
+	var e := s.employee(1)
+	var sat: float = e.satisfaction
+	s.remove_duty(1, "mop")
+	assert_gt(e.satisfaction, sat)
+	sat = e.satisfaction
+	assert_true(s.add_break(1))
+	assert_almost_eq(e.satisfaction, sat + Staff.BREAK_ADD, 0.0001)
+	sat = e.satisfaction
+	assert_true(s.add_day_off(1))
+	assert_almost_eq(e.satisfaction, sat + Staff.DAY_OFF_ADD, 0.0001)
+	sat = e.satisfaction
+	s.remove_duty(1, "mop")
+	assert_eq(e.satisfaction, sat, "a duty they do not have changes nothing")
+
+
+func test_ledger_pays_staff_with_no_debt():
+	var l := Ledger.new()
+	l.money = 30
+	l.pay_staff(20, 1)
+	assert_eq(l.money, 10)
+	assert_eq(l.today.staff, 20)
+	assert_eq(l.today.unpaid, 1)
+	var rec := l.end_day()
+	assert_eq(rec.staff, 20)
+	assert_eq(l.today.staff, 0, "a new day starts clean")
+
+
+func test_firing_drops_opinion_and_friends_hear_without_severance():
+	var town := Town.new(4)
+	var i := 0
+	while (town.people[i].friends as Array).is_empty():
+		i += 1
+	var f: int = town.people[i].friends[0]
+	for p in town.people:
+		p.affinity = 0.5
+	town.record_fired(i, Staff.FIRE_DROP)
+	assert_almost_eq(float(town.people[i].affinity), 0.5 - Staff.FIRE_DROP, 0.0001)
+	assert_eq(float(town.people[f].affinity), 0.5, "with severance their friends hear nothing")
+	town.record_fired(i, Staff.FIRE_DROP_HARSH, Staff.FIRE_DROP_HARSH * Staff.FIRE_FRIEND_SHARE)
+	assert_almost_eq(float(town.people[f].affinity), 0.5 - Staff.FIRE_DROP_HARSH * Staff.FIRE_FRIEND_SHARE, 0.0001)
