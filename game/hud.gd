@@ -2398,6 +2398,18 @@ func _build_tip(p := 0) -> String:
 		Catalog.label(hand), int(hand.price), use, turn, _g("back", p)]
 
 
+## Added to the slip while a chef holds a piece they can put down (not a build or
+## treatment tool, which are laid where the chef faces anyway): how to stand still and aim.
+func _aim_note(p: int) -> String:
+	var ch: Player = game.chefs[p]
+	var hand: Dictionary = ch.hand
+	if hand.is_empty() or Catalog.is_build_tool(hand.id) or Treatments.is_laying_tool(hand.id):
+		return ""
+	if _mode(p) == "touch":
+		return "      Hold Aim to stand still and aim"
+	return "      Hold %s to stand still and aim" % _g("aim", p)
+
+
 ## Redraws every hint for a new device: the corner hint, the prompt's keycap,
 ## the build slip and the shop's key line.
 func refresh_input() -> void:
@@ -2471,7 +2483,7 @@ func show_build() -> void:
 		d.row.visible = p < n
 		if p < n:
 			(d.tag as ChefTag).visible = n > 1
-			d.label.text = _build_tip(p)
+			d.label.text = _build_tip(p) + _aim_note(p)
 	_dirty_label.text = game.dirty_note()
 	_dirty_note.visible = _dirty_label.text != ""
 	menu_notes.refresh()
