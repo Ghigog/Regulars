@@ -1437,6 +1437,9 @@ static func hinge(n: Node3D, at: Vector3) -> Node3D:
 ## Shapes and heights are shared by every theme (sheets 8 and 10). `node` is the
 ## piece's place in its upgrade tree (PRD 8.3): a step adds its own marks.
 static func station(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "") -> void:
+	if type == "till":   # its own piece, drawn at worktop height as it stands on a counter
+		register(n)
+		return
 	_station_body(n, type, tier, base, pass_look, node)
 	_base_marks(n, base)
 	if node != "" and node != base:

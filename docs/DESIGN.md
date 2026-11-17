@@ -35,9 +35,20 @@ Survive as many days as you can; three walkouts in one day ends the run.
   floor is reached from below or beside it. Floor laid behind a wall, or a door or
   archway through it, is refused while a piece hangs on it alone.
 - **Storage (PRD 8.4).** Ingredients live in storage the player builds. At night, E on
-  a counter, its fridge line or a shelf opens its **storage card** (fixes after the
-  first playtest, 17 November 2026): an Ingredients tab first, then Upgrades (the
-  counter's tree, bought where it stands, nothing lifted) and Move (picks it up). The
+  a counter, its fridge line or a shelf **lifts it** where it stands and opens its
+  **storage card** (fixes after the first playtest, 17 November 2026; reworked the same
+  day): an Ingredients tab first, then Upgrades (the counter's tree, bought where it
+  stands). E puts the piece back down with the chosen box in; Enter (pad X) puts a box
+  in or takes it out and keeps the card open; Tab keeps the piece in hand to carry, its
+  boxes going with it (any that do not fit where it lands are left out, with a note).
+  E picks up every piece, hoods over bare floor included; on a cell with a wall piece
+  over a floor piece the wall piece comes first, and once it is put back the next E
+  there takes the one below. The prompt names the piece ("Pick up sink"). Everything
+  sells, the start's pieces and the last sink, bin, tray stack and till too (the tray
+  stack and the till are in the Kitchen tab now); while the kitchen has none of one of
+  those four the shop sells it at any level and the door card stays shut (`ESSENTIALS`).
+  The till is its own piece: it stands on a counter (or a tool on one), comes off before
+  what it stands on, and there is one at a time. The
   Ingredients tab lists what is stored there, then every box: what fits first, then the
   rest dimmed with why ("Needs a fridge"), so the player learns a fridge exists. The
   shop's Pantry tab is gone. The Kitchen tab lists the under-counter fridge outright (a

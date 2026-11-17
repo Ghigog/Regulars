@@ -440,7 +440,7 @@ func test_turned_table_has_seats_above_and_below():
 	assert_true(cells.has(Vector2i(8, 2)) and cells.has(Vector2i(8, 4)), "guests use the turned seats")
 
 
-func test_selling_refunds_half_but_not_the_last_stove_or_fixtures():
+func test_selling_refunds_half_of_anything_the_last_stove_and_the_fixtures_too():
 	_to_build()
 	assert_true(game.pick_up(Vector3(9.5, 0, 0.5)))        # the fern
 	assert_eq(game.sell_value(), 10)
@@ -448,11 +448,11 @@ func test_selling_refunds_half_but_not_the_last_stove_or_fixtures():
 	assert_eq(game.ledger.money, 160)
 	assert_false(game.stations.has(Vector2i(9, 0)))
 	assert_true(game.pick_up(Vector3(2.5, 0, 2.5)))        # the tray stack
-	assert_false(game.sell_hand(), "fixtures are not for sale")
-	game.cancel_hand()
+	assert_true(game.sell_hand(), "the start's pieces sell too")
+	assert_eq(game.ledger.money, 160 + Catalog.price_of("trays") / 2)
 	assert_true(game.pick_up(Vector3(0.5, 0, 3.5)))        # one of two stoves
 	assert_true(game.sell_hand())
-	assert_eq(game.ledger.money, 160 + Catalog.price_of("stove") / 2)
+	assert_eq(game.ledger.money, 160 + Catalog.price_of("trays") / 2 + Catalog.price_of("stove") / 2)
 	assert_true(game.pick_up(Vector3(0.5, 0, 4.5)))
 	assert_true(game.sell_hand(), "every station can be sold, even the last stove")
 	assert_null(game.find_station("stove"))
@@ -2614,7 +2614,7 @@ func test_a_second_sink_and_bin_each_have_their_own_mess():
 	assert_eq(game.ledger.money, Catalog.price_of("sink") / 2)
 	game.find_station("sink").dirty = 0
 	assert_true(game.pick_up(Grid.center(game.find_station("sink").cell)))
-	assert_eq(game.sell_block(), "Your last sink")
+	assert_eq(game.sell_block(), "", "the last sink sells too; the door waits for another")
 	game.cancel_hand()
 
 
@@ -2713,7 +2713,7 @@ func test_a_storage_card_shows_boxes_first_and_dims_what_needs_a_fridge():
 	assert_true(game.open_storage(c))
 	assert_true(game.storing())
 	assert_eq(game.hud._category, "Ingredients", "ingredients come first")
-	assert_eq(game.hud.shop_tabs(), ["Ingredients", "Upgrades", "Move"])
+	assert_eq(game.hud.shop_tabs(), ["Ingredients", "Upgrades"])
 	var items: Array[Dictionary] = game.shop_items("", "Ingredients")
 	var patty := items.filter(func(bp: Dictionary) -> bool: return bp.id == "box_patty")
 	assert_eq(patty.size(), 1, "a fridge-only kind is still listed, so the player learns of fridges")
@@ -2748,15 +2748,6 @@ func test_the_upgrades_tab_upgrades_a_counter_where_it_stands():
 	game.close_shop()
 	assert_true(game.player.hand.is_empty(), "nothing was lifted")
 	assert_eq(game.stations[c].cell, c)
-
-
-func test_the_move_tab_picks_the_piece_up():
-	_to_build()
-	var c := _plain_counter()
-	game.open_storage(c)
-	game.storage_move()
-	assert_false(game.shopping)
-	assert_true(game.player.hand.get("moving", false), "picked up to move, as E used to")
 
 
 func test_the_fridge_is_sold_in_the_kitchen_tab_as_a_counter_already_upgraded():

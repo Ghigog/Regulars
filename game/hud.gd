@@ -2049,9 +2049,9 @@ func show_review() -> void:
 
 
 const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
-## The storage card's tabs (E on a storage piece at night): what goes in it first,
-## then its upgrade tree, then picking it up to move it.
-const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades", "Move"]
+## The storage card's tabs (E lifts a storage piece at night and opens it): what goes
+## in it first, then its upgrade tree.
+const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades"]
 
 
 ## The tabs of the tray now open: the shop's, or a storage card's.
@@ -2145,9 +2145,6 @@ func set_search(text: String) -> void:
 func _set_category(cat: String) -> void:
 	if game.storing() and cat == "Upgrades":
 		game.storage_upgrades()
-		return
-	if game.storing() and cat == "Move":
-		game.storage_move()
 		return
 	if cat != _category and _shop:
 		game.sfx("tab", 0.08)
@@ -2309,6 +2306,13 @@ func _hint_text(p := 0) -> String:
 
 
 func _shop_keys_text() -> String:
+	if game.storing() and game.shopper.hand.get("carry", false):   # the piece is lifted
+		match _mode():
+			"pad":
+				return "A put down with it in      X put in or take out      B carry it"
+			"touch":
+				return "Tap a box to put it in or take it out      Use put down"
+		return "E put down with it in      Enter put in or take out      Tab carry it"
 	if game.storing():
 		match _mode():
 			"pad":
@@ -2647,7 +2651,7 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		return _storage_info(bp)
 	var id: String = bp.id
 	var tier: int = bp.tier
-	var locked := l.level() < Catalog.level_of(id, tier)
+	var locked: bool = game.buy_level(id) < Catalog.level_of(id, tier)
 	var price := "$%d" % Catalog.bp_price(bp)
 	if Treatments.is_box(id):   # free; laying it costs a price a cell each night (PRD 9.5)
 		price = "Free"
@@ -2658,7 +2662,7 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
 	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp), "locked": locked,
 		"price": "Level %d" % Catalog.level_of(id, tier) if locked else price,
-		"can": game.catalog.can_buy(id, l.money, l.level(), tier) and l.money >= Catalog.bp_price(bp)}
+		"can": game.catalog.can_buy(id, l.money, game.buy_level(id), tier) and l.money >= Catalog.bp_price(bp)}
 
 
 ## A box on the storage card: one stored here is taken out; one that may go in shows
@@ -2776,6 +2780,13 @@ func _select(i: int, dir: int) -> void:
 
 
 ## Left and right along the tray, wrapping at the ends.
+## The box or piece in the middle of the shop row, or {} when the row is empty.
+func shop_selected() -> Dictionary:
+	if _shop == null or _shop_items.is_empty():
+		return {}
+	return _shop_items[_shop_index]
+
+
 func shop_move(d: int) -> void:
 	if _shop == null or _shop_items.is_empty():
 		return
