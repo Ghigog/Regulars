@@ -286,7 +286,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
   Start options; in the shop the stick and d-pad browse. Touch: a joystick bottom left;
   down the right a big Use button that names the action, and above it, by night, Shop,
   Drop or Done, Turn, Sell, or Erase (with a build tool, Erase makes drags take things
-  away); a small Menu button for options. Taps on the room work as clicks (pick a guest,
+  away); a small Menu button for options. **Aiming** (asked for after the first
+  playtest, 17 November 2026): Shift, either trigger, or the touch Aim button beside Use,
+  held, plants the chef; the move input only turns them. At night they may face a
+  diagonal too (`Player.aim_dir`, a 45 degree slice each), so W alone faces the cell
+  straight up the screen and all eight cells around can be picked up or built on without
+  a step; in service the station turned to wins over a nearer one. Taps on the room work as clicks (pick a guest,
   place a piece, drag floors), and a touch on a control never reaches the room. Keys,
   pad buttons and touch buttons all become the same actions (use, back, turn, sell,
   shop, town, options, confirm, search, mute and the four browse directions), sent to the

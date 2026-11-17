@@ -18,11 +18,13 @@ extends CanvasLayer
 ##
 ## Keys: WASD or arrows walk (and browse), E/Space use, Enter confirm, Esc back,
 ## R turn, X sell, Tab shop, T town, O options, F search, M mute, N the menu screen
-## (R on an ingredient station at night switches its stock).
+## (R on an ingredient station at night switches its stock). Shift held: the chef stands
+## still and WASD only turns them, to aim (diagonals too at night).
 ## Controller: left stick or d-pad walk (the d-pad also browses), A use (confirm
 ## on the receipt and the end screen), B back, X sell, Y shop (town on the
-## receipt), LB/RB turn, Start options, Back the menu screen.
-## Touch: a joystick bottom left, a column of round buttons on the right; taps on
+## receipt), LB/RB turn, either trigger held aims, Start options, Back the menu screen.
+## Touch: a joystick bottom left, a column of round buttons on the right (Aim, beside
+## Use, is held while the joystick turns the chef); taps on
 ## the room still pick guests and place pieces, as a mouse click would.
 
 signal mode_changed(mode: String, p: int)   # a player's device kind, which their hints follow
@@ -34,11 +36,11 @@ const BTN_R := 44.0
 const USE_R := 66.0
 ## What each action is called on screen, per mode.
 const GLYPHS := {
-	"keys": {"move": "WASD", "use": "E", "back": "Esc", "turn": "R", "sell": "X", "shop": "Tab",
+	"keys": {"move": "WASD", "aim": "Shift", "use": "E", "back": "Esc", "turn": "R", "sell": "X", "shop": "Tab",
 		"confirm": "Enter", "town": "T", "options": "O", "search": "F", "browse": "Arrows", "menu": "N"},
-	"pad": {"move": "Stick", "use": "A", "back": "B", "turn": "RB", "sell": "X", "shop": "Y",
+	"pad": {"move": "Stick", "aim": "LT", "use": "A", "back": "B", "turn": "RB", "sell": "X", "shop": "Y",
 		"confirm": "A", "town": "Y", "options": "Start", "search": "", "browse": "D-pad", "menu": "Back"},
-	"touch": {"move": "Joystick", "use": "Use", "back": "Back", "turn": "Turn", "sell": "Sell", "shop": "Shop",
+	"touch": {"move": "Joystick", "aim": "Aim", "use": "Use", "back": "Back", "turn": "Turn", "sell": "Sell", "shop": "Shop",
 		"confirm": "Tap", "town": "Tap", "options": "Menu", "search": "", "browse": "Swipe", "menu": "Dishes"},
 }
 ## The keyboard's actions. WASD and the arrows also walk (read in move()).
@@ -182,6 +184,14 @@ func stick(p := 0) -> Vector2:
 	return players[p].stick()
 
 
+## Whether player p holds their chef in place to aim: Shift on the keyboard, either
+## trigger on a controller, the Aim button on touch.
+func aiming(p := 0) -> bool:
+	if owner_of("keys") == p and Input.is_physical_key_pressed(KEY_SHIFT):
+		return true
+	return players[p].holding("aim")
+
+
 static func keys_vector() -> Vector2:
 	return Vector2(
 		float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))
@@ -315,6 +325,11 @@ func _pad_axis(e: InputEventJoypadMotion) -> void:
 	var source := "pad:%d" % e.device
 	var who := players[owner_of(source)]
 	var v: Vector2 = who._sticks.get(source, Vector2.ZERO)
+	if e.axis in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:   # held: the chef stands and aims
+		who.hold(source, "trigger%d" % e.axis, "aim", e.axis_value > 0.5)
+		if e.axis_value > 0.5:
+			_use(source)
+		return
 	if e.axis == JOY_AXIS_LEFT_X:
 		v.x = e.axis_value
 	elif e.axis == JOY_AXIS_LEFT_Y:
@@ -380,6 +395,7 @@ func buttons() -> Array:
 	elif game.phase == game.Phase.SERVICE or (build and not _touch_shops()):
 		var word: String = game.hud.last_action if game.hud.last_action != "" else "Use"
 		out.append(["use", word, Vector2(x, y), USE_R])
+		out.append(["aim", "Aim", Vector2(x - USE_R - BTN_R - 18.0, y + USE_R - BTN_R), BTN_R])   # held: stand and turn
 		y -= USE_R + BTN_R + 16.0
 	if build and not _touch_shops() and not game.hud.card_open():
 		if not hand.is_empty():
