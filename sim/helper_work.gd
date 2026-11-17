@@ -37,6 +37,7 @@ const WORK_PER_STAR := 0.1      # tunable
 const TASK_SECONDS := {
 	"take": 0.4, "pick": 0.3, "put": 0.3, "order": 1.2, "clear": 0.5, "wash": 1.2,
 	"empty_bin": 0.6, "wipe": 0.8, "serve": 0.4, "pour": 1.6, "add": 0.3,
+	"write": 2.0, "give": 1.0,   # PRD 11.4: writing a bill at the till (WRITE_TIME), handing it over
 }
 const PRESS_SECONDS := 2.2      # tunable: a press tool's job (chop, slice, grate...) at a base tool
 const HEAT_REACT := 0.25        # tunable: seconds after the food is done before they lift it
@@ -51,7 +52,7 @@ const IDLE_CHAT_AFTER := 1.0    # seconds idle before a helper is free to chat
 ## The kind of work each task is, for training and for the tolerance it wears on.
 const TASK_KIND := {
 	"prep": "food", "fetch": "food", "assemble": "food", "tray": "food", "scrap": "food",
-	"order": "service", "carry": "service", "clear": "service", "help_up": "service",
+	"order": "service", "bill": "service", "carry": "service", "clear": "service", "help_up": "service",
 	"dirt": "clean", "wash": "clean", "bin": "clean",
 }
 
@@ -148,6 +149,8 @@ static func steps(task: Dictionary, duties: Array, dest_duty := "") -> Array:
 			return [{"do": "pick_tray", "at": task.cell, "ticket": task.tray}, {"do": "serve", "at": task.table}]
 		"order":
 			return [{"do": "order", "at": task.cell}]
+		"bill":   # PRD 11.4: write it at the till (always right), carry it, hand it over
+			return [{"do": "write", "table": task.table}, {"do": "give", "table": task.table}]
 		"clear":
 			return [{"do": "clear", "at": task.cell}, {"do": "to_sink"}]
 		"help_up":

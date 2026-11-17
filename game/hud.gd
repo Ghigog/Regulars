@@ -76,6 +76,7 @@ var _shop_tag: Control                  # "Chef 1 is shopping", over the shop in
 var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, over the slip
 var _dirty_label: Label
 var menu: MenuScreen           # the menu screen, while it is open
+var bill: BillScreen           # the bill screen at the till (PRD 11.3), while it is open
 var desk: DeskScreen           # the desk screen (PRD 10.3), while it is open
 var menu_notes: MenuScreen.BuildNotes   # night zero's hint and the restock note, over the slip
 var _shop: Control             # the shop's sliding tray; null while the shop is shut
@@ -1035,7 +1036,8 @@ func _label(parent: Node, font_size: int, text := "") -> Label:
 
 
 const STATE_WORDS := {"queue": "Queueing outside", "to_seat": "Finding a seat", "ordering": "Waiting to order", "waiting": "Waiting for food",
-	"eating": "Eating", "company": "Found nothing they liked", "leaving": "Leaving"}
+	"eating": "Eating", "company": "Found nothing they liked", "leaving": "Leaving", "chatting": "Chatting after the meal",
+	"to_pay": "Waiting for the bill", "to_till": "Going to pay at the till", "at_till": "Waiting for the bill at the till"}
 
 
 ## The guest card (click a guest): who they are, how they feel and what they have
@@ -1105,6 +1107,9 @@ func _update_guest() -> void:
 		return
 	var m: GuestMood = _guest.mood
 	_guest_state.text = STATE_WORDS.get(_guest.state, "")
+	var paying: float = _guest.game.pay_wait(_guest)   # PRD 11: how long they have waited to pay
+	if paying >= 0.0:
+		_guest_state.text = ("Waiting at the till, %ds" if _guest.state == "at_till" else "Waiting for the bill, %ds") % roundi(paying)
 	var hints := m.tolerance_hints()
 	_guest_hints.visible = not hints.is_empty()
 	_guest_hints.text = "\n".join(hints)
@@ -1907,6 +1912,14 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_row(box, "", "SALES:", "$%d" % rec.sales)
 	_row(box, "", "TIPS:", "$%d" % rec.tips)
 	_row(box, "", "WALKOUTS:", str(rec.walkouts))
+	var unpaid_bills := int(rec.get("unpaid_bills", 0))
+	if unpaid_bills > 0:   # PRD 11: parties who left without paying, an open-purse stamp each
+		var ub := _row(box, "", "LEFT UNPAID:", str(unpaid_bills))
+		for k in mini(unpaid_bills, 5):
+			var purse := Icon.new("purse", 34, false)
+			purse.rotation = [-0.12, 0.08, -0.04, 0.14, -0.1][k]
+			ub.get_parent().add_child(purse)
+			ub.get_parent().move_child(purse, ub.get_index())
 	_row(box, "", "STOCK:", "-$%d" % int(rec.get("stock", 0)))
 	if int(rec.get("staff", 0)) > 0 or int(rec.get("unpaid", 0)) > 0:   # wages, paid with the stock (PRD 10.4)
 		_row(box, "", "STAFF:", "-$%d" % int(rec.get("staff", 0)))
@@ -2063,6 +2076,24 @@ func desk_open() -> bool:
 ## A full-screen card (the menu or the desk) is over the room: nobody walks or builds.
 func card_open() -> bool:
 	return menu != null or desk != null
+
+
+func bill_open() -> bool:
+	return bill != null
+
+
+func open_bill(ch: Player) -> void:
+	if bill != null:
+		return
+	bill = BillScreen.new()
+	root.add_child(bill)
+	bill.setup(game, self, ch)
+
+
+func close_bill() -> void:
+	if bill != null:
+		bill.queue_free()
+		bill = null
 
 
 func open_desk() -> void:

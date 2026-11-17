@@ -434,7 +434,7 @@ func test_training_raises_skill_and_lowers_tolerance():
 func test_room_duties_list_tool_kinds_in_the_room_and_the_fixed_tasks():
 	var room := Staff.room_duties(["grill", "chop", "pour"], ["stove", "stove", "sink", "bin", "mop"])
 	assert_eq(room.food, ["grill", "board", "tap", "fetch", "assemble"] as Array[String])
-	assert_eq(room.service, ["take_orders", "carry_trays", "clear_tables", "help_up"] as Array[String])
+	assert_eq(room.service, ["take_orders", "take_payment", "carry_trays", "clear_tables", "help_up"] as Array[String])
 	assert_eq(room.clean, ["mop", "wash_up", "empty_bin"] as Array[String], "a cleaning tool by its piece")
 	var empty := Staff.room_duties([], [])
 	assert_eq(empty.food, ["fetch", "assemble"] as Array[String], "no prep tools: only the fixed tasks")

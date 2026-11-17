@@ -914,3 +914,21 @@ func test_the_desk_is_in_the_shop_now():
 	_game()
 	var ids: Array = Catalog.search("desk", "", Scenery.theme_id).map(func(bp: Dictionary) -> String: return bp.id)
 	assert_true(ids.has("desk"))
+
+
+func test_a_server_with_take_payment_brings_the_bill_and_the_table_pays():
+	_game()
+	var g := _seated()
+	game.take_orders(g.table)
+	game.serve(g, game.full_tray_for(g))
+	var h := _helper(3, ["take_payment"])
+	var paid := false
+	for i in 400:
+		game.step(0.1)
+		g.mood.patience = maxf(g.mood.patience, 0.5)
+		if g.state == "leaving":
+			paid = true
+			break
+	assert_true(paid, "the helper wrote the bill and handed it over")
+	assert_gt(int(game.ledger.today.sales), 0)
+	assert_eq(h.held, "")

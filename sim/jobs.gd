@@ -25,6 +25,8 @@ extends RefCounted
 ##       what is made goes straight on it instead of filling the worktops.
 ##   trays:    [{id, cell, table, wait}]   a built tray at the pass, to carry.
 ##   tables:   [{id, cell, state: "order" | "clear", wait}]
+##   bills:    [{id, cell, wait}]   a table ready to pay with no slip printed yet (PRD 11.4):
+##       `id` is the table's number, `cell` where the bill is handed over.
 ##   dirt:     {Vector2i: level}           as `FloorMess.dirt`; level `DIRT_FROM` and up is a task.
 ##   grease:   {Vector2i: true}            dirt that is kitchen grease (the scraper's, PRD 9.5).
 ##   fallen:   [{id, cell, wait}]          someone down on the floor (PRD 9.3).
@@ -36,7 +38,7 @@ extends RefCounted
 
 ## How urgent each kind of task is before it waits, in points. (tunable)
 const URGENCY := {
-	"help_up": 6.0, "carry": 5.0, "tray": 4.5, "assemble": 4.0, "scrap": 3.8, "prep": 3.5, "fetch": 3.0, "order": 3.0,
+	"help_up": 6.0, "carry": 5.0, "tray": 4.5, "assemble": 4.0, "scrap": 3.8, "prep": 3.5, "bill": 3.5, "fetch": 3.0, "order": 3.0,
 	"clear": 2.0, "dirt": 1.0, "wash": 1.5, "bin": 1.5,
 }
 const DIRT_FROM := 2           # dirt at this level or more is a task
@@ -53,7 +55,7 @@ const BAD_BASE := 0.4          # bad chance for a one-star cook at a base tool
 ## The duties for each task type. Prep is the tool's (`Staff.duty_of_tool`), per station.
 const DUTIES := {
 	"fetch": ["fetch"], "assemble": ["assemble"], "tray": ["assemble"], "carry": ["carry_trays"], "order": ["take_orders"],
-	"clear": ["clear_tables"], "help_up": ["help_up"], "wash": ["wash_up"], "bin": ["empty_bin"],
+	"bill": ["take_payment"], "clear": ["clear_tables"], "help_up": ["help_up"], "wash": ["wash_up"], "bin": ["empty_bin"],
 }
 
 var tasks: Dictionary = {}         # key -> task
@@ -79,6 +81,8 @@ func rebuild(world: Dictionary) -> void:
 	for t: Dictionary in world.get("tables", []):
 		var type := "order" if t.state == "order" else "clear"
 		_add("%s:%s" % [type, str(t.id)], type, t.cell, float(t.get("wait", 0.0)), {"table": t.id})
+	for b: Dictionary in world.get("bills", []):
+		_add("bill:%s" % str(b.id), "bill", b.cell, float(b.get("wait", 0.0)), {"table": b.id})
 	var dirt: Dictionary = world.get("dirt", {})
 	for cell: Vector2i in dirt:
 		var level := int(dirt[cell])

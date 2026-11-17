@@ -194,6 +194,28 @@ static func icon(id: String) -> Array:
 			o.append([_grown(pen, 0.07), INK])
 			o.append([pen, GOLD])
 			o.append([PackedVector2Array([Vector2(0.26, -0.38), Vector2(0.4, -0.5), Vector2(0.2, -0.7)]), INK])
+		"bill":  # ready to pay (PRD 11): a torn-edged paper slip, lines on it, a gold coin
+			var slip := PackedVector2Array([Vector2(-0.62, 0.92), Vector2(0.5, 0.92), Vector2(0.5, -0.62)])
+			for k in 7:   # the torn bottom edge, right to left
+				slip.append(Vector2(0.5 - (k + 1) * 0.16, -0.62 - (0.16 if k % 2 == 0 else 0.0)))
+			slip.append(Vector2(-0.62, -0.62))
+			o.append([_grown(slip, 0.11), INK])
+			o.append([slip, CREAM])
+			for i in 3:
+				o.append([rect(-0.18 + i * 0.04, 0.6 - i * 0.34, 0.66 - i * 0.12, 0.12), INK])
+			o.append([ell(0.52, -0.5, 0.42), INK])
+			o.append([ell(0.52, -0.5, 0.31), GOLD])
+			o.append([rect(0.52, -0.5, 0.08, 0.3), INK])
+		"purse":  # left without paying (PRD 11): an open coin purse, empty, clasp apart
+			o.append([ell(0, -0.2, 0.92, 0.72, 180, 360), INK])
+			o.append([rect(0, -0.12, 1.84, 0.2), INK])
+			o.append([ell(0, -0.2, 0.78, 0.58, 180, 360), CORAL])
+			o.append([rect(0, -0.12, 1.6, 0.08), CORAL])
+			for side in [-1.0, 1.0]:   # the clasp's two halves, swung open
+				var arm := PackedVector2Array([Vector2(side * 0.72, -0.02), Vector2(side * 0.84, 0.06), Vector2(side * 0.44, 0.7), Vector2(side * 0.32, 0.62)])
+				o.append([_grown(arm, 0.05), INK])
+				o.append([arm, GOLD])
+				o.append([ell(side * 0.4, 0.72, 0.13), GOLD])
 		"warning":  # a gold road-sign triangle with an ink rim and a bold "!"
 			o.append([PackedVector2Array([Vector2(0, 1.0), Vector2(-1.05, -0.82), Vector2(1.05, -0.82)]), INK])
 			o.append([PackedVector2Array([Vector2(0, 0.74), Vector2(-0.8, -0.66), Vector2(0.8, -0.66)]), GOLD])

@@ -459,6 +459,8 @@ func _apply_demo(demo: String) -> void:
 			a.time = 1.0
 	elif demo in ["helpers", "helpers_break", "helpers_slip"]:   # PRD 10.6/10.8: staff at work; see Crew.demo
 		crew.demo(demo)
+	elif demo.begins_with("pay_"):   # PRD 11: paying the bill; see _demo_pay
+		_demo_pay(demo)
 	elif demo == "staff_only":   # PRD 10.7: a busy day run by helpers alone; see Crew.staff_only
 		ledger.day = 8
 		flyers_out = true
@@ -623,6 +625,7 @@ func _apply_demo(demo: String) -> void:
 	elif demo == "summary" or demo == "town":
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.record_sale(DEMO_BILL, 3)
+		ledger.record_unpaid_bill()   # PRD 11: the LEFT UNPAID line and its open-purse stamp
 		ledger.record_found_nothing(3)
 		arrivals.clear()
 		if demo == "town":  # a spread of opinions, then the town book over the receipt
@@ -1089,7 +1092,7 @@ func _demo_desk(demo: String) -> void:
 ## washer two nights from quitting.
 func _demo_hires() -> void:
 	for h: Array in [[2, "Grill cook", ["grill", "fetch", "assemble"], 1, 1, 0.85, 0],
-			[5, "Server", ["take_orders", "carry_trays", "clear_tables"], 2, 2, 0.5, 0],
+			[5, "Server", ["take_orders", "take_payment", "carry_trays", "clear_tables"], 2, 2, 0.5, 0],
 			[9, "Washer", ["wash_up", "empty_bin"], 0, 1, 0.12, 2]]:
 		var pid := staff.add_post(h[1], h[2], h[3], h[4], 99)
 		var cv := staff._make_cv(h[0], Staff.skills_from(town.people[h[0]].tolerance), town.rating(h[0]), 1.0, pid)
@@ -1227,6 +1230,111 @@ func _demo_menu(demo: String) -> void:
 	if demo == "menu_name":
 		hud.menu.open_item(cheese)
 		hud.menu.start_naming()
+
+
+## PRD 11's demos. pay_call: a table ready to pay calling the chef in sight, a second
+## behind a partition not calling (shoot at about 8). pay_till: two guests queued at the
+## till (about 8). pay_bill: the bill screen open, two tables waiting, three items ticked
+## (3). pay_hand: the chef handing a slip over, the bar half full (3). pay_wrong: a refused
+## bill and its line on the guest card (4). pay_server: the server walking a slip to a
+## table (about 10).
+func _demo_pay(demo: String) -> void:
+	arrivals.assign([{"time": 99999.0, "idx": 13}])
+	var t1: Station = stations[Vector2i(6, 5)]
+	var t2: Station = stations[Vector2i(8, 3)]
+	var t3: Station = stations[Vector2i(6, 1)]
+	match demo:
+		"pay_call":
+			# A partition shuts the far table off from the chef in the near corner.
+			for x in range(5, 8):
+				add_wall(Vector2i(x, 3), 0)
+			for y in range(0, 3):
+				add_wall(Vector2i(8, y), 1)
+			_demo_paying_party([0, 1], t1)
+			_demo_paying_party([2], t3)
+			player.position = Grid.center(Vector2i(9, 5))
+			player.look(Vector2i(-1, 0))
+		"pay_till":
+			var a := _demo_paying_party([0, 1], t1)
+			var b := _demo_paying_party([2, 3], t2)
+			player.position = Grid.center(Vector2i(1, 4))
+			player.look(Vector2i(1, 0))
+			get_tree().create_timer(1.0).timeout.connect(func() -> void:
+				send_to_till(a[0].table)
+				send_to_till(b[0].table))
+		"pay_bill":
+			# A fuller menu than the test kitchen's one main: bread as a side, and a drink.
+			var bread: String = fixed_main().bread
+			menu.add("side", [bread], Pantry.name_of(bread), "cheap")
+			if Scenery.theme_id == "diner":
+				add_station("fountain", Vector2i(1, 2))
+				menu.add("drink", ["soda"], "Soda", "cheap")
+			menu_changed()
+			_demo_paying_party([0, 1], t1)
+			_demo_paying_party([2], t2)
+			var till := till_station()
+			player.position = Grid.center(till.cell + Vector2i(-1, 0))
+			player.look(Vector2i(1, 0))
+			get_tree().create_timer(1.0).timeout.connect(func() -> void:
+				open_bill(player)
+				var items := tonight_menu()
+				if items.is_empty():
+					return
+				hud.bill.bill.add(int(items[0].id), 2)
+				hud.bill.bill.add(int(items[-1].id))
+				hud.bill._sel_key = "item:%d" % int(items[0].id)
+				hud.bill.render())
+		"pay_hand":
+			var party := _demo_paying_party([0, 1], t1)
+			player.position = Grid.center(t1.cell + Vector2i(1, 0))
+			player.look(Vector2i(-1, 0))
+			player.set_held("bill")
+			player.bill = right_bill(party[0].table)
+			player.demo_giving = 0.5
+		"pay_wrong":
+			var party := _demo_paying_party([0, 1], t1)
+			player.position = Grid.center(t1.cell + Vector2i(1, 0))
+			player.look(Vector2i(-1, 0))
+			get_tree().create_timer(2.5).timeout.connect(func() -> void:
+				var wrong := right_bill(party[0].table)
+				var items := tonight_menu()
+				wrong.add(int(items[-1].id))   # one too many
+				player.set_held("bill")
+				player.bill = wrong
+				give_bill(player, party[0].table)
+				hud.show_guest(party[0]))
+		"pay_server":
+			_demo_paying_party([0, 1], stations[Vector2i(8, 3)])
+			player.position = Grid.center(Vector2i(1, 4))
+			player.look(Vector2i(1, 0))
+			crew.demo_hire(5, "Server", ["take_orders", "take_payment", "carry_trays", "clear_tables"], Vector2i(5, 5))
+
+
+## Demos (PRD 11): a party sat straight down at `table`, served and done eating.
+func _demo_paying_party(ids: Array, table: Station) -> Array[Guest]:
+	for idx: int in ids:   # tastes are random: make sure each orders from the demo menu
+		town.people[idx].dislikes = []
+	var party := spawn_group(ids)
+	for i in party.size():
+		var g := party[i]
+		queue.erase(g)
+		g.line_place = -1
+		g.table = table
+		g.seat = table.seats[i]
+		seat_taken[g.seat] = g
+		g.position = Grid.center(g.seat)
+		g.cell = g.seat
+		g.goal = g.position
+		g.path.clear()
+		g._sit()
+	_reflow_queue()
+	take_orders(table)
+	for g in party:
+		if g.state == "waiting":
+			serve(g, full_tray_for(g))
+			finish_meal(g)
+			g.timer = 0.3 * party.find(g)
+	return party
 
 
 func _demo_order(take: bool) -> void:
@@ -4794,7 +4902,21 @@ func offer_comp(g: Guest) -> void:
 	sfx("perfect")
 
 
+## The last bite (PRD 11): the plate is left on the table and they sit back to chat.
+## Paying comes later, when the bill is handed over (`pay_bill`).
 func finish_meal(g: Guest) -> void:
+	g.table.dirty += 1
+	g.table.refresh()
+	floor_dirt.meal_mess(g)
+	if g._meal:
+		g._meal.queue_free()
+		g._meal = null
+	g.state = "chatting"
+	g.timer = Guest.CHAT_TIME
+
+
+## One guest pays their share of the table's bill: what `finish_meal` paid before PRD 11.
+func _pay_guest(g: Guest) -> void:
 	var bill := g.mood.pay_for(g.bill_base)
 	if g.mood.paid_full():   # someone used to deals is let down by full price
 		var letdown := town.paid_full_price(g.idx)
@@ -4818,15 +4940,372 @@ func finish_meal(g: Guest) -> void:
 	if talk != "":
 		hud.say(talk)
 	_critic_leaves(g, false)
-	g.table.dirty += 1
-	g.table.refresh()
-	floor_dirt.meal_mess(g)
 	popup("+$%d" % (bill + tip), g.position + Vector3(0, 1.9, 0), Color(Build.TRIM))
 	Fx.coin(self, g.position + Vector3(0, 1.5, 0))
 	if g.mood.satisfaction() > 0.5:
 		g._heart_time = 2.5
+
+
+# ---------------------------------------------------------------- paying (PRD 11)
+
+const TILL_AFTER := 12.0   # tunable: seconds ready to pay before one of them goes to the till
+const HAND_TIME := 1.0     # tunable: seconds of held E to hand a bill over
+const CALL_EVERY := 0.5    # how often a ready table looks for someone to wave at
+const TILL_GAP := 0.75     # metres between guests queued at the till
+var pay_since := {}        # table Station -> clock when it became ready to pay
+var _call_t := 0.0
+
+
+## Every table with seats, in a fixed order: down the room, then across. Numbered from 1.
+func dining_tables() -> Array[Station]:
+	var out: Array[Station] = []
+	for st: Station in stations.values():
+		if not st.seats.is_empty():
+			out.append(st)
+	out.sort_custom(func(a: Station, b: Station) -> bool:
+		return a.cell.x < b.cell.x if a.cell.x != b.cell.x else a.cell.y < b.cell.y)
+	return out
+
+
+func table_number(st: Station) -> int:
+	return dining_tables().find(st) + 1
+
+
+func table_by_number(n: int) -> Station:
+	var all := dining_tables()
+	return all[n - 1] if n >= 1 and n <= all.size() else null
+
+
+## Everyone sat at this table who has not left.
+func party_at(table: Station) -> Array[Guest]:
+	var out: Array[Guest] = []
+	for g: Guest in guests:
+		if g.table == table and g.state != "leaving" and g.state != "queue" and g.state != "to_seat":
+			out.append(g)
+	return out
+
+
+## The guests at this table who ordered something, and so are on the bill.
+func payers(table: Station) -> Array[Guest]:
+	return party_at(table).filter(func(g: Guest) -> bool: return not g.ordered_items().is_empty())
+
+
+## Every guest at the table who ordered has eaten and chatted: one bill for the table.
+func ready_to_pay(table: Station) -> bool:
+	if table == null:
+		return false
+	var p := payers(table)
+	return not p.is_empty() and p.all(func(g: Guest) -> bool: return g.paying())
+
+
+## Seconds this guest's table has been ready to pay, or -1 when it is not.
+func pay_wait(g: Guest) -> float:
+	if not g.paying() or not pay_since.has(g.table):
+		return -1.0
+	return clock - float(pay_since[g.table])
+
+
+## The right bill for a table, from what its party ordered.
+func right_bill(table: Station) -> Bill:
+	var orders := []
+	for g in payers(table):
+		orders.append(g.ordered_items())
+	return Bill.for_party(table_number(table), orders)
+
+
+## The counter the till stands on (it moves with it). Null if it is gone.
+func till_station() -> Station:
+	for st: Station in stations.values():
+		if st.has_node("till"):
+			return st
+	return null
+
+
+func till_cell() -> Vector2i:
+	var st := till_station()
+	return st.cell if st != null else NO_CELL
+
+
+## The room-side cell in front of the till, where the line to pay starts.
+func till_front() -> Vector2i:
+	var t := till_cell()
+	if t == NO_CELL:
+		return NO_CELL
+	var best := NO_CELL
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(-1, 0)]:
+		var c := t + d
+		if grid.in_bounds(c) and not grid.is_blocked(c) and grid.edge_open(t, c) and (best == NO_CELL or c.x > best.x):
+			best = c
+	return best
+
+
+## Where the `i`th guest in line at the till stands: a single file out into the room.
+func till_spot(i: int) -> Vector3:
+	var f := till_front()
+	var d := f - till_cell()
+	var dir := Vector3(d.x, 0, d.y)
+	if dir == Vector3.ZERO:
+		dir = Vector3(1, 0, 0)
+	return Grid.center(f) - dir * 0.15 + dir * TILL_GAP * i
+
+
+## Guests queued at the till (or on their way), front first.
+func till_line() -> Array[Guest]:
+	var out: Array[Guest] = []
+	for g: Guest in guests:
+		if g.state == "to_till" or g.state == "at_till":
+			out.append(g)
+	out.sort_custom(func(a: Guest, b: Guest) -> bool: return a.line_place < b.line_place)
+	return out
+
+
+## Everyone at the till steps up to their place; the line follows the till if it moved.
+func reflow_till() -> void:
+	var line := till_line()
+	for i in line.size():
+		var g := line[i]
+		g.line_place = i
+		var at := till_spot(i)
+		var c := Grid.to_cell(at)
+		g.walk_to(c if grid.in_bounds(c) else till_front(), at)
+		if g.state == "at_till" and g.position.distance_to(at) > 0.05:
+			g.state = "to_till"
+
+
+## One of a ready table's guests stands and walks to the till.
+func send_to_till(table: Station) -> Guest:
+	if till_front() == NO_CELL:
+		return null
+	var p := payers(table)
+	var who: Guest = null
+	for g in p:
+		if g.calling:
+			who = g
+	if who == null:
+		for g in party_at(table):
+			if g.state == "to_pay":
+				who = g
+				break
+	if who == null or who.state != "to_pay":
+		return null
+	who.stand_up()
+	who.state = "to_till"
+	who.calling = false
+	who.line_place = till_line().size()
+	who.mood.think("I'll go and pay at the till")
+	reflow_till()
+	return who
+
+
+## Someone who could bring the bill and can see the table: a chef, or a helper with
+## the take_payment duty (PRD 11.4).
+func _bill_watchers() -> Array[Player]:
+	var out: Array[Player] = chefs.duplicate()
+	if crew != null:
+		for h in crew.helpers:
+			if crew.has_duty(h, "take_payment"):
+				out.append(h)
+	return out
+
+
+func _sees(table: Station, who: Player) -> bool:
+	return grid.has_los(table.cell, who.cell())
+
+
+## The table numbers waiting to pay, for the bill screen: {number, size, till, printed}.
+func bill_tables() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for st in dining_tables():
+		if ready_to_pay(st):
+			var at_till := party_at(st).any(func(g: Guest) -> bool: return g.state == "at_till" or g.state == "to_till")
+			out.append({"number": table_number(st), "size": party_at(st).size(), "till": at_till,
+				"printed": slip_out(table_number(st))})
+	return out
+
+
+## A slip for this table is already printed and in someone's hand.
+func slip_out(number: int) -> bool:
+	for h in hands():
+		if h.held == "bill" and h.bill != null and h.bill.table == number:
+			return true
+	return false
+
+
+## Runs every step in service: tables become ready, call while watched, and after
+## TILL_AFTER with no bill on the way one guest goes to the till.
+func _tick_paying(delta: float) -> void:
+	_call_t -= delta
+	var look := _call_t <= 0.0
+	if look:
+		_call_t = CALL_EVERY
+	for st in dining_tables():
+		if not ready_to_pay(st):
+			pay_since.erase(st)
+			for g in party_at(st):
+				g.calling = false
+			continue
+		if not pay_since.has(st):
+			pay_since[st] = clock
+		var p := payers(st)
+		if look:
+			var seen := _bill_watchers().any(func(w: Player) -> bool: return _sees(st, w))
+			var caller: Guest = null
+			for g in p:
+				if g.calling:
+					caller = g
+			if seen and caller == null:
+				for g in p:
+					if g.state == "to_pay":
+						caller = g
+						break
+				if caller != null:
+					caller.calling = true
+					sfx("bell", 0.04, 1.3)
+			elif not seen and caller != null:
+				caller.calling = false
+		var at_till := party_at(st).any(func(g: Guest) -> bool: return g.state == "to_till" or g.state == "at_till")
+		if not at_till and clock - float(pay_since[st]) >= TILL_AFTER and not slip_out(table_number(st)):
+			send_to_till(st)
+	# Slips for tables that have gone are thrown away.
+	for h in hands():
+		if h.held == "bill" and h.bill != null and not ready_to_pay(table_by_number(h.bill.table)) \
+				and payers(table_by_number(h.bill.table)).is_empty():
+			h.set_held("")
+
+
+## Everyone at the table goes: the company with them, the one at the till out of the door.
+func _party_leaves(table: Station) -> void:
+	for g in party_at(table):
+		g.calling = false
+		g.line_place = -1
+		_leave(g)
+	pay_since.erase(table)
+	reflow_till()
+
+
+## The bill is right: each guest who ordered pays their share, then the party leaves.
+func pay_bill(table: Station) -> void:
+	for g in payers(table):
+		_pay_guest(g)
 	sfx("coin")
-	_leave(g)
+	_party_leaves(table)
+
+
+## A party waited to pay until they gave up (PRD 11): no money, no tip, an opinion drop
+## friends hear about. Not a walkout and not a strike.
+func leave_unpaid(table: Station) -> void:
+	var p := payers(table)
+	if p.is_empty():
+		return
+	ledger.record_unpaid_bill()
+	var talk := ""
+	for g in p:
+		g.mood.skipped_bill = true
+		g.mood.think("Nobody came with the bill")
+		_critic_leaves(g, false)
+		talk = town.left_unpaid(g.idx)
+	hud.say(talk if p.size() == 1 else "Table %d left without paying. Nobody came." % table_number(table))
+	sfx("fail")
+	_party_leaves(table)
+
+
+## Where the chef holding a bill would hand it over: the table they face, if its party is
+## waiting to pay, or the till they face, if someone is queued there. Null for neither.
+func bill_target(ch: Player) -> Station:
+	if ch.held != "bill":
+		return null
+	var st := station_at(ch.target_cell())
+	return st if bill_place(st) else null
+
+
+## A bill can be handed over here: a table whose party waits to pay, or the till with
+## someone queued at it.
+func bill_place(st: Station) -> bool:
+	if st == null:
+		return false
+	if not st.seats.is_empty() and ready_to_pay(st):
+		return true
+	return st == till_station() and till_line().any(func(g: Guest) -> bool: return g.state == "at_till")
+
+
+## The table a bill handed over at `at` is checked against: that table, or at the till
+## the table of the guest there it is written for (else the guest at the front).
+func _bill_table_at(at: Station, bill: Bill) -> Station:
+	if at != till_station():
+		return at
+	var front: Station = null
+	for g in till_line():
+		if g.state != "at_till":
+			continue
+		if table_number(g.table) == bill.table:
+			return g.table
+		if front == null:
+			front = g.table
+	return front
+
+
+## The hold filled: the bill is checked. Right, they pay and go; wrong, they refuse it and
+## say what is wrong, the slip is thrown away and each loses a little joy.
+func give_bill(ch: Player, at: Station) -> bool:
+	var table := _bill_table_at(at, ch.bill)
+	if table == null or ch.bill == null:
+		return false
+	var written := ch.bill
+	ch.set_held("")
+	ch.punch()
+	var diff = Bill.check(written, right_bill(table))
+	if diff is String:
+		pay_bill(table)
+		return true
+	var line := Bill.refusal(diff, menu)
+	for g in party_at(table):
+		g.mood.refuse_bill(line)
+	var who := payers(table)
+	if not who.is_empty():
+		hud.say("%s: \"%s.\"" % [who[0].info.name, line])
+		Fx.play(who[0], "anger", Vector3(0, 1.75, 0), 0.3)
+	sfx("fail")
+	return false
+
+
+## Opens the bill screen for a chef at the till.
+func open_bill(ch: Player) -> void:
+	hud.open_bill(ch)
+	sfx("page")
+
+
+func close_bill() -> void:
+	hud.close_bill()
+
+
+## "Print": the slip goes into the chef's hand, and the screen closes.
+func print_bill(ch: Player, bill: Bill) -> void:
+	if bill.table < 0 or bill.is_empty() or slip_out(bill.table) or ch.held != "":
+		sfx("fail")
+		return
+	var slip := Bill.new(bill.table, bill.items)
+	ch.set_held("bill")
+	ch.bill = slip
+	close_bill()
+	sfx("page")
+
+
+## A chef holding E with a bill fills the hand-over bar; walking off cancels it.
+func _tick_giving(ch: Player, held: bool, delta: float) -> void:
+	if ch.held != "bill":
+		return
+	var at := bill_target(ch)
+	if ch.demo_giving >= 0.0 and at != null:
+		ch.show_giving(at, ch.demo_giving)
+		return
+	if not held or at == null or (ch.give_at != null and ch.give_at != at):
+		ch.stop_giving()
+		return
+	ch.give_at = at
+	ch.give_t += delta
+	ch.show_giving(at, ch.give_t / HAND_TIME)
+	if ch.give_t >= HAND_TIME:
+		give_bill(ch, at)
 
 
 ## One guest runs out of patience and the rest of their group who are still
@@ -4933,6 +5412,23 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	var held_ing := Tray.parse(held)
 	var act := ""
 	var why := ""
+	# Paying (PRD 11): the till writes bills; a slip in hand is handed over with a held E.
+	if held == "" and st == till_station() and st.item == "" and not bill_tables().is_empty():
+		if not dry_run:
+			open_bill(ch)
+		return "Write the bill"
+	if held == "bill":
+		if bill_place(st):
+			return "Hold to give the bill"
+		if st.type == "bin":
+			if not dry_run:
+				ch.set_held("")
+				st.count += 1
+				st.refresh()
+			return _finish_use(st, ["Throw away", ""], dry_run, ch)
+		if not st.seats.is_empty() or st == till_station():
+			return _finish_use(st, ["", "Nobody here is waiting to pay"], dry_run, ch)
+		return ""
 	if surface_first(st, held):
 		return _finish_use(st, _use_surface(st, dry_run, ch), dry_run, ch)
 	var ing := Catalog.ingredient_of(st.type)   # a drink dispenser's own drink
@@ -5548,6 +6044,7 @@ func step(delta: float) -> void:
 	_seat_waiting_guests()
 	for g in guests.duplicate():
 		g.tick(delta)
+	_tick_paying(delta)
 	if ledger.is_closed_down():
 		_close_down()
 	elif arrivals.is_empty() and guests.is_empty():
@@ -5565,8 +6062,8 @@ func _process(delta: float) -> void:
 		elif phase == Phase.SERVICE or (phase == Phase.BUILD and shopper != ch and not hud.card_open() \
 				and not (hud.typing() and controls.owner_of("keys") == p)):
 			input = controls.move(p)
-		if preps.has(p):
-			input = Vector2.ZERO   # the chef stands at the tool while a minigame runs
+		if preps.has(p) or (hud.bill_open() and hud.bill.chef == ch):
+			input = Vector2.ZERO   # the chef stands at the tool while a minigame runs, or writes a bill
 		ch.move(input, delta)
 		ch.carry(not ch.hand.is_empty())
 		if phase == Phase.BUILD:
@@ -5577,6 +6074,8 @@ func _process(delta: float) -> void:
 			_paint_held(p)
 		if phase in [Phase.SERVICE, Phase.BUILD] and shopper != ch and not preps.has(p):
 			clean_kit.hold_use(ch, controls.holding(p, "use"))   # held E keeps mopping
+		if phase == Phase.SERVICE and not (hud.bill_open() and hud.bill.chef == ch):
+			_tick_giving(ch, controls.holding(p, "use"), delta)   # held E hands a bill over (PRD 11)
 	if phase == Phase.BUILD:
 		_refresh_openings()
 	step(delta)
@@ -5604,6 +6103,11 @@ func _update_camera(delta: float) -> void:
 
 func _update_cursor(ch: Player = null) -> void:
 	ch = _me(ch)
+	if (hud.bill_open() and hud.bill.chef == ch) or ch.give_t > 0.0 or ch.demo_giving >= 0.0:
+		# Writing a bill, or handing one over (PRD 11): the slip or the fill bar, no prompt.
+		ch.cursor.visible = false
+		hud.show_prompt(Vector2.ZERO, "", chefs.find(ch))
+		return
 	var fallen: Node3D = floor_dirt.help_target(ch) if phase == Phase.SERVICE else null
 	if fallen != null:   # someone down beside the chef: helping them up comes first (PRD 9.3)
 		ch.cursor.visible = false
@@ -5961,6 +6465,9 @@ func act(p: int, action: String, echo := false) -> void:
 	if hud.menu_open():
 		hud.menu.action(action, echo)
 		return
+	if hud.bill_open() and p < chefs.size() and hud.bill.chef == chefs[p]:
+		hud.bill.action(action, echo)
+		return
 	if echo:
 		return
 	if action == "options":
@@ -5979,6 +6486,9 @@ func act(p: int, action: String, echo := false) -> void:
 					prep_press(p)
 				elif action == "back":
 					cancel_prep(p)
+			elif action == "back" and ch.held == "bill":
+				ch.set_held("")   # the slip is thrown away (PRD 11)
+				sfx("putdown")
 			elif action == "turn":
 				turn_tray(stations.get(ch.target_cell()))
 			elif action == "menu":

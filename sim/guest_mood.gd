@@ -9,6 +9,11 @@ var savour := 0.0    # how good the food was
 var thoughts: Array[String] = []
 var discounted := false  # the chef offered half price while they waited
 var comped := false      # the chef made the meal free
+var skipped_bill := false  # ran out of patience waiting to pay, and left without (PRD 11)
+
+## Paying (PRD 11). Waiting for the bill drains patience slower than waiting for food.
+const PAY_PATIENCE_SCALE := 1.5   # tunable: seconds to snap, as a multiple of the table's
+const WRONG_BILL_JOY := 0.1       # tunable: joy lost when handed a wrong bill
 
 ## A free meal is for a guest who is very unhappy: nearly out of patience, or disgusted.
 const COMP_BELOW := 0.25     # patience below which a free meal can be offered
@@ -249,6 +254,21 @@ func taste(quality: float) -> void:
 
 func walked_out() -> bool:
 	return patience <= 0.0
+
+
+## Waiting to pay (PRD 11): patience runs at `PAY_PATIENCE_SCALE` of the table's.
+## Running out means they leave without paying: `skipped_bill`, not a walkout strike.
+func wait_to_pay(delta: float, table_seconds: float) -> void:
+	wait(delta, table_seconds * PAY_PATIENCE_SCALE)
+	if walked_out():
+		skipped_bill = true
+
+
+## Handed a bill that is wrong: they refuse it, a little less happy, and say why.
+func refuse_bill(line: String) -> void:
+	joy = clampf(joy - WRONG_BILL_JOY, 0.0, 1.0)
+	thoughts.erase(line)   # said again if it happens again
+	think(line)
 
 
 ## How they feel right now, for the dot above their head: "joy", "meh" or "mad".

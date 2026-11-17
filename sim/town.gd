@@ -35,6 +35,7 @@ const TASTE_TWO_TAGS := 0.3      # tunable: chance someone likes two tags, not o
 const TASTE_HATE_TAG := 0.4      # tunable: chance someone dislikes a whole tag
 const MAX_DISLIKED_SHARE := 1.0 / 3.0   # nobody dislikes more than this share of the theme
 const MAX_DISLIKERS_SHARE := 0.2        # no ingredient is disliked by more than this share of the town
+const UNPAID_OPINION := 0.2             # tunable: opinion lost leaving unpaid (half a walkout's)
 const NOTHING_LIKED_DROP := 0.05        # tunable: opinion lost finding nothing on the menu
 ## Opinions by topic (PRD 2). Affinity is the sum of these five parts; the four the
 ## critic rates are kept apart so a review can replace them. Bookkeeping only until
@@ -223,6 +224,19 @@ func record_found_nothing(i: int) -> float:
 	for f: int in people[i].friends:
 		_nudge(f, -NOTHING_LIKED_DROP * FRIEND_SHARE, {"variety": 1.0})
 	return -NOTHING_LIKED_DROP
+
+
+## Guest `i` waited to pay until they gave up and left without paying (PRD 11). Not a
+## strike: they ate, the kitchen did its job. Half a walkout's drop, filed under speed;
+## friends hear it. Returns the gossip line.
+func left_unpaid(i: int) -> String:
+	_nudge(i, -UNPAID_OPINION, {"speed": 1.0})
+	for f: int in people[i].friends:
+		_nudge(f, -UNPAID_OPINION * FRIEND_SHARE, {"speed": 1.0})
+	var friends := friend_names(i)
+	if friends == "":
+		return "%s left without paying. Nobody came." % people[i].name
+	return "%s will tell %s: left without paying, nobody came." % [people[i].name, friends]
 
 
 ## Staff member `i` was fired (PRD 10.4): their opinion drops by `drop`; without

@@ -209,6 +209,23 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   `desk_staff`, `desk_raise`, `desk_fire`, `desk_restock`, `desk_wages`, `helpers`,
   `helpers_break`, `helpers_slip`, `staff_only` (run each once per theme).
 
+**Paying the bill (PRD 11)**
+- No sheet draws paying. The bill bubble is a cream paper slip with a torn zigzag foot,
+  three ink lines and a gold coin at its corner, so it reads as "the bill" by shape and
+  not as a plate or the order pad (which has a coral binding and a pencil). A guest who
+  calls waves with it; a guest queued at the till shows it all the time.
+- The printed slip in hand is a small paper card tipped up to the camera, ink lines and
+  a coral total. Handing it over shows a bar wider and taller than a patience bar, with
+  the slip icon at its left end, over the table, so the two never read as one another.
+- The bill screen is plain paper, a coral "THE BILL" ribbon and paper buttons; a table
+  picked and an item ticked get a coral border, a table whose slip is out is greyed.
+- Leaving without paying stamps an open coin purse (coral, the gold clasp swung apart)
+  beside the receipt's LEFT UNPAID line, one per party up to five, never a strike mark.
+- Screenshots: `pay_call` (8), `pay_till` (8), `pay_bill` (3), `pay_hand` (3), `pay_wrong`
+  (4), `pay_server` (about 4.5: the server handing the slip over, bar filling; the walk
+  from the till is only a cell or two, so the PRD's "walking a slip" moment is brief).
+  Checked once per theme.
+
 **How it is made**
 - Nothing is modelled in Blender yet. Every mesh is generated in GDScript: chamfered
   boxes (the 3 cm bevel), lathed shapes (bodies, plates, pots, hats) and flat cut-out

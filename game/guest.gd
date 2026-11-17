@@ -14,7 +14,11 @@ var game
 var idx := 0
 var info: Dictionary
 var mood := GuestMood.new()
-var state := "queue"  # queue, to_seat, ordering, waiting (for food), eating, company, browse, leaving
+var state := "queue"  # queue, to_seat, ordering, waiting (for food), eating, company, browse, leaving,
+## and paying (PRD 11): chatting (after the last bite), to_pay (seated, waiting for the
+## bill), to_till (walking to pay at the till), at_till (queued in front of the pass)
+const CHAT_TIME := 3.0    # tunable: seconds of chat after the meal before asking for the bill
+var calling := false      # PRD 11: this guest has a hand up with the bill bubble
 ## browse: reading the menu at the door, having found no main; they walk on after.
 const BROWSE_TIME := 2.2
 var hint_tag := ""        # a liked tag the menu is full of, which they remarked on
@@ -163,6 +167,11 @@ func _stand() -> void:
 	var c := Grid.to_cell(goal)
 	if game.grid.in_bounds(c):
 		cell = c
+
+
+## Waiting to pay (PRD 11), seated or at the till.
+func paying() -> bool:
+	return state == "to_pay" or state == "to_till" or state == "at_till"
 
 
 ## Sat down and waiting: to order, or for the food they ordered.
@@ -327,6 +336,30 @@ func tick(delta: float) -> void:
 			game.apply_surroundings(self, delta)
 			if timer <= 0.0:
 				game.finish_meal(self)
+		"chatting":   # the meal is done: a moment's chat (alone, they just sit back)
+			_face(Grid.center(table.cell) - position, delta)
+			timer -= delta
+			game.apply_surroundings(self, delta)
+			if timer <= 0.0:
+				state = "to_pay"
+		"to_pay", "at_till":   # ready to pay: the party's patience runs once the table is ready
+			if state == "to_pay":
+				_face(Grid.center(table.cell) - position, delta)
+				game.apply_surroundings(self, delta)
+			else:
+				_advance(delta)
+				_face(Grid.center(game.till_cell()) - position, delta)
+			if game.ready_to_pay(table):
+				mood.wait_to_pay(delta, game.table_patience())
+				if mood.skipped_bill:
+					game.leave_unpaid(table)
+		"to_till":
+			if _advance(delta):
+				state = "at_till"
+			if game.ready_to_pay(table):
+				mood.wait_to_pay(delta, game.table_patience())
+				if mood.skipped_bill:
+					game.leave_unpaid(table)
 		"company":   # nothing to eat: they sit with friends and go when the friends go
 			_face(Grid.center(table.cell) - position, delta)
 			var staying := party.any(func(m) -> bool:
@@ -350,7 +383,7 @@ func tick(delta: float) -> void:
 
 func _refresh(delta: float) -> void:
 	var p := mood.patience
-	_bar.visible = state == "queue" or seated_waiting() or state == "to_seat"
+	_bar.visible = state == "queue" or seated_waiting() or state == "to_seat" or (paying() and game.ready_to_pay(table))
 	_fill.scale.x = maxf(p, 0.001)
 	_fill.position.x = (p - 1.0) * BAR_WIDTH / 2.0
 	var shade := snappedf(p, 0.1)  # few distinct colours, so materials stay cached
@@ -359,7 +392,8 @@ func _refresh(delta: float) -> void:
 	# Impatient guests shake a little.
 	_body.position.x = sin(_age * 40.0) * 0.02 if (_bar.visible and p < 0.25) else 0.0
 	_body.set_face(mood.expression(state == "eating", stormed))
-	_body.pose = "eat" if state == "eating" else ("tap" if seated_waiting() and p < 0.35 else "idle")
+	_body.pose = "eat" if state == "eating" else ("tap" if seated_waiting() and p < 0.35 else \
+		("wave" if (calling and state == "to_pay") else "idle"))
 	# Bored guests slump; guests about to snap lean in; disgust pitches them back.
 	var lean := 0.0
 	if seated_waiting():
@@ -387,6 +421,10 @@ func _refresh(delta: float) -> void:
 		want = "order"   # a notepad: come and take my order
 	elif state == "waiting":
 		want = want_icon()
+	elif state == "at_till" or state == "to_till" or (state == "to_pay" and calling):
+		want = "bill"   # PRD 11: the call; at the till it is up all the time
+	elif state == "chatting" and party.size() > 1 and fmod(_age + idx * 0.7, 2.4) < 1.4:
+		want = "chat"
 	elif state == "queue" and p < 0.6:
 		want = "zzz"
 	elif _heart_time > 0.0:

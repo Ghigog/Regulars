@@ -13,7 +13,7 @@ var history: Array[Dictionary] = []
 
 
 static func _blank() -> Dictionary:
-	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0}
+	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0, "unpaid_bills": 0}
 
 
 func level() -> int:
@@ -50,6 +50,11 @@ func pay_staff(amount: int, unpaid := 0) -> void:
 ## Someone read the menu and found no main they would eat. Not a strike.
 func record_found_nothing(count := 1) -> void:
 	today.found_nothing += count
+
+
+## A party left without paying (PRD 11): no money, and not a strike.
+func record_unpaid_bill() -> void:
+	today.unpaid_bills += 1
 
 
 func record_walkout() -> void:

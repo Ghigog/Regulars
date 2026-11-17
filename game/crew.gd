@@ -61,6 +61,12 @@ func clear() -> void:
 	_since = REBUILD_EVERY
 
 
+## Whether a helper's post includes `duty`.
+func has_duty(h: Helper, duty: String) -> bool:
+	var e: Dictionary = game.staff.employee(h.person)
+	return not e.is_empty() and (e.get("duties", []) as Array).has(duty)
+
+
 func helper_of(person: int) -> Helper:
 	for h in helpers:
 		if h.person == person:
@@ -180,6 +186,8 @@ func _drop(h: Helper) -> void:
 
 ## Frees the tool they were working and any surface they had in mind.
 func _let_go(h: Helper) -> void:
+	if h.held == "bill":
+		h.set_held("")   # a slip is thrown away, not put down
 	var st: Station = _using.get(h)
 	if st != null and is_instance_valid(st):
 		if st.prep_by == HELPER_PREP:
@@ -216,6 +224,7 @@ func _run(h: Helper, delta: float) -> void:
 			_fail(h)
 			return
 		h.work_left = t
+		s.total = t
 	var poll := _poll(h, s)
 	if poll == "fail":
 		_fail(h)
@@ -223,6 +232,8 @@ func _run(h: Helper, delta: float) -> void:
 	if poll == "now":
 		h.work_left = minf(h.work_left, HelperWork.HEAT_REACT)
 	h.work_left -= delta
+	if s.do == "give" and game.station_at(s.at) != null:   # the hand-over bar, as a chef's (PRD 11)
+		h.show_giving(game.station_at(s.at), 1.0 - h.work_left / maxf(float(s.get("total", 1.0)), 0.01))
 	if h.work_left > 0.0 or poll == "wait":
 		return
 	var more: Variant = _finish(h, s)
@@ -312,6 +323,16 @@ func _start(h: Helper, s: Dictionary) -> bool:
 			if st == null:
 				return false
 			s.at = st.cell
+		"write":
+			var till: Station = game.till_station()
+			if till == null:
+				return false
+			s.at = till.cell
+		"give":
+			var table: Station = game.table_by_number(int(s.table))
+			if table == null or not game.ready_to_pay(table):
+				return false
+			s.at = _bill_place(table).cell
 	if STASH.has(str(s.do)) or s.get("mode", "") == "put" or s.do == "leave" or s.do == "put_tray":
 		if s.has("at") and game.station_at(s.at) != null and s.do != "to_sink" and s.do != "bin":
 			_claims[s.at] = h
@@ -416,6 +437,17 @@ func _work(h: Helper, s: Dictionary) -> float:
 			if st == null or h.held != "" or game._guests_to_order(st).is_empty():
 				return -1.0
 			return HelperWork.task_seconds("order", h.rating, sat)
+		"write":
+			var table: Station = game.table_by_number(int(s.table))
+			if st == null or h.held != "" or table == null or not game.ready_to_pay(table) or game.slip_out(int(s.table)):
+				return -1.0
+			h.punch()
+			return HelperWork.task_seconds("write", h.rating, sat)
+		"give":
+			var table: Station = game.table_by_number(int(s.table))
+			if st == null or h.held != "bill" or table == null or not game.ready_to_pay(table):
+				return -1.0
+			return HelperWork.task_seconds("give", h.rating, sat)
 		"clear":
 			if st == null or h.held != "" or st.dirty <= 0:
 				return -1.0
@@ -560,6 +592,14 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 		"order":
 			game.take_orders(st)
 			h.punch()
+		"write":   # always right
+			h.set_held("bill")
+			h.bill = game.right_bill(game.table_by_number(int(s.table)))
+			game.sfx("page")
+		"give":
+			h.punch()
+			if not game.give_bill(h, st):
+				return null
 		"clear":
 			st.dirty -= 1
 			st.refresh()
@@ -743,7 +783,7 @@ func demo(which: String) -> void:
 	var on_break := which == "helpers_break"
 	var slip := which == "helpers_slip"
 	var hires := [[2, "Grill cook", ["fetch", "grill", "assemble"], 0, 0.85, Vector2i(1, 4)],
-		[5, "Server", ["take_orders", "carry_trays", "clear_tables"] + (["help_up"] as Array if slip else []), 1 if on_break else 0, 0.7, Vector2i(7, 5) if on_break else Vector2i(5, 3)],
+		[5, "Server", ["take_orders", "take_payment", "carry_trays", "clear_tables"] + (["help_up"] as Array if slip else []), 1 if on_break else 0, 0.7, Vector2i(7, 5) if on_break else Vector2i(5, 3)],
 		[9, "Washer", ["wash_up", "empty_bin", "clear_tables", "mop"], 1 if on_break else 0, 0.35, Vector2i(8, 5) if on_break else Vector2i(3, 3)]]
 	for row: Array in hires:
 		var pid: int = game.staff.add_post(row[1], row[2], row[3], 0, 99)
@@ -765,6 +805,17 @@ func demo(which: String) -> void:
 		game.floor_dirt.mess.dirt[Vector2i(6, 3)] = 2
 	var t: float = game.clock
 	game.arrivals.assign([{"time": t + 0.5, "group": [0, 1]}, {"time": t + 2.0, "group": [4]}, {"time": t + 5.0, "group": [6, 7]}])
+
+
+## PRD 11.4's demo: one server hired with `duties`, standing at `at`.
+func demo_hire(person: int, post: String, duties: Array, at: Vector2i) -> Helper:
+	var pid: int = game.staff.add_post(post, duties, 0, 0, 99)
+	var cv: Dictionary = game.staff._make_cv(person, Staff.skills_from(game.town.people[person].tolerance),
+		game.town.rating(person), 1.0, pid)
+	game.staff.cvs.append(cv)
+	game.staff.hire(cv.id, -1, game.ledger.day)
+	game.staff.employee(person).satisfaction = 0.9
+	return add_helper(person, at)
 
 
 func _demo_slip(h: Helper, c: Vector2i) -> void:
@@ -830,7 +881,7 @@ const STAFF_CREW := [
 	[2, "Line cook", ["fetch", "grill", "fryer", "pot", "assemble"], 2],
 	[5, "Prep cook", ["fetch", "board", "slicer", "grater", "bread_knife", "steamer", "assemble"], 2],
 	[7, "Drinks", ["fetch", "tap", "juicer", "blender", "assemble", "take_orders", "carry_trays"], 0],
-	[9, "Server", ["take_orders", "carry_trays", "clear_tables", "help_up"], 1],
+	[9, "Server", ["take_orders", "take_payment", "carry_trays", "clear_tables", "help_up"], 1],
 	[11, "Cleaner", ["wash_up", "empty_bin", "clear_tables", "mop", "sponge", "scraper", "spill_kit", "help_up"], 1],
 ]
 const STAFF_TREAT := {"cleaner": Rect2i(5, 2, 3, 2), "primer": Rect2i(8, 5, 2, 2), "finish": Rect2i(5, 4, 1, 3)}
@@ -1031,9 +1082,23 @@ func world() -> Dictionary:
 			dirt[c] = mess.dirt[c]
 			if mess.is_grease(c):
 				grease[c] = true
+	var bills := []   # PRD 11.4: tables ready to pay with no slip printed yet
+	for st: Station in game.dining_tables():
+		var n: int = game.table_number(st)
+		if game.ready_to_pay(st) and not game.slip_out(n):
+			var at: Station = _bill_place(st)
+			bills.append({"id": n, "cell": at.cell, "wait": game.clock - float(game.pay_since.get(st, game.clock))})
 	return {"stations": tools, "storage": storage, "items": items, "tickets": tickets, "trays": trays,
-		"tables": tables, "dirt": dirt, "grease": grease, "fallen": fallen, "sinks": sinks, "bins": bins,
+		"bills": bills, "tables": tables, "dirt": dirt, "grease": grease, "fallen": fallen, "sinks": sinks, "bins": bins,
 		"burnt": burnt, "tray_room": _free_surfaces()}
+
+
+## Where a table's bill is handed over: the till if one of them went to pay there.
+func _bill_place(table: Station) -> Station:
+	var till: Station = game.till_station()
+	if till != null and game.party_at(table).any(func(g: Guest) -> bool: return g.state == "at_till" or g.state == "to_till"):
+		return till
+	return table
 
 
 static func _wait_of(g: Guest) -> float:

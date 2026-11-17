@@ -9,7 +9,8 @@ lost while the core loop is polished. Sections are ordered roughly by when to bu
 ## 1. The vertical slice (what is in the game now)
 
 An endless run. Each night you build the kitchen and write the menu; each day guests
-arrive, read the menu, order, and you prep, assemble and serve their trays and get paid.
+arrive, read the menu, order, and you prep, assemble and serve their trays, then write
+their bill at the till and take the money.
 Survive as many days as you can; three walkouts in one day ends the run.
 
 - Direct control of one chef (WASD, E/Space).
@@ -549,6 +550,45 @@ Survive as many days as you can; three walkouts in one day ends the run.
   "Paying $N" once served, with "ordered extras" or "in a hurry". All in `GuestMood`
   (`comfort`, `bill_scale`, `stay_scale`, `pay_for`). `REGULARS_DEMO=mood`. Comfort does
   not change how much mess a guest leaves.
+- **Paying the bill** (PRD 11, `sim/bill.gd`). Every table is three trips: order, serve,
+  pay. The last bite leaves the dirty tray on the table and the guest sits back to chat
+  for 3 s (`Guest.CHAT_TIME`; speech bubbles with company, none alone), then waits for
+  the bill (`to_pay`). When everyone at the table who ordered has finished chatting, the
+  table is ready to pay: one bill per table, paid by the whole party. Their patience runs
+  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`). While a chef, or a helper
+  with the `take_payment` duty, can see the table (`Grid.has_los`, checked every half
+  second), one guest waves with the bill bubble (a torn-edged slip with a coin) and a soft
+  bell rings once. After 12 s ready with no slip printed for them (`TILL_AFTER`), the one
+  who called (else the first) stands and queues at the till, on the room side of the
+  pass, bubble always up; the line follows the till if the pass moves. A chef facing the
+  till with empty hands (and nothing on that counter top) gets "Write the bill": the
+  bill screen, a paper slip with the waiting tables by number and party size (at the till
+  marked, a table whose slip is out greyed, so two chefs never write one table twice),
+  then tonight's menu by course with a count beside each (E or click adds, Backspace, X
+  or right click takes off), then Print. It never shows what the table had: the player
+  remembers, or reads "Orders" on the guest card. The slip is held like a tray; Esc (B)
+  or the bin throws it away, and a slip for a party that has gone is thrown away. At the
+  table (or at the till, for the guest queued there) the chef holds E for 1 s
+  (`HAND_TIME`) with a fill bar over the table, cancelled by letting go or walking off.
+  Exactly right (`Bill.check`), each guest who ordered pays what `finish_meal` paid
+  before (mood scale, half price or free meal, tip, sale, visit, gossip, coin) and the
+  party leaves, the company with them. Wrong, they refuse it and say why in the thought
+  log and the corner line ("We never had the fries", "You forgot my soda", "That's not
+  our table"), each loses 0.1 joy and they keep waiting. A party whose patience runs out
+  waiting to pay leaves without paying: no money, an opinion drop half a walkout's
+  (`Town.left_unpaid`, filed under speed, friends hear it), `Ledger.today.unpaid_bills`,
+  and an open-purse stamp on the receipt's LEFT UNPAID line. Not a strike. Tables can be
+  cleared while the party chats or waits; the seat frees only when they go. Helpers
+  (11.4): a `bill` task per ready table with no slip out (urgency 3.5, just above an
+  order), duty `take_payment` (service, on the Server post in the demos). The helper
+  writes it at the till (always right, 2 s at five stars, slower with fewer), carries it
+  and hands it over with the same bar; a chef can still write it first, and the helper
+  lets it go. The guest card says "Waiting for the bill, Ns" (or "at the till").
+  Decided defaults from the PRD: one bill per table, leaving unpaid is no strike, a
+  wrong bill is refused (an undercharge too), a quick payment adds nothing to the tip.
+  Departures: the PRD's "Q drops it" is Esc/B (there is no Q action); the eaten tray is
+  not left in front of each guest, it is the table's dirty tray. `REGULARS_DEMO=pay_call`,
+  `pay_till`, `pay_bill`, `pay_hand`, `pay_wrong`, `pay_server`.
 - **The critic** (PRD 2, `sim/critic.gd`). One townsperson, picked with the run's seed
   (`critic_idx`), eats as a critic every fifth day (5, 10, 15 ...). They always come,
   alone, at a time in the middle half of the day: no visit roll, no grudge, and the menu

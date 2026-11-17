@@ -12,6 +12,11 @@ var held := ""
 var held_quality := 1.0
 var tray: Tray                    # the tray in hand, when held is "tray"
 var tray_tag := ""                # the colour of its ticket slip
+var bill: Bill                    # the printed bill in hand, when held is "bill" (PRD 11)
+var give_t := 0.0                 # seconds E has been held handing the bill over
+var give_at: Node3D               # the table (or the till) it is being handed over at
+var demo_giving := -1.0           # demos: the hand-over bar frozen this full (-1: off)
+var _give_bar: Node3D
 var facing := Vector2i(0, 1)      # nearest grid direction to `aim`
 var aim := Vector3(0, 0, 1)       # the way the chef is really looking (any of 8 ways)
 var _velocity := Vector3.ZERO
@@ -73,6 +78,9 @@ func set_held(kind: String, quality := 1.0, tray_: Tray = null, tag := "") -> vo
 	held_quality = quality
 	tray = tray_ if kind == "tray" else null
 	tray_tag = tag if kind == "tray" else ""
+	if kind != "bill":
+		bill = null
+		stop_giving()
 	if _held_node:
 		_held_node.queue_free()
 		_held_node = null
@@ -84,6 +92,42 @@ func set_held(kind: String, quality := 1.0, tray_: Tray = null, tag := "") -> vo
 		_held_size = 0.4
 		_held_node.create_tween().tween_property(self, "_held_size", 1.0, 0.18) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Handing a bill over (PRD 11): the fill bar over `at` (a table or the till), `share`
+## of the way full.
+func show_giving(at: Node3D, share: float) -> void:
+	if _give_bar == null:
+		_give_bar = Node3D.new()
+		_give_bar.top_level = true
+		_give_bar.basis = Build.CAM_BASIS
+		add_child(_give_bar)
+		# Wider and taller than a patience bar, with the slip at its left end, so the two
+		# never read as one another.
+		Build.flat(_give_bar, Icons.rect(0, 0, 1.0, 0.24), Build.TRIM)
+		Build.flat(_give_bar, Icons.rect(0, 0, 0.92, 0.15), "#6b5647", 0.003)
+		var fill := Build.flat(_give_bar, Icons.rect(0, 0, 0.92, 0.15), Build.GOOD, 0.006)
+		fill.name = "fill"
+		var icon := Node3D.new()
+		icon.position = Vector3(-0.62, 0, 0.009)
+		_give_bar.add_child(icon)
+		var layers := Icons.icon("bill")
+		for i in layers.size():
+			Build.flat(icon, Icons._moved([layers[i]], Vector2.ZERO, 0.2)[0][0], layers[i][1], i * 0.002)
+		Build.on_top(_give_bar, 0.0)
+	_give_bar.visible = true
+	_give_bar.global_position = at.global_position + Vector3(0, 2.05, 0)
+	var fill: Node3D = _give_bar.get_node("fill")
+	var k := clampf(share, 0.001, 1.0)
+	fill.scale.x = k
+	fill.position.x = (k - 1.0) * 0.46
+
+
+func stop_giving() -> void:
+	give_t = 0.0
+	give_at = null
+	if _give_bar != null:
+		_give_bar.visible = false
 
 
 ## A prep minigame's reward ("burst") or penalty ("penalty"): faster or slower for

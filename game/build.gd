@@ -886,6 +886,14 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 				m.position = Vector3(0.5, -0.55, 0.35)
 		"tool:sponge", "tool:scourer", "tool:grease_scraper", "tool:spill_kit":
 			hand_tool(n, kind.trim_prefix("tool:"), quality).scale = Vector3.ONE * 1.4
+		"bill":  # a printed bill (PRD 11): a paper slip held up, inked lines, a coral total
+			var slip := Node3D.new()
+			slip.rotation.x = -1.0   # tipped up to the camera, so it reads as paper
+			n.add_child(slip)
+			_add(slip, bevel_mesh(Vector3(0.26, 0.012, 0.36), 0.004), Vector3(0, 0.12, 0), Color(PAPER), 0.0)
+			for k in 4:
+				box(slip, Vector3(-0.02 + (k % 2) * 0.02, 0.128, -0.12 + k * 0.06), Vector3(0.16 - (k % 2) * 0.05, 0.004, 0.018), "#3a2c22")
+			box(slip, Vector3(0.05, 0.128, 0.13), Vector3(0.1, 0.005, 0.04), CORAL)
 		"rubbish_bag":  # a fat knotted sack, for carrying out the front
 			ball(n, Vector3(0, 0.17, 0), 0.19, BAG).scale = Vector3(1, 0.95, 0.9)
 			ball(n, Vector3(0, 0.38, 0), 0.06, BAG)

@@ -35,6 +35,7 @@ const DUTIES := {
 	"assemble": {"kind": "food", "weight": 2.0},
 	# Serving.
 	"take_orders": {"kind": "service", "weight": 2.0},
+	"take_payment": {"kind": "service", "weight": 2.0},
 	"carry_trays": {"kind": "service", "weight": 3.0},
 	"clear_tables": {"kind": "service", "weight": 2.0},
 	"help_up": {"kind": "service", "weight": 1.0},
@@ -725,7 +726,7 @@ const DUTY_WORDS := {
 	"grill": "Grill", "fryer": "Fryer", "pot": "Stock pot", "board": "Chopping board",
 	"slicer": "Slicer", "tap": "Pour drinks",
 	"grater": "Grater", "bread_knife": "Bread knife", "juicer": "Juicer", "blender": "Blender", "steamer": "Steamer", "fetch": "Fetch ingredients", "assemble": "Assemble trays",
-	"take_orders": "Take orders", "carry_trays": "Carry trays to tables", "clear_tables": "Clear tables",
+	"take_orders": "Take orders", "take_payment": "Take payment", "carry_trays": "Carry trays to tables", "clear_tables": "Clear tables",
 	"help_up": "Help fallen people up", "mop": "Mop", "sponge": "Sponge", "scraper": "Scraper",
 	"spill_kit": "Spill kit", "wash_up": "Wash up", "empty_bin": "Empty the bin",
 }
@@ -743,7 +744,7 @@ const CLEAN_PIECES := {"mop_bucket": "mop", "mop": "mop", "sponge": "sponge", "s
 ## Every tree node a cleaning home can be bought up to (PRD 9.5) brings its line's duty
 ## too, through the tool it keeps (`clean_duty`): a flat mop's bucket is still the mop's.
 ## Duties listed whatever is in the room.
-const FIXED_DUTIES := {"food": ["fetch", "assemble"], "service": ["take_orders", "carry_trays", "clear_tables", "help_up"],
+const FIXED_DUTIES := {"food": ["fetch", "assemble"], "service": ["take_orders", "take_payment", "carry_trays", "clear_tables", "help_up"],
 	"clean": ["wash_up", "empty_bin"]}
 const MAX_POST_NAME := 18
 const LIKE_AT_NEUTRAL := 0.5   # how much someone with no opinion yet likes the restaurant, for applying
