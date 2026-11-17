@@ -187,6 +187,7 @@ var _music: AudioStreamPlayer
 var _sun: DirectionalLight3D
 var _lens: ColorRect
 var _sconces: Array[OmniLight3D] = []
+var _night := 0.0   # 0 in service, eases to 1 in the build phase at night
 var _env: Environment
 var _shot_path := ""
 var _shot_time := 0.0
@@ -2075,16 +2076,21 @@ func _update_daylight() -> void:
 	# East is the right of the screen and west is the left, so shadows run across
 	# the picture: leftward in the morning, rightward by evening. The arc leans a
 	# little toward the camera so the faces we see are lit at midday.
-	var arc := deg_to_rad(lerpf(24.0, 156.0, p))
+	_night = move_toward(_night, 1.0 if phase == Phase.BUILD else 0.0, get_process_delta_time() * 0.7)
+	var n := smoothstep(0.0, 1.0, _night)  # 0 by day, 1 in the calm of the night: moonlight and lamps
+	var arc := deg_to_rad(lerpf(lerpf(24.0, 156.0, p), 128.0, n))
 	var east := Vector3(1, 0, -1).normalized()
 	var over := Vector3(0, 1, 0).rotated(east, deg_to_rad(SUN_LEAN))
 	var from := east * cos(arc) + over * sin(arc)
 	_sun.basis = Basis.looking_at(-from)
-	_env.background_color = Color(Scenery.t().backdrop).lerp(Color("#d9c9cc"), t)
-	_env.ambient_light_color = Color("#ece0dc").lerp(Color("#d9bfd0"), t)  # mauve evening shade
-	_sun.light_energy = lerpf(SUN_ENERGY.x, SUN_ENERGY.y, t)
-	for l in _sconces:  # practical lights come up as the sun goes down
-		l.light_energy = float(l.get_meta("full", 0.45)) * lerpf(0.35, 1.0, t)
+	_sun.light_color = _sun.light_color.lerp(Color("#a9bdff"), n)  # cool silver moonlight
+	_env.background_color = Color(Scenery.t().backdrop).lerp(Color("#d9c9cc"), t).lerp(Color("#161b34"), n)
+	_env.ambient_light_color = Color("#ece0dc").lerp(Color("#d9bfd0"), t).lerp(Color("#6f80b8"), n)  # deep blue shade
+	_env.ambient_light_energy = lerpf(0.62, 0.5, n)
+	_env.tonemap_exposure = lerpf(1.12, 1.0, n)
+	_sun.light_energy = lerpf(lerpf(SUN_ENERGY.x, SUN_ENERGY.y, t), 0.42, n)
+	for l in _sconces:  # practical lights come up as the sun goes down, and glow warm all night
+		l.light_energy = float(l.get_meta("full", 0.45)) * lerpf(lerpf(0.35, 1.0, t), 1.7, n)
 
 
 func popup(text: String, at: Vector3, col: Color) -> void:
