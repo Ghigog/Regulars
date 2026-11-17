@@ -181,6 +181,7 @@ func seated_waiting() -> bool:
 
 func _sit() -> void:
 	state = "ordering"
+	game.sfx("sit")
 	mood.patience = minf(1.0, mood.patience + 0.3)
 	_body.create_tween().tween_property(_body, "position:y", SEAT_HEIGHT, 0.2) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

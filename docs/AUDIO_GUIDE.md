@@ -143,6 +143,16 @@ The prompts below are for ElevenLabs Sound Effects, to replace them and to add t
 missing ones. Each entry gives the file name, the status (**have**, **split** for
 one sound doing too many jobs, or **new**), the length, whether it loops, and the prompt.
 
+**In the game (17 November 2026):** everything from `grill_drop` to `order_ready` below
+is recorded and wired in. The files came as MP3s and were converted to 16-bit mono
+WAV, peak-normalised, with each level in `SOUNDS` set to match what it replaced. The
+spatula flip is `patty_flip.wav` (it plays on "Take off the heat"); `flip.wav` stays the
+door card's. The bell's creak is its own file, `creaky_door.wav`, played with the bell
+whenever someone comes in (`door_bell`). `order_ready` keeps its first three taps
+(0.78 s) and plays once a whole party is seated. Placeholders that now have
+recordings are skipped by `tools/make_sfx.py` (`RECORDED`). `sizzle_cooking` swells
+about 18 dB around 4 to 5 s, so its loop pulses: a steadier take would sit better.
+
 ### Rules for every effect
 
 - **Material:** it's a toy diorama, so everything is painted wood, felt, card, tin and
@@ -174,45 +184,45 @@ one sound doing too many jobs, or **new**), the length, whether it loops, and th
 The most important sounds in the game. A player should be able to cook with their eyes
 shut.
 
-**`grill_drop.wav`** · new · 0.8 s · one-shot
+**`grill_drop.wav`** · **in** · 0.8 s · one-shot
 > A small raw burger patty slapped down onto a hot flat-top griddle: a soft wet pat, then an instant bright hiss that flares up and settles. Close-miked, dry, a little cartoonish and appetising, like a toy kitchen that really works. No voices, no music.
 
-**`sizzle_raw.wav`** · split (from `sizzle`) · 8 s · loop
+**`sizzle_raw.wav`** · **in** · 8 s · loop
 > Steady gentle sizzle of a single raw patty on a griddle: quiet, wet, juicy bubbling with soft fat pops, even and calm. Close and dry, no kitchen clatter, no voices. Seamless loop.
 
-**`sizzle_cooking.wav`** · split · 8 s · loop
+**`sizzle_cooking.wav`** · **in** · 8 s · loop
 > A burger patty halfway cooked on a hot griddle: a fuller, brighter sizzle with more frequent crisp fat pops and a faint crackle, lively but controlled. Close, dry, appetising. Seamless loop.
 
-**`sizzle_done.wav`** · split · 8 s · loop
+**`sizzle_done.wav`** · **in** · 8 s · loop
 > A perfectly browned patty on the griddle: a drier, crisper, higher sizzle, tight little crackles, the wet bubbling mostly gone. It should sound ready to come off. Close, dry. Seamless loop.
 
 The game cross-fades these three by doneness, so they need to match in loudness and
 character.
 
-**`smoke_warn.wav`** · new · 6 s · loop
+**`smoke_warn.wav`** · **in** · 6 s · loop
 > A patty left too long on a griddle: harsh dry crackling, spitting fat and a thin rising hiss of smoke, with an edge of trouble but still small and toy-like. Sounds like it's starting to catch. Close and dry. Seamless loop.
 
-**`flip.wav`** · have · 0.5 s · one-shot
+**`patty_flip.wav`** · **in** · 0.5 s · one-shot
 > A small wooden-handled spatula scrapes under a burger patty and flips it: a short metallic scrape, a soft airy flop, then a fresh burst of sizzle as it lands. Quick, satisfying, close and dry.
 
-**`ding.wav`** · have · 1.0 s · one-shot
+**`ding.wav`** · **in** · 1.0 s · one-shot
 > A single bright, round tap on a small brass kitchen timer bell, pitched to C, with a short warm ring that fades fast. Cheerful and clear, like a toy diner bell. No reverb tail.
 
-**`burn.wav`** · have · 1.2 s · one-shot
+**`burn.wav`** · **in** · 1.2 s · one-shot
 > A burger burning: a sudden angry hiss and a dry crackle collapsing into a sad little puff of smoke, then a quiet fizzle. Comic deflation, not alarming. Close and dry.
 
-**`plate_food.wav`** · new · 0.5 s · one-shot
+**`plate_food.wav`** · **in** · 0.5 s · one-shot
 > A cooked patty and a soft bun placed onto a ceramic diner plate: a gentle squash of bread, a light clink of china underneath. Small, tidy and pleasing. Close and dry.
 
 ### 2. Service and guests
 
-**`bell.wav`** · have · 1.5 s · one-shot
+**`bell.wav`** · **in** · 1.5 s · one-shot
 > A small brass shop bell on a curved spring above a wooden café door, jingling twice as the door swings open, with a soft creak of the hinge underneath. Friendly and welcoming, toy-sized, dry room.
 
-**`sit.wav`** · new · 0.6 s · one-shot
+**`sit.wav`** · **in** · 0.6 s · one-shot
 > A small wooden chair scraped back across a wooden floor, then a soft settling bump as someone sits down. Short and light, like a dolls' house chair. Close and dry.
 
-**`order_ready.wav`** · new · 0.7 s · one-shot
+**`order_ready.wav`** · **in** · 0.7 s · one-shot
 > Two light knuckle taps on a wooden table followed by a soft, polite little "ahem"-like woodblock pop: a guest signalling they're ready to order. Gentle and attention-catching but never rude. Dry and close.
 
 **`order_take.wav`** · new · 0.9 s · one-shot

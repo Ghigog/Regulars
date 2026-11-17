@@ -380,6 +380,23 @@ func _make_smoke() -> void:
 		_fx[id] = fx
 
 
+## The loop this tool's cooking sounds like: a stove's by doneness (raw, cooking,
+## done, then smoke as it dries out toward burnt), anything else the old sizzle.
+func sizzle_stage() -> String:
+	if not is_cooking():
+		return ""
+	if mode() != "stove":
+		return "sizzle"
+	var tt := _times()
+	if cook < tt[0]:
+		return "sizzle_raw"
+	if cook < tt[1]:
+		return "sizzle_cooking"
+	if cook <= tt[2]:
+		return "sizzle_done"
+	return "smoke_warn"
+
+
 func is_cooking() -> bool:
 	if item == "" or item == "tray" or item.begins_with("burnt") or not is_heat_tool():
 		return false
