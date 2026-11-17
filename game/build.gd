@@ -256,15 +256,15 @@ static func flat_mat(col: Color) -> StandardMaterial3D:
 
 ## A flat colour that draws over everything in the world, for gauges that must
 ## never be hidden. Higher `prio` draws later.
-static func overlay_mat(col: Color, prio := 0) -> StandardMaterial3D:
-	var key := "over|%s|%d" % [col.to_html(), prio]
+static func overlay_mat(col: Color, prio := 0, depth := false) -> StandardMaterial3D:
+	var key := "over|%s|%d|%s" % [col.to_html(), prio, depth]
 	if not _mats.has(key):
 		var m := StandardMaterial3D.new()
 		m.albedo_color = col
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		m.no_depth_test = true
+		m.no_depth_test = not depth   # `depth`: hidden behind what stands in front of it
 		m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS  # keeps it sharp under the tilt-shift blur
 		m.render_priority = clampi(prio, 0, 120)
 		_mats[key] = m
