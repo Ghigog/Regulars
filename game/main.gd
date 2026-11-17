@@ -55,14 +55,21 @@ const ORDER_RELIEF := 0.1           # patience back when the chef comes over and
 const ORDER_HANDS_FREE := true      # the chef needs empty hands to take an order
 const BOOTH_DELIGHT := 0.08   # a booth's benches are cosier than chairs
 const SOUNDS := {  # name -> volume in dB
-	"pickup": -5.0, "putdown": -5.0, "ding": -3.0, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": -4.0,
-	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -9.0, "perfect": -4.0, "sizzle": -10.0,
+	"pickup": -5.0, "putdown": -5.0, "ding": -1.7, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": 0.5,
+	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -15.2, "perfect": -4.0, "sizzle": -10.0,
 	"roll": -8.0, "lift": -10.0, "rattle": -9.0, "page": -7.0, "thump": -6.0, "rip": -6.0,
 	"flutter": -10.0, "rustle": -9.0, "rope": -8.0, "stamp": -4.0,
 	"slide": -8.0, "tick": -9.0, "tab": -8.0, "flip": -5.0,
 	"zoom": -6.0, "wobble": -6.0, "chop": -7.0, "slice": -9.0, "glug": -8.0,
+	# Recorded (docs/AUDIO_GUIDE.md), peak-normalised; levels match what each replaces.
+	"grill_drop": 5.7, "patty_flip": 0.2, "plate_food": 2.3, "creaky_door": -13.1, "sit": -4.7,
+	"order_ready": 1.2, "sizzle_raw": -0.3, "sizzle_cooking": -8.2, "sizzle_done": -1.8, "smoke_warn": -3.5,
 }
-const LOOPING: Array[String] = ["sizzle"]
+## Loops: the stove's three sizzles and its smoke cross-fade by doneness; "sizzle" is
+## the fryer's and the pot's.
+const LOOPING: Array[String] = ["sizzle", "sizzle_raw", "sizzle_cooking", "sizzle_done", "smoke_warn"]
+const LOOP_FADE := 60.0   # dB a second a loop fades in or out
+const LOOP_OFF := -50.0
 const MUSIC_DB := -14.0
 const MUSIC_FADE := 1.2   # seconds to cross-fade between tracks
 ## Track per moment. "Intro" is in assets/music too, waiting for a title screen.
@@ -1986,7 +1993,7 @@ func _load_sounds() -> void:
 		if LOOPING.has(id):
 			stream = stream.duplicate()
 			stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-			stream.loop_end = stream.data.size() / 2
+			stream.loop_end = stream.data.size() / (2 * (2 if stream.stereo else 1))   # 16-bit frames
 		else:
 			p.max_polyphony = 4
 		p.volume_db = SOUNDS[id]
@@ -2042,6 +2049,12 @@ func set_volumes(sfx_level: float, music_level: float) -> void:
 
 
 ## Plays a sound with a little random pitch so repeats do not sound identical.
+## Someone comes in: the shop bell and, under it, the door's creak.
+func door_bell() -> void:
+	sfx("bell")
+	sfx("creaky_door")
+
+
 func sfx(id: String, vary := 0.06, pitch := 1.0) -> void:
 	if _sfx.has(id):
 		_sfx[id].pitch_scale = pitch * randf_range(1.0 - vary, 1.0 + vary)
@@ -3537,7 +3550,7 @@ func _update_ghost(ch: Player = null) -> void:
 			else:
 				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier), ch.hand.get("base", ""))
 			if layer != "" and wall_facing.has(cell):
-				_layer_band(ch.ghost, layer, int(wall_facing[cell]) - (0 if layer == "high" else int(ch.hand.facing)))
+				_layer_band(ch.ghost, layer, int(wall_facing[cell]) - (0 if layer == "high" else int(ch.hand.facing)), hn == "hook")
 	var p := hover
 	if ch.ghost == null or p == Vector3.INF:
 		ch.no_mark.visible = false
@@ -3565,12 +3578,15 @@ func _update_ghost(ch: Player = null) -> void:
 ## A pale band on the wall behind a ghost marking the layer it takes (PRD 8.5): the
 ## high band for a hung piece, the low band for a shelf standing low, both for a tall
 ## piece. `turn` is the wall's facing in the ghost's own frame.
-func _layer_band(ghost: Node3D, layer: String, turn: int) -> void:
+func _layer_band(ghost: Node3D, layer: String, turn: int, small := false) -> void:
 	var band := Node3D.new()
 	band.rotation.y = turn * PI / 2
 	ghost.add_child(band)
 	var y0 := Build.HIGH_Y0 if layer == "high" else 0.0
 	var y1 := 0.92 if layer == "base" else Build.HIGH_Y1
+	if small:   # a hook is a small thing low in the band: frame it, not the whole layer
+		y0 = Build.HIGH_Y0 - 0.2
+		y1 = Build.HIGH_Y0 + 0.5
 	var plate := Build.box(band, Vector3(0, y0, -0.48), Vector3(0.98, y1 - y0, 0.02), Build.GOOD)
 	plate.material_override = Build.overlay_mat(Color(Build.GOOD, 0.4), 2)
 	for y: float in [y0, y1]:   # a darker rule top and bottom, so the band reads by shape too
@@ -3954,7 +3970,7 @@ func _seat_waiting_guests() -> void:
 			seat_taken[g.seat] = g
 			g.state = "to_seat"
 			g.walk_to(g.seat)
-		sfx("bell")
+		door_bell()
 		_reflow_queue()
 
 
@@ -3970,6 +3986,9 @@ func on_seated(g: Guest) -> void:
 				g.mood.delight(0.15, "Oh good, %s is here!" % mate.info.name)
 				mate.mood.delight(0.15, "Oh good, %s is here!" % g.info.name)
 	cheer_with_decor(g)
+	if party_at(g.table).all(func(o: Guest) -> bool: return o.state != "to_seat"):
+		# The whole party is down: a knock on the table, they are ready to order.
+		get_tree().create_timer(0.6).timeout.connect(sfx.bind("order_ready", 0.04))
 
 
 ## Everything a seated guest can see changes how they feel.
@@ -5853,6 +5872,12 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 		if act == "Wash":
 			sfx("wash")
 			burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
+		elif act == "Grill":
+			sfx("grill_drop")
+		elif act == "Take off the heat":
+			sfx("patty_flip")   # the spatula under the patty
+		elif act.begins_with("Add "):
+			sfx("plate_food")   # onto the tray's plate
 		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free") or act.begins_with("Take order") or act.ends_with(" orders")):
 			sfx("pickup" if ch.held != "" else "putdown")
 	return act
@@ -6197,7 +6222,7 @@ func _cancel_all_preps() -> void:
 
 
 func _tick_stoves(delta: float) -> void:
-	var sizzling := false
+	var loops := {}
 	for st: Station in stations.values():
 		var stage := st.tick_cooking(delta)
 		if stage == "prep":
@@ -6208,9 +6233,26 @@ func _tick_stoves(delta: float) -> void:
 			shake(0.08)
 		elif stage == "rested":
 			sfx("tick")
-		sizzling = sizzling or st.is_cooking()
-	if _sfx.has("sizzle") and _sfx.sizzle.playing != sizzling:
-		_sfx.sizzle.playing = sizzling
+		if st.sizzle_stage() != "":
+			loops[st.sizzle_stage()] = true
+	_fade_loops(loops, delta)
+
+
+## Fades each looping sound toward on (wanted) or off, so a patty's sizzle changes
+## smoothly as it cooks; one that has faded out stops.
+func _fade_loops(want: Dictionary, delta: float) -> void:
+	for id: String in LOOPING:
+		if not _sfx.has(id):
+			continue
+		var p: AudioStreamPlayer = _sfx[id]
+		var on := want.has(id)
+		if on and not p.playing:
+			p.volume_db = LOOP_OFF
+			p.play()
+		if p.playing:
+			p.volume_db = move_toward(p.volume_db, float(SOUNDS[id]) if on else LOOP_OFF, LOOP_FADE * delta)
+			if not on and p.volume_db <= LOOP_OFF:
+				p.stop()
 
 
 func step(delta: float) -> void:
@@ -6485,7 +6527,7 @@ func join(source: String) -> int:
 	var ch := add_chef(ENTRANCE_CELL)
 	ch.look(Vector2i(-1, 0))
 	burst(ch.position + Vector3(0, 1.0, 0), "stars", 0.5)
-	sfx("bell")
+	door_bell()
 	ch.punch()
 	hud.say("Chef %d joined." % (p + 1))
 	hud.coop_hint_time = 25.0

@@ -70,7 +70,13 @@ def reverb(b, amount=0.25):
     return out
 
 
+# Recorded sounds (docs/AUDIO_GUIDE.md) replace these placeholders: never written over.
+RECORDED = {"ding", "burn", "bell"}
+
+
 def save(name, b, peak=0.8):
+    if name in RECORDED:
+        return
     top = max(1e-9, max(abs(s) for s in b))
     fade = int(RATE * 0.004)
     with wave.open(os.path.join(OUT, name + ".wav"), "w") as w:
