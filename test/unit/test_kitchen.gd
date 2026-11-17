@@ -1373,3 +1373,47 @@ func test_a_two_tap_fountain_pours_what_the_rail_wants_and_turns_on_put_back():
 	var have: Array = game.kitchen_stock().map(func(s: Dictionary) -> String: return s.ingredient)
 	for d in ["soda", "cola", "coffee"]:
 		assert_has(have, d)
+
+
+func test_turned_fridge_keeps_its_turn_when_put_down():
+	_game()
+	game.open_build()
+	game.ledger.money = 500
+	var f: Station = game.add_station("fridge", Vector2i(2, 5), 1, 0, "fridge")
+	assert_true(game.pick_up(_at(2, 5), null, true))
+	game.rotate_hand()
+	assert_true(game.place(Vector3i(2, 5, 0)))
+	assert_eq(f.facing, 1, "picked up whole, turned, put back")
+
+
+
+func test_turned_fridge_lifted_with_its_card_keeps_its_turn():
+	_game()
+	game.open_build()
+	var f: Station = game.add_station("fridge", Vector2i(2, 5), 1, 0, "fridge")
+	var ch: Player = game.player
+	ch.hand = {"id": f.type, "tier": f.tier, "price": 0, "facing": f.facing, "moving": true, "node": f,
+		"in_place": true, "carry": true, "layer": "base", "y": f.position.y,
+		"from": Vector3i(2, 5, 0), "from_facing": f.facing}
+	assert_true(game.open_storage(Vector2i(2, 5)))
+	game.close_shop()
+	assert_false(ch.hand.is_empty(), "kept in hand")
+	game.rotate_hand()
+	assert_true(game.place(Vector3i(2, 5, 0)))
+	assert_eq(f.facing, 1)
+
+
+func test_turning_a_lifted_fridge_with_its_card_open_sticks():
+	_game()
+	game.open_build()
+	var f: Station = game.add_station("fridge", Vector2i(2, 5), 1, 0, "fridge")
+	var ch: Player = game.player
+	ch.hand = {"id": f.type, "tier": f.tier, "price": 0, "facing": f.facing, "moving": true, "node": f,
+		"in_place": true, "carry": true, "layer": "base", "y": f.position.y,
+		"from": Vector3i(2, 5, 0), "from_facing": f.facing}
+	f.position.y += game.LIFT
+	game.open_storage(Vector2i(2, 5))
+	assert_true(game.shop_action("turn"))
+	game.storage_put_down()
+	assert_eq(f.facing, 1)
+	assert_almost_eq(f.position.y, 0.0, 0.001)
