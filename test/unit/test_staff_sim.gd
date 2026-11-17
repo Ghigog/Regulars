@@ -650,7 +650,7 @@ func test_every_task_kind_comes_with_its_duty():
 		"storage": [{"cell": Vector2i(0, 0), "kinds": ["patty"]}],
 		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["patty"]},
 			{"id": 2, "cell": Vector2i(3, 1), "lacks": []}],
-		"trays": [{"id": 9, "cell": Vector2i(3, 2), "table": 4}],
+		"dishes": [{"id": 9, "cell": Vector2i(3, 2), "table": 4}],
 		"tables": [{"id": 4, "cell": Vector2i(8, 8), "state": "order"}, {"id": 5, "cell": Vector2i(9, 8), "state": "clear"}],
 		"dirt": {Vector2i(5, 5): 1, Vector2i(6, 5): 2},
 		"fallen": [{"id": 12, "cell": Vector2i(6, 6)}],
@@ -798,10 +798,10 @@ func test_two_helpers_never_take_the_same_task_or_station():
 
 func test_a_chef_doing_a_task_takes_it_off_the_board():
 	var s := _crew({1: ["carry_trays"]})
-	var b := _board({"trays": [{"id": 3, "cell": Vector2i(1, 0)}]})
+	var b := _board({"dishes": [{"id": 3, "cell": Vector2i(1, 0)}]})
 	assert_eq(b.chef_takes("carry:3"), -1, "no helper held it")
 	assert_eq(b.assign(s, [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}], 1, 0.0, 100.0), {})
-	b.rebuild({"trays": [{"id": 3, "cell": Vector2i(1, 0)}]})
+	b.rebuild({"dishes": [{"id": 3, "cell": Vector2i(1, 0)}]})
 	assert_true(b.chef_keys.has("carry:3"), "the claim lasts while the task does")
 	b.rebuild({})
 	assert_false(b.chef_keys.has("carry:3"))
@@ -809,7 +809,7 @@ func test_a_chef_doing_a_task_takes_it_off_the_board():
 
 func test_a_chef_takes_what_a_helper_holds_and_the_helper_moves_on():
 	var s := _crew({1: ["carry_trays"]})
-	var b := _board({"trays": [{"id": 3, "cell": Vector2i(1, 0)}, {"id": 4, "cell": Vector2i(5, 0)}]})
+	var b := _board({"dishes": [{"id": 3, "cell": Vector2i(1, 0)}, {"id": 4, "cell": Vector2i(5, 0)}]})
 	var h := [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}]
 	assert_eq(b.assign(s, h, 1, 0.0, 100.0)[1].key, "carry:3")
 	assert_eq(b.chef_takes("carry:3"), 1)
@@ -820,7 +820,7 @@ func test_a_chef_takes_what_a_helper_holds_and_the_helper_moves_on():
 func test_breaks_days_off_and_falls_take_a_helper_off_the_board():
 	var s := _staff()
 	_hire(s, 1, ["carry_trays"], EVEN, 3, 1)
-	var b := _board({"trays": [{"id": 3, "cell": Vector2i(1, 0)}]})
+	var b := _board({"dishes": [{"id": 3, "cell": Vector2i(1, 0)}]})
 	var h := [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}]
 	assert_eq(b.assign(s, h, 1, 0.0, 100.0).size(), 1)
 	var brk: float = Staff.break_starts(1, 100.0)[0]
@@ -836,7 +836,7 @@ func test_breaks_days_off_and_falls_take_a_helper_off_the_board():
 
 func test_an_unhappy_helper_reacts_slower():
 	var s := _crew({1: ["carry_trays"]})
-	var b := _board({"trays": [{"id": 3, "cell": Vector2i(1, 0)}]})
+	var b := _board({"dishes": [{"id": 3, "cell": Vector2i(1, 0)}]})
 	s.employee(1).satisfaction = 0.0
 	assert_almost_eq(JobBoard.reaction(0.0), JobBoard.REACT_BASE * (1.0 + Staff.SLOW_MAX), 0.001)
 	var wait := JobBoard.REACT_BASE * 1.2
@@ -948,18 +948,25 @@ func test_a_ready_made_box_needs_no_tool():
 	assert_true(steps[0].ready)
 
 
-func test_a_ticket_s_tray_is_started_first_when_there_is_room():
-	var w := {"storage": [{"cell": Vector2i(0, 0), "kinds": ["bun"]}], "tray_room": 1,
-		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["bun"], "tray": false},
-			{"id": 2, "cell": Vector2i(3, 0), "lacks": ["bun"], "tray": false}]}
+func test_a_ticket_s_plates_are_set_out_first_when_there_is_room():
+	var w := {"storage": [{"cell": Vector2i(0, 0), "kinds": ["bun"]}], "plate_room": 1,
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["bun"], "plated": false, "unplated": 1},
+			{"id": 2, "cell": Vector2i(3, 0), "lacks": ["bun"], "plated": false, "unplated": 1}]}
 	var b := _board(w)
-	assert_eq(b.tasks["tray:1"].duties, ["assemble"])
-	assert_gt(b.tasks["tray:1"].urgency, b.tasks["fetch:1:0"].urgency, "the tray before its food")
-	assert_false(b.tasks.has("tray:2"), "one worktop, one tray")
-	assert_false(b.tasks.has("fetch:2:0"), "no tray and nowhere for its food: it waits")
-	assert_eq(HelperWork.steps(b.tasks["tray:1"], ["assemble"]), [{"do": "start_tray", "ticket": 1}])
-	w.tray_room = 0
+	assert_eq(b.tasks["plates:1"].duties, ["assemble"])
+	assert_gt(b.tasks["plates:1"].urgency, b.tasks["fetch:1:0"].urgency, "the plate before its food")
+	assert_false(b.tasks.has("plates:2"), "one worktop, one plate")
+	assert_false(b.tasks.has("fetch:2:0"), "no plate and nowhere for its food: it waits")
+	assert_eq(HelperWork.steps(b.tasks["plates:1"], ["assemble"]), [{"do": "set_plates", "ticket": 1}])
+	w.plate_room = 0
 	assert_eq(_board(w).tasks.size(), 0)
+	w.tickets[0].started = true
+	assert_true(_board(w).tasks.has("fetch:1:0"), "with a plate out already, its food is made meanwhile")
+
+
+func test_leftover_plates_are_cleared_away():
+	var b := _board({"leftovers": [{"cell": Vector2i(4, 3)}]})
+	assert_eq(b.tasks["tidy:4,3"].duties, ["assemble"])
 
 
 func test_burnt_food_on_a_tool_is_scraped_by_whoever_works_it():

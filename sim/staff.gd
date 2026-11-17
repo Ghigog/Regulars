@@ -447,7 +447,7 @@ static func mistake_chance(satisfaction: float) -> float:
 	return MISTAKE_MAX * low_factor(satisfaction)
 
 
-## Rolls one task for a mistake: "" (none), "slip" (burnt food, a dropped tray, dirt left
+## Rolls one task for a mistake: "" (none), "slip" (burnt food, a dropped plate, dirt left
 ## behind) or "spite" (the same, on purpose).
 func roll_mistake(person: int) -> String:
 	var e := employee(person)
@@ -725,8 +725,8 @@ func tolerance(person: int, kind: String) -> float:
 const DUTY_WORDS := {
 	"grill": "Grill", "fryer": "Fryer", "pot": "Stock pot", "board": "Chopping board",
 	"slicer": "Slicer", "tap": "Pour drinks",
-	"grater": "Grater", "bread_knife": "Bread knife", "juicer": "Juicer", "blender": "Blender", "steamer": "Steamer", "fetch": "Fetch ingredients", "assemble": "Assemble trays",
-	"take_orders": "Take orders", "take_payment": "Take payment", "carry_trays": "Carry trays to tables", "clear_tables": "Clear tables",
+	"grater": "Grater", "bread_knife": "Bread knife", "juicer": "Juicer", "blender": "Blender", "steamer": "Steamer", "fetch": "Fetch ingredients", "assemble": "Plate up",
+	"take_orders": "Take orders", "take_payment": "Take payment", "carry_trays": "Carry plates to tables", "clear_tables": "Clear tables",
 	"help_up": "Help fallen people up", "mop": "Mop", "sponge": "Sponge", "scraper": "Scraper",
 	"spill_kit": "Spill kit", "wash_up": "Wash up", "empty_bin": "Empty the bin",
 }

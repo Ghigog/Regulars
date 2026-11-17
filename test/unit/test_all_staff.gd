@@ -107,31 +107,28 @@ func _chores() -> Dictionary:
 	return out
 
 
-## How a ticket stands: what its tray still needs, where the tray is, who holds it.
+## How a ticket stands: what its plates still need, where they are, who holds them.
 ## Any change is progress.
 func _state_of(tk: Dictionary) -> String:
-	var tray: Tray = game.tray_for_ticket(int(tk.id))
-	if tray == null:
-		var on := []
-		for h: Player in game.hands():
-			on.append(h.held)
-		return "no tray " + str(on)
-	var st: Station = game._station_with_tray(tray)
-	var by := ""
-	for h: Player in game.hands():
-		if h.tray == tray:
-			by = h.name
-	return "%s at %s by %s" % [str(Crew._tray_needs(tray)), str(st.cell) if st != null else "-", by]
+	var parts := []
+	for e: Dictionary in game.crew._tagged(int(tk.id)):
+		var d: Dish = e.dish
+		parts.append("%d:%s@%s" % [d.line, str(d.ings), str(e.st.cell) if e.st != null else "hand"])
+	return "%s needs %s served %d" % [str(parts), str(game.crew._ticket_needs(tk)), tk.order.served_count()]
 
 
 func _why(tk: Dictionary) -> String:
-	var tray: Tray = game.tray_for_ticket(int(tk.id))
 	var tasks := []
 	for task: Dictionary in game.crew.board.tasks.values():
-		if task.get("ticket", null) == int(tk.id) or task.get("tray", null) == int(tk.id):
+		if task.get("ticket", null) == int(tk.id):
 			tasks.append("%s by %s" % [task.type, str(task.duties)])
-	return "ticket %d (%s) stuck: needs %s; tray %s; board %s" % [tk.id, str(tk.items.map(func(i: Dictionary) -> String: return i.name)),
-		str(Crew._tray_needs(tray) if tray != null else "no tray"), "complete" if tray != null and tray.is_complete() else "-", str(tasks)]
+	var tops := []
+	for st: Station in game.stations.values():
+		if st.type in ["counter", "pass"] and st.item != "":
+			tops.append("%s:%s" % [str(st.cell), st.item if st.item != "dish" else "dish" + str(st.dish.ings) + "t" + str(st.dish.ticket)])
+	return "ticket %d (%s) stuck: %s; board %s; tops %s; cups %d plates %d" % [tk.id, str(tk.items.map(func(i: Dictionary) -> String: return i.name)),
+		_state_of(tk), str(tasks), str(tops), game.find_station("cups").count if game.find_station("cups") else -1,
+		game.find_station("plates").count]
 
 
 func _check(theme: String, seed_value: int, day := 1) -> Dictionary:

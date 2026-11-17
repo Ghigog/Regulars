@@ -14,7 +14,7 @@ const STAFF := ["posts", "cvs", "employees", "extra_duties", "_next_post", "_nex
 const CRITIC := ["critic_idx", "next_visit", "known", "last_review", "_boost", "_boost_from", "_boost_to"]
 const TOWN := ["people", "taste_seed"]
 ## What a station keeps from night to night, beside its place and look.
-const PIECE := ["tier", "facing", "base", "pass_look", "node", "stacked", "count", "dirty", "dirty_age", "tap", "kit_tool", "kit_used"]
+const PIECE := ["tier", "facing", "base", "pass_look", "node", "stacked", "count", "dirty", "dirty_cups", "dirty_age", "tap", "kit_tool", "kit_used"]
 
 
 static func exists(path := PATH) -> bool:
@@ -161,6 +161,8 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 
 static func _place(g: Node3D, p: Dictionary) -> void:
 	var st: Station
+	if p.type == "trays":
+		p.type = "plates"   # saved before the plate stack was the tray stack
 	if p.high:
 		st = g.add_high(p.node if p.node != "" else p.type, p.cell)
 	else:
@@ -168,6 +170,7 @@ static func _place(g: Node3D, p: Dictionary) -> void:
 	st.stacked = bool(p.stacked)
 	st.count = int(p.count)
 	st.dirty = int(p.dirty)
+	st.dirty_cups = int(p.get("dirty_cups", 0))
 	st.dirty_age = float(p.dirty_age)
 	st.tap = int(p.tap)
 	st.kit_tool = str(p.kit_tool)

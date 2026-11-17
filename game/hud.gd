@@ -185,8 +185,8 @@ class Punch extends Icon:
 
 ## Five pips for where a townsperson stands, with an arrow when it moved today.
 ## Read by count and arrow shape, not by colour.
-## A ticket's ingredient marks: a ring per ingredient, filled with a tick once it is
-## on the ticket's tray. Read live from the game, so they tick off as the chef works.
+## A ticket's ingredient marks: a ring per ingredient, filled with a tick once its item
+## has been served to the guest. Read live from the game, so they tick off as plates land.
 class Marks extends Control:
 	var game
 	var ticket := -1
@@ -1468,9 +1468,6 @@ func refresh_tickets() -> void:
 		var g: Guest = tk.guest
 		head.add_child(Face.new(Color(g.info.shirt), str(g.info.name).left(1)))
 		_label(head, 18, g.info.name)
-		var tray: Tray = game.tray_for_ticket(int(tk.id))
-		if tray != null:   # a tray is being built for it: a little tray mark
-			head.add_child(Icon.new("tray", 22, false))
 		var line := 0
 		for course in Menu.COURSES:
 			for it: Dictionary in tk.items:

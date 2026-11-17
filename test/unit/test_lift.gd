@@ -36,14 +36,14 @@ func test_a_hood_over_bare_floor_is_picked_up_and_sold():
 	assert_false(game.highs.has(Vector2i(0, 3)))
 
 
-func test_the_tray_stack_is_sold_and_the_door_waits_for_another():
+func test_the_plate_stack_is_sold_and_the_door_waits_for_another():
 	_face(Vector2i(2, 3), Vector2i(0, -1))
 	game.build_interact()
-	assert_eq(game.player.hand.id, "trays")
-	assert_true(game.sell_hand(), "the tray stack is for sale")
-	assert_true(game.open_block().contains("tray stack"))
+	assert_eq(game.player.hand.id, "plates")
+	assert_true(game.sell_hand(), "the plate stack is for sale")
+	assert_true(game.open_block().contains("plate stack"))
 	game.ledger.money = 100
-	assert_true(game.shop_items("", "Kitchen").any(func(bp: Dictionary) -> bool: return bp.id == "trays"))
+	assert_true(game.shop_items("", "Kitchen").any(func(bp: Dictionary) -> bool: return bp.id == "plates"))
 
 
 func test_the_last_sink_is_sold_and_sold_again_at_any_level():

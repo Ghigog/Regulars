@@ -639,7 +639,7 @@ func test_a_fetch_is_cooked_by_a_cook_and_left_for_one_otherwise():
 	var cook := HelperWork.steps(task, ["fetch", "grill", "assemble"], "grill")
 	assert_eq(cook.map(func(s: Dictionary) -> String: return s.do), ["take", "cook", "deliver"])
 	assert_eq(cook[1].at, Vector2i(0, 3))
-	assert_true(cook[2].assemble, "with the assemble duty it goes on the tray")
+	assert_true(cook[2].assemble, "with the assemble duty it goes on the plate")
 	var runner := HelperWork.steps(task, ["fetch"], "grill")
 	assert_eq(runner.map(func(s: Dictionary) -> String: return s.do), ["take", "leave"])
 	var bun := HelperWork.steps({"type": "fetch", "cell": Vector2i(0, 6), "kind": "bun", "job": "none", "dest": Vector2i(4, 4), "ticket": 4}, ["fetch"])
@@ -657,13 +657,15 @@ func test_prep_steps_pick_up_cook_in_place_or_pour():
 	assert_true(here[0].in_place)
 	var pour := HelperWork.steps({"type": "prep", "cell": Vector2i(1, 2), "station": Vector2i(1, 2), "kind": "soda",
 		"job": "pour", "item": null, "ticket": 1}, ["tap"])
-	assert_eq(pour.map(func(s: Dictionary) -> String: return s.do), ["pour", "deliver"])
+	assert_eq(pour.map(func(s: Dictionary) -> String: return s.do), ["get_cup", "pour", "set_out"], "into the ticket's cup")
 
 
 func test_serving_and_cleaning_steps():
 	var c := Vector2i(6, 1)
-	assert_eq(HelperWork.steps({"type": "carry", "cell": Vector2i(4, 4), "tray": 2, "table": c}, []).map(
-		func(s: Dictionary) -> String: return s.do), ["pick_tray", "serve"])
+	assert_eq(HelperWork.steps({"type": "carry", "cell": Vector2i(4, 4), "cells": [Vector2i(4, 4), Vector2i(4, 5)], "table": c}, []).map(
+		func(s: Dictionary) -> String: return s.do), ["pick_dish", "pick_dish", "serve"], "two plates a trip")
+	assert_eq(HelperWork.steps({"type": "tidy", "cell": Vector2i(4, 4)}, []).map(
+		func(s: Dictionary) -> String: return s.do), ["pick_dish", "bin", "restack"])
 	assert_eq(HelperWork.steps({"type": "order", "cell": c}, [])[0].do, "order")
 	assert_eq(HelperWork.steps({"type": "clear", "cell": c}, []).map(func(s: Dictionary) -> String: return s.do), ["clear", "to_sink"])
 	assert_eq(HelperWork.steps({"type": "bin", "cell": c}, []).map(func(s: Dictionary) -> String: return s.do), ["empty_bin", "to_door"])
@@ -676,12 +678,12 @@ func test_serving_and_cleaning_steps():
 
 func test_what_is_in_hand_is_put_away_where_it_belongs():
 	assert_eq(HelperWork.stash_for(""), "")
-	assert_eq(HelperWork.stash_for("dirty_tray"), "to_sink")
+	assert_eq(HelperWork.stash_for("dirty_dishes"), "to_sink")
 	assert_eq(HelperWork.stash_for("rubbish_bag"), "to_door")
 	assert_eq(HelperWork.stash_for("burnt:patty"), "bin")
 	assert_eq(HelperWork.stash_for("tool:mop"), "drop")
 	assert_eq(HelperWork.stash_for("prep:patty"), "stash")
-	assert_eq(HelperWork.stash_for("tray"), "stash")
+	assert_eq(HelperWork.stash_for("dishes"), "stash")
 
 
 func test_made_food_covers_the_oldest_ticket_first():
@@ -792,7 +794,7 @@ func test_a_helper_with_no_assemble_duty_leaves_the_cooking_for_others():
 	_run(30.0)
 	var made: Array = game.stations.values().filter(func(st: Station) -> bool: return st.item == "prep:" + game.fixed_main().grill)
 	assert_eq(made.size(), 1, "the patty is grilled and put down for someone to plate")
-	assert_null(game.tray_for_ticket(int(game.tickets[0].id)), "nobody built a tray")
+	assert_eq(game.crew._tagged(int(game.tickets[0].id)), [], "nobody set out a plate")
 
 
 func _order_by_chef(g: Guest) -> void:
@@ -800,10 +802,10 @@ func _order_by_chef(g: Guest) -> void:
 	assert_eq(game.tickets.size(), 1)
 
 
-func test_a_washer_washes_up_into_the_tray_stack():
+func test_a_washer_washes_up_into_the_plate_stack():
 	_game()
 	var sink: Station = game.find_station("sink")
-	var stack: Station = game.find_station("trays")
+	var stack: Station = game.find_station("plates")
 	sink.dirty = 2
 	var before := stack.count
 	_helper(3, ["wash_up"], Vector2i(3, 3))

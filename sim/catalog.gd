@@ -101,13 +101,17 @@ const ITEMS := {
 	"bin": {"name": "Bin", "price": 30, "level": 2, "category": "Kitchen", "tiers": 1,
 		"blurb": "Another bin. The chef uses the nearest"},
 	"dish_rack": {"name": "Dish rack", "price": 50, "level": 3, "category": "Kitchen", "tiers": 1,
-		"blurb": "Beside a sink: it takes two more trays before it looks piled"},
+		"blurb": "Beside a sink: more dishes soak before it looks piled"},
 	"sink": {"name": "Sink", "price": 70, "level": 3, "category": "Kitchen", "tiers": 1,
 		"blurb": "Another place to wash up"},
 	"till": {"name": "Till", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Where guests pay. Stands on a counter. The kitchen needs one to open"},
-	"trays": {"name": "Tray stack", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,
-		"blurb": "Where clean trays are kept. The kitchen needs one to open"},
+	"plates": {"name": "Plate stack", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Where clean plates are kept. Food goes out on them. The kitchen needs one to open"},
+	"cups": {"name": "Cup stack", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Where clean cups are kept. Fill one at a drink station. The kitchen needs one to open"},
+	"tray_stack": {"name": "Tray stack", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Take a tray: it holds two more plates or cups"},
 	"stove": {"name": "Stove", "price": 50, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "grill",
 		"blurb": "Grills patties and fish. Boils and fries at a pinch. Upgrade it in hand"},
 	"fryer": {"name": "Fryer", "price": 70, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "fry",
@@ -270,7 +274,7 @@ static func bp_blurb(bp: Dictionary) -> String:
 ## Where a Kitchen piece sits in the tab, in kitchen order: storage, cooking tools,
 ## drinks, the hood, washing up, cleaning, the desk. Other tabs are one group.
 const KITCHEN_GROUPS := {"counter": 0, "fridge": 0, "shelf": 0, "cabinet": 0, "hood": 3,
-	"bin": 4, "sink": 4, "trays": 4, "till": 4, "dish_rack": 4, "mop_bucket": 5, "hook": 5, "sponge": 5, "robot_dock": 5, "desk": 6}
+	"bin": 4, "sink": 4, "plates": 4, "cups": 4, "tray_stack": 4, "till": 4, "dish_rack": 4, "mop_bucket": 5, "hook": 5, "sponge": 5, "robot_dock": 5, "desk": 6}
 
 
 static func group_of(bp: Dictionary) -> int:

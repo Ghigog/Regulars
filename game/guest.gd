@@ -22,13 +22,13 @@ var calling := false      # PRD 11: this guest has a hand up with the bill bubbl
 ## browse: reading the menu at the door, having found no main; they walk on after.
 const BROWSE_TIME := 2.2
 var hint_tag := ""        # a liked tag the menu is full of, which they remarked on
-var liked_meal := false   # their tray had something they like
+var liked_meal := false   # their meal had something they like
 ## What they asked for once the chef took their order: {main, side, drink} (menu
 ## items, any of them {}) and "ticket", the ticket id (-1 if they ordered nothing).
 ## Empty until then. `planned` is what they will order, chosen at the door.
 var order := {}
 var planned := {}
-var bill_base := 0       # the tray's price: what the bill is before mood and deals
+var bill_base := 0       # the order's price: what the bill is before mood and deals
 var _meal_tray: Tray
 var path: Array[Vector2i] = []
 var goal := Vector3.ZERO  # the exact spot to stop on once the path is walked
@@ -232,12 +232,25 @@ func start_eating(quality: float, tray: Tray = null) -> String:
 	return said
 
 
+## The plates and cups served so far, set down in front of them while they wait for the rest.
+func show_served(t: Tray) -> void:
+	_meal_tray = t
+	_set_meal("tray", 1.0)
+
+
+## Takes what is in front of them off the table (they left, or finished).
+func clear_meal() -> void:
+	if _meal:
+		_meal.queue_free()
+		_meal = null
+
+
 func _set_meal(kind: String, quality: float) -> void:
 	if _meal:
 		_meal.queue_free()
 	_meal_kind = kind
 	var to_table := (Grid.center(table.cell) - position).normalized()
-	_meal = Build.tray(_meal_tray, "", kind == "tray_bitten") if kind.begins_with("tray") else Build.item(kind, quality)
+	_meal = Build.meal(_meal_tray, kind == "tray_bitten") if kind.begins_with("tray") else Build.item(kind, quality)
 	_meal.position = to_table * 0.5 + Vector3(0, 0.74, 0)
 	_meal.rotation.y = atan2(to_table.x, to_table.z)
 	add_child(_meal)
