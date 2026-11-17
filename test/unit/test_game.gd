@@ -2763,6 +2763,69 @@ func test_the_upgrades_tab_upgrades_a_counter_where_it_stands():
 	assert_eq(game.stations[c].cell, c)
 
 
+## A length of the pass, bare, with open floor on its kitchen side; the chef faces it.
+func _pass_counter_faced() -> Vector2i:
+	for c: Vector2i in game.stations:
+		var st: Station = game.stations[c]
+		if st.type == "counter" and st.pass_look and st.base == "counter" and not st.has_node("till") \
+				and game.kitchen.stock(c).is_empty() and not game.stations.has(c + Vector2i(0, 1)):
+			game.player.position = Grid.center(c + Vector2i(0, 1))
+			game.player.facing = Vector2i(0, -1)
+			return c
+	return game.NO_CELL
+
+
+func test_a_lifted_counter_turns_on_its_upgrade_tree_and_comes_down_a_fridge_that_lifts_again():
+	_to_build()
+	game.ledger.money = 200
+	var c := _pass_counter_faced()
+	assert_ne(c, game.NO_CELL, "the start has a bare length of pass")
+	assert_true(game.lift())
+	game.shop_action("shop")   # Tab: the Upgrades tab
+	assert_true(game.upgrading)
+	assert_true(game.buy_upgrade("fridge"))
+	var st: Station = game.stations[c]
+	assert_not_null(st._vis.get_node_or_null("door"), "drawn a fridge while still lifted")
+	game.shop_action("turn")
+	assert_eq(st.facing, 1, "R turns it on the tree too, to see its back")
+	assert_true(game.upgrading, "and the tree stays open")
+	game.shop_action("shop")   # back to the ingredients
+	game.shop_action("use")    # E: down with the chosen box in
+	assert_false(game.shopping)
+	assert_eq(st.facing, 1, "set down the way it was turned")
+	assert_false(game.kitchen.stock(c).is_empty(), "a box went in")
+	assert_eq(game.build_action(), "Pick up")
+	assert_true(game.lift(), "the fridge lifts again")
+	assert_true(game.storing())
+	assert_eq(game.player.hand.node, st)
+
+
+func test_a_click_on_a_stocked_fridge_lifts_it_whole_as_e_does():
+	_to_build()
+	var c := _pass_counter_faced()
+	game.player.position = Grid.center(Vector2i(1, 1))   # away from it: the click reaches
+	var st: Station = game.stations[c]
+	st.set_base("fridge")
+	game.kitchen.set_cell(c, "fridge")
+	game._store_box(c, "box_patty")
+	assert_true(game.lift(game.player, Grid.center(c)))
+	assert_true(game.storing(), "its card opens, the box still in it")
+	assert_eq(game.player.hand.node, st)
+	assert_true(game.kitchen.stock(c).has("box_patty"))
+
+
+func test_a_fridge_on_the_pass_shows_its_door_in_front_of_the_pass():
+	var plain := Node3D.new()
+	var on_pass := Node3D.new()
+	Build.station(plain, "counter", 1, "fridge")
+	Build.station(on_pass, "counter", 1, "fridge", true)
+	var front := func(n: Node3D) -> float: return (n.get_node("door") as Node3D).position.z
+	assert_gt(front.call(on_pass), 0.54, "past the pass's front, so it is not hidden inside it")
+	assert_lt(front.call(plain), 0.5, "a plain counter's door is where it was")
+	plain.free()
+	on_pass.free()
+
+
 func test_the_fridge_is_sold_in_the_kitchen_tab_as_a_counter_already_upgraded():
 	_to_build()
 	game.ledger.money = 200

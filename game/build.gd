@@ -1407,7 +1407,7 @@ static func _pass(n: Node3D) -> void:
 ## stacked drawers, a column of three down each side with brass pulls, readable from
 ## any turn; a bare one also swaps its front doors for two rows of drawers. The tool
 ## on top, if any, draws over it as usual.
-static func _double(n: Node3D, front: bool) -> void:
+static func _double(n: Node3D, front: bool, dz := 0.0) -> void:
 	var face := _tint(CABINET, 0.07)
 	for sx: float in [-1.0, 1.0]:
 		for k in 3:
@@ -1419,8 +1419,8 @@ static func _double(n: Node3D, front: bool) -> void:
 	for k in 2:
 		var y := 0.2 + k * 0.28
 		for sx: float in [-1.0, 1.0]:
-			box(n, Vector3(sx * 0.225, y, 0.462), Vector3(0.4, 0.25, 0.03), face)
-			box(n, Vector3(sx * 0.225, y + 0.17, 0.48), Vector3(0.14, 0.035, 0.03), "#d9a441", 0.0, R_WOOD)
+			box(n, Vector3(sx * 0.225, y, 0.462 + dz), Vector3(0.4, 0.25, 0.03), face)
+			box(n, Vector3(sx * 0.225, y + 0.17, 0.48 + dz), Vector3(0.14, 0.035, 0.03), "#d9a441", 0.0, R_WOOD)
 
 
 ## A door's hinge: a node named "door" at the hinge line, which Station.used() swings
@@ -1441,25 +1441,31 @@ static func station(n: Node3D, type: String, tier: int, base := "", pass_look :=
 		register(n)
 		return
 	_station_body(n, type, tier, base, pass_look, node)
-	_base_marks(n, base)
+	_base_marks(n, base, PASS_FRONT if pass_look and not Kitchen.is_tall(base) else 0.0)
 	if node != "" and node != base:
 		_node_marks(n, node)
 
 
+## How far a length of the pass stands proud of a plain counter's front: its marks
+## (drawers, a fridge door) come forward by this, or the pass's body hides them.
+const PASS_FRONT := 0.09
+
+
 ## What an upgraded counter adds under whatever stands on it: a third row of drawers
 ## (long counter), a white fridge front with a frost-blue badge (under-counter fridge),
-## or a whole tall fridge (its top is then not a worktop).
-static func _base_marks(n: Node3D, base: String) -> void:
+## or a whole tall fridge (its top is then not a worktop). `dz` brings the front
+## marks forward onto a length of the pass.
+static func _base_marks(n: Node3D, base: String, dz := 0.0) -> void:
 	match base:
 		"long_counter":
 			_double(n, false)
 			for sx: float in [-1.0, 1.0]:
-				box(n, Vector3(sx * 0.225, 0.06, 0.47), Vector3(0.4, 0.08, 0.03), _tint(CABINET, 0.07))
-				box(n, Vector3(sx * 0.225, 0.07, 0.49), Vector3(0.14, 0.03, 0.03), "#d9a441", 0.0, R_WOOD)
+				box(n, Vector3(sx * 0.225, 0.06, 0.47 + dz), Vector3(0.4, 0.08, 0.03), _tint(CABINET, 0.07))
+				box(n, Vector3(sx * 0.225, 0.07, 0.49 + dz), Vector3(0.14, 0.03, 0.03), "#d9a441", 0.0, R_WOOD)
 		"fridge":
 			# A cold dark inside, seen when the door (hinged on the left) swings open.
-			box(n, Vector3(0, 0.15, 0.455), Vector3(0.84, 0.58, 0.02), "#2b4a52")
-			var door := hinge(n, Vector3(-0.45, 0.0, 0.47))
+			box(n, Vector3(0, 0.15, 0.455 + dz), Vector3(0.84, 0.58, 0.02), "#2b4a52")
+			var door := hinge(n, Vector3(-0.45, 0.0, 0.47 + dz))
 			box(door, Vector3(0.45, 0.13, 0), Vector3(0.9, 0.62, 0.04), "#eef3f4", 0.0, R_GLOSS)
 			box(door, Vector3(0.45, 0.66, 0.03), Vector3(0.6, 0.045, 0.04), "#c9d0d1", 0.0, R_WOOD)
 			cyl(door, Vector3(0.75, 0.32, 0.02), 0.07, 0.02, "#8fc3cf").rotation.x = PI / 2
@@ -1597,7 +1603,7 @@ static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) ->
 
 static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "") -> void:
 	if base == "double_counter":
-		_double(n, type == "counter")
+		_double(n, type == "counter", PASS_FRONT if pass_look else 0.0)
 	if Treatments.is_box(type):
 		treatment_box(n, Treatments.key_of(type))
 		return
@@ -1761,7 +1767,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			for i in 4:
 				ball(n, Vector3(-0.3 + i * 0.2, 0.79, 0.475), 0.04, "#2b2f31")
 		"counter":
-			if pass_look:
+			if pass_look and not Kitchen.is_tall(base):   # a tall fridge stands whole, the pass broken round it
 				_pass(n)
 			else:
 				_counter(n, CABINET, WORKTOP, base != "double_counter")
