@@ -2981,6 +2981,10 @@ func rotate_hand(ch: Player = null) -> void:
 	if not ch.hand.is_empty() and not on_edge(ch.hand.id) and not Catalog.is_build_tool(ch.hand.id) \
 			and not Kitchen.is_high_only(hand_node(ch.hand)):   # a hung piece faces off its wall
 		ch.hand.facing = (int(ch.hand.facing) + 1) % 4
+		if ch.hand.get("carry", false) and ch.hand.get("node") is Station:   # lifted in place: turn it now
+			var st: Station = ch.hand.node
+			st.place_at(st.cell, int(ch.hand.facing))
+			st.position.y = float(ch.hand.get("y", 0.0)) + LIFT
 		sfx("pickup")
 
 
@@ -6466,6 +6470,7 @@ func shop_action(action: String) -> bool:
 		match action:
 			"left", "right", "up", "down": hud.tree_move(action)
 			"back" when storing(): storage_ingredients()
+			"shop" when storing(): storage_ingredients()
 			"back", "shop": close_shop()
 			"use", "confirm": hud.tree_buy()
 			_: return false
@@ -6478,11 +6483,15 @@ func shop_action(action: String) -> bool:
 			"sell":
 				hud.shop_buy()
 				return true
+			"turn":   # the lifted piece turns where it hangs; E sets it down that way round
+				rotate_hand(shopper)
+				return true
 	match action:
 		"left": hud.shop_move(-1)
 		"right": hud.shop_move(1)
 		"up": hud.shop_category(-1)
 		"down": hud.shop_category(1)
+		"shop" when storing() and storage_tree() != "": storage_upgrades()
 		"back", "shop": close_shop()
 		"use", "confirm": hud.shop_buy()
 		"search": hud.focus_search()
