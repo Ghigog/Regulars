@@ -1926,6 +1926,7 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 		total.create_tween().tween_method(func(v: float) -> void: total.text = "$%d" % roundi(v), 0.0, float(earned), 0.9) \
 		.set_delay(0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	_row(box, "", "IN THE BANK:", "$%d" % game.ledger.money)
+	_new_in_shop(box, rec)
 	var note := Sheet.new("note").pad(18, 14, 18, 12)
 	note.rotation = -0.035
 	stack.add_child(note)
@@ -1943,6 +1944,24 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	refresh_ready()
 	if animate:
 		_pop_in(clip)
+
+
+## A day that ended on a new level: "LEVEL 3: NEW IN THE SHOP" and the pieces it opened,
+## as little pictures with their names, so new pieces never turn up unannounced.
+func _new_in_shop(box: VBoxContainer, rec: Dictionary) -> void:
+	var lvl := int(rec.get("level", 1))
+	if lvl <= int(rec.get("level_was", 1)):
+		return
+	var fresh: Array[Dictionary] = []
+	for l in range(int(rec.get("level_was", 1)) + 1, lvl + 1):
+		fresh.append_array(Catalog.unlocked_at(l, Scenery.theme_id))
+	_rule(box)
+	_row(box, "", "LEVEL %d:" % lvl, "NEW IN THE SHOP" if not fresh.is_empty() else "")
+	var names := ", ".join(fresh.map(func(bp: Dictionary) -> String: return Catalog.label(bp)))
+	if names != "":
+		var nl := _label(box, 16, names)
+		nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		nl.custom_minimum_size = Vector2(380, 0)
 
 
 ## The critic's review as a newspaper cutting: masthead, a headline by stars, the
@@ -2016,7 +2035,20 @@ func show_review() -> void:
 	_pop_in(clip)
 
 
-const SHOP_TABS: Array[String] = ["Kitchen", "Pantry", "Dining", "Decor", "Build", "Extras"]
+const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
+## The storage card's tabs (E on a storage piece at night): what goes in it first,
+## then its upgrade tree, then picking it up to move it.
+const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades", "Move"]
+
+
+## The tabs of the tray now open: the shop's, or a storage card's.
+func shop_tabs() -> Array[String]:
+	if not game.storing():
+		return SHOP_TABS
+	var tabs := STORAGE_TABS.duplicate()
+	if game.storage_tree() == "":
+		tabs.erase("Upgrades")
+	return tabs
 const TRAY_DROP := 260.0   # how far below its place the shop tray waits
 
 
@@ -2080,6 +2112,12 @@ func set_search(text: String) -> void:
 
 
 func _set_category(cat: String) -> void:
+	if game.storing() and cat == "Upgrades":
+		game.storage_upgrades()
+		return
+	if game.storing() and cat == "Move":
+		game.storage_move()
+		return
 	if cat != _category and _shop:
 		game.sfx("tab", 0.08)
 	_category = cat
@@ -2240,6 +2278,13 @@ func _hint_text(p := 0) -> String:
 
 
 func _shop_keys_text() -> String:
+	if game.storing():
+		match _mode():
+			"pad":
+				return "A put in or take out      D-pad browse      B close"
+			"touch":
+				return "Tap a box, then tap it again to put it in"
+		return "E put in or take out      Up/Down tabs      Tab close"
 	match _mode():
 		"pad":
 			return "A buy      D-pad browse      B close"
@@ -2261,7 +2306,7 @@ func _build_tip(p := 0) -> String:
 	if hand.is_empty():
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % game.ledger.day
-		return "%s walk      %s pick up      %s shop (Pantry for stock)      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
+		return "%s walk      %s open a counter for stock      %s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
 	if Treatments.is_laying_tool(hand.id):   # a floor treatment (PRD 9.5): laid free, paid each night
 		var k := Treatments.key_of(hand.id)
 		var off: bool = game.treat_off.has(k)
@@ -2420,7 +2465,7 @@ func show_shop() -> void:
 	if _shop:
 		return
 	_search = ""
-	_category = SHOP_TABS[0]
+	_category = shop_tabs()[0]
 	_shop_index = 0
 	build_bar.visible = false
 	_shop = Control.new()
@@ -2524,7 +2569,7 @@ func show_shop() -> void:
 	middle.add_theme_constant_override("separation", 8)
 	strip.add_child(middle)
 	_tabs.clear()
-	for cat: String in SHOP_TABS:
+	for cat: String in shop_tabs():
 		var tab := _button(middle, cat, _set_category.bind(cat))
 		tab.add_theme_font_size_override("font_size", 16)
 		tab.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -2567,10 +2612,12 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		return {"name": "Flyers", "price": "Out" if game.flyers_out else "$%d" % Town.FLYER_PRICE,
 			"blurb": "More guests tomorrow",
 			"can": not game.flyers_out and l.money >= Town.FLYER_PRICE, "locked": false}
+	if game.storing():
+		return _storage_info(bp)
 	var id: String = bp.id
 	var tier: int = bp.tier
 	var locked := l.level() < Catalog.level_of(id, tier)
-	var price := "$%d" % Catalog.price_of(id, tier)
+	var price := "$%d" % Catalog.bp_price(bp)
 	if Treatments.is_box(id):   # free; laying it costs a price a cell each night (PRD 9.5)
 		price = "Free"
 	elif Treatments.is_laying_tool(id):
@@ -2578,9 +2625,22 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 	elif Catalog.is_box(id):   # a box is free to take; its kind costs a fee each night (PRD 8.4)
 		var b := Pantry.station_ingredient(id)
 		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
-	return {"name": Catalog.label(bp), "blurb": Catalog.blurb_of(id, tier), "locked": locked,
+	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp), "locked": locked,
 		"price": "Level %d" % Catalog.level_of(id, tier) if locked else price,
-		"can": game.catalog.can_buy(id, l.money, l.level(), tier)}
+		"can": game.catalog.can_buy(id, l.money, l.level(), tier) and l.money >= Catalog.bp_price(bp)}
+
+
+## A box on the storage card: one stored here is taken out; one that may go in shows
+## its nightly fee; one that may not is dimmed with why ("Needs a fridge").
+func _storage_info(bp: Dictionary) -> Dictionary:
+	var b := Pantry.station_ingredient(bp.id)
+	var fee := "Free" if Treatments.is_box(bp.id) or b.is_empty() else "$%d a night" % Pantry.fee_of(b.id, b.ready)
+	if bp.get("stored", false):
+		return {"name": Catalog.label(bp), "blurb": "Stored here. Take it out", "locked": false,
+			"price": "Take out", "can": true}
+	var why: String = game.kitchen.store_refusal(game.storing_cell, bp.id)
+	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp) if why == "" else why,
+		"locked": why != "", "price": fee if why == "" else why, "can": why == ""}
 
 
 ## Rebuilds the row for the current search and category, keeping the selection on
@@ -2694,7 +2754,8 @@ func shop_move(d: int) -> void:
 
 func shop_category(d: int) -> void:
 	if _shop:
-		_set_category(SHOP_TABS[wrapi(SHOP_TABS.find(_category) + d, 0, SHOP_TABS.size())])
+		var tabs := shop_tabs()
+		_set_category(tabs[wrapi(tabs.find(_category) + d, 0, tabs.size())])
 
 
 ## Buys the piece in the middle. A refusal shakes it; flyers get a little hop.
@@ -2723,7 +2784,8 @@ func show_tree(key: String) -> void:
 		return
 	build_bar.visible = false
 	var p: int = maxi(game.chefs.find(game.shopper), 0)
-	var keys := "%s buy      %s choose      %s close" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p)]
+	var keys := "%s buy      %s choose      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p),
+		"back to ingredients" if game.storing() else "close"]
 	if _mode(p) == "touch":
 		keys = "Tap a step, then tap it again to buy"
 	_tree = TreeScreen.new(game, self, key, keys)

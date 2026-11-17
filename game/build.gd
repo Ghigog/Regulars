@@ -1415,6 +1415,16 @@ static func _double(n: Node3D, front: bool) -> void:
 			box(n, Vector3(sx * 0.225, y + 0.17, 0.48), Vector3(0.14, 0.035, 0.03), "#d9a441", 0.0, R_WOOD)
 
 
+## A door's hinge: a node named "door" at the hinge line, which Station.used() swings
+## open and shut. Its parts are drawn relative to the hinge.
+static func hinge(n: Node3D, at: Vector3) -> Node3D:
+	var h := Node3D.new()
+	h.name = "door"
+	h.position = at
+	n.add_child(h)
+	return h
+
+
 ## Furniture visuals centred on a cell, front facing +z. Tier adds a gold trim.
 ## Shapes and heights are shared by every theme (sheets 8 and 10). `node` is the
 ## piece's place in its upgrade tree (PRD 8.3): a step adds its own marks.
@@ -1436,16 +1446,26 @@ static func _base_marks(n: Node3D, base: String) -> void:
 				box(n, Vector3(sx * 0.225, 0.06, 0.47), Vector3(0.4, 0.08, 0.03), _tint(CABINET, 0.07))
 				box(n, Vector3(sx * 0.225, 0.07, 0.49), Vector3(0.14, 0.03, 0.03), "#d9a441", 0.0, R_WOOD)
 		"fridge":
-			box(n, Vector3(0, 0.13, 0.47), Vector3(0.9, 0.62, 0.04), "#eef3f4", 0.0, R_GLOSS)
-			box(n, Vector3(0, 0.66, 0.5), Vector3(0.6, 0.045, 0.04), "#c9d0d1", 0.0, R_WOOD)
-			cyl(n, Vector3(0.3, 0.32, 0.49), 0.07, 0.02, "#8fc3cf").rotation.x = PI / 2
+			# A cold dark inside, seen when the door (hinged on the left) swings open.
+			box(n, Vector3(0, 0.15, 0.455), Vector3(0.84, 0.58, 0.02), "#2b4a52")
+			var door := hinge(n, Vector3(-0.45, 0.0, 0.47))
+			box(door, Vector3(0.45, 0.13, 0), Vector3(0.9, 0.62, 0.04), "#eef3f4", 0.0, R_GLOSS)
+			box(door, Vector3(0.45, 0.66, 0.03), Vector3(0.6, 0.045, 0.04), "#c9d0d1", 0.0, R_WOOD)
+			cyl(door, Vector3(0.75, 0.32, 0.02), 0.07, 0.02, "#8fc3cf").rotation.x = PI / 2
 		"tall_fridge", "glass_fridge":
 			box(n, Vector3(0, 0.0, 0), Vector3(0.96, 2.1, 0.94), "#eef3f4", 0.0, R_GLOSS)
-			box(n, Vector3(0, 1.32, 0.48), Vector3(0.86, 0.04, 0.02), "#c9d0d1")
-			box(n, Vector3(0.36, 0.9, 0.5), Vector3(0.05, 0.6, 0.04), "#c9d0d1", 0.0, R_WOOD)
-			if base == "glass_fridge":
+			if base == "glass_fridge":   # seen through: no door to swing (PRD 8 fixes)
+				box(n, Vector3(0, 1.32, 0.48), Vector3(0.86, 0.04, 0.02), "#c9d0d1")
+				box(n, Vector3(0.36, 0.9, 0.5), Vector3(0.05, 0.6, 0.04), "#c9d0d1", 0.0, R_WOOD)
 				box(n, Vector3(-0.04, 0.2, 0.485), Vector3(0.66, 1.0, 0.02), "#8fc3cf", 0.0, R_GLOSS)
-			cyl(n, Vector3(-0.3, 1.7, 0.49), 0.08, 0.02, "#8fc3cf").rotation.x = PI / 2
+				cyl(n, Vector3(-0.3, 1.7, 0.49), 0.08, 0.02, "#8fc3cf").rotation.x = PI / 2
+			else:   # the lower door swings open on a dark cold inside; the freezer door stays
+				box(n, Vector3(0, 0.12, 0.475), Vector3(0.84, 1.14, 0.02), "#2b4a52")
+				box(n, Vector3(0, 1.32, 0.48), Vector3(0.86, 0.04, 0.02), "#c9d0d1")
+				cyl(n, Vector3(-0.3, 1.7, 0.49), 0.08, 0.02, "#8fc3cf").rotation.x = PI / 2
+				var door := hinge(n, Vector3(-0.46, 0.0, 0.49))
+				box(door, Vector3(0.46, 0.06, 0), Vector3(0.9, 1.24, 0.03), "#eef3f4", 0.0, R_GLOSS)
+				box(door, Vector3(0.82, 0.9, 0.025), Vector3(0.05, 0.36, 0.04), "#c9d0d1", 0.0, R_WOOD)
 
 
 ## The marks a tree step puts on its tool. An efficient step shows as brass studs on
@@ -1501,9 +1521,13 @@ static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) ->
 			# A teal wall cabinet: two doors with brass pulls under a thin cornice.
 			_add(n, bevel_mesh(Vector3(0.94, 0.86, 0.42), 0.04), Vector3(0, y0 + 0.48, back + 0.21), Color(CABINET), 0.0)
 			box(n, Vector3(0, y0 + 0.9, back + 0.22), Vector3(0.98, 0.05, 0.46), WOOD, 0.0, R_WOOD)
-			for sx: float in [-1.0, 1.0]:
-				box(n, Vector3(sx * 0.225, y0 + 0.1, back + 0.43), Vector3(0.42, 0.76, 0.03), _tint(CABINET, 0.07))
-				box(n, Vector3(sx * 0.07, y0 + 0.14, back + 0.455), Vector3(0.035, 0.16, 0.03), "#d9a441", 0.0, R_WOOD)
+			# The left door swings open on a dark inside when the cabinet is used.
+			box(n, Vector3(-0.225, y0 + 0.12, back + 0.415), Vector3(0.4, 0.72, 0.02), "#2b3a3a")
+			box(n, Vector3(0.225, y0 + 0.1, back + 0.43), Vector3(0.42, 0.76, 0.03), _tint(CABINET, 0.07))
+			box(n, Vector3(0.07, y0 + 0.14, back + 0.455), Vector3(0.035, 0.16, 0.03), "#d9a441", 0.0, R_WOOD)
+			var door := hinge(n, Vector3(-0.435, y0, back + 0.43))
+			box(door, Vector3(0.21, 0.1, 0), Vector3(0.42, 0.76, 0.03), _tint(CABINET, 0.07))
+			box(door, Vector3(0.365, 0.14, 0.025), Vector3(0.035, 0.16, 0.03), "#d9a441", 0.0, R_WOOD)
 		"shelf", "wide_shelf":
 			var planks := 2 if node == "wide_shelf" else 1
 			for i in planks:

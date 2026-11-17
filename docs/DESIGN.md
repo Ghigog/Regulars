@@ -33,8 +33,17 @@ Survive as many days as you can; three walkouts in one day ends the run.
   what stands below. High slots are storage like any other; a cabinet hung over bare
   floor is reached from below or beside it. Floor laid behind a wall, or a door or
   archway through it, is refused while a piece hangs on it alone.
-- **Storage (PRD 8.4).** Ingredients live in storage the player builds. The shop's
-  Pantry tab has a box per food kind of the run's theme (free to take; its kind costs
+- **Storage (PRD 8.4).** Ingredients live in storage the player builds. At night, E on
+  a counter, its fridge line or a shelf opens its **storage card** (fixes after the
+  first playtest, 17 November 2026): an Ingredients tab first, then Upgrades (the
+  counter's tree, bought where it stands, nothing lifted) and Move (picks it up). The
+  Ingredients tab lists what is stored there, then every box: what fits first, then the
+  rest dimmed with why ("Needs a fridge"), so the player learns a fridge exists. The
+  shop's Pantry tab is gone. The Kitchen tab lists the under-counter fridge outright (a
+  counter already upgraded, priced as both) and runs in kitchen order: storage, cooking
+  tools, drinks, the hood, washing up, cleaning, the desk (`Catalog.KITCHEN_GROUPS`).
+  Pieces above the player's level are hidden in the shop, the card and the trees; a day
+  that ends on a new level says "LEVEL N: NEW IN THE SHOP" on the receipt. There is a box per food kind of the run's theme (free to take; its kind costs
   its nightly fee) and, from level 2, ready-made boxes of the chopped kinds and cheese
   (prepped, always plain, 1.5x the fee: `READY_FEE`). A box goes into a free slot: a
   counter holds one kind, a double counter two, a long counter three (`Kitchen.NODES`
@@ -301,7 +310,9 @@ Survive as many days as you can; three walkouts in one day ends the run.
   (it keeps whatever is on it). Click to put it down for free, R to turn it a quarter
   turn (a turned table seats guests above and below), right-click or Esc to put it
   back; a piece still carried when the day opens goes back too. Sell (button or X)
-  refunds half the catalog price. Fixtures (fridge, sink, bin, plate stack, pass
+  refunds half the catalog price, except same-night returns: whatever was paid for a
+  piece since the last day ended (buying it, or an upgrade step) comes back in full if
+  it is sold before the door opens (`spent_tonight` in `game/main.gd`). Fixtures (fridge, sink, bin, plate stack, pass
   counters) can be moved but not sold, and the last stove and last table cannot be sold.
   Player-built partitions move and sell the same way; the entrance wall does not.
 - **Upgrade trees (PRD 8.3).** Nothing is upgraded in the shop. At night, pick a piece
@@ -387,7 +398,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     cell, never dirty); or the spill kit (a covered cell to a puddle, three times a day,
     faster help up). Hood: extractor (less grease, and kitchen grease smells a cell less
     far).
-  - *Treatments (9.5).* Boxes from the Pantry tab, kept in storage (never with food, never
+  - *Treatments (9.5).* Boxes from a storage card's Ingredients tab, kept in storage (never with food, never
     in a fridge), laid a cell at a time with the floor drag at night and re-laid every
     night for their price a cell, paid at the door with the stock. Floor cleaner ($3:
     dirt mops off in one press), strong cleaner ($5: and feet don't track it off), primer

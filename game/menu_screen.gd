@@ -245,7 +245,7 @@ func _page() -> void:
 			b.modulate.a = 0.45
 			_targets.erase(b)
 	if not any:
-		var none := _label(right, 20, "No %s in the kitchen yet: buy %s in the shop." % (["drinks", "a soda fountain or a wine barrel"] if it.course == "drink" else ["food", "a box in the Pantry"]))
+		var none := _label(right, 20, "No %s in the kitchen yet: buy %s in the shop." % (["drinks", "a soda fountain or a wine barrel"] if it.course == "drink" else ["food", "a box: press E on a counter"]))
 		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		none.modulate.a = 0.6
 	# Name, price level, off tonight, delete, done.

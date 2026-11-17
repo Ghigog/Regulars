@@ -185,7 +185,8 @@ func make_tastes(theme_id: String) -> void:
 		if staples.any(func(s: String) -> bool: return likes.has(s)):
 			continue
 		var open := staples.filter(func(s: String) -> bool: return not (p.dislikes as Array).has(s))
-		likes.append(open[r.randi_range(0, open.size() - 1)])
+		if not open.is_empty():   # someone who dislikes every staple keeps their tastes as they are
+			likes.append(open[r.randi_range(0, open.size() - 1)])
 	# Liked tags that came to nothing are dropped, so hints never point at nothing.
 	for p in people:
 		p.liked_tags = (p.liked_tags as Array).filter(func(t: String) -> bool:

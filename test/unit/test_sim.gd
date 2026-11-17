@@ -428,13 +428,21 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 71, "one entry a piece: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
+	assert_eq(Catalog.search().size(), 72, "one entry a piece, and the under-counter fridge sold outright: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen", "diner")
-	assert_eq(kitchen.size(), 14, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, stove, board, the soda fountain, a mop bucket, a hook, a sponge and the desk (PRD 10.6)")
-	assert_eq(kitchen[0].id, "hook", "cheapest first, then by name")
+	assert_eq(kitchen.size(), 15, "the counter, the under-counter fridge, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, stove, board, the soda fountain, a mop bucket, a hook, a sponge and the desk (PRD 10.6)")
+	assert_eq(kitchen.map(func(bp: Dictionary) -> String: return Catalog.label(bp)).slice(0, 4),
+		["Wall shelf", "Counter", "Wall cabinet", "Under-counter fridge"],
+		"storage first, cheapest first within it")
+	assert_eq(str(kitchen[3].get("base", "")), "fridge", "the fridge is a counter already upgraded")
+	assert_eq(Catalog.bp_price(kitchen[3]), Kitchen.price_of("fridge"), "priced as counter and fridge both")
+	assert_eq(str(kitchen[-1].id), "desk", "the desk comes last")
+	assert_eq(Catalog.group_of(kitchen[4]), 1, "then the cooking tools")
+	assert_eq(Catalog.search("", "Kitchen", "diner", 1).filter(func(bp: Dictionary) -> bool:
+		return Catalog.bp_level(bp) > 1).size(), 0, "a level hides what needs a higher one")
 	var pantry := Catalog.search("", "Pantry", "diner")
 	assert_eq(pantry.size(), 17, "a box per boxed diner food kind, four ready-made (PRD 8.4, 8.6) and the floor cleaner (9.5)")
 	assert_eq(pantry[0].id, "box_bun", "boxes are free to take: by name")

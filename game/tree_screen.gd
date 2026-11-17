@@ -123,6 +123,9 @@ func set_root(key: String) -> void:
 	cards.clear()
 	_views.clear()
 	lay = Upgrades.layout(key)
+	for k: String in lay.keys():   # what needs a higher level is hidden, as in the shop
+		if k != key and Upgrades.level(k) > game.ledger.level():
+			lay.erase(k)
 	var ext := Upgrades.extent(lay)
 	_content.size = Vector2(PAD.x * 2 + (ext.x - 1) * COL + CARD.x, PAD.y * 2 + (ext.y - 1) * ROW + CARD.y)
 	view = Vector2(VIEW.x, minf(VIEW.y, _content.size.y))
@@ -169,7 +172,7 @@ func select(k: String) -> void:
 func _why(k: String) -> String:
 	match state_of(k):
 		"held":
-			return "In hand"
+			return "This one" if game.storing() else "In hand"
 		"later":
 			return "Buy the %s first" % Upgrades.name_of(Upgrades.parent(k))
 	if game.ledger.level() < Upgrades.level(k):
@@ -464,7 +467,7 @@ class Card extends Control:
 	func _price() -> String:
 		match screen.state_of(key):
 			"held":
-				return "In hand"
+				return "This one" if screen.game.storing() else "In hand"
 		if screen.game.ledger.level() < Upgrades.level(key):
 			return "Level %d" % Upgrades.level(key)
 		return "+$%d" % Upgrades.step_price(key)

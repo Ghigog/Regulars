@@ -90,6 +90,8 @@ func refund(amount: int) -> void:
 func end_day() -> Dictionary:
 	var record := today.duplicate()
 	record["day"] = day
+	record["level"] = level()
+	record["level_was"] = int(history[-1].get("level", 1)) if not history.is_empty() else 1
 	history.append(record)
 	today = _blank()
 	day += 1

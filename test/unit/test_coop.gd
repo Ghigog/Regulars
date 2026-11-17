@@ -311,5 +311,5 @@ func test_each_players_hint_line_uses_their_own_device():
 	assert_eq(game.hud._prompts[1].key_label.text, "A", "chef 2's bubble shows the pad's button")
 	assert_true(game.hud._prompts[1].tag.visible, "and their numbered tag")
 	_to_build()
-	assert_string_contains(game.hud._build_tip(1), "A pick up")
-	assert_string_contains(game.hud._build_tip(0), "E pick up")
+	assert_string_contains(game.hud._build_tip(1), "A open a counter")
+	assert_string_contains(game.hud._build_tip(0), "E open a counter")

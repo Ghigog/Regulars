@@ -595,6 +595,7 @@ func test_buying_a_step_turns_the_held_piece_into_it():
 	assert_eq([st.type, st.node], ["slicer", "slicer"])
 	assert_eq(game.kitchen.get_piece(Vector2i(2, 5), "top"), "slicer")
 	assert_true(game.pick_up(_at(2, 5)))
+	game.ledger.day += 1   # a later night: no same-night return
 	assert_eq(game.sell_value(), Kitchen.price_of("slicer") / 2, "sold for its whole price, as before: half")
 
 
@@ -640,6 +641,7 @@ func test_a_fern_climbs_its_short_tree():
 	assert_eq((game.hand.node as Station).tier, 2)
 	assert_eq(int(game.hand.tier), 2)
 	assert_eq(game.ledger.money, 500 - (Catalog.price_of("plant", 2) - Catalog.price_of("plant")))
+	game.ledger.day += 1   # a later night: no same-night return
 	assert_eq(game.sell_value(), Catalog.price_of("plant", 2) / 2)
 
 

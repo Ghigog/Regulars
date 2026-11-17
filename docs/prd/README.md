@@ -15,6 +15,7 @@ project can build it. Read `CLAUDE.md` first, then the PRD, then only the code i
 | 8 | [Counters, storage and the tool tree](08-counters-storage-tools.md) | Very large, seven milestones | nothing | Built (16 November 2026, all seven milestones) |
 | 9 | [Floor mess and cleaning](09-floor-mess.md) | Large, six milestones | 8, from 9.4 on | Built (16 November 2026, all six milestones) |
 | 10 | [Staff](10-staff.md) | Very large, eight milestones | 8, 9 (per milestone) | Built (16 November 2026, all eight milestones) |
+| 11 | [Paying the bill](11-paying.md) | Large, four milestones | 10 for 11.4 | Written (17 November 2026) |
 
 ## Suggested order
 

@@ -216,7 +216,8 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	game.open_shop()
 	assert_true(game.shopping)
 	assert_eq(game.hud._category, "Kitchen", "there is no All tab")
-	var kitchen: int = Catalog.search("", "Kitchen", Scenery.theme_id).size()
+	var kitchen: int = game.shop_items("", "Kitchen").size()
+	assert_lt(kitchen, Catalog.search("", "Kitchen", Scenery.theme_id).size(), "pieces above the level are hidden")
 	assert_eq(game.hud._cards.get_child_count(), kitchen)
 	game.hud.set_search("fern")
 	assert_eq(game.hud._cards.get_child_count(), 1, "a search looks through every category")
@@ -228,7 +229,7 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	game.hud.shop_move(-1)
 	assert_eq(game.hud._shop_index, kitchen - 1, "left from the first wraps to the last")
 	game.hud.shop_category(1)
-	assert_eq(game.hud._category, "Pantry")
+	assert_eq(game.hud._category, "Dining", "the Pantry tab went: boxes go in from a storage card")
 	game.close_shop()
 	assert_null(game.hud._shop)
 	game.start_day()
@@ -460,6 +461,7 @@ func test_partition_can_be_picked_up_moved_and_sold():
 	assert_false(game.grid.walls.has(Vector3i(6, 3, 1)))
 	assert_true(game.place(Vector3i(6, 4, 1)))
 	assert_true(game.grid.walls.has(Vector3i(6, 4, 1)))
+	game.ledger.day += 1   # a later night: no same-night return
 	assert_true(game.pick_up(Vector3(6.05, 0, 4.5)))
 	assert_true(game.sell_hand())
 	assert_eq(game.ledger.money, 145)
@@ -1255,6 +1257,7 @@ func test_rug_lies_flat_and_is_moved_and_sold_like_a_fern():
 	assert_true(game.pick_catalog("floor_planks"))
 	assert_false(game.remove_at(Vector3i(7, 4, 0)), "no lifting the floor out from under a rug")
 	game.cancel_hand()
+	game.ledger.day += 1   # a later night: no same-night return
 	assert_true(game.pick_up(Vector3(5.5, 0, 0.5)))
 	assert_true(game.sell_hand())
 	assert_eq(game.ledger.money, 87, "half back")
@@ -2502,6 +2505,7 @@ func test_starting_over_shows_the_theme_card_but_not_the_title():
 
 
 func test_the_shop_lists_only_what_the_theme_sells():
+	game.ledger.xp = 1000   # every level, so nothing is hidden
 	var ids := func() -> Array:
 		return game.shop_items().map(func(bp: Dictionary) -> String: return str(bp.id))
 	var diner: Array = ids.call()
@@ -2682,3 +2686,136 @@ func test_the_critic_orders_even_when_nothing_suits_them():
 	assert_not_null(c)
 	assert_false(c.planned.main.is_empty(), "never turned away by the menu")
 	assert_ne(c.state, "browse")
+
+
+func _plain_counter() -> Vector2i:
+	for c: Vector2i in game.stations:
+		var st: Station = game.stations[c]
+		if st.type == "counter" and st.base == "counter" and game.kitchen.stock(c).is_empty():
+			return c
+	return game.NO_CELL
+
+
+func test_a_storage_card_shows_boxes_first_and_dims_what_needs_a_fridge():
+	_to_build()
+	var c := _plain_counter()
+	assert_ne(c, game.NO_CELL, "the start has a bare counter")
+	assert_true(game.open_storage(c))
+	assert_true(game.storing())
+	assert_eq(game.hud._category, "Ingredients", "ingredients come first")
+	assert_eq(game.hud.shop_tabs(), ["Ingredients", "Upgrades", "Move"])
+	var items: Array[Dictionary] = game.shop_items("", "Ingredients")
+	var patty := items.filter(func(bp: Dictionary) -> bool: return bp.id == "box_patty")
+	assert_eq(patty.size(), 1, "a fridge-only kind is still listed, so the player learns of fridges")
+	assert_eq(game.hud._storage_info(patty[0]).price, "Needs a fridge")
+	assert_false(game.hud._storage_info(patty[0]).can)
+	assert_true(game.kitchen.store_refusal(c, items[0].id) == "", "what fits comes first")
+	assert_true(game.buy({"id": "box_bun", "tier": 1}))
+	assert_true(game.kitchen.stock(c).has("box_bun"), "put straight in, the card still open")
+	assert_true(game.storing())
+	assert_true(game.shop_items("", "Ingredients")[0].get("stored", false), "what is stored is listed first")
+	assert_true(game.buy({"id": "box_bun", "tier": 1, "stored": true}))
+	assert_false(game.kitchen.stock(c).has("box_bun"), "and taken out again")
+	game.close_shop()
+	assert_false(game.storing())
+
+
+func test_the_upgrades_tab_upgrades_a_counter_where_it_stands():
+	_to_build()
+	game.ledger.money = 200
+	var c := _plain_counter()
+	game.open_storage(c)
+	game.storage_upgrades()
+	assert_true(game.upgrading)
+	assert_true(game.buy_upgrade("fridge"))
+	assert_eq(game.stations[c].base, "fridge", "the counter is a fridge, still standing there")
+	assert_eq(game.kitchen.get_piece(c, "base"), "fridge")
+	assert_eq(game.ledger.money, 200 - Upgrades.step_price("fridge"))
+	game.storage_ingredients()
+	assert_false(game.upgrading)
+	assert_true(game.storing(), "back on the card's ingredients")
+	assert_true(game.buy({"id": "box_patty", "tier": 1}), "a fridge takes patties")
+	game.close_shop()
+	assert_true(game.player.hand.is_empty(), "nothing was lifted")
+	assert_eq(game.stations[c].cell, c)
+
+
+func test_the_move_tab_picks_the_piece_up():
+	_to_build()
+	var c := _plain_counter()
+	game.open_storage(c)
+	game.storage_move()
+	assert_false(game.shopping)
+	assert_true(game.player.hand.get("moving", false), "picked up to move, as E used to")
+
+
+func test_the_fridge_is_sold_in_the_kitchen_tab_as_a_counter_already_upgraded():
+	_to_build()
+	game.ledger.money = 200
+	var fridge := Catalog.node_blueprint("fridge")
+	assert_true(game.shop_items("", "Kitchen").has(fridge))
+	assert_true(game.pick_catalog(fridge.id, 1, null, "fridge"))
+	assert_eq(int(game.hand.price), Kitchen.price_of("fridge"))
+	var spot := Vector3i(3, 4, 0)
+	assert_true(game.place(spot))
+	var st: Station = game.stations[Vector2i(3, 4)]
+	assert_eq(st.base, "fridge", "placed as a fridge, not stacked onto a counter")
+	assert_eq(game.ledger.money, 200 - Kitchen.price_of("fridge"))
+
+
+func test_crates_stand_on_open_counters_and_closed_ones_keep_a_tag():
+	_to_build()
+	var c := _plain_counter()
+	game._store_box(c, "box_bun")
+	var st: Station = game.stations[c]
+	assert_true(st.shows_crates())
+	assert_not_null(st.get_node_or_null("crates"), "the crate stands on the counter")
+	assert_null(st.get_node_or_null("box_tags"))
+	st.set_base("fridge")
+	game.kitchen.set_cell(c, "fridge")
+	game._show_boxes(c)
+	assert_false(st.shows_crates())
+	assert_not_null(st.get_node_or_null("box_tags"), "a fridge keeps its stock inside, a tag over it")
+	assert_not_null(st._vis.get_node_or_null("door"), "with a door that swings open when used")
+
+
+func test_a_day_ending_on_a_new_level_says_what_is_new_in_the_shop():
+	var l := Ledger.new()
+	assert_eq(int(l.end_day().get("level", 0)), 1)
+	l.xp = Ledger.XP_PER_LEVEL
+	var rec := l.end_day()
+	assert_eq(int(rec.level), 2)
+	assert_eq(int(rec.level_was), 1)
+	var fresh := Catalog.unlocked_at(2, "diner").map(func(bp: Dictionary) -> String: return str(bp.id))
+	assert_true(fresh.has("table") and fresh.has("bin"), "tables and the bin open at level 2")
+	assert_false(fresh.has("sink"), "the sink waits for level 3")
+
+
+func test_a_piece_sold_the_night_it_was_bought_comes_back_at_full_price():
+	_to_build()
+	game.ledger.money = 200
+	assert_true(game.pick_catalog("counter"))
+	assert_true(game.place(Vector3i(3, 4, 0)))
+	game.cancel_hand()
+	assert_eq(game.ledger.money, 185)
+	assert_true(game.pick_up(Grid.center(Vector2i(3, 4))))
+	assert_eq(game.sell_value(), 15, "a same-night return")
+	assert_true(game.sell_hand())
+	assert_eq(game.ledger.money, 200)
+
+
+func test_an_older_piece_sells_for_half_and_tonights_upgrade_comes_back_whole():
+	_to_build()
+	game.ledger.money = 200
+	assert_true(game.pick_catalog("counter"))
+	assert_true(game.place(Vector3i(3, 4, 0)))
+	game.cancel_hand()
+	game.ledger.day += 1   # a night later: last night's counter is second-hand now
+	var c := Vector2i(3, 4)
+	game.open_storage(c)
+	game.storage_upgrades()
+	assert_true(game.buy_upgrade("fridge"))
+	game.close_shop()
+	assert_true(game.pick_up(Grid.center(c)))
+	assert_eq(game.sell_value(), Kitchen.price_of("counter") / 2 + Upgrades.step_price("fridge"),
+		"half for the counter, all of tonight's fridge step")

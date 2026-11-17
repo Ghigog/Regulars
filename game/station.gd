@@ -55,6 +55,7 @@ var _shown_look := ""
 var _vis: Node3D
 var _fx := {}
 var _tags: Node3D
+var _crates: Node3D   # the boxes of stock drawn standing on an open counter
 
 
 static func quality_at(t: float) -> float:
@@ -474,6 +475,8 @@ func place_at(cell_: Vector2i, facing_: int) -> void:
 	facing = posmod(facing_, 4)
 	position = Grid.center(cell)
 	_vis.rotation.y = facing * PI / 2
+	if _crates:
+		_crates.rotation.y = _vis.rotation.y
 	seats = seats_for(type, cell, facing)
 	if lamp:
 		lamp.position = position + Vector3(0, 1.0, 0)
@@ -533,12 +536,39 @@ func set_boxes(b: Array, y := 1.6) -> void:
 	if _tags:
 		_tags.queue_free()
 		_tags = null
+	if _crates:
+		_crates.queue_free()
+		_crates = null
 	if boxes.is_empty():
+		return
+	if shows_crates():   # an open counter: the crates themselves stand on it
+		_crates = Node3D.new()
+		_crates.name = "crates"
+		add_child(_crates)
+		_crates.rotation.y = _vis.rotation.y
+		var gap := 0.86 / boxes.size()
+		for i in boxes.size():
+			var cr := Node3D.new()
+			cr.position = Vector3(-0.43 + gap * (i + 0.5), CRATE_Y, -0.2)
+			cr.scale = Vector3.ONE * minf(CRATE_SCALE, gap * 0.95)
+			_crates.add_child(cr)
+			Build.station(cr, str(boxes[i]), 1)
 		return
 	_tags = Node3D.new()
 	_tags.name = "box_tags"
 	add_child(_tags)
 	Build.box_tags(_tags, boxes, y)
+
+
+const CRATE_Y := 0.9        # an open counter's worktop
+const CRATE_SCALE := 0.72   # a crate on a worktop, big enough to read at 20 px
+
+
+## Whether its stock is drawn as crates standing on it: a bare counter, double or long.
+## A fridge or cabinet keeps its stock inside (the tag says what) and opens its door
+## when used; a tool on a counter leaves no room, so it keeps the tag too.
+func shows_crates() -> bool:
+	return type == "counter" and base in ["counter", "double_counter", "long_counter"] and not high
 
 
 ## A little show when the chef uses the station: a door swings open.

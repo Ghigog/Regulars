@@ -60,6 +60,16 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+**Stock you can see (playtest fixes, 17 November 2026)**
+- A bare counter (single, double or long) shows its stored crates standing at the back
+  of the worktop, the same crate the storage card shows, side by side a slot each, so
+  it is plain the buns come from there. No icon card over it.
+- Closed storage keeps its stock inside with the icon card over it: the under-counter
+  and tall fridges and the wall cabinet each have a hinged door (`Build.hinge`) that
+  swings open on a dark inside when a chef or helper takes from or puts into it. The
+  glass-door fridge has no door to swing. A tool standing on a counter leaves no room
+  for crates, so that counter keeps the card too.
+
 **The wall layer (PRD 8.5)**
 - The kitchen's fixed hood, wall cabinets and jar shelf are placed pieces now, one cell
   each: two hoods side by side read as the one long canopy (a square frustum squashed to

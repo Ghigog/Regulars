@@ -234,8 +234,48 @@ func _init(seed_value := 1) -> void:
 
 
 static func label(bp: Dictionary) -> String:
+	if bp.get("base", "") != "":   # a counter sold already upgraded (a fridge)
+		return str(Kitchen.NODES[bp.base].name)
 	var tier: int = bp.tier
 	return str(ITEMS[bp.id].name) + (" " + "+".repeat(tier - 1) if tier > 1 else "")
+
+
+## Tree nodes the Kitchen tab also sells outright, as their root piece already upgraded:
+## a fridge is a counter at its fridge node, priced as both.
+const SHOP_NODES: Array[String] = ["fridge"]
+
+
+## The blueprint the shop shows for one of SHOP_NODES.
+static func node_blueprint(node: String) -> Dictionary:
+	return {"id": Kitchen.family_of(Kitchen.root_of(node)), "tier": 1, "node": node, "base": node}
+
+
+## What a blueprint costs: a catalog piece at its tier, or a shop node's full price.
+static func bp_price(bp: Dictionary) -> int:
+	if bp.get("base", "") != "":
+		return Kitchen.price_of(bp.base)
+	return price_of(bp.id, int(bp.tier))
+
+
+static func bp_blurb(bp: Dictionary) -> String:
+	if bp.get("base", "") != "":
+		return Upgrades.blurb(bp.base)
+	return blurb_of(bp.id, int(bp.tier))
+
+
+## Where a Kitchen piece sits in the tab, in kitchen order: storage, cooking tools,
+## drinks, the hood, washing up, cleaning, the desk. Other tabs are one group.
+const KITCHEN_GROUPS := {"counter": 0, "fridge": 0, "shelf": 0, "cabinet": 0, "hood": 3,
+	"bin": 4, "sink": 4, "dish_rack": 4, "mop_bucket": 5, "hook": 5, "sponge": 5, "robot_dock": 5, "desk": 6}
+
+
+static func group_of(bp: Dictionary) -> int:
+	var key: String = bp.get("base", "") if bp.get("base", "") != "" else bp.id
+	if ITEMS.has(bp.id) and ITEMS[bp.id].category != "Kitchen":
+		return 0
+	if KITCHEN_GROUPS.has(key):
+		return KITCHEN_GROUPS[key]
+	return 2 if tool_of(bp.id) == "pour" else (1 if tool_of(bp.id) != "" else 7)
 
 
 ## Two different blueprints to choose between tonight.
@@ -316,11 +356,14 @@ func can_buy(id: String, money: int, level: int, tier := 1) -> bool:
 	return tier >= 1 and tier <= int(ITEMS[id].tiers) and money >= price_of(id, tier) and level >= level_of(id, tier)
 
 
-## Everything for sale that matches, cheapest first. `query` is matched against the
-## name, the category and what the piece does; an empty query or category matches all.
-static func search(query := "", category := "", theme := "") -> Array[Dictionary]:
+## Everything for sale that matches: by tab, then (in the Kitchen tab) kitchen order,
+## then cheapest first. `query` is matched against the name, the category and what the
+## piece does; an empty query or category matches all. `level` above 0 leaves out what
+## needs a higher level (the shop hides it).
+static func search(query := "", category := "", theme := "", level := 0) -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	var words := query.strip_edges().to_lower().split(" ", false)
+	var offered: Array[Dictionary] = []
 	for id: String in ITEMS:
 		var item: Dictionary = ITEMS[id]
 		if category != "" and item.category != category:
@@ -332,18 +375,44 @@ static func search(query := "", category := "", theme := "") -> Array[Dictionary
 			continue   # reached only through its tree (PRD 8.3)
 		if Treatments.is_laying_tool(id) or (Treatments.is_box(id) and not Treatments.is_root(Treatments.key_of(id))):
 			continue   # a laying tool is listed by the game while its box is stored (PRD 9.5)
-		var bp := {"id": id, "tier": 1}   # higher tiers are steps in the piece's tree now
-		var text := ("%s %s %s" % [label(bp), item.category, blurb_of(id, 1)]).to_lower()
+		offered.append({"id": id, "tier": 1})   # higher tiers are steps in the piece's tree now
+		if node != "":
+			for n in SHOP_NODES:
+				if Kitchen.root_of(n) == node:
+					offered.append(node_blueprint(n))
+	for bp in offered:
+		if level > 0 and bp_level(bp) > level:
+			continue
+		var text := ("%s %s %s" % [label(bp), ITEMS[bp.id].category, bp_blurb(bp)]).to_lower()
 		var hit := true
 		for w in words:
 			hit = hit and text.contains(w)
 		if hit:
 			found.append(bp)
 	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		var pa := price_of(a.id, a.tier)
-		var pb := price_of(b.id, b.tier)
+		var ca := CATEGORIES.find(ITEMS[a.id].category)
+		var cb := CATEGORIES.find(ITEMS[b.id].category)
+		if ca != cb:
+			return ca < cb
+		var ga := group_of(a)
+		var gb := group_of(b)
+		if ga != gb:
+			return ga < gb
+		var pa := bp_price(a)
+		var pb := bp_price(b)
 		return pa < pb if pa != pb else label(a) < label(b))
 	return found
+
+
+## What a theme's shop first offers at a level: pieces needing exactly that level,
+## in shop order (the receipt's "new in the shop" line).
+static func unlocked_at(lvl: int, theme := "") -> Array[Dictionary]:
+	return search("", "", theme).filter(func(bp: Dictionary) -> bool: return bp_level(bp) == lvl)
+
+
+## The level a blueprint needs: a shop node needs its root piece's.
+static func bp_level(bp: Dictionary) -> int:
+	return level_of(bp.id, int(bp.tier))
 
 
 func can_shelve(bp: Dictionary) -> bool:

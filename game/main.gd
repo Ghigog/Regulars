@@ -144,6 +144,8 @@ var upgrading := false           # the shop is showing the upgrade tree of what 
 ## switched off (still laid, not paid for or in force).
 var treat_laid := {}
 var treat_off := {}
+const NO_CELL := Vector2i(-99, -99)
+var storing_cell := NO_CELL      # the storage card is open on this cell (E on a counter, shelf or fridge)
 var shopping: bool:              # the shop is open over the build phase
 	get: return shopper != null
 var door_open := true            # which side of the door card faces the street
@@ -681,7 +683,7 @@ func _apply_demo(demo: String) -> void:
 		ledger.record_sale(DEMO_BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_desk.bind(demo))
-	elif demo in ["pantry", "storage"]:   # PRD 8.4: the shop's Pantry tab; boxes in counters and a fridge; shoot at 3
+	elif demo in ["pantry", "storage", "storage_card", "storage_card_up", "boxes_open"]:   # PRD 8.4: boxes in counters and a fridge; a counter's storage card; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.money = 300
 		arrivals.clear()
@@ -825,13 +827,20 @@ func _demo_counters() -> void:
 ## Storage (PRD 8.4): "storage" a double counter with two boxes and a board on it, two
 ## under-counter fridges with the chilled kinds, ready-made in a
 ## pass counter, and a box held over a counter (its tags show what each cell holds);
-## "pantry" the shop open on its Pantry tab.
+## "storage_card" (or "pantry") a plain counter's storage card on Ingredients, the chilled
+## kinds dimmed "Needs a fridge"; "storage_card_up" the same card on Upgrades.
 func _demo_storage(demo: String) -> void:
 	open_build()
-	if demo == "pantry":
-		open_shop()
-		hud._set_category("Pantry")
-		get_tree().create_timer(0.3).timeout.connect(hud.shop_move.bind(1))
+	if demo in ["pantry", "storage_card", "storage_card_up"]:
+		var plain := NO_CELL
+		for c: Vector2i in stations:
+			if stations[c].type == "counter" and stations[c].base == "counter" and plain == NO_CELL:
+				plain = c
+		open_storage(plain)
+		if demo == "storage_card_up":
+			storage_upgrades()
+		else:
+			get_tree().create_timer(0.3).timeout.connect(hud.shop_move.bind(1))
 		return
 	var sea := Scenery.seaside()
 	for step: Array in [["counter", 2, 5], ["counter", 2, 5]]:
@@ -843,7 +852,11 @@ func _demo_storage(demo: String) -> void:
 	add_station("board", Vector2i(2, 5))
 	stock_box("calamari" if sea else "cheese", Vector2i(1, 6))   # a second under-counter fridge
 	stock_box("pepper" if sea else "tomato", Vector2i(4, 5), true)
-	pick_catalog("box_lemon" if sea else "box_onion")
+	if demo == "boxes_open":   # the crates on the counter, and a fridge door caught open at 3
+		get_tree().create_timer(1.8).timeout.connect(func() -> void: station_at(Vector2i(1, 6)).used())
+		get_tree().create_timer(1.8).timeout.connect(func() -> void: station_at(Vector2i(0, 5)).used())
+	else:
+		pick_catalog("box_lemon" if sea else "box_onion")
 	player.position = Grid.center(Vector2i(3, 3))
 	player.look(Vector2i(1, 0))
 	_demo_hover = Vector3(4.5, 0, 3.5)
@@ -1731,6 +1744,8 @@ static func hand_node(h: Dictionary) -> String:
 		return st.base if st.type == "counter" and st.base != "" else st.node
 	if h.get("id", "") == "sponge":
 		return "hook"   # sold hanging on its own hook (PRD 9.4)
+	if h.get("base", "") != "":
+		return h.base   # a counter sold as a fridge
 	return Kitchen.node_of(str(h.get("id", "")))
 
 
@@ -2173,8 +2188,17 @@ func open_build() -> void:
 ## each floor treatment with its box stored (PRD 9.5) under Build, and the flyers under Extras.
 func shop_items(query := "", category := "") -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
+	if storing():   # the storage card: what is stored here, then every box there is
+		for box: String in kitchen.stock(storing_cell):
+			found.append({"id": box, "tier": 1, "stored": true})
+		for bp in Catalog.search(query, "Pantry", Scenery.theme_id, ledger.level()):
+			if not kitchen.stock(storing_cell).has(bp.id):
+				found.append(bp)
+		found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:   # what fits first
+			return _storage_rank(a) < _storage_rank(b))
+		return found
 	if category != "Extras":
-		found = Catalog.search(query, category, Scenery.theme_id)
+		found = Catalog.search(query, category, Scenery.theme_id, ledger.level())
 	if category == "" or category == "Build":
 		for k: String in Treatments.ITEMS:
 			var id := Treatments.tool_id(k)
@@ -2226,6 +2250,9 @@ func open_shop(ch: Player = null) -> void:
 func close_shop() -> void:
 	if not shopping:
 		return
+	if upgrading and shopper.hand.get("in_place", false):
+		shopper.hand = {}   # upgraded where it stands: nothing was lifted
+	storing_cell = NO_CELL
 	shopper = null
 	sfx("slide", 0.0, 0.8)
 	if upgrading:
@@ -2265,6 +2292,20 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		hud.show_build()
 		return true
 	var st: Station = ch.hand.node
+	_bought_tonight(st, Upgrades.step_price(to))   # an upgrade bought tonight comes back whole too
+	if ch.hand.get("in_place", false):   # the storage card: upgraded where it stands
+		if Kitchen.is_tall(to) and kitchen.get_piece(st.cell, "high") != "":
+			ledger.refund(Upgrades.step_price(to))
+			st.set_meta("fresh", spent_tonight(st) - Upgrades.step_price(to))
+			sfx("fail")
+			hud.say("A tall fridge needs the wall above clear. Take down what hangs there first.")
+			return false
+		st.set_base(to)
+		kitchen.set_cell(st.cell, to)
+		_show_boxes(st.cell)
+		menu_changed()
+		sfx("coin")
+		return true
 	if st.type == "hook" and Kitchen.tool_of(to) != "":   # the hook's tool is swapped
 		clean_kit.upgrade_tool(st, Kitchen.tool_of(to))
 		sfx("coin")
@@ -2282,6 +2323,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		up.setup(to, st.cell, st.tier, st.facing, st.base, st.pass_look)
 		up.stacked = st.stacked
 		up.visible = false
+		_bought_tonight(up, spent_tonight(st))   # what was paid tonight goes with it
 		clean_kit.upgrade_home(st, up, Kitchen.tool_of(to))   # a bucket's mop goes with it (PRD 9.5)
 		st.queue_free()
 		ch.hand.node = up
@@ -2301,14 +2343,122 @@ func _swap_treatment(was: String, now: String) -> void:
 		treat_off[now] = true
 
 
+# ---------------------------------------------------------------- the storage card
+
+## Whether the tray open is a storage card rather than the shop.
+func storing() -> bool:
+	return shopping and storing_cell != NO_CELL
+
+
+## The storage cell in front of a chef with empty hands: a bare counter (or its fridge
+## line) or a piece on the wall that keeps boxes. A tool on a counter is picked up, so
+## it is not one. NO_CELL if none.
+func _storage_in_front(ch: Player) -> Vector2i:
+	if not ch.hand.is_empty():
+		return NO_CELL
+	var c := ch.target_cell()
+	if kitchen.slots(c) == 0 or (stations.has(c) and needs_cleaning(stations[c])):
+		return NO_CELL
+	var st: Station = stations.get(c)
+	if st != null and not st.type in ["counter", "shelf"]:
+		return NO_CELL
+	return c
+
+
+## Opens the storage card on a cell: its boxes first, then its upgrades.
+func open_storage(cell: Vector2i, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if phase != Phase.BUILD or shopping or cell == NO_CELL or hud.card_open():
+		return false
+	shopper = ch
+	storing_cell = cell
+	sfx("slide")
+	hud.show_shop()
+	return true
+
+
+## The tree key of the storage piece standing at the open card's cell ("" when it has
+## no tree, or only a piece on the wall keeps boxes there).
+func storage_tree() -> String:
+	var st: Station = stations.get(storing_cell)
+	if st == null or st.type != "counter":
+		return ""
+	var key := Upgrades.key_of(st.type, st.tier, st.base)
+	return key if Upgrades.has_tree(key) else ""
+
+
+## The card's Upgrades tab: the tree of the piece where it stands, nothing lifted.
+func storage_upgrades() -> void:
+	var key := storage_tree()
+	if key == "" or not storing():
+		sfx("fail")
+		return
+	var ch := shopper
+	var st: Station = stations[storing_cell]
+	ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
+		"node": st, "in_place": true, "from": Vector3i(st.cell.x, st.cell.y, 0), "from_facing": st.facing}
+	hud.hide_shop()
+	upgrading = true
+	sfx("tab", 0.08)
+	hud.show_tree(key)
+
+
+## Back from the Upgrades tab to the card's Ingredients.
+func storage_ingredients() -> void:
+	if not upgrading:
+		return
+	shopper.hand = {}
+	upgrading = false
+	hud.hide_tree()
+	sfx("tab", 0.08)
+	hud.show_shop()
+
+
+## The card's Move tab: shut it and pick the piece up as E used to.
+func storage_move() -> void:
+	var ch := shopper
+	var cell := storing_cell
+	close_shop()
+	pick_up(Grid.center(cell), ch)
+
+
+## Ranks a box on the card: stored here, then ones that fit, then ones that do not.
+func _storage_rank(bp: Dictionary) -> int:
+	if bp.get("stored", false):
+		return 0
+	return 1 if kitchen.store_refusal(storing_cell, bp.id) == "" else 2
+
+
+## Takes a box out of the open card's cell, or puts one in. The card stays open.
+func _storage_buy(bp: Dictionary) -> bool:
+	var ok := false
+	if bp.get("stored", false):
+		ok = kitchen.unstore(storing_cell, bp.id)
+	else:
+		ok = _store_box(storing_cell, bp.id)
+	if not ok:
+		sfx("fail")
+		return false
+	_show_boxes(storing_cell)
+	var st := station_at(storing_cell)
+	if st:
+		st.used()   # a fridge or cabinet swings its door open
+	menu_changed()
+	sfx("putdown")
+	hud._refresh_catalog()
+	return true
+
+
 ## Buys what the shop is showing. Flyers are paid for at once; a piece goes into
 ## the hands of the chef whose player is shopping, and the shop shuts, so it can
 ## be carried to its place.
 func buy(bp: Dictionary) -> bool:
+	if storing():
+		return _storage_buy(bp)
 	if bp.id == FLYERS.id:
 		if buy_flyers():
 			return true
-	elif pick_catalog(bp.id, int(bp.tier), shopper):
+	elif pick_catalog(bp.id, int(bp.tier), shopper, bp.get("base", "")):
 		sfx("pickup")
 		close_shop()
 		return true
@@ -2317,14 +2467,18 @@ func buy(bp: Dictionary) -> bool:
 
 
 ## Picks a piece from the catalog to place. Nothing is paid until it is placed.
-func pick_catalog(id: String, tier := 1, ch: Player = null) -> bool:
+## `base` is a tree node the shop sells outright (a counter already a fridge).
+func pick_catalog(id: String, tier := 1, ch: Player = null, base := "") -> bool:
 	ch = _me(ch)
+	var bp := Catalog.node_blueprint(base) if base != "" else {"id": id, "tier": tier}
 	if phase != Phase.BUILD or Cleaning.carrying_mess(ch.held) or not catalog.can_buy(id, ledger.money, ledger.level(), tier) \
-			or not Catalog.sold_in(id, Scenery.theme_id):
+			or ledger.money < Catalog.bp_price(bp) or not Catalog.sold_in(id, Scenery.theme_id):
 		return false
 	if ch.hand.get("moving", false):
 		cancel_hand(ch)
-	ch.hand = {"id": id, "tier": tier, "price": Catalog.price_of(id, tier), "facing": 0}
+	ch.hand = {"id": id, "tier": tier, "price": Catalog.bp_price(bp), "facing": 0}
+	if base != "":
+		ch.hand.base = base
 	hud.show_build()
 	return true
 
@@ -2380,9 +2534,13 @@ func pick_up(p: Vector3, ch: Player = null) -> bool:
 			st.set_base(Kitchen.unstacked(st.base))
 			st.stacked = false
 			kitchen.set_cell(c, st.base)
+			var moved := mini(spent_tonight(stations[c]), Kitchen.price_of("counter"))   # tonight's counter comes off first
+			if moved > 0:
+				stations[c].set_meta("fresh", spent_tonight(stations[c]) - moved)
 			st = Station.new()
 			add_child(st)
 			st.setup("counter", c, 1, stations[c].facing)
+			_bought_tonight(st, moved)
 		else:
 			_unregister(st)
 		st.visible = false
@@ -2480,9 +2638,24 @@ func sell_value(ch: Player = null) -> int:
 	if not ch.hand.get("moving", false) or not Catalog.ITEMS.has(ch.hand.id):
 		return 0
 	var key := hand_key(ch)
-	if key != "":
-		return Upgrades.price(key) / 2   # the piece's whole price, upgrades and all
-	return Catalog.price_of(ch.hand.id, int(ch.hand.tier)) / 2
+	var whole := Upgrades.price(key) if key != "" else Catalog.price_of(ch.hand.id, int(ch.hand.tier))   # upgrades and all
+	var fresh := mini(spent_tonight(ch.hand.get("node")), whole)
+	return (whole - fresh) / 2 + fresh   # half back, but what was bought tonight comes back whole
+
+
+## Same-night returns: what was paid tonight for a piece (bought or upgraded since the
+## last day ended) is paid back in full if it is sold before the door opens.
+func _bought_tonight(n: Object, amount: int) -> void:
+	if n == null or amount <= 0:
+		return
+	n.set_meta("fresh", spent_tonight(n) + amount)
+	n.set_meta("fresh_night", ledger.day)
+
+
+func spent_tonight(n: Variant) -> int:
+	if not (n is Object) or n == null or int(n.get_meta("fresh_night", -1)) != ledger.day:
+		return 0
+	return int(n.get_meta("fresh", 0))
 
 
 ## Why the carried piece cannot be sold; empty when it can.
@@ -2693,18 +2866,26 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		sfx("putdown")
 		hud.show_build()
 		return true
+	var paid := int(ch.hand.price)
 	if ch.hand.id == "screen":
 		var n := add_wall(cell, spot.z, 0.9 + 0.1 * int(ch.hand.tier))
 		n.set_meta("tier", int(ch.hand.tier))
 		wall_nodes[spot] = n
+		_bought_tonight(n, paid)
 	elif ch.hand.id == "rug":
 		add_rug(cell, int(ch.hand.facing))
-	elif Kitchen.is_counter(ch.hand.id) and _bare_counter(cell) != null:
+		_bought_tonight(rug_at(cell), paid)
+	elif Kitchen.is_counter(ch.hand.id) and ch.hand.get("base", "") == "" and _bare_counter(cell) != null:
+		_bought_tonight(_bare_counter(cell), paid)
 		_stack_counter(cell)
 	elif layer_for(cell, hand_node(ch.hand)) == "high":
-		clean_kit.on_built(add_high(hand_node(ch.hand) if ch.hand.id == "sponge" else ch.hand.id, cell), ch.hand.id)
+		var hung := add_high(hand_node(ch.hand) if ch.hand.id == "sponge" else ch.hand.id, cell)
+		_bought_tonight(hung, paid)
+		clean_kit.on_built(hung, ch.hand.id)
 	else:
-		clean_kit.on_built(add_station(ch.hand.id, cell, int(ch.hand.tier), int(ch.hand.facing)), ch.hand.id)
+		var st := add_station(ch.hand.id, cell, int(ch.hand.tier), int(ch.hand.facing), ch.hand.get("base", ""))
+		_bought_tonight(st, paid)
+		clean_kit.on_built(st, ch.hand.id)
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
 	sfx("putdown")
 	_after_building(ch)
@@ -2714,7 +2895,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 ## A new piece or tool stays in hand while there is money for another.
 func _after_building(ch: Player = null) -> void:
 	ch = _me(ch)
-	if not catalog.can_buy(ch.hand.id, ledger.money, ledger.level(), int(ch.hand.tier)):
+	if not catalog.can_buy(ch.hand.id, ledger.money, ledger.level(), int(ch.hand.tier)) or ledger.money < int(ch.hand.price):
 		ch.hand = {}
 	hud.show_build()
 
@@ -2963,6 +3144,8 @@ func build_action(ch: Player = null) -> String:
 		return clean
 	if desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
 		return "Use desk"
+	if _storage_in_front(ch) != NO_CELL and not Cleaning.carrying_mess(ch.held) and not CleanKit.holding(ch):
+		return "Open"
 	if not Cleaning.carrying_mess(ch.held) and not CleanKit.holding(ch) and _piece_in_front(ch) != Vector3.INF:
 		return "Pick up"
 	return door_action(ch)
@@ -3026,6 +3209,8 @@ func build_interact(ch: Player = null) -> void:
 			pick_up(_piece_in_front(ch), ch)
 		"Use desk":
 			open_desk(ch)
+		"Open":
+			open_storage(_storage_in_front(ch), ch)
 		"Open up", "Take out rubbish":
 			use_door(ch)
 			hud.show_build()
@@ -3066,7 +3251,7 @@ func _update_ghost(ch: Player = null) -> void:
 				var hs: Station = ch.hand.node
 				Build.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" else "", false, hs.node)
 			else:
-				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier))
+				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier), ch.hand.get("base", ""))
 			if layer != "" and wall_facing.has(cell):
 				_layer_band(ch.ghost, layer, int(wall_facing[cell]) - (0 if layer == "high" else int(ch.hand.facing)))
 	var p := hover
@@ -5480,6 +5665,7 @@ func shop_action(action: String) -> bool:
 	if upgrading:
 		match action:
 			"left", "right", "up", "down": hud.tree_move(action)
+			"back" when storing(): storage_ingredients()
 			"back", "shop": close_shop()
 			"use", "confirm": hud.tree_buy()
 			_: return false
