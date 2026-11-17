@@ -87,7 +87,7 @@ func test_tab_keeps_a_lifted_counter_in_hand_with_its_boxes():
 	game.kitchen.store(c, "box_bun")
 	_face(Vector2i(5, 3), Vector2i(-1, 0))
 	game.build_interact()
-	game.shop_action("shop")
+	game.shop_action("back")
 	assert_false(game.shopping)
 	assert_eq(game.player.hand.id, "counter")
 	assert_eq(game.player.hand.get("stock", []), ["box_bun"])
