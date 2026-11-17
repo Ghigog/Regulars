@@ -447,7 +447,7 @@ func _stick_home() -> Vector2:
 
 
 func _options() -> bool:
-	return game.hud != null and game.hud.options_open()
+	return game.hud != null and (game.hud.options_open() or game.hud.pause_open())
 
 
 func _stick_shown() -> bool:

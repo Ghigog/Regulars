@@ -262,11 +262,11 @@ func test_start_on_an_unseated_pad_joins_and_on_a_seated_one_opens_options():
 	assert_eq(game.chefs.size(), 2, "pad 1 joined")
 	assert_false(game.hud.options_open(), "joining does not open the options")
 	_tap_pad(JOY_BUTTON_START, 1)
-	assert_true(game.hud.options_open(), "Start on a seated pad opens the options")
-	game.hud.toggle_options()
+	assert_true(game.hud.pause_open(), "Start on a seated pad opens the pause menu")
+	game.hud.toggle_pause()
 	_tap_pad(JOY_BUTTON_START, 0)
-	assert_true(game.hud.options_open(), "and on player one's pad")
-	game.hud.toggle_options()
+	assert_true(game.hud.pause_open(), "and on player one's pad")
+	game.hud.toggle_pause()
 
 
 func test_holding_start_leaves():
