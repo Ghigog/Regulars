@@ -2332,10 +2332,10 @@ func _shop_keys_text() -> String:
 	if game.storing() and game.shopper.hand.get("carry", false):   # the piece is lifted
 		match _mode():
 			"pad":
-				return "A put down with it in      X put in or take out      B carry it"
+				return "A put down with it in      X put in or take out      %s turn      B carry it" % _g("turn")
 			"touch":
 				return "Tap a box to put it in or take it out      Use put down"
-		return "E put down with it in      Enter put in or take out      Tab carry it"
+		return "E put down with it in      Enter put in or take out      R turn      Tab carry it"
 	if game.storing():
 		match _mode():
 			"pad":
@@ -2863,6 +2863,8 @@ func show_tree(key: String) -> void:
 	var p: int = maxi(game.chefs.find(game.shopper), 0)
 	var keys := "%s buy      %s choose      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p),
 		"back to ingredients" if game.storing() else "close"]
+	if game.shopper != null and game.shopper.hand.get("node") is Station:   # the piece in hand turns
+		keys += "      %s turn" % _g("turn", p)
 	if _mode(p) == "touch":
 		keys = "Tap a step, then tap it again to buy"
 	_tree = TreeScreen.new(game, self, key, keys)

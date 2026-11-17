@@ -715,7 +715,7 @@ func _apply_demo(demo: String) -> void:
 		ledger.record_sale(DEMO_BILL, 5)
 		arrivals.clear()
 		get_tree().create_timer(1.0).timeout.connect(_demo_desk.bind(demo))
-	elif demo in ["pantry", "storage", "storage_card", "storage_card_up", "boxes_open"]:   # PRD 8.4: boxes in counters and a fridge; a counter's storage card; shoot at 3
+	elif demo in ["pantry", "storage", "storage_card", "storage_card_up", "storage_fridge", "boxes_open"]:   # PRD 8.4: boxes in counters and a fridge; a counter's storage card; shoot at 3
 		ledger.record_sale(DEMO_BILL, 5)
 		ledger.money = 300
 		arrivals.clear()
@@ -860,19 +860,27 @@ func _demo_counters() -> void:
 ## under-counter fridges with the chilled kinds, ready-made in a
 ## pass counter, and a box held over a counter (its tags show what each cell holds);
 ## "storage_card" (or "pantry") a plain counter's storage card on Ingredients, the chilled
-## kinds dimmed "Needs a fridge"; "storage_card_up" the same card on Upgrades.
+## kinds dimmed "Needs a fridge"; "storage_card_up" the same card on Upgrades;
+## "storage_fridge" the counter upgraded to a fridge while lifted, back on Ingredients.
 func _demo_storage(demo: String) -> void:
 	open_build()
-	if demo in ["pantry", "storage_card", "storage_card_up"]:
+	if demo in ["pantry", "storage_card", "storage_card_up", "storage_fridge"]:
 		var plain := NO_CELL
+		var side := Vector2i(0, 1) if demo == "storage_fridge" else Vector2i(1, 0)   # the fridge's door in view
 		for c: Vector2i in stations:
-			if stations[c].type == "counter" and stations[c].base == "counter" and plain == NO_CELL:
+			if stations[c].type == "counter" and stations[c].base == "counter" and not stations[c].has_node("till") \
+					and not stations.has(c + side) and plain == NO_CELL:
 				plain = c
-		player.position = Grid.center(plain + Vector2i(1, 0))
-		player.look(Vector2i(-1, 0))
+		player.position = Grid.center(plain + side)
+		player.look(-side)
 		lift()   # E: the counter rises with its card open
 		if demo == "storage_card_up":
 			storage_upgrades()
+		elif demo == "storage_fridge":   # upgraded to a fridge while lifted, back on its card
+			storage_upgrades()
+			buy_upgrade("fridge")
+			storage_ingredients()
+			rotate_hand()   # turned on its card, the door toward the camera
 		else:
 			get_tree().create_timer(0.3).timeout.connect(hud.shop_move.bind(1))
 		return
@@ -2629,9 +2637,10 @@ func storage_ingredients() -> void:
 ## shelf, cabinet or fridge, PRD 8.4) rises where it stands with its storage card open:
 ## choose a box and E puts the piece back down with it in (`storage_put_down`); Tab or Esc
 ## keeps it in hand, its boxes with it, to carry elsewhere.
-func lift(ch: Player = null) -> bool:
+## `at`: a point on the piece (a mouse click); by default the one in front of the chef.
+func lift(ch: Player = null, at := Vector3.INF) -> bool:
 	ch = _me(ch)
-	var p := _piece_in_front(ch)
+	var p := _piece_in_front(ch) if at == Vector3.INF else at
 	if p == Vector3.INF:
 		return false
 	var c := Grid.to_cell(p)
@@ -6473,6 +6482,8 @@ func shop_action(action: String) -> bool:
 			"shop" when storing(): storage_ingredients()
 			"back", "shop": close_shop()
 			"use", "confirm": hud.tree_buy()
+			"turn" when shopper.hand.get("node") is Station:   # turn it round to see its back
+				rotate_hand(shopper)
 			_: return false
 		return true
 	if storing() and shopper.hand.get("carry", false):
@@ -6565,7 +6576,7 @@ func _build_mouse(event: InputEvent, ch: Player) -> void:
 			if not place(snap(p, ch), ch):
 				sfx("fail")
 		else:
-			pick_up(p, ch)
+			lift(ch, p)   # as E does: a piece that keeps boxes rises with its card open
 	elif not ch.drag.is_empty() and (right == bool(ch.drag.remove) or erase):
 		finish_drag(ch.drag.from, p, ch.drag.remove, ch)
 
