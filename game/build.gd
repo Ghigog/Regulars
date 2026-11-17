@@ -789,57 +789,148 @@ static func _layer(n: Node3D, id: String, y: float, first: bool, last: bool, coa
 	return 0.03
 
 
-## A tray as built so far: the main stacked on a plate, the side in a dish and the
-## drink in a cup, each in the order the menu item lists it. `tag` is the colour of
-## the ticket slip clipped to the rim ("" for no ticket).
-static func tray(t: Tray, tag := "", bitten := false) -> Node3D:
+## Tonight's menu, for drawing a loose stack in the order of the item it is heading for.
+## The game keeps it current.
+static var menu: Array = []
+
+
+static func menu_items() -> Array:
+	return menu
+
+
+## An empty plate as served on: white, a low rim. Its top is at 0.015.
+static func _serving_plate(n: Node3D, pos := Vector3.ZERO) -> void:
+	lathe(n, pos, [[0.0, 0.0], [0.11, 0.0], [0.18, 0.025], [0.185, 0.035], [0.165, 0.035], [0.11, 0.015], [0.0, 0.015]], "#f6efe0", 0.0, R_GLOSS)
+
+
+## An empty cup: a pale tumbler, wider at the top.
+static func _empty_cup(n: Node3D, pos := Vector3.ZERO) -> void:
+	_add(n, lathe_mesh([[0.0, 0.0], [0.05, 0.0], [0.065, 0.17], [0.058, 0.17], [0.045, 0.012], [0.0, 0.012]], 16), pos, Color("#dfeef0"), 0.0, R_GLOSS)
+	cyl(n, pos + Vector3(0, 0.165, 0), 0.066, 0.01, CORAL)
+
+
+## Food stacked in the order `ids` lists it, skipping any whose `have` is below 0. One
+## bread in a stack of several wraps it: a heel below, the dome on top. `bitten`: half eaten.
+static func _food(spot: Node3D, ids: Array, have: Array, y: float, bitten := false) -> void:
+	var placed := 0
+	for k in ids.size():
+		if float(have[k]) >= 0.0:
+			placed += 1
+	var wrap: bool = ids.size() > 1 and Pantry.is_bread(ids[0]) and ids.count(ids[0]) == 1 and float(have[0]) >= 0.0
+	var shown := 0
+	var coat := _breaded(ids, have)
+	for k in ids.size():
+		if float(have[k]) < 0.0:
+			continue
+		shown += 1
+		if bitten and shown > maxi(1, placed / 2):
+			break
+		y += _layer(spot, ids[k], y, k == 0, k == ids.size() - 1 and not wrap, coat)
+	if wrap and not bitten:
+		_layer(spot, ids[0], y, false, true)
+
+
+## A plate, a cup, or a loose stack of food on a worktop, as it is now.
+static func dish(d: Dish, items: Array = []) -> Node3D:
 	var n := Node3D.new()
-	_tray_board(n)
-	if tag != "":
-		box(n, Vector3(-0.2, 0.06, 0.24), Vector3(0.16, 0.1, 0.012), PAPER).rotation.x = -0.3
-		box(n, Vector3(-0.2, 0.09, 0.244), Vector3(0.16, 0.03, 0.012), tag).rotation.x = -0.3
+	if d == null:
+		return n
+	if items.is_empty():
+		items = menu
+	if d.dirty:
+		return item("dirty_cup" if d.vessel == Dish.CUP else "dirty_plate")
+	var lay := d.layout(items)
+	if d.vessel == Dish.CUP:
+		if d.is_empty():
+			_empty_cup(n)
+		else:
+			ingredient(n, str(lay[0][0]) if not (lay[0] as Array).is_empty() else d.ings[0], "prep")
+		return n
+	var y := 0.0
+	if d.vessel == Dish.PLATE:
+		_serving_plate(n)
+		y = 0.015
+	if d.ings.size() == 1 and d.vessel == "":
+		ingredient(n, d.ings[0], "prep")
+		return n
+	_food(n, lay[0], lay[1], y)
+	return n
+
+
+## Several dishes carried: side by side in the hands, or on a tray (`on_tray`) two by two.
+static func carried(dishes: Array, on_tray: bool) -> Node3D:
+	var n := Node3D.new()
+	if on_tray:
+		_tray_board(n)
+	var spots := [Vector3(-0.15, 0.0, 0.0), Vector3(0.15, 0.0, 0.0), Vector3(-0.15, 0.0, -0.18), Vector3(0.15, 0.0, -0.18)] \
+		if on_tray else [Vector3(-0.2, 0.0, 0.0), Vector3(0.2, 0.0, 0.0)]
+	for i in dishes.size():
+		var d := dish(dishes[i])
+		d.position = spots[mini(i, spots.size() - 1)] + Vector3(0, 0.035 if on_tray else 0.0, 0.1 if on_tray else 0.0)
+		d.scale = Vector3.ONE * (0.72 if on_tray else 0.85)
+		n.add_child(d)
+	return n
+
+
+## A guest's order as served, on the table: the main on its plate, the side on a small
+## plate, the drink beside them. Only the lines served so far. `bitten`: half eaten.
+static func meal(t: Tray, bitten := false) -> Node3D:
+	var n := Node3D.new()
 	if t == null:
 		return n
 	for l in t.lines:
+		var placed := false
+		for q: float in l.have:
+			placed = placed or q >= 0.0
+		if not placed:
+			continue
 		var spot := Node3D.new()
 		n.add_child(spot)
 		var course: String = l.item.course
-		var y := 0.03
+		var y := 0.015
 		if course == "main":
 			spot.position = Vector3(-0.1, 0, 0)
-			lathe(spot, Vector3(0, 0.03, 0), [[0.0, 0.0], [0.11, 0.0], [0.18, 0.025], [0.185, 0.035], [0.165, 0.035], [0.11, 0.015], [0.0, 0.015]], "#f6efe0", 0.0, R_GLOSS)
-			y = 0.045
+			_serving_plate(spot)
 		elif course == "side":
 			spot.position = Vector3(0.18, 0, 0.11)
-			spot.scale = Vector3.ONE * 0.62
-			lathe(spot, Vector3(0, 0.03, 0), [[0.0, 0.0], [0.12, 0.0], [0.17, 0.08], [0.15, 0.08], [0.1, 0.02], [0.0, 0.02]], "#9fd3de", 0.0, R_GLOSS)
-			y = 0.05
+			spot.scale = Vector3.ONE * 0.7
+			_serving_plate(spot)
 		else:
-			spot.position = Vector3(0.2, 0.03, -0.11)
-		var ings: Array = l.item.ingredients
-		var placed := 0
-		for k in ings.size():
-			if float(l.have[k]) >= 0.0:
-				placed += 1
-		if course == "drink":
-			if placed > 0:
-				ingredient(spot, ings[0], "prep")
+			spot.position = Vector3(0.2, 0.0, -0.11)
+			ingredient(spot, l.item.ingredients[0], "prep")
 			continue
-		# One bread in a stack of several wraps it: a heel below, the dome on top.
-		var wrap: bool = ings.size() > 1 and Pantry.is_bread(ings[0]) \
-			and ings.count(ings[0]) == 1 and float(l.have[0]) >= 0.0
-		var shown := 0
-		var coat := _breaded(ings, l.have)
-		for k in ings.size():
-			if float(l.have[k]) < 0.0:
-				continue
-			shown += 1
-			if bitten and course == "main" and shown > maxi(1, placed / 2):
-				break
-			y += _layer(spot, ings[k], y, k == 0, k == ings.size() - 1 and not wrap, coat)
-		if wrap and not bitten:
-			_layer(spot, ings[0], y, false, true)
+		_food(spot, l.item.ingredients, l.have, y, bitten and course == "main")
 	return n
+
+
+## A whole order on a tray board, for the menu screen's turning picture.
+static func tray(t: Tray, tag := "", bitten := false) -> Node3D:
+	var n := Node3D.new()
+	_tray_board(n)
+	var m := meal(t, bitten)
+	m.position.y = 0.03
+	n.add_child(m)
+	return n
+
+
+## A stack of clean plates, cups or trays on its counter.
+static func stack_load(n: Node3D, type: String, count: int) -> void:
+	for i in count:
+		var t: Node3D
+		match type:
+			"plates":
+				t = Node3D.new()
+				_serving_plate(t)
+				t.position = Vector3(0, 0.916 + i * 0.022, 0)
+			"cups":   # two rows of upturned cups
+				t = Node3D.new()
+				_empty_cup(t)
+				t.rotation.x = PI
+				t.position = Vector3(-0.2 + (i % 3) * 0.2, 0.916 + 0.18 + (i / 3) * 0.0, -0.12 + (i / 3) * 0.24)
+			_:
+				t = item("tray")
+				t.position = Vector3(0, 0.916 + i * 0.04, 0)
+		n.add_child(t)
 
 
 ## Whether a stack is breaded: a fillet and a coating (breadcrumbs) both on it.
@@ -867,14 +958,21 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 	match kind:
 		"tray":
 			_tray_board(n)
-		"dirty_tray":
-			_tray_board(n)
-			lathe(n, Vector3(-0.1, 0.03, 0), [[0.0, 0.0], [0.11, 0.0], [0.18, 0.025], [0.185, 0.035], [0.165, 0.035], [0.11, 0.015], [0.0, 0.015]], "#f6efe0", 0.0, R_GLOSS)
-			lathe(n, Vector3(-0.09, 0.05, 0.0), [[0.05, 0.0], [0.07, 0.008], [0.09, 0.0]], "#7a4a2b", 0.0, R_GLOSS)
-			ball(n, Vector3(-0.12, 0.05, 0.02), 0.022, "#7a4a2b", 0.0, R_GLOSS)
-			cyl(n, Vector3(0.2, 0.03, -0.11), 0.06, 0.16, "#e9dcc8").rotation.z = 1.35
-			for c: Vector3 in [Vector3(0.1, 0.05, 0.12), Vector3(-0.2, 0.05, -0.12), Vector3(0.18, 0.05, 0.1)]:
+		"plate":
+			_serving_plate(n)
+		"cup":
+			_empty_cup(n)
+		"dirty_plate":
+			# A smeared plate with crumbs and a gravy ring.
+			_serving_plate(n)
+			lathe(n, Vector3(0.01, 0.02, 0.0), [[0.05, 0.0], [0.07, 0.008], [0.09, 0.0]], "#7a4a2b", 0.0, R_GLOSS)
+			ball(n, Vector3(-0.03, 0.02, 0.02), 0.022, "#7a4a2b", 0.0, R_GLOSS)
+			for c: Vector3 in [Vector3(0.08, 0.025, 0.06), Vector3(-0.08, 0.025, -0.06), Vector3(0.05, 0.025, -0.08)]:
 				box(n, c, Vector3(0.035, 0.02, 0.03), "#e0a850").rotation.y = c.x * 20.0
+		"dirty_cup":
+			_empty_cup(n)
+			cyl(n, Vector3(0, 0.012, 0), 0.046, 0.025, "#8a5a3a")   # a last drop in the bottom
+			box(n, Vector3(0.02, 0.2, 0), Vector3(0.014, 0.14, 0.014), PAPER).rotation.z = 0.35
 		"tool:mop", "tool:sponge_mop", "tool:flat_mop", "tool:wringer_mop", "tool:scrubber":
 			# Held out at the side, head on the floor, the pole leaning out (PRD 9.4). Held
 			# items are tipped 25 degrees to the camera (Player.move); a pole stands back
@@ -1128,7 +1226,7 @@ static func box_tags(n: Node3D, boxes: Array, y := 1.6) -> void:
 ## piled up, a heap of suds that rises over the rim (readable from across the room).
 static func sink_load(n: Node3D, plates: int, piled: bool) -> void:
 	for i in mini(plates, 4):
-		var p := item("dirty_tray")
+		var p := item("dirty_plate")
 		p.position = Vector3(-0.15 + i * 0.1, 0.95 + 0.01 * i, 0.06)
 		p.rotation = Vector3(0.0, 0.0, -1.15)
 		p.scale = Vector3.ONE * 0.8
@@ -1773,7 +1871,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 				_counter(n, CABINET, WORKTOP, base != "double_counter")
 		"pass":
 			_pass(n)
-		"trays":
+		"plates", "cups", "tray_stack":
 			_counter(n, CABINET, WORKTOP)
 			_add(n, bevel_mesh(Vector3(0.74, 0.02, 0.54), 0.008), Vector3(0, 0.9, 0), Color(CORAL), 0.0)
 		"sink":

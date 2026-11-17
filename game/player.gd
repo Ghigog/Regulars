@@ -5,13 +5,17 @@ extends Node3D
 const SPEED := 4.4
 const RADIUS := 0.28
 const REACH := 1.3   # how far from a station's centre (or a seated guest) the chef can use it
-const GROSS_ITEMS: Array[String] = ["dirty_tray", "rubbish_bag"]   # and anything burnt
+const GROSS_ITEMS: Array[String] = ["dirty_dishes", "rubbish_bag"]   # and anything burnt
+const HANDS := 2      # plates or cups carried in the hands
+const ON_TRAY := 4    # plates or cups carried on a tray
 
 var game
 var held := ""
 var held_quality := 1.0
-var tray: Tray                    # the tray in hand, when held is "tray"
-var tray_tag := ""                # the colour of its ticket slip
+## Plates, cups and loose stacks in hand: held is "dishes" (clean, with or without food)
+## or "dirty_dishes" (eaten off) while there are any; "tray" for an empty tray in hand.
+var dishes: Array[Dish] = []
+var on_tray := false              # they are carried on a tray, which takes ON_TRAY
 var bill: Bill                    # the printed bill in hand, when held is "bill" (PRD 11)
 var give_t := 0.0                 # seconds E has been held handing the bill over
 var give_at: Node3D               # the table (or the till) it is being handed over at
@@ -69,16 +73,24 @@ func set_trim(t: int) -> void:
 		add_child(fresh)
 		move_child(fresh, at)
 		if held != "":
-			set_held(held, held_quality, tray, tray_tag)
+			set_held(held, held_quality, dishes, on_tray)
 	else:
 		add_child(Peg.rigged(_body))
 
 
-func set_held(kind: String, quality := 1.0, tray_: Tray = null, tag := "") -> void:
+## What is in hand. For "dishes" and "dirty_dishes", `dishes_` are the dishes and
+## `tray_` whether they ride on a tray ("tray" alone is an empty tray). Anything else
+## empties the hands of dishes and tray.
+func set_held(kind: String, quality := 1.0, dishes_: Array = [], tray_ := false) -> void:
+	if kind in ["dishes", "dirty_dishes"] and dishes_.is_empty():
+		kind = "tray" if tray_ else ""
 	held = kind
 	held_quality = quality
-	tray = tray_ if kind == "tray" else null
-	tray_tag = tag if kind == "tray" else ""
+	var ds: Array[Dish] = []
+	if kind in ["dishes", "dirty_dishes"]:
+		ds.assign(dishes_)
+	dishes = ds
+	on_tray = tray_ and kind in ["dishes", "dirty_dishes", "tray"]
 	if kind != "bill":
 		bill = null
 		stop_giving()
@@ -87,7 +99,7 @@ func set_held(kind: String, quality := 1.0, tray_: Tray = null, tag := "") -> vo
 		_held_node = null
 	_body.pose = "carry" if kind != "" else "idle"
 	if kind != "":
-		_held_node = Build.tray(tray, tray_tag) if kind == "tray" else Build.item(kind, quality)
+		_held_node = Build.carried(dishes, on_tray) if kind in ["dishes", "dirty_dishes", "tray"] else Build.item(kind, quality)
 		_held_node.position = Vector3(0, 0.42, 0.34)
 		_body.add_child(_held_node)
 		_held_size = 0.4
@@ -210,6 +222,37 @@ func punch() -> void:
 func carry(on: bool) -> void:
 	if held == "":
 		_body.pose = "carry" if on else "idle"
+
+
+## How many plates or cups the hands take now: more on a tray.
+func capacity() -> int:
+	return ON_TRAY if on_tray else HANDS
+
+
+## Room for one more dish of this kind (clean or dirty) in hand.
+func has_room(dirty := false) -> bool:
+	if held == "" or (held == "tray" and on_tray):
+		return true
+	return held == ("dirty_dishes" if dirty else "dishes") and dishes.size() < capacity()
+
+
+## Adds a dish to the hands (see `has_room`).
+func take_dish(d: Dish) -> void:
+	var ds: Array = dishes.duplicate()
+	ds.append(d)
+	set_held("dirty_dishes" if d.dirty else "dishes", 1.0, ds, on_tray)
+
+
+## Takes a dish out of the hands, keeping the rest (and the tray).
+func drop_dish(d: Dish) -> void:
+	var ds: Array = dishes.duplicate()
+	ds.erase(d)
+	set_held(held, 1.0, ds, on_tray)
+
+
+## Redraws what is held after a dish in hand changed.
+func show_held() -> void:
+	set_held(held, held_quality, dishes, on_tray)
 
 
 func carrying_something_gross() -> bool:

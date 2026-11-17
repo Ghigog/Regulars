@@ -18,12 +18,18 @@ extends RefCounted
 ##       on a tool, "held" in someone's hands. Each covers one of a ticket's lacks. `kind`
 ##       is what it is being made into (a lemon on a juicer is lemonade); `form`, what it
 ##       is now ("raw:lemon"), where that differs from `HelperWork.hold_for(kind)`.
-##   tickets:  [{id, cell, lacks: [kinds], wait: seconds, assembled: bool, tray: bool}]
+##   tickets:  [{id, cell, lacks: [kinds], wait: seconds, assembled: bool, plated: bool, started: bool,
+##       unplated: int}]
 ##       an order on the rail. `lacks`: ingredients it still needs made (a kind twice for
-##       two). With nothing lacking and no tray yet, it is a tray to assemble at `cell`.
-##       With no tray at all (`tray` false) a tray is started for it first (PRD 10.7), so
-##       what is made goes straight on it instead of filling the worktops.
-##   trays:    [{id, cell, table, wait}]   a built tray at the pass, to carry.
+##       two). With nothing lacking and food still loose, it is assembled at `cell`.
+##       Until each of its items has a plate or cup set out (`plated` false), they are set
+##       out first (PRD 10.7), so what is made goes straight on them instead of filling
+##       the worktops. `started`: some are out already; `unplated`: how many are still to
+##       set out, a worktop each.
+##   dishes:   [{id, cell, cells, table, wait}]   one or two finished plates or cups on
+##       worktops (`cells`) for the same table, to carry together.
+##   leftovers: [{cell}]  a plate or cup set out for an order that no longer needs it:
+##       scraped into the bin and put back on its stack.
 ##   tables:   [{id, cell, state: "order" | "clear", wait}]
 ##   bills:    [{id, cell, wait}]   a table ready to pay with no slip printed yet (PRD 11.4):
 ##       `id` is the table's number, `cell` where the bill is handed over.
@@ -34,12 +40,12 @@ extends RefCounted
 ##   bins:     [{cell, full: bool}]
 ##   burnt:    [{cell, duty}]              burnt food on a tool, blocking it: scraped into the
 ##       bin by whoever works that tool (`duty`, PRD 10.7).
-##   tray_room: int                        free worktops a tray could be started on.
+##   plate_room: int                       free worktops plates could be set out on.
 
 ## How urgent each kind of task is before it waits, in points. (tunable)
 const URGENCY := {
-	"help_up": 6.0, "carry": 5.0, "tray": 4.5, "assemble": 4.0, "scrap": 3.8, "prep": 3.5, "bill": 3.5, "fetch": 3.0, "order": 3.0,
-	"clear": 2.0, "dirt": 1.0, "wash": 1.5, "bin": 1.5,
+	"help_up": 6.0, "carry": 5.0, "plates": 4.5, "assemble": 4.0, "scrap": 3.8, "prep": 3.5, "bill": 3.5, "fetch": 3.0, "order": 3.0,
+	"clear": 2.0, "tidy": 2.0, "dirt": 1.0, "wash": 1.5, "bin": 1.5,
 }
 const DIRT_FROM := 2           # dirt at this level or more is a task
 const DIRT_PER_LEVEL := 0.5    # tunable: urgency a level of dirt adds over `DIRT_FROM`
@@ -54,7 +60,7 @@ const BAD_BASE := 0.4          # bad chance for a one-star cook at a base tool
 
 ## The duties for each task type. Prep is the tool's (`Staff.duty_of_tool`), per station.
 const DUTIES := {
-	"fetch": ["fetch"], "assemble": ["assemble"], "tray": ["assemble"], "carry": ["carry_trays"], "order": ["take_orders"],
+	"fetch": ["fetch"], "assemble": ["assemble"], "plates": ["assemble"], "tidy": ["assemble"], "carry": ["carry_trays"], "order": ["take_orders"],
 	"bill": ["take_payment"], "clear": ["clear_tables"], "help_up": ["help_up"], "wash": ["wash_up"], "bin": ["empty_bin"],
 }
 
@@ -76,8 +82,11 @@ func rebuild(world: Dictionary) -> void:
 	for st: Dictionary in world.get("stations", []):
 		_stations[st.id] = st
 	_ingredient_tasks(world)
-	for t: Dictionary in world.get("trays", []):
-		_add("carry:%s" % str(t.id), "carry", t.cell, float(t.get("wait", 0.0)), {"tray": t.id, "table": t.get("table")})
+	for t: Dictionary in world.get("dishes", []):
+		_add("carry:%s" % str(t.id), "carry", t.cell, float(t.get("wait", 0.0)),
+			{"cells": t.get("cells", [t.cell]), "table": t.get("table")})
+	for t: Dictionary in world.get("leftovers", []):
+		_add("tidy:%d,%d" % [t.cell.x, t.cell.y], "tidy", t.cell, 0.0)
 	for t: Dictionary in world.get("tables", []):
 		var type := "order" if t.state == "order" else "clear"
 		_add("%s:%s" % [type, str(t.id)], type, t.cell, float(t.get("wait", 0.0)), {"table": t.id})
@@ -136,7 +145,8 @@ func _add(key: String, type: String, cell: Vector2i, wait: float, extra := {}) -
 func _ingredient_tasks(world: Dictionary) -> void:
 	var items: Array = (world.get("items", []) as Array).duplicate()
 	var storage: Array = world.get("storage", [])
-	var room := int(world.get("tray_room", 99))
+	var room := int(world.get("plate_room", 99))
+	var waiting_plates := false
 	for t: Dictionary in world.get("tickets", []):
 		var lacks: Array = t.get("lacks", [])
 		var wait := float(t.get("wait", 0.0))
@@ -144,13 +154,18 @@ func _ingredient_tasks(world: Dictionary) -> void:
 			if not t.get("assembled", false):
 				_add("assemble:%s" % str(t.id), "assemble", t.cell, wait, {"ticket": t.id})
 			continue
-		if not t.get("tray", true):
-			# No more trays started than worktops to start them on; a ticket with no tray
-			# and no worktop free waits, rather than have food made with nowhere to go.
-			if room <= 0:
+		if not t.get("plated", true):
+			# No more plates set out than worktops to set them on; a ticket with none and
+			# no worktop free waits, rather than have food made with nowhere to go. One
+			# with some out goes on cooking meanwhile.
+			# The oldest ticket waiting sets out what fits, so a busy room never stalls.
+			var need := maxi(1, int(t.get("unplated", 1)))
+			if room >= need or (room > 0 and not waiting_plates):
+				room -= mini(need, room)
+				waiting_plates = true
+				_add("plates:%s" % str(t.id), "plates", t.cell, wait, {"ticket": t.id})
+			elif not t.get("started", false):
 				continue
-			room -= 1
-			_add("tray:%s" % str(t.id), "tray", t.cell, wait, {"ticket": t.id})
 		for i in lacks.size():
 			var kind := String(lacks[i])
 			var job := Pantry.tool_of(kind) if Pantry.ITEMS.has(kind) else ""
@@ -423,7 +438,7 @@ static func roll_prep(staff: Staff, person: int, quality: float) -> Dictionary:
 
 
 ## Rolls any other task: {ok: bool, spite: bool}. Not ok is the task's slip: a dropped
-## tray, dirt left behind, an order misheard.
+## plate, dirt left behind, an order misheard.
 static func roll_task(staff: Staff, person: int) -> Dictionary:
 	var mistake := staff.roll_mistake(person)
 	return {"ok": mistake == "", "spite": mistake == "spite"}

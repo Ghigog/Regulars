@@ -95,7 +95,7 @@ var staff: Staff                       # PRD 10: job posts, the CV pile and the 
 var applicants := {}                   # PRD 10.3: person -> peg standing in line outside tonight
 var critic: Critic                     # PRD 2: who eats as the critic, and the last review
 var critic_guest: Guest                # the critic, while they are here on a critic day
-var _critic_seen := {}                 # what the critic saw as their tray arrived: {patience, quality}
+var _critic_seen := {}                 # what the critic saw as their meal arrived: {patience, quality}
 var _critic_rated := {}                # their ratings once they leave, printed at the end of the day
 var ledger: Ledger
 var phase: int = Phase.SERVICE
@@ -132,10 +132,10 @@ var _frame := [WIDE_FOCUS, WIDE_SIZE, CLOSE_FOCUS, CLOSE_SIZE]   # the camera, f
 const NIGHT_ZERO_BLOCK := "Buy an ingredient, a tool, and write a menu."
 const NIGHT_HINTS: Array[String] = ["Buy a tool, and boxes of stock from the shop's Pantry.", "Write a menu.", "Flip the door card to open."]
 var menu_board: MenuBoard               # the chalkboard by the door: tonight's names
-const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "trays": "Tray stack", "pass": "Pass counter"}
+const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "plates": "Plate stack", "cups": "Cup stack", "pass": "Pass counter"}
 ## What a kitchen cannot open without. Every piece can be sold, these too; while there is
 ## none of one, the shop sells it at any level and the door card stays shut.
-const ESSENTIALS: Array[String] = ["sink", "bin", "trays", "till"]
+const ESSENTIALS: Array[String] = ["sink", "bin", "plates", "till"]
 const LIFT := 0.3   # how high a piece rises while its storage card is open on it
 var _demo_hover: Vector3:            # chef 1's held spot, for tests and demos
 	get: return player.demo_hover
@@ -475,12 +475,12 @@ func _demo_mop_line() -> void:
 
 ## Dev aid for screenshots: REGULARS_DEMO=cook or =summary jumps to that moment.
 func _apply_demo(demo: String) -> void:
-	if demo == "cook":   # a patty on the grill, the chef with a tray for it
+	if demo == "cook":   # a patty on the grill, the chef with a plate for it
 		find_station("stove").set_item("raw:" + fixed_main().grill)
 		find_station("stove").cook = -8.2
 		player.position = Grid.center(Vector2i(1, 3))
 		player.look(Vector2i(-1, 0))
-		player.set_held("tray", 1.0, Tray.new())
+		player.take_dish(Dish.make(Dish.PLATE))
 		for a in arrivals:
 			a.time = 1.0
 	elif demo in ["helpers", "helpers_break", "helpers_slip"]:   # PRD 10.6/10.8: staff at work; see Crew.demo
@@ -521,8 +521,8 @@ func _apply_demo(demo: String) -> void:
 		var sink := find_station("sink")
 		sink.dirty = 4
 		sink.refresh()
-		find_station("trays").count = 0
-		find_station("trays").refresh()
+		find_station("plates").count = 0
+		find_station("plates").refresh()
 		var bin := find_station("bin")
 		bin.count = Station.BIN_HOLDS
 		bin.refresh()
@@ -564,7 +564,7 @@ func _apply_demo(demo: String) -> void:
 			a.time = 0.2
 		get_tree().create_timer(8.0).timeout.connect(_demo_order.bind(false))
 		get_tree().create_timer(9.5).timeout.connect(_demo_order.bind(true))
-	elif demo == "ticket" or demo == "tray":  # two tickets on the rail and a half-built tray; or a full tray carried. Shoot at 10
+	elif demo == "ticket" or demo == "tray":  # two tickets on the rail and a bun on a patty waiting for a plate; or a whole order carried on a tray. Shoot at 10
 		for a in arrivals:
 			a.time = 0.2
 		get_tree().create_timer(8.0).timeout.connect(_demo_ticket.bind(demo == "tray"))
@@ -907,7 +907,7 @@ func _demo_storage(demo: String) -> void:
 ## The wall layer (PRD 8.5) at night. "wall": the start's hoods over the stoves and
 ## cabinets by the back door (one holding a box), a low and a high shelf as one closet,
 ## and the grill fridge turned into a tall fridge. "wall_build": a wall cabinet in hand,
-## its ghost hung over the tray stack with the high band lit behind it.
+## its ghost hung over the plate stack with the high band lit behind it.
 func _demo_wall(demo: String) -> void:
 	open_build()
 	var sea := Scenery.seaside()
@@ -1399,22 +1399,29 @@ func _demo_ticket(full: bool) -> void:
 			take_orders(g.table)
 	if tickets.is_empty():
 		return
-	var pass_st: Station = stations[Vector2i(4, 4)]
-	var t := Tray.new()
-	t.assign(int(tickets[0].id), tickets[0].items)
+	var pass_st: Station = stations[Vector2i(4, 3)]
 	if full:
-		t = full_tray_for(tickets[0].guest)
-		player.set_held("tray", 1.0, t, tray_tag(t))
+		# Every dish of the first ticket, made and plated, carried on a tray.
+		var ds: Array = []
+		for it: Dictionary in tickets[0].items:
+			var d := Dish.make(Tray.vessel_of(it))
+			for ing: String in it.ingredients:
+				d.add(Tray.kind("prep", ing), 1.0)
+			ds.append(d)
+		player.set_held("dishes", 1.0, ds, true)
 		player.position = Grid.center(Vector2i(2, 5))
 		player.look(Vector2i(0, 1))
 	else:
-		t.add("prep:" + fixed_main().bread, Prep.PLAIN)
-		pass_st.set_tray(t, tray_tag(t))
+		# A cooked patty with a bun on it, waiting for the plate in hand.
+		var d := Dish.new()
+		d.add("prep:" + fixed_main().grill, 1.0)
+		d.add("prep:" + fixed_main().bread, Prep.PLAIN)
+		pass_st.set_dish(d)
 		find_station("stove").set_item("raw:" + fixed_main().grill)
 		find_station("stove").cook = 3.0
-		player.position = Grid.center(Vector2i(3, 4))
+		player.position = Grid.center(Vector2i(3, 3))
 		player.look(Vector2i(1, 0))
-		player.set_held("prep:" + fixed_main().grill, 1.0)
+		player.take_dish(Dish.make(Dish.PLATE))   # "Plate it"
 	hud.refresh_tickets()
 
 
@@ -1662,9 +1669,9 @@ func _build_layout() -> void:
 	for spot: Array in [
 		# The cooking line runs down the left wall under the hood, as in sheet 1.
 		# The cell in front of the back doorway stays clear, so the patties can be reached.
-		# The kitchen starts empty but for the sink, the bin, the tray stack and the
+		# The kitchen starts empty but for the sink, the bin, the plate stack and the
 		# counters: the player buys the first stations and writes the menu on night zero.
-		["trays", 2, 2], ["sink", 3, 2], ["bin", 0, 5, 1],
+		["plates", 2, 2], ["sink", 3, 2], ["bin", 0, 5, 1],
 		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], [fern(), 9, 0],
 	]:
 		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
@@ -2803,7 +2810,7 @@ func buy_level(id: String) -> int:
 	return 999 if missing(id) else ledger.level()
 
 
-## Whether the kitchen is without one of its essentials (a sink, a bin, a tray stack).
+## Whether the kitchen is without one of its essentials (a sink, a bin, a plate stack).
 func missing(id: String) -> bool:
 	if id == "till":
 		return till_station() == null
@@ -4404,18 +4411,6 @@ func _waiting_guest_at(table: Station) -> Guest:
 	return best
 
 
-## The waiting guest at this table whose ticket the tray in hand is for.
-func _guest_for_tray(table: Station, tray: Tray) -> Guest:
-	if tray == null or tray.ticket < 0:
-		return null
-	for s in table.seats:
-		if seat_taken.has(s):
-			var g: Guest = seat_taken[s]
-			if g.state == "waiting" and int(g.order.get("ticket", -1)) == tray.ticket:
-				return g
-	return null
-
-
 ## Everyone at this table who is sat down and has not ordered yet.
 func _guests_to_order(table: Station) -> Array[Guest]:
 	var out: Array[Guest] = []
@@ -4425,7 +4420,7 @@ func _guests_to_order(table: Station) -> Array[Guest]:
 	return out
 
 
-# ---------------------------------------------------------------- menu, tickets and trays
+# ---------------------------------------------------------------- menu, tickets and dishes
 
 ## Every kind stocked tonight, each once: {ingredient, ready, stocked}. A box in a storage
 ## slot stocks its kind (PRD 8.4); a drink dispenser holds its own drinks, no slot needed.
@@ -4475,11 +4470,17 @@ const POURED_FROM := {"soda": "soda fountain", "cola": "two-tap fountain", "coff
 
 ## Which drink a dispenser with several taps pours next: the first a ticket on the
 ## rail still wants, else the tap it is turned to.
-func pour_pick(st: Station, taps: Array[String]) -> String:
+func pour_pick(st: Station, taps: Array[String], cup: Dish = null) -> String:
+	var fits := func(d: String) -> bool:
+		return cup == null or cup.refusal(Tray.kind("prep", d), menu.items) == ""
+	if cup != null and not cup.is_empty():
+		for d in taps:
+			if fits.call(d):
+				return d   # a cup started on one drink is finished with the one it lacks
 	for t: Dictionary in tickets:
 		for it: Dictionary in t.get("items", []):
 			for d: String in it.get("ingredients", []):
-				if taps.has(d):
+				if taps.has(d) and fits.call(d):
 					return d
 	return taps[st.tap % taps.size()]
 
@@ -4658,6 +4659,8 @@ func open_block() -> String:
 	for id in ESSENTIALS:
 		if missing(id):
 			return "The kitchen needs a %s. Buy one in the shop (%s)." % [piece_name({"id": id, "tier": 1}).to_lower(), controls.glyph("shop")]
+	if find_station("cups") == null and tonight_menu().any(func(it: Dictionary) -> bool: return it.course == "drink"):
+		return "Drinks go out in cups: the kitchen needs a cup stack. Buy one in the shop (%s)." % controls.glyph("shop")
 	if not Menu.has_main(tonight_menu()):
 		if ledger.history.is_empty():
 			return NIGHT_ZERO_BLOCK
@@ -4976,11 +4979,11 @@ func take_orders(table: Station) -> void:
 		if not items.is_empty():
 			o.ticket = _next_ticket
 			_next_ticket += 1
-			tickets.append({"id": o.ticket, "guest": g, "items": items})
+			var order := Tray.new()
+			order.assign(o.ticket, items)
+			tickets.append({"id": o.ticket, "guest": g, "items": items, "order": order})
 		g.take_order(o)
 		g.mood.patience = minf(1.0, g.mood.patience + ORDER_RELIEF)
-		if not items.is_empty():
-			_claim_for(tickets[-1])
 	hud.refresh_tickets()
 	sfx("order_take")
 
@@ -5000,98 +5003,121 @@ func hands() -> Array[Player]:
 	return out
 
 
-## Every tray in the room and in hand.
+## Every order on the rail: what each guest has been served so far.
 func all_trays() -> Array[Tray]:
 	var out: Array[Tray] = []
-	for st: Station in stations.values():
-		if st.item == "tray" and st.tray != null:
-			out.append(st.tray)
-	for ch in hands():
-		if ch.held == "tray" and ch.tray != null:
-			out.append(ch.tray)
+	for tk: Dictionary in tickets:
+		if tk.has("order"):
+			out.append(tk.order)
 	return out
 
 
+## A ticket's order record: its lines and what has been served on each.
 func tray_for_ticket(id: int) -> Tray:
-	for t in all_trays():
-		if t.ticket == id:
-			return t
-	return null
+	var tk := find_ticket(id)
+	return tk.get("order") if not tk.is_empty() else null
 
 
-## The oldest ticket with no tray yet, after `after` (a ticket id) when given.
-func _free_ticket(after := -1, tray: Tray = null) -> Dictionary:
-	var start := 0
-	if after >= 0:
-		for k in tickets.size():
-			if int(tickets[k].id) == after:
-				start = k + 1
-	for n in tickets.size():
-		var t: Dictionary = tickets[(start + n) % tickets.size()]
-		if int(t.id) == after or tray_for_ticket(int(t.id)) != null:
-			continue
-		if tray != null and not tray.is_empty() and not tray.matches(t.items):
-			continue
-		return t
-	return {}
-
-
-## The colour of the slip on a tray: its guest's shirt, or "" with no ticket.
-func tray_tag(t: Tray) -> String:
-	var tk := find_ticket(t.ticket) if t != null else {}
+## The colour of a ticket's slip: its guest's shirt, or "" with no ticket.
+func ticket_tag(id: int) -> String:
+	var tk := find_ticket(id)
 	return "" if tk.is_empty() else str(tk.guest.info.shirt)
 
 
-func _station_with_tray(t: Tray) -> Station:
-	for st: Station in stations.values():
-		if st.item == "tray" and st.tray == t:
-			return st
-	return null
+## The waiting guests at this table who want one of these dishes, each once.
+func _dish_guests(table: Station, dishes: Array) -> Array[Guest]:
+	var out: Array[Guest] = []
+	var taken := {}
+	for d: Dish in dishes:
+		var g := _guest_for_dish(table, d, taken)
+		if g != null:
+			taken[g] = int(taken.get(g, 0)) + 1
+			if not out.has(g):
+				out.append(g)
+	return out
 
 
-func _show_tray(t: Tray) -> void:
-	var st := _station_with_tray(t)
-	if st != null:
-		st.tray_tag = tray_tag(t)
-		st.show_tray()
-	else:
-		for ch in hands():
-			if ch.tray == t:
-				ch.set_held("tray", 1.0, t, tray_tag(t))
+## The waiting guest at this table with a line still open for this dish's item: the
+## least patient first. `taken` counts dishes already promised to each guest this press.
+func _guest_for_dish(table: Station, d: Dish, taken := {}) -> Guest:
+	if d == null or d.vessel == "" or d.dirty:
+		return null
+	var it := d.item_of(menu.items)
+	if it.is_empty():
+		return null
+	var best: Guest = null
+	for s in table.seats:
+		if not seat_taken.has(s):
+			continue
+		var g: Guest = seat_taken[s]
+		if g.state != "waiting":
+			continue
+		var t := tray_for_ticket(int(g.order.get("ticket", -1)))
+		if t == null:
+			continue
+		# Lines for this item not yet served, less those already promised this press.
+		var free := 0
+		for l in t.lines:
+			if int(l.item.id) == int(it.id) and not t._served(l):
+				free += 1
+		if free <= int(taken.get(g, 0)):
+			continue
+		if best == null or g.mood.patience < best.mood.patience:
+			best = g
+	return best
 
 
-## A new ticket goes to an empty tray already put down with none.
-func _claim_for(ticket: Dictionary) -> void:
-	for st: Station in stations.values():
-		if st.item == "tray" and st.tray != null and st.tray.ticket < 0 and st.tray.is_empty():
-			st.tray.assign(int(ticket.id), ticket.items)
-			_show_tray(st.tray)
-			return
-
-
-## Turn while facing a tray: it moves to the next ticket without a tray. A tray with
-## something on it only moves to a ticket for exactly the same items.
-func turn_tray(st: Station) -> bool:
-	if st == null or st.item != "tray" or st.tray == null:
-		return false
-	var t := st.tray
-	var next := _free_ticket(t.ticket, t)
-	if next.is_empty():
-		hud.say("No other ticket for this tray.")
-		sfx("fail")
-		return false
-	if t.is_empty():
-		t.assign(int(next.id), next.items)
-	else:
-		t.reassign(int(next.id))
-	_show_tray(t)
+## Sets down every dish in hand that a waiting guest at this table ordered. A guest
+## whose whole order is there starts eating. Returns how many were served.
+func serve_dishes(ch: Player, table: Station) -> int:
+	var n := 0
+	for d: Dish in ch.dishes.duplicate():
+		var g := _guest_for_dish(table, d)
+		if g == null:
+			continue
+		var t := tray_for_ticket(int(g.order.ticket))
+		if t.serve_dish(d, menu.items) < 0:
+			continue
+		ch.drop_dish(d)
+		n += 1
+		if t.is_complete():
+			serve(g, t)
+		else:
+			g.show_served(t)
+			sfx("plate_food")
 	hud.refresh_tickets()
+	return n
+
+
+## Why none of the dishes in hand can be served here.
+func _not_served_why(dishes: Array) -> String:
+	for d: Dish in dishes:
+		if d.vessel == "" and not d.is_empty():
+			return "Put it on a plate first"
+	for d: Dish in dishes:
+		if d.is_empty():
+			continue
+		if d.item_of(menu.items).is_empty():
+			var it := d.heading_for(menu.items)
+			if not it.is_empty():
+				var need := d.needs_for(it)
+				if not need.is_empty():
+					return "Needs %s" % Pantry.name_of(need[0]).to_lower()
+	return "Nobody here ordered that"
+
+
+## Turns a dispenser with several taps to its next tap.
+func turn_tap(st: Station) -> bool:
+	if st == null or dispenser_drinks(st).size() < 2:
+		return false
+	st.tap = (st.tap + 1) % dispenser_drinks(st).size()
+	hud.say("Turned to %s." % Pantry.name_of(dispenser_drinks(st)[st.tap]).to_lower())
 	sfx("page")
 	return true
 
 
-## Tears a guest's ticket off the rail. A tray made for it keeps what is on it but
-## shows no ticket.
+## Tears a guest's ticket off the rail. What was already served to them is left on the
+## table as dirty dishes.
 func tear_ticket(g: Guest) -> void:
 	var id := int(g.order.get("ticket", -1))
 	if id < 0:
@@ -5100,14 +5126,27 @@ func tear_ticket(g: Guest) -> void:
 	if tk.is_empty():
 		return
 	tickets.erase(tk)
-	var t := tray_for_ticket(id)
-	if t != null:
-		t.ticket = -1
-		_show_tray(t)
+	var t: Tray = tk.get("order")
+	if t != null and t.served_count() > 0 and g.state in ["waiting", "ordering"] and g.table != null:
+		_leave_dirty(g.table, t)
+		g.clear_meal()
 	hud.refresh_tickets()
 
 
-## How the meal tastes to this guest: the tray's quality, raised for what they like.
+## Leaves a guest's served plates and cups on the table, dirty.
+func _leave_dirty(table: Station, t: Tray) -> void:
+	for l in t.lines:
+		var served := false
+		for q: float in l.have:
+			served = served or q >= 0.0
+		if served:
+			table.dirty += 1
+			if l.item.course == "drink":
+				table.dirty_cups += 1
+	table.refresh()
+
+
+## How the meal tastes to this guest: its quality, raised for what they like.
 func savour_for(g: Guest, t: Tray) -> float:
 	return Menu.savour(t.qualities(), t.ingredients(), g.info.likes)
 
@@ -5139,16 +5178,15 @@ func serve(g: Guest, t: Tray) -> void:
 		burst(g.position + Vector3(0, 1.3, 0), "stars")
 
 
-## A finished tray for a guest's ticket, every ingredient at quality `q`. For demos
+## A guest's whole order served, every ingredient at quality `q`. For demos
 ## and tests: their table's order is taken first if it has not been.
 func full_tray_for(g: Guest, q := 1.0) -> Tray:
 	if g.order.is_empty() and g.state == "ordering":
 		take_orders(g.table)
-	var t := Tray.new()
 	var tk := find_ticket(int(g.order.get("ticket", -1)))
 	if tk.is_empty():
-		return t
-	t.assign(int(tk.id), tk.items)
+		return Tray.new()
+	var t: Tray = tk.order
 	for l in t.lines:
 		for k in l.have.size():
 			l.have[k] = q
@@ -5181,8 +5219,11 @@ func offer_comp(g: Guest) -> void:
 ## The last bite (PRD 11): the plate is left on the table and they sit back to chat.
 ## Paying comes later, when the bill is handed over (`pay_bill`).
 func finish_meal(g: Guest) -> void:
-	g.table.dirty += 1
-	g.table.refresh()
+	if g._meal_tray != null:
+		_leave_dirty(g.table, g._meal_tray)
+	else:
+		g.table.dirty += 1
+		g.table.refresh()
 	floor_dirt.meal_mess(g)
 	if g._meal:
 		g._meal.queue_free()
@@ -5679,8 +5720,8 @@ func _use_as(st: Station, held_ing: Dictionary) -> String:
 
 
 ## The player uses the station they are facing. Returns the name of the action taken.
-## With dry_run, nothing changes and only the name is returned. A refusal (a tray
-## that is not finished, an ingredient its ticket does not need) is returned as its
+## With dry_run, nothing changes and only the name is returned. A refusal (a plate
+## that is not finished, food nothing on the menu combines) is returned as its
 ## reason, and on a real use it is said and nothing changes.
 func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	ch = _me(ch)
@@ -5692,6 +5733,7 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 
 func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	ch = _me(ch)
+	Build.menu = menu.items
 	var held := ch.held
 	var q := ch.held_quality
 	var held_ing := Tray.parse(held)
@@ -5714,20 +5756,38 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 		if not st.seats.is_empty() or st == till_station():
 			return _finish_use(st, ["", "Nobody here is waiting to pay"], dry_run, ch)
 		return ""
-	if surface_first(st, held):
-		return _finish_use(st, _use_surface(st, dry_run, ch), dry_run, ch)
 	var ing := Catalog.ingredient_of(st.type)   # a drink dispenser's own drink
 	var taps := dispenser_drinks(st)
+	var drinks_here := ing != "" and not taps.is_empty() and Pantry.is_drink(ing)
+	if surface_first(st, held) and not (drinks_here and held in ["", "dishes"] and st.item == ""):
+		return _finish_use(st, _use_surface(st, dry_run, ch), dry_run, ch)
 	if taps.size() > 1:
-		# Two taps (PRD 8.6): pour what a ticket wants, else the tap in turn. Putting a
-		# poured drink back turns to the next tap.
-		ing = pour_pick(st, taps)
-		if held != "" and taps.has(Tray.parse(held).get("id", "")) and held.begins_with("prep"):
-			act = "Put back"
+		# Two taps (PRD 8.6): pour what the cup and a ticket want, else the tap it is
+		# turned to (Turn, or Use with empty hands, turns it).
+		ing = pour_pick(st, taps, _cup_in_hand(ch, ""))
+		if held == "":
+			act = "Turn to %s" % Pantry.name_of(taps[(st.tap + 1) % taps.size()]).to_lower()
 			if not dry_run:
-				ch.set_held("")
-				st.tap = (taps.find(Tray.parse(held).id) + 1) % taps.size()
-			return _finish_use(st, [act, ""], dry_run, ch)
+				turn_tap(st)
+			return act
+	if drinks_here:
+		# A drink station fills the cup in hand (PRD: drinks go out in cups).
+		var cup := _cup_in_hand(ch, ing)
+		if cup != null:
+			var pour: bool = Pantry.tool_of(ing) == "pour" and not Catalog.ITEMS.get(st.type, {}).get("ready", false)
+			act = ("Pour %s" if pour else "Fill with %s") % Pantry.name_of(ing).to_lower()
+			if not dry_run:
+				if pour:
+					start_prep(chefs.find(ch), st, "pour", ing, "", cup)
+					return act
+				cup.add(Tray.kind("prep", ing), Prep.PLAIN)
+				ch.show_held()
+		elif held == "":
+			why = "Bring a cup for the %s" % Pantry.name_of(ing).to_lower()
+		elif held == "dishes":
+			var cups := ch.dishes.filter(func(d: Dish) -> bool: return d.vessel == Dish.CUP)
+			why = "Bring a cup" if cups.is_empty() else (cups[0] as Dish).refusal(Tray.kind("prep", ing), menu.items)
+		return _finish_use(st, [act, why], dry_run, ch)
 	if ing != "":
 		var ready: bool = Catalog.ITEMS[st.type].get("ready", false) if Catalog.ITEMS.has(st.type) else false
 		if held == "" and Pantry.tool_of(ing) == "pour":
@@ -5835,44 +5895,69 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 					r = r2
 			act = r[0]
 			why = r[1]
-		"trays":
-			if held == "" and st.count > 0:
-				act = "Take tray"
-				if not dry_run:
-					st.count -= 1
-					ch.set_held("tray", 1.0, Tray.new())
-			elif held == "tray" and ch.tray.is_empty():
+		"plates", "cups":
+			# One plate or cup a press; two in the hands, four on a tray. An empty one in
+			# hand goes back.
+			var v := Dish.PLATE if st.type == "plates" else Dish.CUP
+			var noun := "plate" if v == Dish.PLATE else "cup"
+			var spare := _empty_in_hand(ch, v)
+			if spare != null:
 				act = "Put back"
 				if not dry_run:
 					st.count += 1
-					ch.set_held("")
-					hud.refresh_tickets()
+					ch.drop_dish(spare)
+			elif st.count > 0 and held in ["", "tray", "dishes"] and ch.has_room():
+				act = "Take %s" % noun
+				if not dry_run:
+					st.count -= 1
+					ch.take_dish(Dish.make(v))
+			elif st.count <= 0 and held in ["", "tray", "dishes"]:
+				why = "No clean %ss. Wash some up" % noun
+			elif held == "dishes":
+				why = "Your hands are full"
+			if not dry_run:
+				st.refresh()
+		"tray_stack":
+			# A tray takes four plates or cups instead of two.
+			if not ch.on_tray and st.count > 0 and held in ["", "dishes", "dirty_dishes"]:
+				act = "Take tray"
+				if not dry_run:
+					st.count -= 1
+					ch.set_held(held if held != "" else "tray", 1.0, ch.dishes, true)
+			elif ch.on_tray and ch.dishes.size() <= Player.HANDS:
+				act = "Put tray back"
+				if not dry_run:
+					st.count += 1
+					ch.set_held(ch.held, 1.0, ch.dishes, false)
+			elif ch.on_tray:
+				why = "Too much to hold without the tray"
 			if not dry_run:
 				st.refresh()
 		"sink":
-			# Trays soak until they are washed, one at a time, back onto the stack.
-			if held == "dirty_tray":
+			# Plates and cups soak until they are washed, one at a time, back onto their stacks.
+			if held == "dirty_dishes":
 				act = "Put in sink"
 				if not dry_run:
-					ch.set_held("")
-					st.dirty += 1
+					st.dirty += ch.dishes.size()
+					st.dirty_cups += ch.dishes.filter(func(d: Dish) -> bool: return d.vessel == Dish.CUP).size()
+					ch.set_held("dirty_dishes", 1.0, [], ch.on_tray)
 					st.refresh()
 			elif held == "" and st.dirty > 0:
 				act = "Wash"
 				if not dry_run:
-					st.dirty -= 1
-					st.refresh()
-					var stack := find_station("trays")
-					stack.count += 1
-					stack.refresh()
+					wash_one(st)
 		"bin":
 			# Every scrap fills it; full, it overflows until the bag goes out the front.
-			if held == "tray" and not ch.tray.is_empty():
+			var scraps := ch.dishes.filter(func(d: Dish) -> bool: return not d.is_empty()) if held == "dishes" else []
+			if not scraps.is_empty():
 				act = "Scrape off"
 				if not dry_run:
-					ch.tray.scrape()
-					_show_tray(ch.tray)
-					hud.refresh_tickets()
+					var keep: Array = []
+					for d: Dish in ch.dishes:
+						d.scrape()
+						if d.vessel != "":
+							keep.append(d)   # a loose stack goes in whole
+					ch.set_held("dishes", 1.0, keep, ch.on_tray)
 			elif not held_ing.is_empty():
 				act = "Throw away"
 				if not dry_run:
@@ -5888,33 +5973,32 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				st.refresh()
 		"table", "booth", "table4":
 			var g := _waiting_guest_at(st)
-			var fed := _guest_for_tray(st, ch.tray) if held == "tray" else null
 			var to_order := _guests_to_order(st)
-			if fed != null and ch.tray.is_complete():
-				act = "Serve %s" % fed.info.name
+			var fed: Array[Guest] = []
+			if held == "dishes":
+				fed = _dish_guests(st, ch.dishes)
+			if not fed.is_empty():
+				act = "Serve %s" % fed[0].info.name if fed.size() == 1 else "Serve %d" % fed.size()
 				if not dry_run:
-					var t := ch.tray
-					ch.set_held("")
-					serve(fed, t)
+					serve_dishes(ch, st)
 			elif not to_order.is_empty() and (held == "" or not ORDER_HANDS_FREE):
 				act = "Take order" if to_order.size() == 1 else "Take %d orders" % to_order.size()
 				if not dry_run:
 					take_orders(st)
-			elif held == "tray" and not to_order.is_empty():
+			elif held == "dishes" and not to_order.is_empty():
 				why = "Take order first"
 				if not dry_run:
 					hud.say("%s hasn't ordered yet. Free your hands and take the order." % to_order[0].info.name)
 					sfx("fail")
 					return why
-			elif held == "tray" and ch.tray.ticket >= 0 and g != null:
-				var tk := find_ticket(ch.tray.ticket)
-				why = "That's for %s" % tk.guest.info.name if not tk.is_empty() else "No ticket"
-			elif held == "" and st.dirty > 0:
-				act = "Clear tray"
+			elif held == "dishes" and g != null:
+				why = _not_served_why(ch.dishes)
+			elif held in ["", "tray", "dirty_dishes"] and st.dirty > 0 and ch.has_room(true):
+				act = "Clear plates"
 				if not dry_run:
-					st.dirty -= 1
-					st.refresh()
-					ch.set_held("dirty_tray")
+					clear_one(st, ch)
+					while st.dirty > 0 and ch.has_room(true):
+						clear_one(st, ch)
 			elif held == "" and g != null and not g.mood.discounted and g.mood.patience < DISCOUNT_BELOW:
 				act = "Half price for %s" % g.info.name
 				if not dry_run:
@@ -5955,7 +6039,7 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 		elif act == "Take off the heat":
 			sfx("patty_flip")   # the spatula under the patty
 		elif act.begins_with("Add "):
-			sfx("plate_food")   # onto the tray's plate
+			sfx("plate_food")   # onto a plate
 		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free") or act.begins_with("Take order") or act.ends_with(" orders")):
 			sfx("pickup" if ch.held != "" else "putdown")
 	return act
@@ -6007,48 +6091,148 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 	var held := ch.held
 	var q := ch.held_quality
 	var held_ing := Tray.parse(held)
+	var here: Dish = st.dish if st.item == "dish" else null
+	var here_ing := Tray.parse(st.item)
+	var items := menu.items
 	var act := ""
 	var why := ""
-	if held == "tray" and st.item == "":
-		act = "Put tray down"
-		if not dry_run:
-			var t := ch.tray
-			ch.set_held("")
-			if t.ticket < 0 and t.is_empty():
-				var tk := _free_ticket()
-				if not tk.is_empty():
-					t.assign(int(tk.id), tk.items)
-			st.set_tray(t, tray_tag(t))
-			hud.refresh_tickets()
-	elif not held_ing.is_empty() and st.item == "tray":
-		why = st.tray.refusal(held)
-		if why == "":
-			act = "Add %s" % Pantry.name_of(held_ing.id).to_lower()
+	if not held_ing.is_empty():
+		if st.item == "":
+			if held_ing.state != "burnt":
+				act = "Put down"
+				if not dry_run:
+					st.set_item(held, q)
+					ch.set_held("")
+		elif here != null:
+			# Onto a plate, a cup, or a stack already started.
+			why = here.refusal(held, items)
+			if why == "":
+				act = "Add %s" % Pantry.name_of(held_ing.id).to_lower()
+				if not dry_run:
+					here.add(held, q)
+					ch.set_held("")
+					st.show_dish()
+		elif not here_ing.is_empty():
+			# Two things made combine into a stack on the worktop (a bun on a patty).
+			var d := Dish.new()
+			why = d.refusal(st.item, items)
+			if why == "":
+				d.add(st.item, st.current_quality())
+				why = d.refusal(held, items)
+			if why == "":
+				act = "Add %s" % Pantry.name_of(held_ing.id).to_lower()
+				if not dry_run:
+					d.add(held, q)
+					ch.set_held("")
+					st.set_dish(d)
+	elif held == "dishes":
+		var loose: Dish = here if here != null and here.vessel == "" else null
+		if loose == null and not here_ing.is_empty():
+			loose = Dish.new()
+			loose.add(st.item, st.current_quality())
+		if st.item == "":
+			act = "Put down"
 			if not dry_run:
-				st.tray.add(held, q)
-				ch.set_held("")
-				st.show_tray()
-				hud.refresh_tickets()
-	elif not held_ing.is_empty() and held_ing.state != "burnt" and st.item == "":
-		act = "Put down"
+				var d: Dish = ch.dishes.back()
+				ch.drop_dish(d)
+				st.set_dish(d)
+		elif loose != null:
+			# Food on the worktop goes onto a plate (or into a cup) in hand.
+			var target: Dish = null
+			for i in range(ch.dishes.size() - 1, -1, -1):
+				var d: Dish = ch.dishes[i]
+				if d.vessel == "" and here_ing.is_empty():
+					continue   # two loose stacks do not merge in the air
+				var r := d.refusal(st.item, items) if not here_ing.is_empty() else d.merge_refusal(loose, items)
+				if r == "":
+					target = d
+					break
+				if why == "":
+					why = r
+			if target == null and why == "":
+				why = "Get a plate for that" if not Pantry.is_drink(loose.ings[0]) else "Get a cup for that"
+			if target != null:
+				why = ""
+				act = "Plate it" if target.vessel == Dish.PLATE and target.is_empty() else (
+					"Add %s" % Pantry.name_of(loose.ings[0]).to_lower() if loose.ings.size() == 1 else "Add it")
+				if not dry_run:
+					target.take_all(loose)
+					st.set_item("")
+					ch.show_held()
+		elif here != null:
+			# A loose stack in hand goes onto the plate on the worktop; else it is picked up.
+			var stack: Dish = null
+			for d: Dish in ch.dishes:
+				if d.vessel == "" and here.merge_refusal(d, items) == "":
+					stack = d
+					break
+			if stack != null:
+				act = "Plate it"
+				if not dry_run:
+					here.take_all(stack)
+					ch.drop_dish(stack)
+					st.show_dish()
+			elif ch.has_room():
+				act = "Pick up"
+				if not dry_run:
+					st.set_item("")
+					ch.take_dish(here)
+			else:
+				why = "Your hands are full"
+	elif held in ["", "tray"] and here != null:
+		act = "Pick up"
 		if not dry_run:
-			st.set_item(held, q)
-			ch.set_held("")
-	elif held == "" and st.item == "tray":
-		var t := st.tray
-		if t.is_complete() or t.ticket < 0 or t.is_empty():
-			act = "Pick up tray"
-			if not dry_run:
-				ch.set_held("tray", 1.0, t, tray_tag(t))
-				st.set_item("")
-		else:
-			why = t.missing()
+			st.set_item("")
+			ch.take_dish(here)
 	elif held == "" and st.item != "":
 		act = "Pick up"
 		if not dry_run:
 			ch.set_held(st.item, st.current_quality())
 			st.set_item("")
 	return [act, why]
+
+
+## A plate (or cup) in hand with nothing on it, last taken first; null for none.
+func _empty_in_hand(ch: Player, vessel: String) -> Dish:
+	if ch.held != "dishes":
+		return null
+	for i in range(ch.dishes.size() - 1, -1, -1):
+		if ch.dishes[i].vessel == vessel and ch.dishes[i].is_empty():
+			return ch.dishes[i]
+	return null
+
+
+## A cup in hand that this drink can go in ("" for any cup), or null.
+func _cup_in_hand(ch: Player, drink: String) -> Dish:
+	if ch.held != "dishes":
+		return null
+	for d: Dish in ch.dishes:
+		if d.vessel == Dish.CUP and (drink == "" or d.refusal(Tray.kind("prep", drink), menu.items) == ""):
+			return d
+	return null
+
+
+## Washes one dish in a sink back onto its stack: plates first.
+func wash_one(st: Station) -> void:
+	var cup := st.dirty_cups >= st.dirty
+	st.dirty -= 1
+	if cup:
+		st.dirty_cups -= 1
+	st.refresh()
+	var stack := find_station("cups" if cup else "plates")
+	if stack != null:
+		stack.count += 1
+		stack.refresh()
+
+
+## Takes one dirty dish off a table into the hands: plates first.
+func clear_one(st: Station, ch: Player) -> void:
+	var cup := st.dirty_cups >= st.dirty
+	st.dirty -= 1
+	if cup:
+		st.dirty_cups -= 1
+	st.refresh()
+	ch.take_dish(Dish.make(Dish.CUP if cup else Dish.PLATE, true))
 
 
 ## The press tools' actions and what a kind is once done (PRD 8.6).
@@ -6080,26 +6264,29 @@ static func press_job(st: Station, held_ing: Dictionary) -> Array:
 
 
 ## Whether a tool's surface, rather than the tool, answers Use: empty hands take what
-## sits on it first, and a tray goes down on it or is built on it. A heat tool's own
-## item is its cooking, so only a tray rests there.
+## sits on it first, and a plate goes down on it or is built on it. A heat tool's own
+## item is its cooking, so only a dish rests there.
 static func surface_first(st: Station, held: String) -> bool:
 	if not Kitchen.is_top(st.type) or st.prep_by >= 0:
 		return false
 	if st.type in ["stove", "fryer", "pot"]:
-		return st.item == "tray" or (held == "tray" and st.item == "")
-	return (held == "" and st.item != "") or held == "tray" or st.item == "tray"
+		return st.item == "dish" or (held == "dishes" and st.item == "")
+	return (held == "" and st.item != "") or held in ["dishes", "tray"] or st.item == "dish"
 
 
 # ---------------------------------------------------------------- prep minigames
 
 ## `src`: the kind the chef held, when it differs from what is made (a lemon for
 ## lemonade, PRD 8.6); it sits on the tool meanwhile and comes back on Back.
-func start_prep(p: int, st: Station, tool: String, ing: String, src := "") -> void:
+func start_prep(p: int, st: Station, tool: String, ing: String, src := "", cup: Dish = null) -> void:
 	var chef: Player = chefs[p]
+	var hands := {"cup": cup, "dishes": chef.dishes.duplicate(), "on_tray": chef.on_tray}
 	var q := st.q(tool) if st.q(tool) > 0.0 else 1.0
 	preps[p] = {"tool": tool, "st": st, "ing": ing, "t": 0.0, "hits": [], "presses": 0, "fill": 0.0, "last": 0.0,
 		"q": q, "sweep": Prep.chop_sweep(q), "auto": Kitchen.is_auto(st.node),
 		"src": src if src != "" else Tray.kind("raw", ing), "v": 0.0, "w": 0.0, "was_held": true}
+	if cup != null:
+		preps[p].merge(hands)   # the dishes in hand wait while the cup is filled
 	if tool == "saw":
 		preps[p].sweep = Prep.saw_stroke(q)
 	st.prep_by = p
@@ -6159,6 +6346,8 @@ func cancel_prep(p: int) -> void:
 	if s.tool != "pour":
 		st.set_item("")
 		chefs[p].set_held(s.src, Prep.PLAIN if str(s.src).begins_with("prep") else 1.0)
+	elif s.get("cup") != null:
+		chefs[p].set_held("dishes", 1.0, s.dishes, s.on_tray)
 	sfx("putdown")
 
 
@@ -6274,7 +6463,11 @@ func _finish_prep(p: int, result: String) -> void:
 	st.hide_widget()
 	if s.tool != "pour":
 		st.set_item("")
-	chefs[p].set_held(Tray.kind("prep", s.ing), Prep.quality_of(result))
+	if s.get("cup") != null:
+		(s.cup as Dish).add(Tray.kind("prep", s.ing), Prep.quality_of(result))
+		chefs[p].set_held("dishes", 1.0, s.dishes, s.on_tray)
+	else:
+		chefs[p].set_held(Tray.kind("prep", s.ing), Prep.quality_of(result))
 	sfx("pickup")
 	_prep_done(p, st, s.tool, result)
 
@@ -6362,6 +6555,7 @@ func step(delta: float) -> void:
 # ---------------------------------------------------------------- input & frame
 
 func _process(delta: float) -> void:
+	Build.menu = menu.items   # loose stacks draw in the order of the item they are heading for
 	for p in chefs.size():
 		var ch := chefs[p]
 		var input := Vector2.ZERO
@@ -6681,9 +6875,9 @@ func set_down(ch: Player) -> void:
 				best_d = d
 				best = st
 	if best != null:
-		if ch.held == "tray" and ch.tray != null:
-			best.set_tray(ch.tray, tray_tag(ch.tray))
-		else:
+		if ch.held == "dishes" and not ch.dishes.is_empty():
+			best.set_dish(ch.dishes[0])   # the rest go with the tray
+		elif Tray.parse(ch.held).size() > 0:
 			best.set_item(ch.held, ch.held_quality)
 		sfx("putdown")
 	ch.set_held("")
@@ -6821,7 +7015,7 @@ func act(p: int, action: String, echo := false) -> void:
 			elif action == "back" and ch.held == "" and inspected == null:
 				hud.toggle_pause()
 			elif action == "turn":
-				turn_tray(stations.get(ch.target_cell()))
+				turn_tap(stations.get(ch.target_cell()))
 			elif action == "menu":
 				open_menu(ch)   # refused: it says why
 			elif floor_dirt.is_down(ch) or floor_dirt.helping(ch) != null:

@@ -428,12 +428,12 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 74, "one entry a piece, the tray stack, the till, and the under-counter fridge sold outright: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
+	assert_eq(Catalog.search().size(), 76, "one entry a piece, the plate, cup and tray stacks, the till, and the under-counter fridge sold outright: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen", "diner")
-	assert_eq(kitchen.size(), 17, "the counter, the under-counter fridge, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, a tray stack, a till, stove, board, the soda fountain, a mop bucket, a hook, a sponge and the desk (PRD 10.6)")
+	assert_eq(kitchen.size(), 19, "the counter, the under-counter fridge, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, the plate, cup and tray stacks, a till, stove, board, the soda fountain, a mop bucket, a hook, a sponge and the desk (PRD 10.6)")
 	assert_eq(kitchen.map(func(bp: Dictionary) -> String: return Catalog.label(bp)).slice(0, 4),
 		["Wall shelf", "Counter", "Wall cabinet", "Under-counter fridge"],
 		"storage first, cheapest first within it")
@@ -806,7 +806,7 @@ func test_cleaning_knows_what_is_still_dirty():
 
 
 func test_cleaning_names_the_night_actions_and_nothing_else():
-	assert_eq(Cleaning.night_action("Clear tray"), "Clear table")
+	assert_eq(Cleaning.night_action("Clear plates"), "Clear table")
 	assert_eq(Cleaning.night_action("Wash"), "Wash up")
 	assert_eq(Cleaning.night_action("Empty bin"), "Take the bag out")
 	assert_eq(Cleaning.night_action("Put in sink"), "Put in sink")
@@ -815,7 +815,8 @@ func test_cleaning_names_the_night_actions_and_nothing_else():
 
 
 func test_cleaning_carried_mess_is_a_plate_or_the_bag():
-	assert_true(Cleaning.carrying_mess("dirty_tray"))
+	assert_true(Cleaning.carrying_mess("dirty_dishes"))
+	assert_false(Cleaning.carrying_mess("dishes"))
 	assert_true(Cleaning.carrying_mess("rubbish_bag"))
 	assert_false(Cleaning.carrying_mess(""))
 	assert_false(Cleaning.carrying_mess("plate"))
@@ -1485,3 +1486,66 @@ func test_the_critic_always_finds_something_to_order():
 	assert_true(Menu.order(avail, [], ["patty"], rng).main.is_empty(), "anyone else walks on")
 	var o := Critic.order(avail, ["bun"], ["patty"], rng)
 	assert_eq(int(o.main.id), 1, "the critic takes the best match")
+
+
+# ---------- Plates, cups and stacks ----------
+
+func _burger_menu() -> Array:
+	var m := Menu.new()
+	m.add("main", ["bun", "patty"], "Burger")
+	m.add("side", ["potato"], "Fries")
+	m.add("drink", ["soda"], "Soda")
+	return m.items
+
+
+func test_a_loose_stack_combines_only_into_what_the_menu_makes():
+	var items := _burger_menu()
+	var d := Dish.new()
+	d.add("prep:patty", 1.0)
+	assert_eq(d.refusal("prep:bun", items), "", "a bun on a cooked patty")
+	assert_eq(d.refusal("prep:potato", items), "Nothing on the menu has patty with fries")
+	assert_eq(d.refusal("raw:patty", items), "Patty needs grilling first")
+	assert_eq(d.refusal("burnt:bun", items), "That's burnt. Bin it")
+	assert_eq(d.refusal("prep:soda", items), "Drinks go in a cup")
+	d.add("prep:bun", Prep.PLAIN)
+	assert_eq(d.refusal("prep:bun", items), "One bun is enough")
+	assert_eq(d.item_of(items).name, "Burger", "in any order")
+	assert_false(d.is_ready(items), "loose: not served until plated")
+	var plate := Dish.make(Dish.PLATE)
+	assert_eq(plate.merge_refusal(d, items), "")
+	plate.take_all(d)
+	assert_true(d.is_empty())
+	assert_true(plate.is_ready(items))
+	assert_eq(plate.layout(items)[0], ["bun", "patty"], "drawn as the item lists it: the bun wraps the patty")
+
+
+func test_a_cup_holds_drinks_and_a_plate_holds_food():
+	var items := _burger_menu()
+	var cup := Dish.make(Dish.CUP)
+	assert_eq(cup.refusal("prep:potato", items), "Only drinks go in a cup")
+	assert_eq(cup.refusal("prep:soda", items), "")
+	cup.add("prep:soda", Prep.GOOD)
+	assert_true(cup.is_ready(items))
+	assert_eq(Dish.make(Dish.CUP, true).refusal("prep:soda", items), "Wash it first")
+
+
+func test_an_order_fills_a_line_per_dish_served():
+	var items := _burger_menu()
+	var order := Tray.new()
+	order.assign(1, items)
+	var fries := Dish.make(Dish.PLATE)
+	fries.add("prep:potato", Prep.GOOD)
+	assert_eq(order.serve_dish(fries, items), 1, "the side's line")
+	assert_eq(order.served_count(), 1)
+	assert_false(order.is_complete())
+	assert_eq(order.serve_dish(fries, items), -1, "one portion of fries was ordered")
+	var burger := Dish.make(Dish.PLATE)
+	burger.add("prep:patty", 1.0)
+	burger.add("prep:bun", Prep.PLAIN)
+	assert_eq(order.serve_dish(burger, items), 0)
+	assert_eq(order.lines[0].have, [Prep.PLAIN, 1.0] as Array[float], "qualities laid out as the item lists them")
+	var soda := Dish.make(Dish.CUP)
+	soda.add("prep:soda", Prep.GOOD)
+	order.serve_dish(soda, items)
+	assert_true(order.is_complete())
+	assert_eq(Tray.vessel_of(items[2]), Dish.CUP)

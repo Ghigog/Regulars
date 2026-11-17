@@ -11,16 +11,21 @@ extends RefCounted
 ##   take      at a storage cell, take `kind` out of a box
 ##   pick      at a station, pick up the raw `kind` lying there
 ##   cook      at a tool, cook the raw `kind` in hand by `job` (`in_place`: it is already there)
-##   pour      at a dispenser, pour `kind`
-##   deliver   take the prepped thing in hand to its ticket's tray (`assemble`: allowed to
-##             add it) or else down on a free surface
+##   get_cup   take ticket `ticket`'s cup for drink `kind`: off a worktop, else a clean one
+##             from the cup stack, marked for the ticket
+##   pour      at a dispenser, pour `kind` into the cup in hand
+##   set_out   put the plate or cup in hand down on a free worktop by where plates are built
+##   deliver   take the prepped thing in hand to its ticket's plate or cup that needs it
+##             (`assemble`: allowed to add it) or else down on a free surface
 ##   leave     put the raw thing in hand down near `at`, for a cook
-##   assemble  build ticket `ticket`'s tray from what is made (expanded by the game)
-##   pick_tray at a station, pick up ticket `ticket`'s finished tray
-##   serve     at a table, serve the tray in hand
+##   assemble  put what is made on ticket `ticket`'s plates (expanded by the game)
+##   set_plates set out a plate or cup for each of ticket `ticket`'s items (expanded by the game)
+##   pick_dish at a station, pick up the finished plate or cup there (two to a trip)
+##   serve     at a table, serve the dishes in hand
+##   restack   put the empty plates and cups in hand back on their stacks
 ##   order     at a table, take its order
-##   clear     at a table, take a dirty tray off it
-##   to_sink   put the dirty tray in hand in the sink
+##   clear     at a table, take dirty plates and cups off it, as many as the hands hold
+##   to_sink   put the dirty dishes in hand in the sink
 ##   wash      at a sink, wash up until it is empty
 ##   empty_bin at a bin, take the bag out of it
 ##   to_door   take the rubbish bag in hand out of the front door
@@ -51,7 +56,7 @@ const IDLE_CHAT_AFTER := 1.0    # seconds idle before a helper is free to chat
 
 ## The kind of work each task is, for training and for the tolerance it wears on.
 const TASK_KIND := {
-	"prep": "food", "fetch": "food", "assemble": "food", "tray": "food", "scrap": "food",
+	"prep": "food", "fetch": "food", "assemble": "food", "plates": "food", "tidy": "food", "scrap": "food",
 	"order": "service", "bill": "service", "carry": "service", "clear": "service", "help_up": "service",
 	"dirt": "clean", "wash": "clean", "bin": "clean",
 }
@@ -134,19 +139,27 @@ static func steps(task: Dictionary, duties: Array, dest_duty := "") -> Array:
 			var hold := str(task.get("hold", hold_for(str(task.kind))))
 			var deliver := {"do": "deliver", "ticket": task.ticket, "assemble": may_assemble}
 			if str(task.get("job", "")) == "pour" and task.get("item") == null:
-				return [{"do": "pour", "at": at, "kind": task.kind}, deliver]
+				# Drinks go out in cups: the ticket's cup is fetched, filled, and set back out.
+				return [{"do": "get_cup", "ticket": task.ticket, "kind": task.kind},
+					{"do": "pour", "at": at, "kind": task.kind}, {"do": "set_out", "ticket": task.ticket}]
 			if task.cell == at:
 				return [{"do": "cook", "at": at, "job": task.job, "kind": task.kind, "hold": hold, "in_place": true, "ticket": task.ticket}, deliver]
 			return [{"do": "pick", "at": task.cell, "kind": task.kind, "hold": hold},
 				{"do": "cook", "at": at, "job": task.job, "kind": task.kind, "hold": hold, "ticket": task.ticket}, deliver]
 		"assemble":
 			return [{"do": "assemble", "ticket": task.ticket}]
-		"tray":
-			return [{"do": "start_tray", "ticket": task.ticket}]
+		"plates":
+			return [{"do": "set_plates", "ticket": task.ticket}]
+		"tidy":
+			return [{"do": "pick_dish", "at": task.cell}, {"do": "bin"}, {"do": "restack"}]
 		"scrap":
 			return [{"do": "pick", "at": task.cell, "kind": task.kind, "state": "burnt"}, {"do": "bin"}]
 		"carry":
-			return [{"do": "pick_tray", "at": task.cell, "ticket": task.tray}, {"do": "serve", "at": task.table}]
+			var out: Array = []
+			for c: Vector2i in task.get("cells", [task.cell]):
+				out.append({"do": "pick_dish", "at": c})
+			out.append({"do": "serve", "at": task.table})
+			return out
 		"order":
 			return [{"do": "order", "at": task.cell}]
 		"bill":   # PRD 11.4: write it at the till (always right), carry it, hand it over
@@ -182,7 +195,7 @@ static func clean_tool(duties: Array) -> String:
 	return ""
 
 
-## What to do with what is in hand when a task is dropped: a tool goes back, a dirty tray
+## What to do with what is in hand when a task is dropped: a tool goes back, dirty dishes
 ## to the sink, a bag out of the door, anything else down on a free surface. "" for empty hands.
 static func stash_for(held: String) -> String:
 	if held == "":
@@ -190,7 +203,7 @@ static func stash_for(held: String) -> String:
 	if held.begins_with("tool:"):
 		return "drop"
 	match held:
-		"dirty_tray":
+		"dirty_dishes":
 			return "to_sink"
 		"rubbish_bag":
 			return "to_door"
@@ -202,8 +215,8 @@ static func stash_for(held: String) -> String:
 # ---------- Tickets ----------
 
 ## What each ticket still lacks once what is already made is counted: `tickets` oldest
-## first, [{id, needs: [kinds] not yet on its tray}]; `made`: prepped kinds lying about or
-## in hand, not on any tray. A made thing covers the oldest ticket that needs it.
+## first, [{id, needs: [kinds] not yet on its plates}]; `made`: prepped kinds lying about or
+## in hand, on no plate. A made thing covers the oldest ticket that needs it.
 ## Returns {ticket id: [kinds]}.
 static func ticket_lacks(tickets: Array, made: Array) -> Dictionary:
 	var pool := made.duplicate()

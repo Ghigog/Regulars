@@ -1,7 +1,9 @@
 class_name Tray
 extends RefCounted
-## One guest's tray: a line for each menu item on their ticket (main, then side, then
-## drink), and which of each item's ingredients are on it so far. Pure.
+## One guest's order as it reaches their table: a line for each menu item on their
+## ticket (main, then side, then drink), and what of each has been served. Food is
+## carried out on plates and drinks in cups (`Dish`); each one served fills its line.
+## (Named for the trays it once was; the carried tray is now only a way to hold more.) Pure.
 ## A held or stored ingredient is a kind string: "raw:patty", "prep:patty", "burnt:patty".
 
 var ticket := -1                     # the ticket id it belongs to, -1 for none
@@ -160,6 +162,49 @@ func matches(items: Array) -> bool:
 ## Moves a tray to another ticket with the same items, keeping what is on it.
 func reassign(ticket_id: int) -> void:
 	ticket = ticket_id
+
+
+## A served dish fills the first line for its item still empty. Returns the line, or -1
+## when no line wants it.
+func serve_dish(d: Dish, items: Array) -> int:
+	var it := d.item_of(items)
+	if it.is_empty() or d.vessel == "":
+		return -1
+	var li := open_line(int(it.id))
+	if li < 0:
+		return -1
+	lines[li].have = d.have_for(lines[li].item)
+	return li
+
+
+## The first line for this menu item with nothing served on it yet, or -1.
+func open_line(item_id: int) -> int:
+	for li in lines.size():
+		var l: Dictionary = lines[li]
+		if int(l.item.id) == item_id and not _served(l):
+			return li
+	return -1
+
+
+func _served(l: Dictionary) -> bool:
+	for q: float in l.have:
+		if q >= 0.0:
+			return true
+	return false
+
+
+## How many of its lines have been served.
+func served_count() -> int:
+	var n := 0
+	for l in lines:
+		if _served(l):
+			n += 1
+	return n
+
+
+## The vessel each line goes out in: cups for drinks, plates for the rest.
+static func vessel_of(item: Dictionary) -> String:
+	return Dish.CUP if item.course == "drink" else Dish.PLATE
 
 
 ## Takes everything off (into the bin), keeping the ticket.

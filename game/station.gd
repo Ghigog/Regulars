@@ -6,10 +6,12 @@ const COOK_TIME := Prep.GRILL_DONE       # raw until here
 const PERFECT_END := Prep.GRILL_PERFECT  # juicy until here, then it dries out
 const BURN_TIME := Prep.GRILL_BURN
 const NEARLY_TIME := Prep.GRILL_NEARLY   # the raw patty starts to colour
-const TRAYS := 4           # trays in a new tray stack
+const PLATES := 8          # plates in a new plate stack
+const CUPS := 6            # cups in a new cup stack
+const TRAYS := 2           # trays in a tray stack
 const DIAL_SWEEP := 150.0  # degrees either side of straight up
-const SINK_PILED := 3      # this many trays soaking and the washing-up shows (and bothers guests)
-const RACK_HOLDS := 2      # a dish rack beside a sink: this many more trays before it looks piled
+const SINK_PILED := 6      # this many dishes soaking and the washing-up shows (and bothers guests)
+const RACK_HOLDS := 4      # a dish rack beside a sink: this many more dishes before it looks piled
 const BIN_HOLDS := 4       # scraps a bin takes before it overflows
 
 ## A heat tool's behaviour for each heat job: a stove that fries works as a fryer.
@@ -28,10 +30,9 @@ var high := false     # hung in a wall cell's high layer (PRD 8.5): a cabinet, a
 var closet := false   # a high shelf over a low one, drawn as one closet
 var pass_look := false  # a counter drawn as a length of the frame's long teal pass (the starting ones)
 var lamp: OmniLight3D # a table's lamp light, owned by the game
-var item := ""        # what is sitting on a counter or stove: an ingredient kind ("raw:patty") or "tray"
+var item := ""        # what is sitting on a counter or stove: an ingredient kind ("raw:patty") or "dish"
 var quality := 1.0    # how well prepped that item is (0..1)
-var tray: Tray        # the tray on a counter or the pass, when item is "tray"
-var tray_tag := ""    # the colour of that tray's ticket slip ("" for none)
+var dish: Dish        # the plate, cup or loose stack on a counter, when item is "dish"
 var boxes: Array = []   # the boxes of stock in this cell's storage, as the kitchen holds them (PRD 8.4)
 var cook := 0.0       # seconds the piece has been on the heat (stove, fryer, pot)
 var rest := 0.0       # a fryer: seconds left draining on the rack before it can be picked up
@@ -39,8 +40,9 @@ var result := ""      # a fryer: how the piece on the rack came out (good, plain
 var prep_by := -1        # the player playing a press-based minigame here, or -1
 var widget: PrepWidget   # the gauge over a pot or fryer rack, or a press-based minigame
 var tap := 0          # a dispenser with several taps: the one it is turned to (PRD 8.6)
-var count := 0        # clean trays in a tray stack; scraps in a bin
-var dirty := 0        # dirty trays left on a table, or soaking in a sink
+var count := 0        # clean plates, cups or trays in their stack; scraps in a bin
+var dirty := 0        # dirty dishes left on a table, or soaking in a sink (cups among them)
+var dirty_cups := 0   # how many of `dirty` are cups
 var dirty_age := 0.0  # seconds this piece has been messy (see `messy`)
 var seats: Array[Vector2i] = []
 var kit_tool := ""    # a home's cleaning tool kept here ("mop", "sponge"; PRD 9.4), drawn by CleanKit
@@ -69,7 +71,7 @@ static func stage_at(t: float) -> String:
 	return "prep" if t < BURN_TIME else "burnt"
 
 
-## The ingredient sitting here ("" if none or a tray).
+## The ingredient sitting here ("" if none or a dish).
 func ingredient() -> String:
 	var p := Tray.parse(item)
 	return p.id if not p.is_empty() else ""
@@ -101,8 +103,7 @@ func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0, base_ := "",
 	add_child(_vis)
 	_draw()
 	place_at(cell_, facing)
-	if type == "trays":
-		count = TRAYS
+	count = {"plates": PLATES, "cups": CUPS, "tray_stack": TRAYS}.get(type, count)
 	if is_heat_tool():
 		_ring = _vis.get_node_or_null("ring")
 		_make_cook_bar()
@@ -180,8 +181,8 @@ func _show_item(kind: String) -> void:
 		_item_node.queue_free()
 		_item_node = null
 	_shown_look = ""
-	if kind == "tray" and tray != null:
-		_item_node = Build.tray(tray, tray_tag)
+	if kind == "dish" and dish != null:
+		_item_node = Build.dish(dish, Build.menu_items())
 		_item_node.position = Vector3(0, 0.9, 0)
 		add_child(_item_node)
 	elif kind != "":
@@ -206,8 +207,8 @@ func _show_item(kind: String) -> void:
 func set_item(kind: String, q := 1.0) -> void:
 	item = kind
 	quality = q
-	if kind != "tray":
-		tray = null
+	if kind != "dish":
+		dish = null
 	if is_heat_tool():
 		var was := heat
 		heat = _heat_for(kind)
@@ -224,7 +225,7 @@ func set_item(kind: String, q := 1.0) -> void:
 
 
 ## The heat job an item here would cook by: its own tool where this piece can do it,
-## else this piece's own job. "" when nothing (or a tray) is here.
+## else this piece's own job. "" when nothing (or a dish) is here.
 func _heat_for(kind: String) -> String:
 	var p := Tray.parse(kind)
 	if p.is_empty():
@@ -235,18 +236,18 @@ func _heat_for(kind: String) -> String:
 	return main_job()
 
 
-## Puts a tray down here (a counter or the pass).
-func set_tray(t: Tray, tag := "") -> void:
-	tray = t
-	tray_tag = tag
-	item = "tray"
-	_show_item("tray")
+## Puts a plate, cup or loose stack down here (a counter or the pass).
+func set_dish(d: Dish) -> void:
+	dish = d
+	item = "dish"
+	quality = 1.0
+	_show_item("dish")
 
 
-## Redraws the tray after something was added or it changed ticket.
-func show_tray() -> void:
-	if item == "tray":
-		_show_item("tray")
+## Redraws the dish after something was added to it.
+func show_dish() -> void:
+	if item == "dish":
+		_show_item("dish")
 
 
 ## Quality of whatever is here right now; a stove reads it off the timer.
@@ -398,7 +399,7 @@ func sizzle_stage() -> String:
 
 
 func is_cooking() -> bool:
-	if item == "" or item == "tray" or item.begins_with("burnt") or not is_heat_tool():
+	if item == "" or item == "dish" or item.begins_with("burnt") or not is_heat_tool():
 		return false
 	match mode():
 		"stove":
@@ -511,7 +512,7 @@ func messy() -> bool:
 	return false
 
 
-## How many trays soak in a sink before it looks piled: more with a dish rack beside it.
+## How many dishes soak in a sink before it looks piled: more with a dish rack beside it.
 static func piled_at(rack: bool) -> int:
 	return SINK_PILED + (RACK_HOLDS if rack else 0)
 
@@ -525,15 +526,12 @@ func refresh() -> void:
 		_stack.queue_free()
 	_stack = Node3D.new()
 	add_child(_stack)
-	if type == "trays":
-		for i in count:
-			var t := Build.item("tray")
-			t.position = Vector3(0, 0.916 + i * 0.04, 0)
-			_stack.add_child(t)
+	if type in ["plates", "cups", "tray_stack"]:
+		Build.stack_load(_stack, type, count)
 	elif is_table(type):
 		for i in dirty:
-			var d := Build.item("dirty_tray")
-			d.position = Vector3(-0.25 + (i % 2) * 0.5, 0.74, 0.3 - (i / 2) * 0.6)
+			var d := Build.item("dirty_cup" if i >= dirty - dirty_cups else "dirty_plate")
+			d.position = Vector3(-0.25 + (i % 2) * 0.5, 0.74, 0.3 - ((i / 2) % 2) * 0.6) + Vector3(0, (i / 4) * 0.03, 0)
 			_stack.add_child(d)
 	elif type == "sink":
 		Build.sink_load(_stack, dirty, messy())

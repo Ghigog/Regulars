@@ -449,10 +449,10 @@ func test_a_tops_surface_holds_one_thing_and_empty_hands_take_it_first():
 	assert_eq(game.use_station(board), "Pick up", "empty hands take the thing first")
 	assert_eq(game.player.held, "prep:bun")
 	var stove: Station = game.find_station("stove")
-	game.player.set_held("tray", 1.0, Tray.new())
-	assert_eq(game.use_station(stove), "Put tray down", "a tray rests on a stove")
+	game.player.set_held("dishes", 1.0, [Dish.make(Dish.PLATE)])
+	assert_eq(game.use_station(stove), "Put down", "a plate rests on a cold stove")
 	assert_false(stove.is_cooking())
-	assert_eq(game.use_station(stove), "Pick up tray")
+	assert_eq(game.use_station(stove), "Pick up")
 
 
 # ---------- 8.3: upgrade trees (sim) ----------
@@ -1022,7 +1022,7 @@ func test_a_cabinet_hangs_over_a_piece_and_comes_off_before_it():
 	assert_eq(game.ledger.money, 500 - Catalog.price_of("cabinet"))
 	var cab: Station = game.highs[c]
 	assert_true(cab.high)
-	assert_eq(game.stations[c].type, "trays", "the tray stack still stands below")
+	assert_eq(game.stations[c].type, "plates", "the tray stack still stands below")
 	assert_false(game.grid.blocked.has(Vector2i(2, 3)))
 	assert_true(game.pick_catalog("hood"))
 	assert_false(game.can_place(Vector3i(2, 2, 0)), "one high piece a cell")
@@ -1033,7 +1033,7 @@ func test_a_cabinet_hangs_over_a_piece_and_comes_off_before_it():
 	assert_eq(game.highs[c], cab, "cancel hangs it back")
 	assert_true(cab.visible)
 	assert_true(game.pick_up(_at(2, 2)))
-	assert_eq(game.player.hand.id, "trays", "hung back, the next E takes what stands under it")
+	assert_eq(game.player.hand.id, "plates", "hung back, the next E takes what stands under it")
 	game.cancel_hand()
 	assert_true(game.pick_up(_at(2, 2)))
 	assert_true(game.place(Vector3i(1, 2, 0)), "moved along the wall")
@@ -1357,16 +1357,20 @@ func test_corn_steams_or_boils_and_steamed_is_its_own_kind():
 	assert_eq(game.player.held_quality, Prep.BAD, "left too long: mushy")
 
 
-func test_a_two_tap_fountain_pours_what_the_rail_wants_and_turns_on_put_back():
+func test_a_two_tap_fountain_pours_what_the_rail_wants_and_turns_with_empty_hands():
 	_game(false)
+	for d in ["soda", "cola", "coffee"]:
+		game.menu.add("drink", [d], d)
 	var two: Station = _tool_on("two_tap_fountain", Vector2i(2, 5))
 	assert_eq(game.dispenser_drinks(two), ["soda", "cola"])
+	game.player.set_held("dishes", 1.0, [Dish.make(Dish.CUP)])
 	assert_eq(game.use_station(two, true), "Pour soda")
 	game.tickets.append({"id": 99, "guest": null, "items": [{"course": "drink", "ingredients": ["cola"]}]})
 	assert_eq(game.use_station(two, true), "Pour cola", "a ticket wants cola")
 	game.tickets.clear()
-	game.player.set_held("prep:soda", Prep.GOOD)
-	assert_eq(game.use_station(two), "Put back")
+	game.player.set_held("")
+	assert_eq(game.use_station(two), "Turn to cola")
+	game.player.set_held("dishes", 1.0, [Dish.make(Dish.CUP)])
 	assert_eq(game.use_station(two, true), "Pour cola", "turned to the next tap")
 	var coffee: Station = _tool_on("coffee_machine", Vector2i(3, 5))
 	assert_eq(game.use_station(coffee, true), "Pour coffee")

@@ -9,7 +9,7 @@ lost while the core loop is polished. Sections are ordered roughly by when to bu
 ## 1. The vertical slice (what is in the game now)
 
 An endless run. Each night you build the kitchen and write the menu; each day guests
-arrive, read the menu, order, and you prep, assemble and serve their trays, then write
+arrive, read the menu, order, and you prep, assemble, plate and serve their orders, then write
 their bill at the till and take the money.
 Survive as many days as you can; three walkouts in one day ends the run.
 
@@ -44,7 +44,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   E picks up every piece, hoods over bare floor included; on a cell with a wall piece
   over a floor piece the wall piece comes first, and once it is put back the next E
   there takes the one below. The prompt names the piece ("Pick up sink"). Everything
-  sells, the start's pieces and the last sink, bin, tray stack and till too (the tray
+  sells, the start's pieces and the last sink, bin, plate stack and till too (the plate
   stack and the till are in the Kitchen tab now); while the kitchen has none of one of
   those four the shop sells it at any level and the door card stays shut (`ESSENTIALS`).
   The till is its own piece: it stands on a counter (or a tool on one), comes off before
@@ -77,18 +77,27 @@ Survive as many days as you can; three walkouts in one day ends the run.
 - **Tools.** Each prep tool stands on a counter: stove (grill, $50), chopping board
   ($25), the fryer, stock pot and slicer reached in their trees (PRD 8.3). Pour happens
   at the drink's own dispenser. Every piece can be sold, the last stove included.
-- **Tickets and trays** (`sim/tray.gd`). Taking a table's order puts a ticket for each
-  guest who ordered on the rail along the top of the screen (oldest on the left, five
-  shown, more counted on a last tab; each in the guest's shirt colour). The chef takes
-  an empty tray from the tray stack and puts it on a counter or the pass: it takes the
-  oldest ticket with no tray. Turning to it moves it to the next ticket (a tray with
-  something on it only to a ticket for the same items). Ingredients go on in any order;
-  the tray refuses one its ticket does not need, or a raw one that needs prep ("Grill
-  it first"), and says what is missing ("Needs fries"). A finished tray is picked up
-  and served at the guest's table; the bill is the sum of the item prices. After the
-  meal the dirty tray goes to the sink and soaks until washed, one press each, back
-  onto the stack. A guest who leaves tears their ticket off; a tray made for it keeps
-  what is on it.
+- **Tickets, plates and cups** (`sim/tray.gd`, `sim/dish.gd`). Taking a table's order
+  puts a ticket for each guest who ordered on the rail along the top of the screen
+  (oldest on the left, five shown, more counted on a last tab; each in the guest's shirt
+  colour). Each menu item goes out on its own plate, or in a cup for a drink. Made food
+  combines on a worktop: a bun put on a cooked patty makes a loose burger, in any order,
+  but only into something the menu makes ("Nothing on the menu has patty with fries",
+  "One bun is enough", "Patty needs grilling first"). A plate from the plate stack then
+  takes it up ("Plate it"), or food goes onto a plate already put down. A drink station
+  fills the cup in hand (a cup from the cup stack; "Bring a cup"); a two-tap station
+  turns with empty hands or Turn. The hands hold two plates or cups; a tray from the
+  tray stack (bought, optional) holds four. At a table, every dish in hand that a
+  waiting guest there ordered is set down in front of them ("Needs patty", "Put it on a
+  plate first", "Nobody here ordered that"); the ticket ticks off each item served, and
+  a guest starts eating once their whole order is there. The bill is the sum of the item
+  prices. After the meal each plate and cup is left dirty on the table, cleared two at a
+  time (four on a tray), soaks in the sink, and is washed one press each back onto its
+  own stack. An empty plate or cup in hand goes back on its stack with Use. A guest who
+  leaves tears their ticket off and leaves what was served dirty on the table. The
+  kitchen needs a plate stack to open, and a cup stack once a drink is on the menu (the
+  start has the plate stack; the cup stack is bought). Saves from before keep their
+  tray stack as the plate stack.
 - **Prep minigames** (`sim/prep.gd`, gauges in `game/prep_widget.gd`). One per tool,
   each ending good, plain or bad: *grill* (the doneness dial: take it off in the green
   window), *fry* (the same, then two seconds draining on the rack before it can be
@@ -101,7 +110,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   good result gives the chef a one-second burst of speed (1.5x, speed lines and a
   spinning star), a bad one a one-second penalty (half speed, a sweat drop and a
   wobble). Boil and no-prep ingredients give neither.
-- **Quality.** A tray's quality is the average of its ingredients'; the guest's
+- **Quality.** An order's quality is the average of its ingredients'; the guest's
   savour is that, raised by 0.1 for each ingredient they like, up to +0.3
   (`Menu.savour`). It sets the tip as before.
 - **The menu screen** (`game/menu_screen.gd`, `sim/menu.gd`; at night, N, Back on a
@@ -120,7 +129,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   flip with no makeable main or when the stock cannot be paid. Tonight's item names are
   chalked on the A-frame board by the door (`game/menu_board.gd`).
 - **The empty start.** A run opens on night zero with $150 and a kitchen holding only
-  the sink, the bin, the tray stack and the counters. Three hints lead the way, one at
+  the sink, the bin, the plate stack and the counters. Three hints lead the way, one at
   a time ("Buy an ingredient and a tool in the shop.", "Write a menu.", "Flip the door
   card to open."). Tests and most demos start from `test_kitchen()`: the theme's fixed
   main (diner Burger: bun and patty; seaside Fish roll: roll and fish) with its stations.
@@ -129,7 +138,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   fillet, calamari rings, lemon wheels, courgette rounds, pepper strips, new potatoes,
   green beans, a stemmed wine glass). A dish in a bread roll shows as a side-on roll
   with its filling, a fish as a fish, so it never reads as a burger.
-- **A dirty kitchen.** Three or more plates soaking pile up in suds. Every patty thrown
+- **A dirty kitchen.** Six or more dishes soaking pile up in suds (ten with a dish rack). Every patty thrown
   away or burger scraped off goes in the bin; at four it overflows (it still takes more).
   "Empty bin" hands the chef a bag, which goes out of the front door ("Take out rubbish");
   carried, it counts as rubbish. Both are disgust sources (table below).
@@ -149,16 +158,16 @@ Survive as many days as you can; three walkouts in one day ends the run.
   table). Only then do they wait for food, and their bubble shows what they ordered.
   Patience drains while they wait to order, 1.25x as fast as while waiting for food
   (`ORDER_PATIENCE_SCALE` 0.8 in `game/main.gd`); taking the order gives back 0.1
-  (`ORDER_RELIEF`). Holding a tray at a table that has not ordered shows "Take order
+  (`ORDER_RELIEF`). Holding a plate at a table that has not ordered shows "Take order
   first" and E only says why (`ORDER_HANDS_FREE`; set it false to let the chef take
   orders with full hands). Taking an order comes before half price and the free meal at
   the same table. An order is data on the guest (`Guest.order`: `{main, side, drink,
   ticket}`, each an item or empty), chosen at the door by `Menu.group_order` (or by
   `order_for` in `game/main.gd` for a guest who came in another way), and serving
-  matches the tray against its ticket. `REGULARS_DEMO=order`.
+  matches each plate against its ticket. `REGULARS_DEMO=order`.
 - **What guests order.** Each townsperson has hidden tastes: liked and disliked
   ingredient tags. A guest orders a main with nothing they dislike, plus a side and a
-  drink only when one has something they like, all on one tray. Items with liked
+  drink only when one has something they like, all on one ticket. Items with liked
   ingredients and cheap ones are picked more often. In a group, someone with no main
   orders a drink they do not mind, or nothing; the group walks on only if nobody finds
   a main. A guest who walks on stops at the board, thinks "Nothing I liked on the menu"
@@ -166,7 +175,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   counts them. Tastes are never listed: the guest card shows how often they ordered
   each item ("Orders:"), a guest reading a menu with three or more items of a kind they
   like says so ("So many things with vegetables. I love vegetables!"), a liked
-  ingredient on the tray gives "Just how I like it", and gossip names what they
+  ingredient in the order gives "Just how I like it", and gossip names what they
   praised. `REGULARS_DEMO=walkon`, `orders_card`.
 - Grilled and fried food has doneness: the stove's radial dial has a green "perfect"
   window; pull it late and it is dry (plain, falling toward bad), leave it and it burns
@@ -274,7 +283,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     free table that fits is chosen, so a single takes a stool first). Kitchen: a bin
     ($30, level 2) and a sink ($70, level 3), which are now catalog pieces like any other
     (the last of each cannot be sold), and a dish rack ($50, level 3): a sink with one
-    beside it piles at 5 trays, not 3. Each sink and bin has its own mess and sightline,
+    beside it piles at 10 dishes, not 6. Each sink and bin has its own mess and sightline,
     and the "still dirty" note counts them ("2 sinks").
 - **Keyboard, controller or touch** (`game/controls.gd`, `game/player_input.gd`). Each
   device is a source ("keys" for keyboard and mouse, "pad:<id>" per controller, "touch")
@@ -474,12 +483,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
     their friends hear half of it). Skill grows 0.02 per task done in its kind.
   - *In service (10.5, 10.6).* Hires walk in as the door opens and leave as it closes;
     the build phase is the chefs' alone. Five times a second the board is rebuilt from
-    the room: an ingredient a ticket lacks (fetch, then prep at its tool), a tray to
-    start, food to assemble, a tray to carry, a table to order or clear, dirt at level 2
+    the room: an ingredient a ticket lacks (fetch, then prep at its tool), plates to
+    set out, food to assemble, plates to carry, leftover plates to tidy, a table to order or clear, dirt at level 2
     or more, someone fallen, dishes in the sink, a full bin, burnt food to scrap. Each
     free helper takes the task their duties allow that is most urgent for the walk (an
     urgency point is worth four cells; help up 6,
-    carry 5, tray 4.5, assemble 4, scrap 3.8, prep 3.5, fetch and order 3, clear 2, wash
+    carry 5, plates 4.5, assemble 4, scrap 3.8, prep 3.5, fetch and order 3, clear 2, wash
     and bin 1.5, dirt 1 plus 0.5 a level; waiting adds urgency) and reserves it. A chef
     doing a task takes it over, and the helper moves on. No minigames: a prep rolls
     good, plain or bad from skill, the tool's tree quality and satisfaction; a bad roll
@@ -494,9 +503,13 @@ Survive as many days as you can; three walkouts in one day ends the run.
     (`staff_only` and `test_all_staff.gd`, which fails if any ticket, table or chore
     sits unchanged for 120 s). What it changed: kinds made from another's stock
     (lemonade, milkshake, steamed corn) are fetched as their source and worked at their
-    tool, and ready-made boxes go straight to the ticket; a new *tray* task (the
-    assemble duty) starts a ticket's tray first so food goes straight on it, never more
-    trays than free worktops; a new *scrap* task bins burnt food on a tool, done by
+    tool, and ready-made boxes go straight to the ticket; a *plates* task (the
+    assemble duty) sets out a plate or cup for each of a ticket's items first so food
+    goes straight on it, never more than free worktops (the oldest waiting ticket sets
+    out what fits); a drink is poured into the ticket's cup and set back out; finished
+    plates for the same table are carried two at a time (helpers do not use trays); a
+    plate set out for an order served from elsewhere goes to another ticket's same item,
+    else a *tidy* task scrapes it and puts it back on its stack; a new *scrap* task bins burnt food on a tool, done by
     whoever works that tool, and a cook finishes what is on the heat before a break;
     fetchers leave raw food on the press tool itself; for dirt, the scraper takes grease
     only and the spill kit level 4 only, helpers wipe with the room's tool (the flat mop
@@ -567,7 +580,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   (`comfort`, `bill_scale`, `stay_scale`, `pay_for`). `REGULARS_DEMO=mood`. Comfort does
   not change how much mess a guest leaves.
 - **Paying the bill** (PRD 11, `sim/bill.gd`). Every table is three trips: order, serve,
-  pay. The last bite leaves the dirty tray on the table and the guest sits back to chat
+  pay. The last bite leaves the dirty plates and cups on the table and the guest sits back to chat
   for 3 s (`Guest.CHAT_TIME`; speech bubbles with company, none alone), then waits for
   the bill (`to_pay`). When everyone at the table who ordered has finished chatting, the
   table is ready to pay: one bill per table, paid by the whole party. Their patience runs
@@ -582,7 +595,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   marked, a table whose slip is out greyed, so two chefs never write one table twice),
   then tonight's menu by course with a count beside each (E or click adds, Backspace, X
   or right click takes off), then Print. It never shows what the table had: the player
-  remembers, or reads "Orders" on the guest card. The slip is held like a tray; Esc (B)
+  remembers, or reads "Orders" on the guest card. The slip is held like a plate; Esc (B)
   or the bin throws it away, and a slip for a party that has gone is thrown away. At the
   table (or at the till, for the guest queued there) the chef holds E for 1 s
   (`HAND_TIME`) with a fill bar over the table, cancelled by letting go or walking off.
@@ -602,17 +615,17 @@ Survive as many days as you can; three walkouts in one day ends the run.
   lets it go. The guest card says "Waiting for the bill, Ns" (or "at the till").
   Decided defaults from the PRD: one bill per table, leaving unpaid is no strike, a
   wrong bill is refused (an undercharge too), a quick payment adds nothing to the tip.
-  Departures: the PRD's "Q drops it" is Esc/B (there is no Q action); the eaten tray is
-  not left in front of each guest, it is the table's dirty tray. `REGULARS_DEMO=pay_call`,
+  Departures: the PRD's "Q drops it" is Esc/B (there is no Q action); the eaten plates are
+  not left in front of each guest, they are the table's dirty dishes. `REGULARS_DEMO=pay_call`,
   `pay_till`, `pay_bill`, `pay_hand`, `pay_wrong`, `pay_server`.
 - **The critic** (PRD 2, `sim/critic.gd`). One townsperson, picked with the run's seed
   (`critic_idx`), eats as a critic every fifth day (5, 10, 15 ...). They always come,
   alone, at a time in the middle half of the day: no visit roll, no grudge, and the menu
   never turns them away (they order the best match). Closing the door before they arrive
   puts them off to the next day. They are served like anyone. Ratings, 1 to 5: speed
-  from their patience as the tray lands (5 at 0.85 and up, then 0.7, 0.5, 0.3), cleanliness
+  from their patience as the last plate lands (5 at 0.85 and up, then 0.7, 0.5, 0.3), cleanliness
   from their disgust as they leave (5 if they noticed nothing, 4 below Ick, then 3, 2, 1
-  at Ick, Disgusted, Revolted), food from the tray's average quality mapped evenly onto
+  at Ick, Disgusted, Revolted), food from the order's average quality mapped evenly onto
   1 to 5, variety from tonight's menu (a point per course with an item, one for a course
   of three or more, one for eight or more ingredients). Stars are the rounded mean; a
   walkout (out of patience or revolted) rates speed 1 and caps stars at 2 (food 1 if they
@@ -620,7 +633,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   `speed`, `clean`, `quality`, `variety` (each -0.25 to 0.25, the rest spilling into
   `other`) and `other`. Every change is filed after the usual clamp, so nothing moves
   until a review: disgust is `clean`, a visit is split by the satisfaction terms
-  (patience `speed`, savour up to the tray's quality `quality`, savour from liked
+  (patience `speed`, savour up to the order's quality `quality`, savour from liked
   ingredients `variety`, joy and the baseline `other`), finding nothing on the menu is
   `variety`, kindness, walkouts and forgiving are `other`; friends hear it under the
   same topic. The review, printed at the end of the day, replaces everyone's four topics
