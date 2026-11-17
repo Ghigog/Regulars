@@ -2297,12 +2297,12 @@ func _key_note(action: String) -> String:
 func _hint_text(p := 0) -> String:
 	match _mode(p):
 		"pad":
-			return "Stick move     A use     B back     Start options"
+			return "Stick move     LT aim     A use     B back     Start options"
 		"touch":
 			return ""   # the joystick sits there; the Use button names the action
 	if game.chefs.size() > 1:   # shorter in co-op: two lines share the bottom edge
-		return "WASD move     E use     Click a guest     O options"
-	return "WASD move     E or Space use     Click a guest     O options     M mute"
+		return "WASD move     Shift aim     E use     O options"
+	return "WASD move     Shift+WASD aim     E or Space use     Click a guest     O options     M mute"
 
 
 func _shop_keys_text() -> String:

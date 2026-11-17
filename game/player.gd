@@ -34,6 +34,7 @@ var trim := 0                     # which PLAYER_TRIM colour the chef wears
 var hand := {}                    # build phase: the piece or tool in hand ({} for none)
 var drag := {}                    # a mouse drag with a build tool: {"from": Vector3, "remove": bool}
 var aim_mouse := false            # build phase: the mouse, not the chef, says where things go
+var aiming := false               # Shift (a trigger, the touch Aim button) held: standing still, turning
 var mouse_point := Vector3.INF
 var last_paint := Vector3i(-999, -999, -1)   # the spot Use last built on while held
 var demo_hover := Vector3.INF     # demos and tests: where the hand is held
@@ -245,13 +246,20 @@ func target_cell() -> Vector2i:
 			var action: String = game.prompt_for(st, self)
 			if dist > REACH or action == "":
 				continue
-			var score := -dist + 0.4 * to.normalized().dot(aim)
+			var score := -dist + (2.0 if aiming else 0.4) * to.normalized().dot(aim)   # aimed: the one looked at wins
 			if action.begins_with("Serve"):
 				score += 0.5   # a waiting guest beats a counter to put the plate on
 			if score > best_score:
 				best_score = score
 				best = n
 	return best
+
+
+## The grid direction, diagonals included, nearest a look direction: each of the 8 ways
+## takes a 45 degree slice. On screen, W alone faces the cell straight up.
+static func aim_dir(dir: Vector3) -> Vector2i:
+	var s := sin(PI / 8.0)
+	return Vector2i(signi(roundi(dir.x)) if absf(dir.x) > s else 0, signi(roundi(dir.z)) if absf(dir.z) > s else 0)
 
 
 ## Turns the chef to look along a grid direction (used by tests and demos).
@@ -321,8 +329,11 @@ func look_at_cell(c: Vector2i) -> void:
 		aim = to.normalized()
 
 
-## Moves by a screen-space input vector (x = right, y = up on screen).
-func move(input: Vector2, delta: float) -> void:
+## Moves by a screen-space input vector (x = right, y = up on screen). With `hold`
+## (Shift, a trigger or the touch Aim button) the chef stays put and only turns; at
+## night they may face a diagonal too, so every cell around them can be reached.
+func move(input: Vector2, delta: float, hold := false) -> void:
+	aiming = hold
 	if game.floor_dirt.is_down(self):
 		_velocity = Vector3.ZERO   # on the floor: no walking until up again
 		return
@@ -352,6 +363,11 @@ func move(input: Vector2, delta: float) -> void:
 			facing = Vector2i(0, signi(roundi(dir.z)))
 		elif facing.x != signi(roundi(dir.x)) and facing.y != signi(roundi(dir.z)):
 			facing = Vector2i(signi(roundi(dir.x)), 0)
+		if hold and game.phase == game.Phase.BUILD:
+			facing = aim_dir(dir)
+	if hold:
+		dir = Vector3.ZERO
+		_velocity = Vector3.ZERO   # planted: no glide
 	_velocity = _velocity.lerp(dir * speed(), 1.0 - exp(-16.0 * delta))
 	var step := _velocity * delta
 	var next := position + Vector3(step.x, 0, 0)

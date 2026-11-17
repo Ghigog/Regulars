@@ -6246,7 +6246,7 @@ func _process(delta: float) -> void:
 			input = controls.move(p)
 		if preps.has(p) or (hud.bill_open() and hud.bill.chef == ch):
 			input = Vector2.ZERO   # the chef stands at the tool while a minigame runs, or writes a bill
-		ch.move(input, delta)
+		ch.move(input, delta, controls.aiming(p) and (phase == Phase.SERVICE or phase == Phase.BUILD))
 		ch.carry(not ch.hand.is_empty())
 		if phase == Phase.BUILD:
 			if input != Vector2.ZERO:
@@ -6641,6 +6641,8 @@ func _refresh_ready() -> void:
 ## The options screen and the shop are shared; the rest is done by that
 ## player's chef.
 func act(p: int, action: String, echo := false) -> void:
+	if action == "aim":
+		return   # held, not pressed: read each frame (`Controls.aiming`)
 	if hud.options_open():
 		hud.options_action(action, echo)
 		return
