@@ -63,7 +63,7 @@ const SOUNDS := {  # name -> volume in dB
 	"zoom": -6.0, "wobble": -6.0, "chop": -7.0, "slice": -9.0, "glug": -8.0,
 	# Recorded (docs/AUDIO_GUIDE.md), peak-normalised; levels match what each replaces.
 	"grill_drop": 5.7, "patty_flip": 0.2, "plate_food": 2.3, "creaky_door": -13.1, "sit": -4.7,
-	"order_ready": 1.2, "sizzle_raw": -0.3, "sizzle_cooking": -8.2, "sizzle_done": -1.8, "smoke_warn": -3.5,
+	"order_ready": 1.2, "order_take": -2.1, "sizzle_raw": -0.3, "sizzle_cooking": -8.2, "sizzle_done": -1.8, "smoke_warn": -3.5,
 }
 ## Loops: the stove's three sizzles and its smoke cross-fade by doneness; "sizzle" is
 ## the fryer's and the pot's.
@@ -4982,7 +4982,7 @@ func take_orders(table: Station) -> void:
 		if not items.is_empty():
 			_claim_for(tickets[-1])
 	hud.refresh_tickets()
-	sfx("page")
+	sfx("order_take")
 
 
 func find_ticket(id: int) -> Dictionary:

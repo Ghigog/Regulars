@@ -15,7 +15,7 @@ func before_each():
 
 
 func test_every_recorded_sound_loads():
-	for id: String in ["grill_drop", "patty_flip", "plate_food", "creaky_door", "sit", "order_ready",
+	for id: String in ["grill_drop", "patty_flip", "plate_food", "creaky_door", "sit", "order_ready", "order_take",
 			"sizzle_raw", "sizzle_cooking", "sizzle_done", "smoke_warn", "bell", "ding", "burn", "flip"]:
 		assert_true(game._sfx.has(id), id)
 

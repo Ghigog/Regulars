@@ -225,7 +225,7 @@ character.
 **`order_ready.wav`** · **in** · 0.7 s · one-shot
 > Two light knuckle taps on a wooden table followed by a soft, polite little "ahem"-like woodblock pop: a guest signalling they're ready to order. Gentle and attention-catching but never rude. Dry and close.
 
-**`order_take.wav`** · new · 0.9 s · one-shot
+**`order_take.wav`** · **in** · 1.5 s · one-shot
 > A stubby pencil scribbling quickly on a paper order pad, two quick scratches and a tick, then the page flicked over. Brisk and efficient. Close and dry.
 
 **`serve.wav`** · have · 0.6 s · one-shot
