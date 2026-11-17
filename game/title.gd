@@ -16,6 +16,8 @@ var _rows: Array[Control] = []      # what the pointer frame goes round, one per
 var _box: VBoxContainer
 var _keys: Label
 var _frame: Control
+var saved := {}      # the saved game, when there is one: Continue loads it
+var _note: Label
 
 
 static func can_quit() -> bool:
@@ -81,7 +83,13 @@ func _add_button(parent: Container, text: String, id: String, row: Control = nul
 func show_main() -> void:
 	_clear()
 	themes_open = false
-	_add_button(_box, "Play", "play")
+	saved = SaveGame.read(hud.game.save_path)
+	if not saved.is_empty():
+		_add_button(_box, "Continue", "continue")
+		_note = hud._label(_box, 16, SaveGame.blurb(saved))
+		_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_note.modulate.a = 0.75
+	_add_button(_box, "New Game" if not saved.is_empty() else "Play", "play")
 	_add_button(_box, "Settings", "settings")
 	if can_quit():
 		_add_button(_box, "Quit", "quit")
@@ -192,6 +200,8 @@ func action(a: String, echo := false) -> bool:
 
 func press_id(id: String) -> void:
 	match id:
+		"continue":
+			hud.game.continue_game()
 		"play":
 			hud.game.play()
 		"settings":

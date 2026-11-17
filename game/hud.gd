@@ -1584,6 +1584,29 @@ func options_open() -> bool:
 	return _options_card != null
 
 
+var pause: PauseMenu
+
+
+func pause_open() -> bool:
+	return pause != null
+
+
+## Opens or closes the pause menu (Resume, Options, Quit to title). The game stands still
+## while it is open. Not on the title screen, which has its own.
+func toggle_pause() -> void:
+	if pause != null:
+		pause.queue_free()
+		pause = null
+		get_tree().paused = false
+		return
+	if title != null or game.phase == game.Phase.TITLE:
+		return
+	get_tree().paused = true
+	pause = PauseMenu.new()
+	pause.setup(self)
+	root.add_child(pause)
+
+
 ## One action while the options screen is open (see Controls): up and down pick
 ## a row, left and right turn a slider or switch tabs, use or confirm presses,
 ## back or options closes. Held browse keys repeat; nothing else does. Returns
@@ -1611,7 +1634,7 @@ func toggle_options() -> void:
 		_options_card = null
 		_options_rows.clear()
 		save_options()
-		get_tree().paused = false
+		get_tree().paused = pause != null   # back to the pause menu it was opened from
 		return
 	get_tree().paused = true
 	_options_sel = 0
@@ -2301,8 +2324,8 @@ func _hint_text(p := 0) -> String:
 		"touch":
 			return ""   # the joystick sits there; the Use button names the action
 	if game.chefs.size() > 1:   # shorter in co-op: two lines share the bottom edge
-		return "WASD move     Shift aim     E use     O options"
-	return "WASD move     Shift+WASD aim     E or Space use     Click a guest     O options     M mute"
+		return "WASD move     Shift aim     E use     O pause"
+	return "WASD move     Shift+WASD aim     E or Space use     Click a guest     O pause     M mute"
 
 
 func _shop_keys_text() -> String:

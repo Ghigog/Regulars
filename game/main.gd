@@ -144,7 +144,9 @@ var inspected: Guest                 # the guest whose card is open, if any
 var flyers_out := false          # bought tonight, spent on tomorrow's crowd
 var first_night := true          # open on the night before day 1, in the build phase (tests and demos skip it)
 static var _title_seen := false  # the title shows once a launch; starting over skips it
+static var _resume_data := {}  # a saved game being loaded: read by _ready of the reloaded scene
 static var _theme_picked := false  # this run's theme is chosen; starting over asks again
+var save_path := SaveGame.PATH   # the saved game, written at the start of each night
 var theme_path := "user://regulars_theme.cfg"   # the last theme picked, preselected next time
 var allow_quit := true           # tests turn this off to check Quit without leaving
 var quit_asked := false
@@ -211,9 +213,15 @@ func _ready() -> void:
 	_build_scenery()
 	town.make_tastes(Scenery.theme_id)
 	order_rng.seed = seed_value
-	_build_layout()
-	_start_plan()
-	_hang_fixtures()
+	var saved := _resume_data
+	_resume_data = {}
+	if saved.is_empty():
+		_build_layout()
+		_start_plan()
+		_hang_fixtures()
+	else:
+		plan = Floorplan.new(LOT)
+		SaveGame.restore_world(self, saved)
 	floor_dirt = FloorDirt.new()
 	add_child(floor_dirt)
 	floor_dirt.setup(self)
@@ -248,7 +256,13 @@ func _ready() -> void:
 	var demo := OS.get_environment("REGULARS_DEMO")
 	if demo != "" and not demo in ["title", "night0", "picker"]:
 		test_kitchen()   # the demos show a working kitchen
-	if demo == "title" or (first_night and demo == "" and not _title_seen):
+	if not saved.is_empty():
+		first_night = false
+		_theme_picked = true
+		_title_seen = true
+		SaveGame.restore_after(self, saved)
+		_open_night()
+	elif demo == "title" or (first_night and demo == "" and not _title_seen):
 		open_title()
 	elif demo == "picker" or (first_night and demo == "" and not _theme_picked and not theme_forced()):
 		open_title()   # starting over: the theme card again, the title skipped
@@ -619,6 +633,9 @@ func _apply_demo(demo: String) -> void:
 					g.mood.think(Menu.LIKED_THOUGHT)
 					inspect(g)
 					return)
+	elif demo == "pause":  # the pause menu over the room
+		hud.toggle_pause()
+		get_tree().paused = false   # so the screenshot timer still runs
 	elif demo == "options" or demo == "options_gfx":  # the options screen, on either tab
 		hud._options_tab = "graphics" if demo == "options_gfx" else "audio"
 		hud.toggle_options()
@@ -1733,10 +1750,10 @@ func opening_usable(e: Vector3i, seen := {}) -> bool:
 
 
 ## A tool (a top) added where a bare counter stands goes onto that counter.
-func add_station(type: String, cell: Vector2i, tier := 1, facing := 0, base := "", pass_look := false) -> Station:
+func add_station(type: String, cell: Vector2i, tier := 1, facing := 0, base := "", pass_look := false, node := "") -> Station:
 	var st := Station.new()
 	add_child(st)
-	st.setup(type, cell, tier, facing, base, pass_look)
+	st.setup(type, cell, tier, facing, base, pass_look, node)
 	if Station.is_table(type) or type == "floor_lamp":
 		st.lamp = _add_lamp(st.position)
 	if Kitchen.is_top(type) and _bare_counter(cell) != null:
@@ -2242,6 +2259,50 @@ func _open_first_night() -> void:
 	play_music("night")
 	hud.show_build()
 	hud.say("The night before day 1. Set up the kitchen, then flip the door card.")
+	autosave()
+
+
+## A saved game comes back on the night it was saved: the room to tend, the door closed.
+func _open_night() -> void:
+	phase = Phase.BUILD
+	door_open = false
+	_door_turn.rotation.y = PI
+	play_music("night")
+	roll_applicants()
+	hud.show_build()
+	hud.say("Welcome back. Day %d is tomorrow: set up the kitchen, then flip the door card." % ledger.day)
+
+
+## Writes the saved game. Skipped when the game runs headless on the real save's path
+## (the tests set their own).
+func autosave() -> void:
+	if DisplayServer.get_name() == "headless" and save_path == SaveGame.PATH:
+		return
+	SaveGame.write(SaveGame.capture(self), save_path)
+
+
+## Continue on the title screen: the saved game, loaded into a fresh scene.
+func continue_game() -> void:
+	if phase != Phase.TITLE:
+		return
+	var data := SaveGame.read(save_path)
+	if data.is_empty():
+		return
+	_resume_data = data
+	Scenery.theme_id = SaveGame.theme_of(data)
+	_kept_seats = controls.seats.duplicate()
+	get_tree().paused = false
+	if is_inside_tree() and get_tree().current_scene == self:
+		get_tree().call_deferred("reload_current_scene")
+
+
+## Quit to title from the pause menu: back to the first screen of a fresh launch.
+func quit_to_title() -> void:
+	_theme_picked = false
+	_title_seen = false
+	_kept_seats = controls.seats.duplicate()
+	get_tree().paused = false
+	get_tree().reload_current_scene()
 
 
 ## The title screen over the room, before the night before day 1.
@@ -2320,6 +2381,7 @@ func open_build() -> void:
 		staff.start_week(ledger.day)
 	roll_applicants()
 	hud.show_build()
+	autosave()   # the night's start: where Continue picks up
 
 
 ## What the shop lists for a search and a category tab: the catalog, the laying tool of
@@ -3550,7 +3612,7 @@ func _update_ghost(ch: Player = null) -> void:
 			else:
 				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier), ch.hand.get("base", ""))
 			if layer != "" and wall_facing.has(cell):
-				_layer_band(ch.ghost, layer, int(wall_facing[cell]) - (0 if layer == "high" else int(ch.hand.facing)), hn == "hook")
+				_layer_band(ch.ghost, layer, 0 if layer == "high" else int(wall_facing[cell]) - int(ch.hand.facing), hn == "hook")
 	var p := hover
 	if ch.ghost == null or p == Vector3.INF:
 		ch.no_mark.visible = false
@@ -3587,10 +3649,12 @@ func _layer_band(ghost: Node3D, layer: String, turn: int, small := false) -> voi
 	if small:   # a hook is a small thing low in the band: frame it, not the whole layer
 		y0 = Build.HIGH_Y0 - 0.2
 		y1 = Build.HIGH_Y0 + 0.5
-	var plate := Build.box(band, Vector3(0, y0, -0.48), Vector3(0.98, y1 - y0, 0.02), Build.GOOD)
-	plate.material_override = Build.overlay_mat(Color(Build.GOOD, 0.4), 2)
+	y0 -= 0.24   # a margin round the piece, so the band still shows as a frame behind it
+	y1 += 0.24
+	var plate := Build.box(band, Vector3(0, y0, -0.495), Vector3(1.0, y1 - y0, 0.01), Build.GOOD)
+	plate.material_override = Build.overlay_mat(Color(Build.GOOD, 0.6), 2, true)   # behind the piece, on the wall
 	for y: float in [y0, y1]:   # a darker rule top and bottom, so the band reads by shape too
-		Build.box(band, Vector3(0, y - 0.015, -0.47), Vector3(0.98, 0.03, 0.03), Build.GOOD).material_override = Build.overlay_mat(Color(Build.GOOD, 0.85), 2)
+		Build.box(band, Vector3(0, y - 0.015, -0.485), Vector3(1.0, 0.03, 0.02), Build.GOOD).material_override = Build.overlay_mat(Color(Build.GOOD, 0.85), 2, true)
 
 
 ## A build tool shows what it would do: pale squares for floor, bars along the
@@ -3785,6 +3849,7 @@ func _close_down() -> void:
 	crew.clear()
 	play_music("closed")
 	phase = Phase.CLOSED
+	SaveGame.delete(save_path)   # the run is over: nothing to continue
 	var days := ledger.day
 	var earned := ledger.lifetime_earnings()
 	var best := load_best()
@@ -6694,6 +6759,9 @@ func act(p: int, action: String, echo := false) -> void:
 	if hud.options_open():
 		hud.options_action(action, echo)
 		return
+	if hud.pause_open():
+		hud.pause.action(action, echo)
+		return
 	if hud.title_open():
 		if action == "options":
 			hud.toggle_options()
@@ -6712,7 +6780,7 @@ func act(p: int, action: String, echo := false) -> void:
 	if echo:
 		return
 	if action == "options":
-		hud.toggle_options()
+		hud.toggle_pause()
 		return
 	if action == "mute":
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
@@ -6730,6 +6798,8 @@ func act(p: int, action: String, echo := false) -> void:
 			elif action == "back" and ch.held == "bill":
 				ch.set_held("")   # the slip is thrown away (PRD 11)
 				sfx("putdown")
+			elif action == "back" and ch.held == "" and inspected == null:
+				hud.toggle_pause()
 			elif action == "turn":
 				turn_tray(stations.get(ch.target_cell()))
 			elif action == "menu":
@@ -6771,7 +6841,10 @@ func _build_act(action: String, ch: Player = null) -> void:
 		"use":
 			build_interact(ch)
 		"back":
-			cancel_hand(ch)
+			if ch.hand.is_empty():
+				hud.toggle_pause()
+			else:
+				cancel_hand(ch)
 		"turn":
 			rotate_hand(ch)
 		"shop":

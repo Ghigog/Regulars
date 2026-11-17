@@ -1078,8 +1078,11 @@ func test_each_device_is_routed_to_the_player_it_is_seated_to():
 	assert_false(c.holding(0, "use"))
 	_pad(JOY_BUTTON_A, false, 1)
 	_tap_pad(JOY_BUTTON_START, 1)
+	assert_true(game.hud.pause_open(), "the pause menu is shared")
+	game.hud.pause.press_id("options")
 	assert_true(game.hud.options_open(), "the options screen is shared")
 	game.hud.toggle_options()
+	game.hud.toggle_pause()
 
 
 func test_touch_joystick_and_buttons_never_reach_the_room():
@@ -1460,6 +1463,8 @@ func test_options_screen_works_from_the_keyboard():
 	hud.options.sfx = 0.5
 	hud.options.music = 0.5
 	_tap(KEY_O)
+	assert_true(hud.pause_open(), "O opens the pause menu")
+	hud.pause.press_id("options")
 	assert_true(hud.options_open())
 	assert_true(get_tree().paused, "the game waits")
 	assert_eq(hud._options_row(), hud._options_tab_row, "the tabs are chosen first")
@@ -1487,6 +1492,9 @@ func test_options_screen_works_from_the_keyboard():
 	hud.options.merge(saved, true)   # leave the player's own settings file as it was
 	_tap(KEY_ESCAPE)
 	assert_false(hud.options_open())
+	assert_true(hud.pause_open(), "Esc goes back to the pause menu")
+	_tap(KEY_ESCAPE)
+	assert_false(hud.pause_open())
 	assert_false(get_tree().paused)
 
 
@@ -1495,7 +1503,9 @@ func test_options_screen_works_with_a_controller():
 	var saved: Dictionary = hud.options.duplicate()
 	hud.options.sfx = 0.5
 	_tap_pad(JOY_BUTTON_START)
-	assert_true(hud.options_open(), "Start opens the options")
+	assert_true(hud.pause_open(), "Start opens the pause menu")
+	hud.pause.press_id("options")
+	assert_true(hud.options_open())
 	assert_eq(game.controls.mode, "pad")
 	assert_true(hud._options_keys.visible, "the key line shows for a pad")
 	assert_string_contains(hud._options_keys.text, "D-pad")
@@ -1514,14 +1524,16 @@ func test_options_screen_works_with_a_controller():
 	hud.options.merge(saved, true)
 	_tap_pad(JOY_BUTTON_A)
 	assert_false(hud.options_open(), "A on Done closes")
-	_tap_pad(JOY_BUTTON_START)
+	hud.pause.press_id("options")
 	assert_true(hud.options_open())
 	_tap_pad(JOY_BUTTON_B)
 	assert_false(hud.options_open(), "and so does B")
+	hud.toggle_pause()
 
 
 func test_arrows_do_not_walk_the_chef_while_options_are_open():
 	_tap(KEY_O)
+	game.hud.pause.press_id("options")
 	var from: Vector3 = game.player.position
 	_key(KEY_RIGHT)
 	for i in 10:
@@ -1530,6 +1542,7 @@ func test_arrows_do_not_walk_the_chef_while_options_are_open():
 	assert_almost_eq(game.player.position.distance_to(from), 0.0, 0.001, "the chef stays put")
 	_tap(KEY_ESCAPE)
 	assert_false(game.hud.options_open())
+	game.hud.toggle_pause()
 
 
 func test_options_on_touch_have_big_targets_and_no_highlight():
