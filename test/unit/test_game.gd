@@ -874,8 +874,7 @@ func test_music_follows_day_night_and_closing():
 	assert_eq(game.music_id, "night", "the build phase keeps the night track")
 	game.start_day()
 	assert_eq(game.music_id, "day")
-	for i in Ledger.MAX_STRIKES:
-		game.ledger.record_walkout()
+	game.ledger.reputation = 0.0
 	_run(0.2)
 	assert_eq(game.music_id, "closed")
 	assert_false((game._music.stream as AudioStreamMP3).loop, "the closing track plays once")
@@ -897,7 +896,8 @@ func test_days_are_endless_and_get_harder():
 	assert_lt(game.table_patience(), patience_day_2)
 
 
-func test_three_walkouts_end_the_run():
+func test_walkouts_that_empty_the_reputation_meter_end_the_run():
+	game.ledger.reputation = 2.5 * Ledger.REP_WALKOUT
 	for i in 3:
 		game.spawn_guest(i)
 	for g: Guest in game.guests.duplicate():

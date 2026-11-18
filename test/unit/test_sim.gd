@@ -367,11 +367,12 @@ func test_cannot_overspend():
 	assert_eq(l.money, 0)
 
 
-func test_three_walkouts_close_the_restaurant():
+func test_the_restaurant_closes_when_reputation_bottoms_out():
 	var l := Ledger.new()
-	l.record_walkout()
-	l.record_walkout()
-	assert_false(l.is_closed_down())
+	for i in 3:
+		l.record_walkout()
+	assert_false(l.is_closed_down(), "three walkouts no longer end the run on their own")
+	l.reputation = Ledger.REP_WALKOUT
 	l.record_walkout()
 	assert_true(l.is_closed_down())
 

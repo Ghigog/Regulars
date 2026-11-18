@@ -655,8 +655,7 @@ func _apply_demo(demo: String) -> void:
 		get_tree().create_timer(1.0).timeout.connect(_demo_menu.bind(demo))
 	elif demo == "closed":
 		best_path = "user://regulars_best_demo.json"
-		for i in Ledger.MAX_STRIKES:
-			ledger.record_walkout()
+		ledger.reputation = 0.0   # the meter at the bottom: closed down
 	elif demo in ["critic", "critic_bad", "critic_known", "critic_town"]:
 		_demo_critic(demo)
 	elif demo == "summary" or demo == "town":
@@ -4186,6 +4185,11 @@ func _end_day() -> void:
 	if not _critic_rated.is_empty():   # the paper prints the review with tonight's receipt
 		last_day["review"] = critic.publish(_critic_rated.ratings, _critic_rated.walked, town, int(last_day.day))
 		_critic_rated = {}
+		var before := ledger.reputation
+		ledger.record_review(int(last_day.review.stars))   # the review moves the meter (review, item 9)
+		last_day["rep_change"] = float(last_day.get("rep_change", 0.0)) + ledger.reputation - before
+		last_day["reputation"] = ledger.reputation
+		ledger.today.rep_change = 0.0   # counted on tonight's receipt
 	hud.show_summary(last_day)
 	sfx("coin")
 
@@ -5577,6 +5581,7 @@ func _pay_guest(g: Guest) -> void:
 	var was_sore: bool = g.info.sore
 	var was_regular := town.is_regular(g.idx)
 	ledger.record_sale(bill, tip)
+	ledger.record_visit(g.mood.satisfaction())   # the reputation meter (review, item 9)
 	var delta := town.record_visit(g.idx, g.mood.satisfaction(),
 		g.mood.satisfaction_terms(g._meal_tray.quality() if g._meal_tray else -1.0))
 	var talk := town.gossip_line(g.idx, delta, Town.praise_about(g.liked_meal, g.hint_tag) if delta > 0.0 else "")

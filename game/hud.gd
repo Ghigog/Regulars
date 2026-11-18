@@ -36,6 +36,7 @@ var toast: Label
 var money: Label
 var money_tag: Sheet
 var stamps: Array[Punch] = []
+var rep_meter: RepMeter
 var hint: Label
 var ticket_rail: HBoxContainer
 const RAIL_MAX := 5   # tickets shown on the rail; more are counted on a last tab
@@ -534,6 +535,45 @@ class Dangle extends Control:
 
 ## The cork board that holds the walkout card. It hangs on two ropes from the
 ## top of the screen and sways when it lands or is stamped.
+## The reputation meter on the board (review, item 9): a bar that fills from 0 to
+## Ledger.REP_MAX, green when healthy, gold in the middle and coral near the bottom, with
+## the number on it. A change wobbles it, so a walkout is felt.
+class RepMeter extends Control:
+	var value := Ledger.REP_START
+	var _shake := 0.0
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(190, 40)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func set_value(v: float) -> void:
+		if v < value - 0.5:
+			_shake = 0.5
+		value = v
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		if _shake > 0.0:
+			_shake = maxf(0.0, _shake - delta)
+			queue_redraw()
+
+	func _draw() -> void:
+		var off := Vector2(sin(_shake * 60.0) * 4.0 * _shake, 0)
+		var r := Rect2(Vector2(4, 8) + off, Vector2(size.x - 8, 26))
+		draw_rect(r.grow(3), Color(Hud.INK), true)
+		draw_rect(r, Color("#6b5647"), true)
+		var k := clampf(value / Ledger.REP_MAX, 0.0, 1.0)
+		var col := Color(Build.GOOD) if value >= 60.0 else (Color("#f2b632") if value >= Ledger.REP_LOW else Color(Hud.CORAL))
+		draw_rect(Rect2(r.position, Vector2(r.size.x * k, r.size.y)), col, true)
+		for t: float in [0.25, 0.5, 0.75]:   # notches, so it reads without the number
+			draw_line(r.position + Vector2(r.size.x * t, 0), r.position + Vector2(r.size.x * t, 6), Color(Hud.INK, 0.6), 2.0)
+		var font := get_theme_default_font()
+		var txt := "%d" % roundi(value)
+		var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+		draw_string_outline(font, Vector2(r.get_center().x - w / 2.0, r.end.y - 5), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 5, Color(Hud.INK))
+		draw_string(font, Vector2(r.get_center().x - w / 2.0, r.end.y - 5), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(Hud.PAPER))
+
+
 class Board extends Sheet:
 	var angle := 0.0
 	var spin := 0.0
@@ -901,7 +941,7 @@ func setup(game_) -> void:
 	root.add_child(toast_sheet)
 	toast = _label(toast_sheet, 18)
 
-	# Top right: the cork board with the walkout card, hung on ropes.
+	# Top right: the cork board with the reputation card, hung on ropes (review, item 9).
 	board = Board.new()
 	board.anchor_left = 1.0
 	board.anchor_right = 1.0
@@ -914,15 +954,9 @@ func setup(game_) -> void:
 	var cbox := VBoxContainer.new()
 	cbox.add_theme_constant_override("separation", 2)
 	card.add_child(cbox)
-	_label(cbox, 24, "WALKOUTS").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var slots := HBoxContainer.new()
-	slots.alignment = BoxContainer.ALIGNMENT_CENTER
-	slots.add_theme_constant_override("separation", 12)
-	cbox.add_child(slots)
-	for i in Ledger.MAX_STRIKES:
-		var stamp := Punch.new(52)
-		slots.add_child(stamp)
-		stamps.append(stamp)
+	_label(cbox, 24, "REPUTATION").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rep_meter = RepMeter.new()
+	cbox.add_child(rep_meter)
 
 	# Top middle: the rail of open tickets, oldest on the left.
 	ticket_rail = HBoxContainer.new()
@@ -1185,11 +1219,8 @@ func update_status() -> void:
 		_shown_money = l.money
 		money.text = "$%d" % l.money
 		money_tag.reset_size()
-	var strikes := l.strikes()
-	if strikes > _shown_strikes:   # one stamp per new walkout, in turn
-		for i in range(_shown_strikes, mini(strikes, stamps.size())):
-			_stamp(stamps[i], (i - _shown_strikes) * 0.8)
-	_shown_strikes = strikes   # a new day's reset is wiped when the board comes back down
+	if rep_meter and absf(rep_meter.value - l.reputation) > 0.01:
+		rep_meter.set_value(l.reputation)
 
 
 func _process(delta: float) -> void:
@@ -1935,6 +1966,9 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_row(box, "", "SALES:", "$%d" % rec.sales)
 	_row(box, "", "TIPS:", "$%d" % rec.tips)
 	_row(box, "", "WALKOUTS:", str(rec.walkouts))
+	if rec.has("reputation"):   # review, item 9: the meter, and how today moved it
+		var ch := float(rec.get("rep_change", 0.0))
+		_row(box, "", "REPUTATION:", "%d  (%s%d)" % [roundi(float(rec.reputation)), "+" if ch >= 0.0 else "-", absi(roundi(ch))])
 	if int(rec.get("perfect", 0)) > 0:   # review, item 6: good prep shows on the books
 		_row(box, "", "PERFECT PLATES:", "%d   (best run %d)" % [int(rec.perfect), int(rec.get("best_streak", 0))])
 	var unpaid_bills := int(rec.get("unpaid_bills", 0))
@@ -3012,7 +3046,7 @@ func show_closed(days: int, earned: int, best: Dictionary, is_record: bool) -> v
 	box.add_theme_constant_override("separation", 12)
 	menu.add_child(box)
 	_ribbon(box, "CLOSED DOWN", INK)
-	var why := _label(box, 17, "Three guests walked out in one day.")
+	var why := _label(box, 17, "The town's opinion hit rock bottom: nobody will come.")
 	why.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	why.modulate.a = 0.75
 	_ornament(box, "day")

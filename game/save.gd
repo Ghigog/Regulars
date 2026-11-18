@@ -8,7 +8,7 @@ class_name SaveGame
 const PATH := "user://regulars_save.dat"
 const VERSION := 1
 
-const LEDGER := ["money", "xp", "day", "today", "history"]
+const LEDGER := ["money", "xp", "day", "reputation", "today", "history"]
 const MENU := ["items", "retired", "_next"]
 const STAFF := ["posts", "cvs", "employees", "extra_duties", "_next_post", "_next_cv"]
 const CRITIC := ["critic_idx", "next_visit", "known", "last_review", "_boost", "_boost_from", "_boost_to", "reviews"]

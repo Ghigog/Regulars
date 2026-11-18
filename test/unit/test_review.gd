@@ -246,3 +246,60 @@ func test_the_night_cleaner_is_priced_by_the_mess():
 	assert_eq(Cleaning.cleaner_price(0, 0), 0, "nothing to clean, nothing to pay")
 	assert_gt(Cleaning.cleaner_price(3, 0), Cleaning.cleaner_price(1, 0))
 	assert_gt(Cleaning.cleaner_price(1, 12), Cleaning.cleaner_price(1, 0))
+
+
+# ---------- Item 9: a rolling reputation ----------
+
+func _bad_day(l: Ledger, walkouts := 5, unhappy := 3) -> void:
+	for i in walkouts:
+		l.record_walkout()
+	for i in unhappy:
+		l.record_visit(-0.2)
+	l.end_day()
+
+
+func _good_day(l: Ledger, happy := 10) -> void:
+	for i in happy:
+		l.record_visit(0.6)
+	l.end_day()
+
+
+func test_reputation_carries_over_the_nights():
+	var l := Ledger.new()
+	l.record_walkout()
+	var after := l.reputation
+	l.end_day()
+	assert_eq(l.reputation, after, "nothing resets it at night")
+	assert_lt(after, Ledger.REP_START)
+	var rec := l.end_day()
+	assert_eq(float(rec.reputation), after, "the receipt shows it")
+
+
+func test_one_bad_day_hurts_a_good_run_but_does_not_end_it():
+	var l := Ledger.new()
+	for d in 6:
+		_good_day(l)
+	var good := l.reputation
+	assert_gt(good, 90.0, "a good run builds the meter up")
+	_bad_day(l)
+	assert_lt(l.reputation, good - 30.0, "a bad day hurts")
+	assert_false(l.is_closed_down(), "but one bad day does not end a good run")
+	_bad_day(l)
+	_bad_day(l)
+	assert_true(l.is_closed_down(), "a run of them does")
+
+
+func test_good_service_and_reviews_raise_it():
+	var l := Ledger.new()
+	var r := l.reputation
+	l.record_visit(0.6)
+	assert_gt(l.reputation, r)
+	r = l.reputation
+	l.record_review(5)
+	assert_gt(l.reputation, r)
+	r = l.reputation
+	l.record_review(1)
+	assert_lt(l.reputation, r)
+	l.reputation = Ledger.REP_MAX
+	l.record_visit(0.9)
+	assert_eq(l.reputation, Ledger.REP_MAX, "capped")
