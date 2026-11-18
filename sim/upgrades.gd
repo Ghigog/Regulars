@@ -154,7 +154,7 @@ static func blurb(key: String) -> String:
 		return Catalog.blurb_of(catalog_id(key), tier_of(key))
 	if is_treatment(key):
 		var k := Treatments.key_of(key)
-		return "%s.  %s" % [Treatments.ITEMS[k].blurb, Treatments.PRICE_WORDS]
+		return "%s.  Its box: %s, laying free" % [Treatments.ITEMS[k].blurb, Treatments.fee_words(k)]
 	var n: Dictionary = Kitchen.NODES[key]
 	if n.has("blurb"):
 		return str(n.blurb)   # the cleaning trees and the hood's (PRD 9.5) say what they do

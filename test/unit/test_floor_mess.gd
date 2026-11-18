@@ -1092,7 +1092,7 @@ func test_a_box_climbs_its_tree_like_any_piece():
 	var lay := Upgrades.layout("box_cleaner")
 	assert_eq(lay.size(), 6)
 	assert_eq(lay["box_strong_cleaner"], Vector2i(1, 0), "the efficient step runs on along the row")
-	assert_true(Upgrades.blurb("box_primer").contains("$0.25 a tile a night"))
+	assert_true(Upgrades.blurb("box_primer").contains("$3 a night"), "its box's flat fee")
 	var shop := Catalog.search("", "Pantry")
 	assert_true(shop.any(func(bp: Dictionary) -> bool: return bp.id == "box_cleaner"), "the cleaner's box is sold")
 	for id: String in ["box_primer", "box_finish", "treat_cleaner"]:
@@ -1104,14 +1104,20 @@ func test_a_nights_laying_costs_its_price_a_cell_while_on_and_boxed():
 	var laid := {Vector2i(0, 0): "cleaner", Vector2i(1, 0): "cleaner", Vector2i(2, 0): "cleaner",
 		Vector2i(0, 1): "primer", Vector2i(1, 1): "primer"}
 	var boxed := {"cleaner": true, "primer": true}
-	assert_eq(Treatments.night_cost(laid, {}, boxed), 2, "five tiles at $0.25, every treatment the same, rounded up")
-	assert_eq(Treatments.night_cost(laid, {"primer": true}, boxed), 1, "switched off: not paid for")
-	assert_eq(Treatments.night_cost(laid, {}, {"cleaner": true}), 1, "no box stored: not laid")
+	assert_eq(Treatments.night_cost(laid, {}, boxed), Treatments.fee_of("cleaner") + Treatments.fee_of("primer"),
+		"each stocked box's flat fee, however many tiles")
+	assert_eq(Treatments.night_cost(laid, {"primer": true}, boxed), Treatments.fee_of("cleaner"), "switched off: not restocked")
+	assert_eq(Treatments.night_cost(laid, {}, {"cleaner": true}), Treatments.fee_of("cleaner"), "no box stored: not laid")
 	var lines := Treatments.night_lines(laid, {}, {"cleaner": true})
 	assert_eq(lines.primer, {"cells": 2, "fee": 0, "on": false})
-	assert_eq(lines.cleaner, {"cells": 3, "fee": 1, "on": true})
-	assert_eq(Treatments.cost_of_tiles(20), 5, "a twenty-tile kitchen is $5 a night")
-	assert_eq(Treatments.cost_of_tiles(0), 0)
+	assert_eq(lines.cleaner, {"cells": 3, "fee": Treatments.fee_of("cleaner"), "on": true})
+	assert_eq(Treatments.night_cost({}, {}, {"finish": true}), Treatments.fee_of("finish"), "a box stocked costs its fee with no tiles laid")
+	var many := {}
+	for x in 20:
+		many[Vector2i(x, 0)] = "cleaner"
+	assert_eq(Treatments.night_cost(many, {}, {"cleaner": true}), Treatments.fee_of("cleaner"), "twenty tiles cost the same")
+	for k: String in Treatments.ITEMS:
+		assert_between(Treatments.fee_of(k), 2, 8, k + ": in line with the food boxes")
 	assert_eq(Treatments.active(laid, {"cleaner": true}, boxed).keys().size(), 2, "only the primer's cells tomorrow")
 
 
@@ -1355,23 +1361,24 @@ func test_laid_at_night_a_treatment_is_paid_at_the_door_each_night_while_on():
 	assert_true(game.pick_catalog("treat_cleaner"))
 	var money: int = game.ledger.money
 	assert_eq(game.finish_drag(Grid.center(Vector2i(4, 2)), Grid.center(Vector2i(5, 3)), false), 4)
-	assert_eq(game.ledger.money, money, "laying is free: the price comes at the door")
+	assert_eq(game.ledger.money, money, "laying is free")
 	assert_eq(game.treat_laid.size(), 4)
-	assert_eq(game.night_cost(), base + 1, "four tiles at $0.25")
-	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner, 4 cells" and l.fee == 1))
+	var fee := Treatments.fee_of("cleaner")
+	assert_eq(game.night_cost(), base + fee, "the stocked box's flat fee: the tiles add nothing")
+	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner box, 4 tiles" and l.fee == fee))
 	assert_eq(game.floor_dirt.sheen_cells().size(), 4, "a sheen where it is laid")
 	game.rotate_hand()
 	assert_true(game.treat_off.has("cleaner"), "turning the tool switches it off")
-	assert_eq(game.night_cost(), base)
-	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner, 4 cells, off" and l.fee == 0))
+	assert_eq(game.night_cost(), base, "switched off: the box is not restocked")
+	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner box, 4 tiles, off" and l.fee == 0))
 	game.rotate_hand()
-	assert_eq(game.night_cost(), base + 1)
+	assert_eq(game.night_cost(), base + fee)
 	assert_eq(game.finish_drag(Grid.center(Vector2i(5, 3)), Grid.center(Vector2i(5, 3)), true), 1, "a right-drag lifts it")
-	assert_eq(game.night_cost(), base + 1, "three tiles round up to a dollar too")
+	assert_eq(game.night_cost(), base + fee, "fewer tiles, the same fee")
 	game.cancel_hand()
 	money = game.ledger.money
 	game.start_day()
-	assert_eq(game.ledger.money, money - base - 1)
+	assert_eq(game.ledger.money, money - base - fee)
 	assert_eq(game.floor_dirt.mess.treat.size(), 3, "laid for the day")
 	game.floor_dirt.mess.add_dirt(Vector2i(4, 2))
 	game.floor_dirt.mess.add_dirt(Vector2i(4, 2))
@@ -1388,7 +1395,7 @@ func test_without_its_box_a_treatment_is_not_relaid():
 	var c := _shelf_for(game)
 	game.kitchen.store(c, "box_finish")
 	game.treat_laid = {Vector2i(4, 2): "finish", Vector2i(4, 3): "finish"}
-	assert_eq(game.night_cost(), base + 1, "two tiles of finish, the same $0.25 a tile")
+	assert_eq(game.night_cost(), base + Treatments.fee_of("finish"), "the finish box's flat fee")
 	game.kitchen.unstore(c, "box_finish")
 	assert_eq(game.night_cost(), base)
 	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name.ends_with("no box")))
