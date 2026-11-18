@@ -328,21 +328,21 @@ func _at(x: int, z: int) -> Vector3:
 func test_a_tool_needs_a_counter_under_it():
 	_game()
 	var c := Vector2i(2, 5)
-	assert_true(game.pick_catalog("stove"))
+	assert_true(game.pick_catalog("board"))
 	assert_false(game.can_place(Vector3i(2, 5, 0)), "no counter there")
 	game.cancel_hand()
 	assert_true(game.pick_catalog("counter"))
 	assert_true(game.place(Vector3i(2, 5, 0)))
 	game.cancel_hand()
-	assert_true(game.pick_catalog("stove"))
+	assert_true(game.pick_catalog("board"))
 	assert_true(game.place(Vector3i(2, 5, 0)))
 	game.cancel_hand()
 	var st: Station = game.stations[c]
-	assert_eq(st.type, "stove")
+	assert_eq(st.type, "board")
 	assert_eq(st.base, "counter")
-	assert_eq(game.kitchen.get_piece(c, "top"), "stove")
-	assert_eq(game.ledger.money, 500 - Catalog.price_of("counter") - Catalog.price_of("stove"))
-	assert_true(game.pick_catalog("board"))
+	assert_eq(game.kitchen.get_piece(c, "top"), "board")
+	assert_eq(game.ledger.money, 500 - Catalog.price_of("counter") - Catalog.price_of("board"))
+	assert_true(game.pick_catalog("fountain"))
 	assert_false(game.can_place(Vector3i(2, 5, 0)), "one tool per counter")
 	assert_false(game.can_place(Vector3i(3, 2, 0)), "not on a sink")
 
@@ -355,20 +355,29 @@ func test_every_tool_starts_on_a_counter():
 			assert_eq(game.kitchen.get_piece(st.cell, "top"), Kitchen.node_of(st.type))
 
 
+## A board standing on a new counter at (2, 5).
+func _board_on_counter() -> Vector2i:
+	game.pick_catalog("counter")
+	game.place(Vector3i(2, 5, 0))
+	game.cancel_hand()
+	game.pick_catalog("board")
+	game.place(Vector3i(2, 5, 0))
+	game.cancel_hand()
+	return Vector2i(2, 5)
+
+
 func test_lifting_a_tool_leaves_its_counter_and_both_sell():
 	_game()
-	var c := Vector2i(0, 3)
-	assert_eq(game.stations[c].type, "stove")
-	assert_true(game.pick_up(_at(0, 3)))
-	assert_eq(game.player.hand.id, "stove", "the tool comes off first")
+	var c := _board_on_counter()
+	game.player.position = _at(2, 6)
+	assert_true(game.pick_up(_at(2, 5)))
+	assert_eq(game.player.hand.id, "board", "the tool comes off first")
 	assert_eq(game.stations[c].type, "counter")
 	assert_eq(game.kitchen.get_piece(c, "top"), "")
+	var before: int = game.ledger.money
 	assert_true(game.sell_hand())
-	assert_eq(game.ledger.money, 500 + Catalog.price_of("stove") / 2)
-	assert_true(game.pick_up(_at(0, 3)))
-	assert_eq(game.player.hand.id, "hood", "then the hood over it (PRD 8.5)")
-	assert_true(game.sell_hand())
-	assert_true(game.pick_up(_at(0, 3)))
+	assert_eq(game.ledger.money, before + Catalog.price_of("board"), "bought tonight: back in full")
+	assert_true(game.pick_up(_at(2, 5)))
 	assert_eq(game.player.hand.id, "counter")
 	assert_true(game.sell_hand(), "counters are for sale")
 	assert_false(game.stations.has(c))
@@ -376,19 +385,50 @@ func test_lifting_a_tool_leaves_its_counter_and_both_sell():
 	assert_false(game.grid.blocked.has(c))
 
 
+func test_a_stove_lifts_and_sells_whole_with_its_counter():
+	_game()
+	var c := Vector2i(0, 3)
+	assert_eq(game.stations[c].type, "stove")
+	assert_true(game.pick_up(_at(0, 3)))
+	assert_eq(game.player.hand.id, "hood", "the hood over it first (PRD 8.5)")
+	assert_true(game.sell_hand())
+	assert_true(game.pick_up(_at(0, 3)))
+	assert_eq(game.player.hand.id, "stove", "then the stove, its counter and all")
+	assert_eq((game.player.hand.node as Station).base, "counter")
+	assert_false(game.stations.has(c), "no bare counter left behind")
+	var before: int = game.ledger.money
+	assert_true(game.sell_hand())
+	assert_eq(game.ledger.money, before + (Kitchen.price_of("stove") + Kitchen.price_of("counter")) / 2)
+	assert_false(game.kitchen.cells.has(c))
+
+
 func test_a_moved_tool_goes_back_onto_its_counter():
 	_game()
-	var stove: Station = game.stations[Vector2i(0, 3)]
-	assert_true(game.pick_up(_at(0, 3)))
+	var c := _board_on_counter()
+	var board: Station = game.stations[c]
+	assert_true(game.pick_up(_at(2, 5)))
 	game.cancel_hand()
-	assert_eq(game.stations[Vector2i(0, 3)], stove)
-	assert_true(stove.visible)
-	assert_eq(game.kitchen.get_piece(Vector2i(0, 3), "top"), "stove")
-	assert_true(game.pick_up(_at(0, 3)))
+	assert_eq(game.stations[c], board)
+	assert_true(board.visible)
+	assert_eq(game.kitchen.get_piece(c, "top"), "board")
+	assert_true(game.pick_up(_at(2, 5)))
 	assert_true(game.place(Vector3i(4, 3, 0)), "onto the pass")
-	assert_eq(game.stations[Vector2i(4, 3)], stove)
-	assert_true(stove.pass_look, "it takes on the counter it stands on")
-	assert_eq(game.stations[Vector2i(0, 3)].type, "counter")
+	assert_eq(game.stations[Vector2i(4, 3)], board)
+	assert_true(board.pass_look, "it takes on the counter it stands on")
+	assert_eq(game.stations[c].type, "counter")
+
+
+func test_a_moved_stove_goes_on_the_floor_never_onto_a_counter():
+	_game()
+	var stove: Station = game.stations[Vector2i(0, 4)]
+	game.highs.erase(Vector2i(0, 4))   # the hood over it is not this test's
+	assert_true(game.pick_up(_at(0, 4)))
+	assert_eq(game.player.hand.get("node"), stove)
+	assert_false(game.can_place(Vector3i(4, 3, 0)), "not onto the pass: it is a counter itself")
+	assert_true(game.place(Vector3i(2, 5, 0)), "onto open floor")
+	assert_eq(game.stations[Vector2i(2, 5)], stove)
+	assert_eq(stove.base, "counter")
+	assert_eq(game.kitchen.get_piece(Vector2i(2, 5), "top"), "stove")
 
 
 func test_a_counter_on_a_counter_makes_a_double_and_lifts_off_again():
@@ -912,9 +952,10 @@ func test_night_zero_is_winnable_with_counters_a_fridge_and_boxes():
 		assert_eq(game.night_hint(), game.NIGHT_HINTS[0])
 		var fm: Dictionary = game.fixed_main()
 		game.player.position = _at(3, 4)
-		assert_true(game.pick_catalog("stove"))
-		assert_true(game.place(Vector3i(4, 4, 0)), theme + ": a stove on the pass")
-		game.cancel_hand()
+		assert_true(game.open_storage(Vector2i(4, 4)), "a pass counter's card")
+		game.storage_upgrades()
+		assert_true(game.buy_upgrade("stove"), theme + ": the pass counter made a stove")
+		assert_eq(game.stations[Vector2i(4, 4)].type, "stove")
 		assert_true(game.pick_up(_at(4, 5)), "a pass counter")
 		game.open_shop()
 		assert_true(game.buy_upgrade("fridge"), theme + ": the counter's tree reaches a fridge")

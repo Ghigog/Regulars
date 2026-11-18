@@ -130,7 +130,7 @@ var _openings := {}                    # Vector3i edge -> Scenery opening info
 var _opening_ok := {}                  # Vector3i edge -> whether it was last drawn usable
 var _frame := [WIDE_FOCUS, WIDE_SIZE, CLOSE_FOCUS, CLOSE_SIZE]   # the camera, fitted to the floor
 const NIGHT_ZERO_BLOCK := "Buy an ingredient, a tool, and write a menu."
-const NIGHT_HINTS: Array[String] = ["Buy a tool, and boxes of stock from the shop's Pantry.", "Write a menu.", "Flip the door card to open."]
+const NIGHT_HINTS: Array[String] = ["Open a counter with E: make it a stove or a fridge, and stock it with boxes.", "Write a menu.", "Flip the door card to open."]
 var menu_board: MenuBoard               # the chalkboard by the door: tonight's names
 const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "plates": "Plate stack", "cups": "Cup stack", "pass": "Pass counter"}
 ## What a kitchen cannot open without. Every piece can be sold, these too; while there is
@@ -852,10 +852,13 @@ func _demo_coop_build(two: Player) -> void:
 func _demo_counters() -> void:
 	open_build()
 	for step: Array in [["counter", 2, 5], ["counter", 2, 5], ["board", 2, 5],
-			["counter", 3, 4], ["counter", 3, 4], ["stove", 4, 3]]:
+			["counter", 3, 4], ["counter", 3, 4]]:
 		pick_catalog(step[0])
 		place(Vector3i(step[1], step[2], 0))
 		cancel_hand()
+	open_storage(Vector2i(4, 3))   # a length of the pass made a stove on its card
+	storage_upgrades()
+	buy_upgrade("stove")
 	find_station("board").set_item(Tray.kind("prep", "lemon" if Scenery.seaside() else "tomato"))   # a tool's surface still holds a thing
 	player.position = Grid.center(Vector2i(2, 4))
 	player.look(Vector2i(1, 0))
@@ -1830,7 +1833,8 @@ func _off_counter(top: Station) -> void:
 ## something sits on the counter below or on the counter carried.
 func _stacks_on(cell: Vector2i, h: Dictionary) -> bool:
 	var under := _bare_counter(cell)
-	if under == null or under.item != "" or not (Kitchen.is_top(h.id) or Kitchen.is_counter(h.id)):
+	if under == null or under.item != "" or not (Kitchen.is_top(h.id) or Kitchen.is_counter(h.id)) \
+			or Kitchen.grows_from_counter(hand_node(h)):
 		return false
 	if h.get("moving", false) and ((h.node as Station).item != "" \
 			or (Kitchen.is_counter(h.id) and (h.node as Station).base != "counter")):
@@ -2594,7 +2598,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		var top := add_station(to, cell, 1, facing)
 		_bought_tonight(top, Upgrades.step_price(to))
 		burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
-		hud.say("A %s on the counter. Pick it up with E to upgrade it further." % Upgrades.name_of(to).to_lower())
+		hud.say("The counter is a %s now. Open it with E to upgrade it further." % Upgrades.name_of(to).to_lower())
 		menu_changed()
 		sfx("coin")
 		return true
@@ -2613,8 +2617,11 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 			sfx("fail")
 			hud.say("A tall fridge needs the wall above clear. Take down what hangs there first.")
 			return false
-		st.set_base(to)
-		kitchen.set_cell(st.cell, to)
+		if Kitchen.is_top(st.type):   # a stove up its tree where it stands: made anew in place
+			_remake_in_place(st, to, ch)
+		else:
+			st.set_base(to)
+			kitchen.set_cell(st.cell, to)
 		_show_boxes(st.cell)
 		menu_changed()
 		sfx("coin")
@@ -2646,6 +2653,28 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 	return true
 
 
+## A stove (its counter upgraded) bought up its tree where it stands, its card open: it
+## may now work as another piece (a fryer), so a new one takes its place, its counter's
+## boxes, the till and what was paid tonight with it, and the hand holds the new one.
+func _remake_in_place(st: Station, to: String, ch: Player) -> void:
+	var held := kitchen.take_stock(st.cell)
+	_unregister(st)
+	var up := Station.new()
+	add_child(up)
+	up.setup(to, st.cell, st.tier, st.facing, st.base, st.pass_look)
+	up.stacked = st.stacked
+	var till := st.get_node_or_null("till")
+	if till:
+		till.reparent(up, false)
+	_register(up)
+	kitchen.give_stock(up.cell, held)
+	up.position.y = st.position.y   # still lifted while its card is open
+	_bought_tonight(up, spent_tonight(st))
+	st.queue_free()
+	ch.hand.node = up
+	ch.hand.id = up.type
+
+
 ## A treatment's box upgraded: the cells laid with the old one are the new one's now.
 func _swap_treatment(was: String, now: String) -> void:
 	for c: Vector2i in treat_laid:
@@ -2673,7 +2702,7 @@ func _storage_in_front(ch: Player) -> Vector2i:
 	if kitchen.slots(c) == 0 or (stations.has(c) and needs_cleaning(stations[c])):
 		return NO_CELL
 	var st: Station = stations.get(c)
-	if st != null and not st.type in ["counter", "shelf"]:
+	if st != null and not st.type in ["counter", "shelf"] and not Kitchen.grows_from_counter(st.node):
 		return NO_CELL
 	return c
 
@@ -2694,9 +2723,10 @@ func open_storage(cell: Vector2i, ch: Player = null) -> bool:
 ## no tree, or only a piece on the wall keeps boxes there).
 func storage_tree() -> String:
 	var st: Station = stations.get(storing_cell)
-	if st == null or st.type != "counter" or (shopper != null and shopper.hand.get("layer", "") == "high"):
+	if st == null or not (st.type == "counter" or Kitchen.grows_from_counter(st.node)) \
+			or (shopper != null and shopper.hand.get("layer", "") == "high"):
 		return ""
-	var key := Upgrades.key_of(st.type, st.tier, st.base)
+	var key := Upgrades.key_of(st.type, st.tier, st.base if st.type == "counter" else st.node)
 	return key if Upgrades.has_tree(key) else ""
 
 
@@ -2772,8 +2802,8 @@ func _lift_layer(c: Vector2i, ch: Player) -> String:
 	var st: Station = stations.get(c)
 	if st != null and st.has_node("till"):
 		return "till"   # the till comes off before what it stands on
-	if st != null and Kitchen.is_top(st.type):
-		return "top"
+	if st != null and Kitchen.is_top(st.type) and not Kitchen.grows_from_counter(st.node):
+		return "top"   # a stove is its counter upgraded: it lifts whole
 	if highs.has(c) and (st == null or ch.get_meta("low_next", NO_CELL) != c):
 		return "high"
 	return "base" if st != null else ""
@@ -2938,7 +2968,7 @@ func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool
 		return false
 	if stations.has(c) or highs.has(c):
 		var st: Station = stations.get(c)
-		if st != null and Kitchen.is_top(st.type):
+		if st != null and Kitchen.is_top(st.type) and not Kitchen.grows_from_counter(st.node):
 			_off_counter(st)   # the tool comes off first; its counter stays
 		elif not whole and not kitchen.stock(c).is_empty():
 			# Then the boxes, last in first; the counter only once it is empty (PRD 8.4).
@@ -3100,6 +3130,9 @@ func sell_value(ch: Player = null) -> int:
 		return 0
 	var key := hand_key(ch)
 	var whole := Upgrades.price(key) if key != "" else Catalog.price_of(ch.hand.id, int(ch.hand.tier))   # upgrades and all
+	var hs: Variant = ch.hand.get("node")
+	if hs is Station and Kitchen.grows_from_counter((hs as Station).node):
+		whole += Kitchen.price_of((hs as Station).base)   # a stove sells with the counter it grew from
 	var fresh := mini(spent_tonight(ch.hand.get("node")), whole)
 	return (whole - fresh) / 2 + fresh   # half back, but what was bought tonight comes back whole
 
@@ -3296,7 +3329,7 @@ func can_place(spot: Vector3i, ch: Player = null) -> bool:
 			return layer == "high"
 	elif Kitchen.is_tall(hn) and kitchen.get_piece(cell, "high") != "":
 		return false   # a tall piece fills both wall layers
-	if ch.hand.get("counter", false):   # a favourite from a stove's line comes on its own counter
+	if Kitchen.grows_from_counter(hand_node(ch.hand)):   # a stove is its counter upgraded: the floor only
 		return not stations.has(cell) and kitchen.layer_for(cell, "counter") == "base" \
 			and grid.can_place_block(cell, Station.seats_for("counter", cell, int(ch.hand.facing)), LOT, DOOR, reach, touch)
 	if stations.has(cell) or Kitchen.is_top(ch.hand.id):
@@ -3720,7 +3753,7 @@ func _update_ghost(ch: Player = null) -> void:
 				Build.wall_piece(ch.ghost, hn, closet)
 			elif ch.hand.get("node") is Station:
 				var hs: Station = ch.hand.node
-				Build.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" else "", false, hs.node)
+				Build.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" or Kitchen.grows_from_counter(hs.node) else "", false, hs.node)
 			else:
 				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier), "counter" if ch.hand.get("counter", false) else ch.hand.get("base", ""), false, str(ch.hand.get("up", "")))
 			if layer != "" and wall_facing.has(cell):

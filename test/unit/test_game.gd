@@ -537,10 +537,17 @@ func test_selling_refunds_half_of_anything_the_last_stove_and_the_fixtures_too()
 	assert_true(game.pick_up(Vector3(2.5, 0, 2.5)))        # the tray stack
 	assert_true(game.sell_hand(), "the start's pieces sell too")
 	assert_eq(game.ledger.money, 160 + Catalog.price_of("plates") / 2)
-	assert_true(game.pick_up(Vector3(0.5, 0, 3.5)))        # one of two stoves
+	var stoves: Array = game.stations.values().filter(func(st: Station) -> bool: return st.type == "stove")
+	assert_eq(stoves.size(), 2)
+	var at: Vector3 = Grid.center(stoves[0].cell)
+	game.highs.erase(stoves[0].cell)   # whatever hangs over it is not this test's
+	assert_true(game.pick_up(at))
+	assert_eq(game.hand.id, "stove", "a stove, its counter with it")
+	assert_eq(game.sell_value(), (Kitchen.price_of("stove") + Kitchen.price_of("counter")) / 2, "a stove is its counter upgraded")
 	assert_true(game.sell_hand())
-	assert_eq(game.ledger.money, 160 + Catalog.price_of("plates") / 2 + Catalog.price_of("stove") / 2)
-	assert_true(game.pick_up(Vector3(0.5, 0, 4.5)))
+	assert_false(game.stations.has(stoves[0].cell), "no counter left behind")
+	game.highs.erase(stoves[1].cell)
+	assert_true(game.pick_up(Grid.center(stoves[1].cell)))
 	assert_true(game.sell_hand(), "every station can be sold, even the last stove")
 	assert_null(game.find_station("stove"))
 
@@ -2938,6 +2945,28 @@ func test_a_counter_on_its_card_grows_a_stove_where_it_stands():
 	assert_eq(game.kitchen.get_piece(c, "top"), "stove")
 	assert_eq(game.ledger.money, 200 - Kitchen.price_of("stove"), "the tool's whole price")
 	assert_true(game.player.hand.is_empty())
+
+
+func test_a_stove_opens_like_a_counter_and_upgrades_where_it_stands():
+	_to_build()
+	game.ledger.money = 300
+	var c := _plain_counter()
+	game.open_storage(c)
+	game.storage_upgrades()
+	assert_true(game.buy_upgrade("stove"))
+	game.kitchen.store(c, "box_bun")
+	assert_true(game.open_storage(c), "a stove keeps its counter's storage card")
+	assert_eq(game.storage_tree(), "stove", "with the stove's tree on it")
+	game.storage_upgrades()
+	assert_true(game.buy_upgrade("fryer"))
+	var st: Station = game.stations[c]
+	assert_eq(st.type, "fryer", "made a fryer where it stands")
+	assert_eq(st.base, "counter")
+	assert_true(game.kitchen.stock(c).has("box_bun"), "its boxes stay")
+	assert_eq(game.ledger.money, 300 - Kitchen.price_of("fryer"))
+	game.close_shop()
+	assert_true(game.player.hand.is_empty())
+	assert_eq(game.stations[c], st)
 
 
 func test_a_starred_fridge_is_sold_in_favourites_as_a_counter_already_upgraded():

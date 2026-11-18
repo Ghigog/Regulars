@@ -278,6 +278,14 @@ static func family_of(id: String) -> String:
 	return id
 
 
+## A piece in a tree that grows from a counter (TOP_LINKS: the stove and its line): an
+## upgrade of the counter, not a tool on it. It lifts, moves and sells with its counter
+## as one piece, and never stands on another counter. Takes a node or a catalog id.
+static func grows_from_counter(id: String) -> bool:
+	var n := id if NODES.has(id) else node_of(id)
+	return n != "" and TOP_LINKS.has(root_of(n))
+
+
 ## A piece that plays its minigame itself (the auto slicer).
 static func is_auto(id: String) -> bool:
 	return NODES.has(id) and NODES[id].get("auto", false)

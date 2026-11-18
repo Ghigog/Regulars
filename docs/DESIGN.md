@@ -54,7 +54,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
   shop's Pantry tab is gone. The Kitchen tab sells no counter upgrades: a fridge is
   bought as a counter and upgraded on its card, and the stove is a branch of the
   counter's tree too (`Kitchen.TOP_LINKS`: buying it stands a stove on that counter for
-  the stove's whole price; the stove is a tree of its own from there). A full fridge
+  the stove's whole price; the stove is a tree of its own from there). A stove and
+  everything up its tree is the counter upgraded, not a tool on it
+  (`Kitchen.grows_from_counter`): E opens its card like a counter's (its boxes, and its
+  own tree, bought where it stands), it lifts, moves and sells as one piece with its
+  counter (worth both), and goes on open floor, never onto another counter. Tools (board,
+  fountain, wine barrel) still stand on a counter and lift off it. A full fridge
   says so ("The fridge is full") rather than "Needs a fridge". The shop's Favourites
   tab sells any starred tree node (X or the card's star on a tree, kept in
   `user://regulars_favourites.cfg` across runs) already upgraded at the whole price of

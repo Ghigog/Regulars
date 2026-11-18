@@ -304,7 +304,7 @@ static func bp_price(bp: Dictionary) -> int:
 
 static func bp_blurb(bp: Dictionary) -> String:
 	if bp.get("up", "") != "":
-		return Upgrades.blurb(bp.up) + (". On its own counter" if bp.get("counter", false) else "")
+		return Upgrades.blurb(bp.up)
 	if bp.get("base", "") != "":
 		return Upgrades.blurb(bp.base)
 	return blurb_of(bp.id, int(bp.tier))
