@@ -1,0 +1,177 @@
+# Proposed by Formic (https://formic-board.vercel.app) for Godot.
+# Runs this project's checks on every pull request, so Formic's Reviewer Agent
+# can tell a change that works from one that does not. It is yours now: edit it
+# as you like. Formic never replaces it.
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ${{ vars.FORMIC_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/formic/godot
+          key: formic-${{ runner.os }}-${{ hashFiles('project.godot', '.github/formic/godot-version') }}
+          restore-keys: formic-${{ runner.os }}-
+
+      # Godot's work on this checkout, from the newest run before this one.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: hashFiles('project.godot') != ''
+        with:
+          path: |
+            .godot
+          key: formic-godot-work-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: formic-godot-work-${{ runner.os }}-
+
+      # The same setup Formic's agents get, so CI and the agent run the same engine.
+      - name: Set up the project
+        run: |
+          set +e
+          FORMIC_CHECKS="$HOME/.formic/checks.md"
+          FORMIC_BIN="$HOME/.formic/bin"
+          mkdir -p "$FORMIC_BIN"
+          : > "$FORMIC_CHECKS"
+          export FORMIC_CHECKS FORMIC_BIN PATH="$FORMIC_BIN:$PATH"
+          formic_bin() {
+            chmod +x "$1"
+            ln -sf "$1" "$FORMIC_BIN/$2"
+            if [ -n "${GITHUB_PATH:-}" ]; then echo "$FORMIC_BIN" >> "$GITHUB_PATH"; fi
+          }
+          formic_note() { printf '%s\n' "$*" >> "$FORMIC_CHECKS"; }
+          export -f formic_bin formic_note
+
+          if [ -f project.godot ]; then
+            echo "Setting up Godot..."
+            (
+              set -e
+              want=""
+              if [ -f .github/formic/godot-version ]; then want="$(tr -d '[:space:]' < .github/formic/godot-version)"; fi
+              if [ -z "$want" ]; then
+                want="$(sed -n 's/^config\/features=PackedStringArray("\([0-9][0-9.]*\)".*/\1/p' project.godot | head -n 1)"
+              fi
+              if [ -z "$want" ]; then
+                echo "project.godot names no Godot version. Pin one in .github/formic/godot-version, for example 4.7.1."
+                exit 1
+              fi
+              if grep -q '^config/features=.*"C#"' project.godot; then
+                formic_note "This is a C# Godot project. Formic does not install the .NET build of Godot yet, so there is no engine here to build or test it with."
+                echo "C# Godot projects are not supported yet."
+                exit 1
+              fi
+
+              case "$(uname -s)" in
+                Linux) os=linux ;;
+                Darwin) os=macos ;;
+                *)
+                  formic_note "Formic installs Godot on Linux and macOS, and this machine runs $(uname -s). Install Godot here yourself and put it on the PATH as \`godot\`."
+                  echo "Formic installs Godot on Linux and macOS; this machine runs $(uname -s)."
+                  exit 1
+                  ;;
+              esac
+
+              # The newest matching tag. Sorted by number rather than with sort -V, which
+              # macOS's sort does not have everywhere.
+              case "$want" in
+                *-*) tag="$want" ;;
+                *)
+                  pattern="^$(printf '%s' "$want" | sed 's/\./\\./g')(\.[0-9]+)*-stable$"
+                  tag="$(git ls-remote --tags --refs https://github.com/godotengine/godot-builds | sed -n 's#.*refs/tags/##p' | grep -E "$pattern" \
+                    | sed 's/-stable$//' | awk -F. '{ printf "%d %d %d %d %s\n", $1, $2, $3, $4, $0 }' \
+                    | sort -n -k1,1 -k2,2 -k3,3 -k4,4 | tail -n 1 | awk '{ print $5 }')"
+                  if [ -n "$tag" ]; then tag="$tag-stable"; fi
+                  ;;
+              esac
+              if [ -z "$tag" ]; then
+                echo "No stable Godot release matches $want."
+                exit 1
+              fi
+
+              dir="$HOME/.cache/formic/godot/$tag"
+              if [ "$os" = macos ]; then
+                # One universal build, for Intel and Apple silicon alike.
+                zip="Godot_v$tag""_macos.universal.zip"
+                bin="$dir/Godot.app/Contents/MacOS/Godot"
+              else
+                case "$(uname -m)" in
+                  x86_64) arch=x86_64 ;;
+                  aarch64 | arm64) arch=arm64 ;;
+                  *) echo "No Linux Godot build for $(uname -m)."; exit 1 ;;
+                esac
+                zip="Godot_v$tag""_linux.$arch.zip"
+                bin="$dir/Godot_v$tag""_linux.$arch"
+              fi
+              if [ ! -f "$bin" ]; then
+                echo "Downloading Godot $tag..."
+                mkdir -p "$dir"
+                curl -fsSL --retry 3 --max-time 600 -o "$dir/godot.zip" \
+                  "https://github.com/godotengine/godot-builds/releases/download/$tag/$zip"
+                unzip -q -o "$dir/godot.zip" -d "$dir" 2>/dev/null || python3 -m zipfile -e "$dir/godot.zip" "$dir"
+                rm -f "$dir/godot.zip"
+              fi
+              if [ "$os" = macos ]; then
+                # Run through a script, not a link: the app finds its own files from the
+                # path it was started by, and a link elsewhere would point it away from them.
+                chmod +x "$bin"
+                printf '#!/bin/sh\nexec "%s" "$@"\n' "$bin" > "$dir/godot"
+                bin="$dir/godot"
+              fi
+              formic_bin "$bin" godot
+              godot --headless --version
+
+              formic_note "## Godot"
+              formic_note "Godot $tag, headless, is installed: run it as \`godot\`. There is no display, so always pass --headless."
+              formic_note "A fresh checkout has nothing imported. When there is no .godot/ folder, or after you add or change an asset, run \`godot --headless --import\` first: a script that loads an unimported resource fails."
+              if [ -f addons/gut/gut_cmdln.gd ]; then formic_note 'Tests (GUT): `godot --headless -s addons/gut/gut_cmdln.gd -gexit`. A non-zero exit means a test failed; read the log above the summary for which.'
+              else formic_note "No test framework Formic knows (GUT) is installed in addons/."
+              fi
+            )
+            if [ "$?" -ne 0 ]; then echo "Setting up Godot failed; the agent can still install what it needs."; fi
+          fi
+
+          if [ -f .github/formic/setup.sh ]; then
+            echo "Running .github/formic/setup.sh..."
+            FORMIC_HOST=job bash .github/formic/setup.sh
+            if [ "$?" -ne 0 ]; then echo ".github/formic/setup.sh failed; carrying on without it."; fi
+          fi
+
+          if [ -f project.godot ]; then
+            echo "Preparing the Godot project..."
+            (
+              set -e
+              echo "Importing the project..."
+              log="$HOME/.formic/godot-import.log"
+              # macOS has no timeout of its own; Homebrew's coreutils calls it gtimeout.
+              limit=""
+              if command -v timeout > /dev/null; then limit="timeout 1200"; elif command -v gtimeout > /dev/null; then limit="gtimeout 1200"; fi
+              if ! $limit godot --headless --import > "$log" 2>&1; then
+                echo "The import did not finish cleanly; the agent will see the same when it runs it."
+              fi
+              tail -n 20 "$log"
+            )
+            if [ "$?" -ne 0 ]; then echo "Preparing the Godot project failed; the agent can still install what it needs."; fi
+          fi
+
+      # A fresh checkout has nothing imported, and the tests load resources.
+      - name: Import the project
+        run: godot --headless --import
+
+      - name: Run the tests
+        run: |
+          if [ -f addons/gut/gut_cmdln.gd ]; then godot --headless -s addons/gut/gut_cmdln.gd -gexit
+          else echo "No test framework Formic knows is installed in addons/, so there is nothing to run."
+          fi
