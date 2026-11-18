@@ -848,9 +848,9 @@ func test_the_shop_sells_the_cleaning_pieces():
 	for id in ["mop_bucket", "hook", "sponge", "robot_dock"]:
 		assert_eq(Catalog.ITEMS[id].category, "Kitchen", id)
 		assert_true(Catalog.sold_in(id, "diner") and Catalog.sold_in(id, "seaside"), id)
-	assert_eq(Catalog.price_of("mop_bucket"), 20)
+	assert_eq(Catalog.price_of("mop_bucket"), 35, "the sponge's whole way up to it")
 	assert_eq(Catalog.price_of("sponge"), 15)
-	assert_eq(Catalog.price_of("robot_dock"), 300)
+	assert_eq(Catalog.price_of("robot_dock"), 315)
 	assert_lt(Catalog.price_of("hook"), Catalog.price_of("sponge"), "a hook is cheap")
 
 
@@ -1057,7 +1057,7 @@ func test_bought_at_night_a_sponge_hangs_on_its_own_hook_and_a_bucket_holds_a_mo
 	assert_true(game.pick_catalog("mop_bucket"))
 	assert_true(game.place(Vector3i(spot.x, spot.y, 0)))
 	assert_eq((game.stations[spot] as Station).kit_tool, "mop")
-	assert_eq(game.ledger.money, 200 - 15 - 20)
+	assert_eq(game.ledger.money, 200 - 15 - 35)
 
 
 # ---------- 9.5: floor treatments ----------
@@ -1094,7 +1094,8 @@ func test_a_box_climbs_its_tree_like_any_piece():
 	assert_eq(lay["box_strong_cleaner"], Vector2i(1, 0), "the efficient step runs on along the row")
 	assert_true(Upgrades.blurb("box_primer").contains("$3 a night"), "its box's flat fee")
 	var shop := Catalog.search("", "Pantry")
-	assert_true(shop.any(func(bp: Dictionary) -> bool: return bp.id == "box_cleaner"), "the cleaner's box is sold")
+	assert_eq(shop.any(func(bp: Dictionary) -> bool: return bp.id == "box_cleaner"), Treatments.ON_SALE,
+		"the cleaner's box is sold only while treatments are (parked: liquids are in the mop bucket)")
 	for id: String in ["box_primer", "box_finish", "treat_cleaner"]:
 		assert_false(shop.any(func(bp: Dictionary) -> bool: return bp.id == id) \
 			or Catalog.search("", "Build").any(func(bp: Dictionary) -> bool: return bp.id == id), id + " is not in the catalog's list")
@@ -1190,9 +1191,11 @@ func test_on_a_cleaner_a_mop_clears_the_whole_cell_in_one_press():
 # ---------- 9.5: the cleaning trees ----------
 
 func test_the_cleaning_and_hood_trees_are_the_prds():
-	var want := {"sponge_mop": ["mop_bucket", Kitchen.EFFICIENT, 35], "flat_mop": ["sponge_mop", Kitchen.EFFICIENT, 60],
-		"scrubber": ["flat_mop", Kitchen.EFFICIENT, 180], "wringer_bucket": ["mop_bucket", Kitchen.SPECIALIST_STEP, 45],
-		"robot_dock": ["wringer_bucket", Kitchen.SPECIALIST_STEP, 300], "scourer": ["sponge", Kitchen.EFFICIENT, 25],
+	var want := {"mop_bucket": ["sponge", Kitchen.EFFICIENT, 35],
+		"sponge_mop": ["mop_bucket", Kitchen.EFFICIENT, 50], "flat_mop": ["sponge_mop", Kitchen.EFFICIENT, 75],
+		"scrubber": ["flat_mop", Kitchen.EFFICIENT, 195], "wringer_bucket": ["mop_bucket", Kitchen.SPECIALIST_STEP, 60],
+		"cleaner_bucket": ["mop_bucket", Kitchen.SPECIALIST_STEP, 60], "strong_bucket": ["cleaner_bucket", Kitchen.EFFICIENT, 100],
+		"robot_dock": ["wringer_bucket", Kitchen.SPECIALIST_STEP, 315], "scourer": ["sponge", Kitchen.EFFICIENT, 25],
 		"grease_scraper": ["sponge", Kitchen.SPECIALIST_STEP, 40], "spill_kit": ["sponge", Kitchen.SPECIALIST_STEP, 30],
 		"extractor": ["hood", Kitchen.EFFICIENT, 90]}
 	for n: String in want:
@@ -1547,3 +1550,30 @@ func test_the_scraper_on_guest_mess_says_why_and_a_spill_kit_refills_each_day():
 	game.clean_kit.tick(1.0)
 	assert_eq(game.clean_kit.press(game.player), "clean")
 	assert_eq(game.floor_dirt.mess.level(front), 2)
+
+
+func test_the_sponge_grows_into_a_mop_bucket_and_then_a_cleaner_in_its_pail():
+	var game = _game()
+	_night(game)
+	game.ledger.money = 500
+	var w := _wall_cell(game)
+	var h: Station = game.add_high("hook", w)
+	game.clean_kit.on_built(h, "sponge")
+	assert_true(game.pick_up(Grid.center(w)))
+	assert_true(game.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "mop_bucket"),
+		"the sponge's strip offers the mop bucket")
+	assert_true(game.buy_upgrade("mop_bucket"))
+	assert_eq(game.ledger.money, 500 - Upgrades.step_price("mop_bucket"))
+	var b: Station = game.player.hand.node
+	assert_eq(b.type, "mop_bucket", "off the wall: a bucket in hand")
+	assert_eq(b.kit_tool, "mop", "with its mop")
+	var keys: Array = game.strip_choices().map(func(c: Dictionary) -> String: return str(c.get("key", "")))
+	assert_has(keys, "sponge_mop", "better mops")
+	assert_has(keys, "cleaner_bucket", "or a liquid in the pail")
+	assert_true(game.buy_upgrade("cleaner_bucket"))
+	assert_eq((game.player.hand.node as Station).kit_tool, "cleaner_mop")
+	assert_eq(int(CleanTools.TOOLS.cleaner_mop.levels), FloorMess.MAX_LEVEL, "a whole cell a press")
+	var spot := Vector2i(7, 2)
+	assert_true(game.place(Vector3i(spot.x, spot.y, 0)))
+	assert_eq((game.stations[spot] as Station).kit_tool, "cleaner_mop")
+	assert_false(game.highs.has(w), "the hook is gone")

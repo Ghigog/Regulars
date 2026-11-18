@@ -108,19 +108,28 @@ const NODES := {
 	"extractor": {"name": "Extractor", "fit": "hood", "price": 90, "parent": "hood", "step": EFFICIENT,
 		"blurb": "Cuts the stove's grease by more, and kitchen grease smells less far"},
 	"hook": {"name": "Wall hook", "fit": "hook", "price": 5},   # PRD 9.4: a sponge's home (tunable price)
-	# The cleaning trees (PRD 9.5). Each home names the tool it keeps ("tool", a
-	# CleanTools.TOOLS id); upgrading the home swaps that tool for the new one.
-	"mop_bucket": {"name": "Mop bucket", "fit": "floor", "price": 20, "tool": "mop",
-		"blurb": "Mop clears a level a press, dirty after 4"},
-	"sponge_mop": {"name": "Sponge-head mop", "fit": "floor", "price": 35, "parent": "mop_bucket",
+	# The cleaning tree (PRD 9.5, as changed in the owner's review of night zero): one tree
+	# from the sponge. Each home names the tool it keeps ("tool", a CleanTools.TOOLS id);
+	# upgrading the home swaps that tool for the new one. The sponge on its hook grows into
+	# the mop bucket (off the wall, onto the floor), which branches into better mops or a
+	# liquid in the pail.
+	"mop_bucket": {"name": "Mop bucket", "fit": "floor", "price": 35, "parent": "sponge", "step": EFFICIENT,
+		"tool": "mop", "blurb": "Off the wall: a mop and its pail. Clears a level a press, dirty after 4"},
+	"cleaner_bucket": {"name": "Floor cleaner", "fit": "floor", "price": 60, "parent": "mop_bucket",
+		"step": SPECIALIST_STEP, "tool": "cleaner_mop", "liquid": "cleaner",
+		"blurb": "Cleaner in the pail: the mop clears a whole cell a press, dirty after 4"},
+	"strong_bucket": {"name": "Strong cleaner", "fit": "floor", "price": 100, "parent": "cleaner_bucket",
+		"step": EFFICIENT, "tool": "strong_mop", "liquid": "strong_cleaner",
+		"blurb": "A whole cell a press, and the mop never gets dirty"},
+	"sponge_mop": {"name": "Sponge-head mop", "fit": "floor", "price": 50, "parent": "mop_bucket",
 		"step": EFFICIENT, "tool": "sponge_mop", "blurb": "Clears a level a press, dirty after 6"},
-	"flat_mop": {"name": "Flat mop", "fit": "floor", "price": 60, "parent": "sponge_mop", "step": EFFICIENT,
+	"flat_mop": {"name": "Flat mop", "fit": "floor", "price": 75, "parent": "sponge_mop", "step": EFFICIENT,
 		"tool": "flat_mop", "blurb": "Clears a whole cell a press, dirty after 8"},
-	"scrubber": {"name": "Floor scrubber", "fit": "floor", "price": 180, "parent": "flat_mop", "step": EFFICIENT,
+	"scrubber": {"name": "Floor scrubber", "fit": "floor", "price": 195, "parent": "flat_mop", "step": EFFICIENT,
 		"tool": "scrubber", "blurb": "Push it along: clears every cell it passes. Never dirty, slow to walk"},
-	"wringer_bucket": {"name": "Wringer bucket", "fit": "floor", "price": 45, "parent": "mop_bucket",
+	"wringer_bucket": {"name": "Wringer bucket", "fit": "floor", "price": 60, "parent": "mop_bucket",
 		"step": SPECIALIST_STEP, "tool": "wringer_mop", "blurb": "Rinses itself: the mop is never dirty. A level a press"},
-	"robot_dock": {"name": "Robot sweeper", "fit": "floor", "price": 300, "parent": "wringer_bucket",
+	"robot_dock": {"name": "Robot sweeper", "fit": "floor", "price": 315, "parent": "wringer_bucket",
 		"step": SPECIALIST_STEP, "blurb": "A dock. The robot drifts to the nearest dirt and slowly cleans it. Anyone can trip on it"},
 	"sponge": {"name": "Sponge", "fit": "hook", "price": 15, "tool": "sponge",
 		"blurb": "On its own wall hook. Clears a level fast, dirty after 2"},

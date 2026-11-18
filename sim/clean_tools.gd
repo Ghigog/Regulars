@@ -18,6 +18,9 @@ const TOOLS := {
 	"scrubber": {"name": "Floor scrubber", "home": "bucket", "levels": FloorMess.MAX_LEVEL, "time": 0.6,
 		"dirty_after": 0, "push": true, "walk": 0.55},
 	"wringer_mop": {"name": "Wringer mop", "home": "bucket", "levels": 1, "time": 0.6, "dirty_after": 0},
+	"cleaner_mop": {"name": "Mop with cleaner", "home": "bucket", "levels": FloorMess.MAX_LEVEL, "time": 0.6, "dirty_after": 4},
+	"strong_mop": {"name": "Mop with strong cleaner", "home": "bucket", "levels": FloorMess.MAX_LEVEL, "time": 0.6,
+		"dirty_after": 0},
 	"sponge": {"name": "Sponge", "home": "hook", "levels": 1, "time": 0.3, "dirty_after": 2},
 	"scourer": {"name": "Scourer", "home": "hook", "levels": 1, "time": 0.3, "dirty_after": 4},
 	"grease_scraper": {"name": "Grease scraper", "home": "hook", "levels": FloorMess.MAX_LEVEL, "time": 0.3,
@@ -25,6 +28,11 @@ const TOOLS := {
 	"spill_kit": {"name": "Spill kit", "home": "hook", "levels": 2, "time": 0.6, "dirty_after": 0,
 		"uses": 3, "help": 0.5},
 }
+## Bare hands (no tool held): holding E scrubs the cell, a level every HAND_TIME seconds.
+## Every tool is faster (a press is 0.3 to 0.6 s). (tunable)
+const HAND_TIME := 1.8
+const HAND_LEVELS := 1
+
 ## The pieces that are homes, and the kind of home each is (a catalog type).
 const HOMES := {"mop_bucket": "bucket", "hook": "hook", "sponge": "hook"}
 const SPILL_LEVEL := 4   # the spill kit works on a cell this dirty only
@@ -180,6 +188,14 @@ static func press(mess: FloorMess, cell: Vector2i, tool: String, used: int) -> D
 	if _wear(tool) > 0:
 		out.used = mini(used + 1, _wear(tool))
 	return out
+
+
+## One scrub by hand: clears HAND_LEVELS off a reachable dirty cell. Returns the levels
+## taken off (0 under furniture or on a clean cell).
+static func hand_scrub(mess: FloorMess, cell: Vector2i) -> int:
+	if mess.level(cell) <= 0:
+		return 0
+	return mess.clean(cell, HAND_LEVELS)
 
 
 ## The level anyone walking over a cell feels: its dirt, or the robot (or a tool left

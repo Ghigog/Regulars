@@ -30,6 +30,12 @@ var _drawn := {}   # Vector2i -> the look key drawn there
 var _sheen := {}   # Vector2i -> [look key, Node3D]: a floor treatment's sheen (PRD 9.5)
 var _nodes := {}   # Vector2i -> Node3D
 static var _meshes := {}   # outline -> its flat mesh
+static var _mote_mesh: Mesh
+## Motes rising off dirt, so a dirty cell behind a counter or under a table still shows
+## from the camera above (review): more and higher the dirtier the cell. (tunable)
+const MOTES: Array[int] = [0, 3, 4, 6, 8]   # by level
+const MOTE_RISE := 0.75    # metres a second
+const MOTE_LIFE := 2.4     # seconds: tops out near 1.8 m, over counters and tables
 
 
 func setup(game_) -> void:
@@ -512,7 +518,51 @@ static func cell_look(c: Vector2i, lvl: int, walked: Vector2i) -> Node3D:
 			_card(flat, _rot(_ellipse(0.13, 0.035, Vector2(-0.04, 0.08)), turn), SHEEN, 0.004)
 	if walked != Vector2i.ZERO:
 		_footprints(flat, walked, PRINT_PALE if lvl >= 3 else PRINT_DARK)
+	root.add_child(motes(lvl, r.randi()))
 	return root
+
+
+## Little grime motes drifting up off a dirty cell, fading as they rise.
+static func motes(lvl: int, seed_value := 0) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.name = "motes"
+	if _mote_mesh == null:
+		var m := SphereMesh.new()
+		m.radius = 0.035
+		m.height = 0.07
+		m.radial_segments = 6
+		m.rings = 3
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.vertex_color_use_as_albedo = true
+		m.material = mat
+		_mote_mesh = m
+	p.mesh = _mote_mesh
+	p.amount = MOTES[clampi(lvl, 0, MOTES.size() - 1)]
+	p.lifetime = MOTE_LIFE
+	p.preprocess = MOTE_LIFE
+	p.randomness = 0.5
+	p.seed = seed_value
+	p.use_fixed_seed = false
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(0.3, 0.02, 0.3)
+	p.direction = Vector3.UP
+	p.spread = 12.0
+	p.gravity = Vector3.ZERO
+	p.initial_velocity_min = MOTE_RISE * 0.8
+	p.initial_velocity_max = MOTE_RISE * 1.2
+	p.scale_amount_min = 0.7
+	p.scale_amount_max = 1.3 + 0.15 * lvl
+	var ramp := Gradient.new()
+	var c := Color(GRIME).lightened(0.1)
+	ramp.set_color(0, Color(c, 0.0))
+	ramp.set_color(1, Color(c, 0.0))
+	ramp.add_point(0.15, Color(c, 0.9))
+	ramp.add_point(0.7, Color(c, 0.55))
+	p.color_ramp = ramp
+	p.position = Vector3(0, 0.05, 0)
+	return p
 
 
 ## Two pairs of shoe prints heading the way they walked onto the cell.
