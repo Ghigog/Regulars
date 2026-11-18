@@ -2933,26 +2933,30 @@ func show_town() -> void:
 	_ribbon(box, "THE TOWN", INK)
 	var town: Town = game.town
 	var cols := GridContainer.new()
-	cols.columns = 2
-	cols.add_theme_constant_override("h_separation", 34)
-	cols.add_theme_constant_override("v_separation", 7)
+	var ncol := 2 if town.people.size() <= 16 else 3
+	cols.columns = ncol
+	cols.add_theme_constant_override("h_separation", 24)
+	cols.add_theme_constant_override("v_separation", 2 if ncol > 2 else 7)
 	box.add_child(cols)
-	# Fill down the two columns, not across.
-	var half := ceili(town.people.size() / 2.0)
-	for n in town.people.size():
-		var i := (n / 2) + (half if n % 2 == 1 else 0)
+	# Fill down the columns, not across.
+	var rows := ceili(town.people.size() / float(ncol))
+	for n in rows * ncol:
+		var i := (n / ncol) + rows * (n % ncol)
+		if i >= town.people.size():
+			cols.add_child(Control.new())
+			continue
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		cols.add_child(row)
-		var name_label := _label(row, 18, town.people[i].name)
-		name_label.custom_minimum_size = Vector2(86, 0)
+		var name_label := _label(row, 18 if ncol == 2 else 15, town.people[i].name)
+		name_label.custom_minimum_size = Vector2(86 if ncol == 2 else 78, 0)
 		if game.critic.known and i == game.critic.critic_idx:   # after the first review only
 			var quill := Icon.new("quill", 20, false)   # inside the name's column, so the pips stay in line
 			quill.position = Vector2(name_label.get_minimum_size().x + 4, 2)
 			name_label.add_child(quill)
 		row.add_child(Pips.new(town.standing(i) + 1, town.trend(i)))
-		var word := _label(row, 13, town.status_word(i, game.ledger.day))
-		word.custom_minimum_size = Vector2(150, 0)
+		var word := _label(row, 13 if ncol == 2 else 11, town.status_word(i, game.ledger.day))
+		word.custom_minimum_size = Vector2(150 if ncol == 2 else 118, 0)
 		word.modulate.a = 0.7
 	_rule(box)
 	var key := _label(box, 13, "Arrows show who changed their mind today. Friends talk to each other.")

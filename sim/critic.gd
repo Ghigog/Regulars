@@ -17,7 +17,7 @@ const WALKOUT_CAP := 2            # tunable: the most stars a walkout can earn
 const RESET_STEP := 0.1           # tunable: opinion per star above or below 3 after a review
 const AGREE_GAP := 0.05           # tunable: gap below which the town and the critic agree
 ## Extra visit chance for the days after a review, by stars (index = stars).
-const BOOST: Array[float] = [0.0, -0.25, -0.10, 0.0, 0.10, 0.25]   # tunable
+const BOOST: Array[float] = [0.0, -0.1, -0.04, 0.0, 0.04, 0.1]   # tunable: per person, in a town of forty
 const BOOST_DAYS := 4             # tunable: days the boost lasts
 const MIDDLE := Vector2(0.25, 0.75)   # they arrive in the middle half of the day
 
@@ -74,7 +74,7 @@ var _rng := RandomNumberGenerator.new()
 
 
 ## Picks the critic from a town of `people` with the run's seed.
-func _init(seed_value := 1, people := Town.NAMES.size()) -> void:
+func _init(seed_value := 1, people := Town.TOWN_SIZE) -> void:
 	_rng.seed = hash("critic:%d" % seed_value)
 	critic_idx = _rng.randi_range(0, people - 1)
 

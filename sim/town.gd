@@ -7,6 +7,17 @@ const NAMES: Array[String] = [
 	"Mabel", "Otis", "Priya", "Gus", "Ingrid", "Tobias", "Wren",
 	"Hattie", "Leopold", "Suki", "Barnaby", "Odette", "Felix", "Nell",
 ]
+## The rest of the town, drawn from a pool for each theme until the town is TOWN_SIZE.
+## The first fourteen above are the ones on the concept sheets, in both towns.
+const TOWN_SIZE := 40
+const MORE_NAMES := {
+	"diner": ["Dolores", "Earl", "Bev", "Clyde", "Rosalind", "Hank", "Loretta", "Vern", "Marge",
+		"Dwight", "Juniper", "Walt", "Opal", "Rusty", "Ida", "Floyd", "Mae", "Chester", "Pearl",
+		"Lyle", "Delia", "Homer", "Fern", "Archie", "Winnie", "Ezra", "Goldie", "Rex", "Dot", "Sal"],
+	"seaside": ["Morwenna", "Jory", "Tamsin", "Bram", "Coral", "Silas", "Marina", "Kit", "Perran",
+		"Bryony", "Ned", "Isolde", "Fin", "Delphine", "Cormac", "Elsie", "Tristan", "Maud", "Rowan",
+		"Lowen", "Senara", "Jago", "Peg", "Ewan", "Kerensa", "Alf", "Nessa", "Lorcan", "Mo", "Ottilie"],
+}
 const SHIRTS: Array[String] = ["#b85c9e", "#3f7f86", "#e9a23b", "#4a6fa5", "#6c5ce7", "#d9534f", "#5fb37a"]
 const FRIEND_SHARE := 0.4
 const STANDINGS: Array[String] = ["Staying away", "Wary", "Undecided", "Likes you", "Loves you"]
@@ -15,7 +26,13 @@ const REGULAR_STREAK := 3   # good visits in a row that make someone a regular
 const REGULAR_TIP := 1.25
 const GRUDGE_DAYS := 2      # full days a guest stays away after walking out
 const FLYER_PRICE := 15
-const FLYER_BOOST := 0.25
+const FLYER_BOOST := 0.1   # visit chance each, so about four more guests in a town of forty
+## Turnout (review, item 1). Everyone rolls to come from their own affinity, so a liked
+## place fills up; a thin day is topped up to `crowd_floor`, which grows slowly.
+const VISIT_BASE := 0.1      # tunable: visit chance at no opinion either way
+const VISIT_LIKE := 0.45     # tunable: extra chance per point of affinity
+const BIG_GROUP_DAY := 0.025 # tunable: more people bring all their friends, a day at a time
+const BRING_FRIENDS_DAY := 8 # tunable: from this day a friend brings a friend of their own
 ## Kindness. Half price and free meals win goodwill, and friends hear about free ones.
 ## Guests given deals often start to expect them: a full-price visit then lets them down.
 const KIND_HALF := 0.2        # affinity for half price
@@ -49,12 +66,14 @@ var taste_seed := 1
 var theme := "diner"
 
 
-func _init(seed_value := 1) -> void:
+func _init(seed_value := 1, theme_id := "diner") -> void:
 	rng.seed = seed_value
 	taste_seed = seed_value
-	for i in NAMES.size():
+	theme = theme_id
+	var names := town_names(seed_value, theme_id)
+	for i in names.size():
 		people.append({
-			"name": NAMES[i], "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
+			"name": names[i], "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
 			"streak": 0, "away_until": 0, "sore": false, "grudges": 0, "gone": false, "deals": 0,
 			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
 			"likes": [], "dislikes": [], "liked_tags": [], "orders": {},
@@ -62,13 +81,27 @@ func _init(seed_value := 1) -> void:
 			"tolerance": {"food": 3, "service": 3, "clean": 3},
 		})
 	# A ring of friendships plus a few long-distance ones, so gossip travels.
-	for i in NAMES.size():
-		_befriend(i, (i + 1) % NAMES.size())
+	var n := names.size()
+	for i in n:
+		_befriend(i, (i + 1) % n)
 		if i % 3 == 0:
-			_befriend(i, (i + 5) % NAMES.size())
+			_befriend(i, (i + 5) % n)
+		if i % 7 == 2:
+			_befriend(i, (i + 13) % n)
 	make_tastes(theme)
 	make_tolerances()
 	make_ratings()
+
+
+## The town's names: the fourteen drawn ones, then the theme's pool shuffled by the seed.
+static func town_names(seed_value: int, theme_id: String) -> Array[String]:
+	var names: Array[String] = NAMES.duplicate()
+	var pool: Array = (MORE_NAMES.get(theme_id, MORE_NAMES.diner) as Array).duplicate()
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("%d:names:%s" % [seed_value, theme_id])
+	while names.size() < TOWN_SIZE and not pool.is_empty():
+		names.append(pool.pop_at(r.randi_range(0, pool.size() - 1)))
+	return names
 
 
 # ---------------------------------------------------------------- tolerances (PRD 10.1)
@@ -124,6 +157,10 @@ func rating(i: int) -> int:
 ## one grill ingredient or vegetable. Uses its own generator, so it never changes who
 ## visits or how groups form.
 func make_tastes(theme_id: String) -> void:
+	if theme_id != theme:   # the theme was picked after the town was made: its own townsfolk
+		var names := town_names(taste_seed, theme_id)
+		for i in mini(names.size(), people.size()):
+			people[i].name = names[i]
 	theme = theme_id
 	var r := RandomNumberGenerator.new()
 	r.seed = hash("%d:%s" % [taste_seed, theme_id])
@@ -265,10 +302,26 @@ func visit_chance(i: int) -> float:
 	if people[i].gone:
 		return 0.0
 	var affinity: float = people[i].affinity
-	return clampf(0.4 + affinity * 0.5, 0.05, 0.95)
+	return clampf(VISIT_BASE + affinity * VISIT_LIKE, 0.02, 0.9)
 
 
-## Who turns up today. Later days guarantee a bigger crowd.
+## The day's arrival window, the same every day (review, item 1): later days are harder
+## for the crowd, the bigger parties and the shorter patience, not easier for a longer day.
+const DAY_LENGTH := 75.0   # tunable: seconds the door lets people in
+
+
+## How long a table waits, in seconds: less each day, down to a floor.
+static func table_patience(day: int) -> float:
+	return maxf(24.0, 46.0 - 1.5 * day)
+
+
+## The fewest guests a day brings, whatever the town thinks: grows by one every other day.
+static func crowd_floor(day: int) -> int:
+	return 2 + day / 2
+
+
+## Who turns up today. Reputation (and `boost`, from flyers and reviews) decides the
+## crowd; a thin day is topped up to `crowd_floor`.
 func roll_guests(day: int, boost := 0.0) -> Array[int]:
 	var coming: Array[int] = []
 	var staying: Array[int] = []
@@ -279,7 +332,7 @@ func roll_guests(day: int, boost := 0.0) -> Array[int]:
 			coming.append(i)
 		else:
 			staying.append(i)
-	var minimum := mini(3 + day, people.size())
+	var minimum := mini(crowd_floor(day), people.size())
 	while coming.size() < minimum and not staying.is_empty():
 		coming.append(staying.pop_at(rng.randi_range(0, staying.size() - 1)))
 	for i in range(coming.size() - 1, 0, -1):
@@ -291,21 +344,29 @@ func roll_guests(day: int, boost := 0.0) -> Array[int]:
 
 
 ## Splits today's guests into groups of friends, at most `max_size` each. Nobody is
-## grouped with a stranger, so someone whose friends are not coming arrives alone.
-func make_groups(coming: Array[int], max_size: int) -> Array[Array]:
+## grouped with a stranger (from BRING_FRIENDS_DAY a friend's friend may come along), so
+## someone whose friends are not coming arrives alone.
+## Later days bring bigger parties: more people bring every friend who is coming.
+func make_groups(coming: Array[int], max_size: int, day := 1) -> Array[Array]:
 	var left := coming.duplicate()
 	var groups: Array[Array] = []
+	var all_friends := minf(0.95, 0.6 + BIG_GROUP_DAY * day)
 	while not left.is_empty():
 		var first: int = left.pop_front()
 		var group: Array[int] = [first]
 		# Most people would rather bring company than eat alone.
-		var want := max_size if rng.randf() < 0.7 else rng.randi_range(1, max_size)
-		for f: int in people[first].friends:
-			if group.size() >= want:
-				break
-			if left.has(f):
-				left.erase(f)
-				group.append(f)
+		var want := max_size if rng.randf() < all_friends else rng.randi_range(1, max_size)
+		# On later days a friend brings a friend of their own, so parties grow.
+		var reach := 1 if day < BRING_FRIENDS_DAY else group.size() + max_size
+		var k := 0
+		while k < mini(reach, group.size()) and group.size() < want:
+			for f: int in people[group[k]].friends:
+				if group.size() >= want:
+					break
+				if left.has(f):
+					left.erase(f)
+					group.append(f)
+			k += 1
 		groups.append(group)
 	return groups
 

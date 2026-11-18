@@ -210,7 +210,7 @@ func _ready() -> void:
 	load_favourites()
 	var seed_value := int(Time.get_unix_time_from_system())
 	grid = Grid.new(W + 2 - LOT.position.x, LOT.size.y, LOT.position)   # columns W and W + 1 are the pavement outside
-	town = Town.new(seed_value)
+	town = Town.new(seed_value, Scenery.theme_id)
 	critic = Critic.new(seed_value, town.people.size())
 	staff = Staff.new(seed_value)
 	ledger = Ledger.new()
@@ -2170,13 +2170,13 @@ func popup(text: String, at: Vector3, col: Color) -> void:
 
 # ---------------------------------------------------------------- the day
 
-## Days get longer, busier and less forgiving.
+## Days are the same length; they get busier and less forgiving (Town).
 func day_length() -> float:
-	return 50.0 + 5.0 * ledger.day
+	return Town.DAY_LENGTH
 
 
 func table_patience() -> float:
-	return maxf(24.0, 46.0 - 1.5 * ledger.day)
+	return Town.table_patience(ledger.day)
 
 
 func day_progress() -> float:
@@ -2214,7 +2214,7 @@ func start_day() -> void:
 	var critic_day := critic.visits_on(ledger.day)
 	if critic_day:   # they come alone, whatever the dice or a grudge say
 		coming.erase(critic.critic_idx)
-	var groups := town.make_groups(coming, max_party())
+	var groups := town.make_groups(coming, max_party(), ledger.day)
 	var flyered := flyers_out
 	flyers_out = false
 	arrivals.clear()

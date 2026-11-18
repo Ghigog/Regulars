@@ -887,7 +887,7 @@ func test_days_are_endless_and_get_harder():
 	var expected := 0
 	for a: Dictionary in game.arrivals:
 		expected += (a.group as Array).size()
-	assert_gte(expected, 5)
+	assert_gte(expected, Town.crowd_floor(2))
 	game.ledger.day = 9
 	assert_lt(game.table_patience(), patience_day_2)
 

@@ -320,7 +320,7 @@ func test_roll_guests_has_minimum_and_no_duplicates():
 	for p in t.people:
 		p.affinity = -1.0
 	var guests := t.roll_guests(2)
-	assert_gte(guests.size(), 5)
+	assert_gte(guests.size(), Town.crowd_floor(2))
 	var seen := {}
 	for g in guests:
 		assert_false(seen.has(g))
@@ -1456,7 +1456,7 @@ func test_review_boost_lasts_four_days_and_stacks_with_flyers():
 	c.publish({"speed": 5, "clean": 5, "quality": 5, "variety": 5}, false, Town.new(1), 5)
 	assert_eq(c.visit_boost(5), 0.0, "not on the day itself")
 	for d in [6, 7, 8, 9]:
-		assert_eq(c.visit_boost(d), 0.25)
+		assert_eq(c.visit_boost(d), Critic.BOOST[5])
 	assert_eq(c.visit_boost(10), 0.0)
 	var plain := 0
 	var both := 0
@@ -1465,7 +1465,7 @@ func test_review_boost_lasts_four_days_and_stacks_with_flyers():
 		both += Town.new(s).roll_guests(1, Town.FLYER_BOOST + c.visit_boost(6)).size()
 	assert_gt(both, plain, "a good review on top of flyers brings more")
 	c.publish({"speed": 1, "clean": 1, "quality": 1, "variety": 1}, false, Town.new(1), 10)
-	assert_eq(c.visit_boost(11), -0.25, "the next review replaces it")
+	assert_eq(c.visit_boost(11), Critic.BOOST[1], "the next review replaces it")
 
 
 func test_a_clean_review_does_not_bring_back_the_revolted():
