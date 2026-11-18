@@ -328,12 +328,12 @@ func test_swipe_left_dismisses_and_a_mouse_drag_swipes():
 		down.button_index = MOUSE_BUTTON_LEFT
 		down.pressed = true
 		down.global_position = Vector2(500, 300)
-		desk._cv_input(down)
+		desk._cv_input(down, desk._cv_card, 0)
 		var up := InputEventMouseButton.new()
 		up.button_index = MOUSE_BUTTON_LEFT
 		up.pressed = false
 		up.global_position = Vector2(500 + DeskScreen.SWIPE + 30, 300)
-		desk._cv_input(up)
+		desk._cv_input(up, desk._cv_card, 0)
 		assert_eq(game.staff.employees.size(), 1, "dragged right: hired")
 
 

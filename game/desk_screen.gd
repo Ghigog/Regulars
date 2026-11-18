@@ -39,7 +39,8 @@ var _draft := {}           # the post being written: {name, duties, breaks, days
 var _naming := ""          # "", "type" or "grid"
 var _name_text := ""
 var _offer := -1           # the figure being haggled on the top CV; -1 when not haggling
-var _cv_card: Control      # the top CV, dragged to swipe
+var _cv_card: Control      # the CV being dragged (or the chosen one)
+var _pick := 0             # which CV in the pile the buttons act on
 var _drag_from := Vector2.INF
 var _targets: Array[Control] = []
 var _sel := 0
@@ -294,32 +295,45 @@ func _choice_row(parent: HBoxContainer, words: String, field: String, most: int)
 			_mark(b)
 
 
-## The pile: the top CV, the ones under it peeking out, and what to do with it.
+## The pile as a list to scroll: every CV, the chosen one lit. Drag any CV right to hire,
+## left to send them home; the buttons act on the chosen one.
 func _cvs() -> void:
 	var staff: Staff = game.staff
-	var area := CenterContainer.new()
-	area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_content.add_child(area)
 	if staff.cvs.is_empty():
+		var area := CenterContainer.new()
+		area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_content.add_child(area)
 		var none := _label(area, 22, "No CVs in the pile. Put up a job post: townspeople apply overnight.")
 		none.modulate.a = 0.6
 		return
-	var holder := Control.new()
-	holder.custom_minimum_size = CV_SIZE + Vector2(40, 30)
-	area.add_child(holder)
-	for k in range(mini(staff.cvs.size(), 3) - 1, 0, -1):   # the ones underneath, a little askew
-		var under := Hud.Sheet.new("card", 20, 14)
-		under.custom_minimum_size = CV_SIZE
-		under.size = CV_SIZE
-		under.position = Vector2(20 + k * 9, 10 + k * 7)
-		under.pivot_offset = CV_SIZE / 2.0
-		under.rotation = 0.025 * k * (1 if k % 2 else -1)
-		under.modulate = Color(0.93, 0.9, 0.86)
-		holder.add_child(under)
-	var cv: Dictionary = staff.cvs[0]
-	_cv_card = _cv_sheet(cv)
-	_cv_card.position = Vector2(20, 10)
-	holder.add_child(_cv_card)
+	_pick = clampi(_pick, 0, staff.cvs.size() - 1)
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.custom_minimum_size = Vector2(0, 400)
+	_content.add_child(_scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 10)
+	_scroll.add_child(list)
+	var picked: Control = null
+	for i in staff.cvs.size():
+		var slot := Control.new()
+		slot.custom_minimum_size = Vector2(0, CV_SIZE.y + 10)
+		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slot.mouse_filter = Control.MOUSE_FILTER_PASS
+		list.add_child(slot)
+		var sheet := _cv_sheet(staff.cvs[i], i)
+		sheet.position = Vector2((1000 - CV_SIZE.x) / 2.0, 5)
+		if i != _pick:
+			sheet.modulate = Color(0.9, 0.87, 0.83)
+		else:
+			picked = sheet
+			_cv_card = sheet
+		slot.add_child(sheet)
+	if picked != null:
+		_scroll.ensure_control_visible.call_deferred(picked)
+	var cv: Dictionary = _cv()
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	buttons.add_theme_constant_override("separation", 18)
@@ -335,26 +349,44 @@ func _cvs() -> void:
 		_target(offer, "offer")
 		_paper_button(buttons, "unhaggle", _stop_haggle, "Back", 22)
 	else:
+		_paper_button(buttons, "prev", _pick_by.bind(-1), "^", 24).custom_minimum_size = Vector2(56, 0)
 		_paper_button(buttons, "dismiss", dismiss_top, "<  Dismiss", 24).custom_minimum_size = Vector2(200, 0)
 		_paper_button(buttons, "haggle", _start_haggle, "Haggle", 24).custom_minimum_size = Vector2(160, 0)
 		var hire: Button = hud._button(buttons, "Hire at $%d  >" % cv.ask, hire_top)
 		hire.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		hire.custom_minimum_size = Vector2(220, 0)
 		_target(hire, "hire")
-	var foot := _label(_content, 18, note if note != "" else "Drag the CV right to hire, left to send them home.  %s in the pile." % _count_word(staff.cvs.size(), "CV"))
+		_paper_button(buttons, "next", _pick_by.bind(1), "v", 24).custom_minimum_size = Vector2(56, 0)
+	var foot := _label(_content, 18, note if note != "" else "Scroll the pile. Drag a CV right to hire, left to send them home.  %s in the pile." % _count_word(staff.cvs.size(), "CV"))
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if note != "":
 		foot.add_theme_color_override("font_color", Hud.CORAL.darkened(0.3))
 
 
+## The chosen CV (the first in the pile unless another was picked).
+func _cv() -> Dictionary:
+	var cvs: Array = game.staff.cvs
+	return cvs[clampi(_pick, 0, cvs.size() - 1)]
+
+
+func _pick_by(by: int) -> void:
+	var n: int = game.staff.cvs.size()
+	if n == 0:
+		return
+	_pick = clampi(_pick + by, 0, n - 1)
+	_offer = -1
+	game.sfx("tick")
+	render()
+
+
 ## One CV: the face on the left; the name, post, skills, rating and ask on the right.
-func _cv_sheet(cv: Dictionary) -> Control:
+func _cv_sheet(cv: Dictionary, index := 0) -> Control:
 	var sheet := Hud.Sheet.new("card", 22, 16)
 	sheet.custom_minimum_size = CV_SIZE
 	sheet.size = CV_SIZE
 	sheet.pivot_offset = Vector2(CV_SIZE.x / 2.0, CV_SIZE.y)
 	sheet.mouse_filter = Control.MOUSE_FILTER_STOP
-	sheet.gui_input.connect(_cv_input)
+	sheet.gui_input.connect(_cv_input.bind(sheet, index))
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 20)
@@ -523,24 +555,28 @@ func select(key: String) -> bool:
 	return false
 
 
-## Dragging the top CV: it follows the pointer and leans; let go far enough right to
-## hire, left to dismiss, else it springs back.
-func _cv_input(event: InputEvent) -> void:
-	if _cv_card == null:
-		return
+## Dragging a CV: it follows the pointer and leans; let go far enough right to hire,
+## left to dismiss, else it springs back (a plain click chooses it).
+func _cv_input(event: InputEvent, sheet: Control, index: int) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			_drag_from = event.global_position
+			_cv_card = sheet
 		elif _drag_from != Vector2.INF:
 			var dx: float = event.global_position.x - _drag_from.x
 			_drag_from = Vector2.INF
+			var changed := index != _pick
+			_pick = index
 			if dx > SWIPE:
 				hire_top()
 			elif dx < -SWIPE:
 				dismiss_top()
+			elif changed:
+				_offer = -1
+				render()
 			else:
 				drag_to(0.0)
-	elif event is InputEventMouseMotion and _drag_from != Vector2.INF:
+	elif event is InputEventMouseMotion and _drag_from != Vector2.INF and _cv_card == sheet:
 		drag_to(event.global_position.x - _drag_from.x)
 
 
@@ -548,7 +584,7 @@ func _cv_input(event: InputEvent) -> void:
 func drag_to(dx: float) -> void:
 	if _cv_card == null:
 		return
-	_cv_card.position.x = 20 + dx
+	_cv_card.position.x = (1000 - CV_SIZE.x) / 2.0 + dx
 	_cv_card.rotation = clampf(dx / 1600.0, -0.25, 0.25)
 	_cv_card.modulate = Color.WHITE.lerp(Color("#d8f5df") if dx > 0 else Color("#f6d6cf"), clampf(absf(dx) / SWIPE, 0.0, 1.0) * 0.8)
 
@@ -572,7 +608,7 @@ func hire_top() -> void:
 	var staff: Staff = game.staff
 	if staff.cvs.is_empty():
 		return
-	var cv: Dictionary = staff.cvs[0]
+	var cv: Dictionary = _cv()
 	var who: String = game.town.people[cv.person].name
 	if game.desk_hire(int(cv.id)):
 		note = "%s is hired, at $%d a day." % [who, int(cv.ask)]
@@ -585,7 +621,7 @@ func dismiss_top() -> void:
 	var staff: Staff = game.staff
 	if staff.cvs.is_empty():
 		return
-	game.desk_dismiss(int(staff.cvs[0].id))
+	game.desk_dismiss(int(_cv().id))
 	note = ""
 	_offer = -1
 	render()
@@ -595,8 +631,8 @@ func _start_haggle() -> void:
 	var staff: Staff = game.staff
 	if staff.cvs.is_empty():
 		return
-	var ask := int(staff.cvs[0].ask)
-	var last := int(staff.cvs[0].haggle.last)
+	var ask := int(_cv().ask)
+	var last := int(_cv().haggle.last)
 	_offer = clampi(last if last > 0 else int(round(ask * 0.85)), 1, maxi(1, ask - 1))
 	_sel_key = "offer"
 	game.sfx("page")
@@ -604,7 +640,7 @@ func _start_haggle() -> void:
 
 
 func _nudge_offer(by: int) -> void:
-	var ask := int(game.staff.cvs[0].ask)
+	var ask := int(_cv().ask)
 	_offer = clampi(_offer + by, 1, maxi(1, ask - 1))
 	game.sfx("tick")
 	render()
@@ -625,7 +661,7 @@ func make_offer(figure: int) -> String:
 	var staff: Staff = game.staff
 	if staff.cvs.is_empty():
 		return ""
-	var cv: Dictionary = staff.cvs[0]
+	var cv: Dictionary = _cv()
 	var who: String = game.town.people[cv.person].name
 	var r: String = game.desk_haggle(int(cv.id), figure)
 	match r:
