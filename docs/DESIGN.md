@@ -51,8 +51,15 @@ Survive as many days as you can; three walkouts in one day ends the run.
   what it stands on, and there is one at a time. The
   Ingredients tab lists what is stored there, then every box: what fits first, then the
   rest dimmed with why ("Needs a fridge"), so the player learns a fridge exists. The
-  shop's Pantry tab is gone. The Kitchen tab lists the under-counter fridge outright (a
-  counter already upgraded, priced as both) and runs in kitchen order: storage, cooking
+  shop's Pantry tab is gone. The Kitchen tab sells no counter upgrades: a fridge is
+  bought as a counter and upgraded on its card, and the stove is a branch of the
+  counter's tree too (`Kitchen.TOP_LINKS`: buying it stands a stove on that counter for
+  the stove's whole price; the stove is a tree of its own from there). A full fridge
+  says so ("The fridge is full") rather than "Needs a fridge". The shop's Favourites
+  tab sells any starred tree node (X or the card's star on a tree, kept in
+  `user://regulars_favourites.cfg` across runs) already upgraded at the whole price of
+  the way there; a stove-line favourite comes on its own counter, and cleaning homes
+  cannot be starred. The Kitchen tab runs in kitchen order: storage, cooking
   tools, drinks, the hood, washing up, cleaning, the desk (`Catalog.KITCHEN_GROUPS`).
   Pieces above the player's level are hidden in the shop, the card and the trees; a day
   that ends on a new level says "LEVEL N: NEW IN THE SHOP" on the receipt. There is a box per food kind of the run's theme (free to take; its kind costs

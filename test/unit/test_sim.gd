@@ -428,19 +428,17 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 76, "one entry a piece, the plate, cup and tray stacks, the till, and the under-counter fridge sold outright: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
+	assert_eq(Catalog.search().size(), 74, "one entry a piece, the plate, cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
 	var ferns := Catalog.search("FERN")
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
 	var kitchen := Catalog.search("", "Kitchen", "diner")
-	assert_eq(kitchen.size(), 19, "the counter, the under-counter fridge, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, the plate, cup and tray stacks, a till, stove, board, the soda fountain, a mop bucket, a hook, a sponge and the desk (PRD 10.6)")
-	assert_eq(kitchen.map(func(bp: Dictionary) -> String: return Catalog.label(bp)).slice(0, 4),
-		["Wall shelf", "Counter", "Wall cabinet", "Under-counter fridge"],
+	assert_eq(kitchen.size(), 17, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, the plate, cup and tray stacks, a till, board, the soda fountain, a mop bucket, a hook, a sponge and the desk (PRD 10.6); the fridge and stove are counter upgrades")
+	assert_eq(kitchen.map(func(bp: Dictionary) -> String: return Catalog.label(bp)).slice(0, 3),
+		["Wall shelf", "Counter", "Wall cabinet"],
 		"storage first, cheapest first within it")
-	assert_eq(str(kitchen[3].get("base", "")), "fridge", "the fridge is a counter already upgraded")
-	assert_eq(Catalog.bp_price(kitchen[3]), Kitchen.price_of("fridge"), "priced as counter and fridge both")
 	assert_eq(str(kitchen[-1].id), "desk", "the desk comes last")
-	assert_eq(Catalog.group_of(kitchen[4]), 1, "then the cooking tools")
+	assert_eq(Catalog.group_of(kitchen[3]), 1, "then the cooking tools")
 	assert_eq(Catalog.search("", "Kitchen", "diner", 1).filter(func(bp: Dictionary) -> bool:
 		return Catalog.bp_level(bp) > 1).size(), 0, "a level hides what needs a higher one")
 	var pantry := Catalog.search("", "Pantry", "diner")
@@ -1257,7 +1255,7 @@ func test_a_themed_search_lists_untagged_pieces_and_that_themes_own():
 		for id: String in Catalog.ITEMS:
 			var node := Kitchen.node_of(id)
 			var treat := Treatments.key_of(id)   # PRD 9.5: laying tools and later boxes are not in the catalog's list
-			if not Catalog.ITEMS[id].has("theme") and (node == "" or Kitchen.is_root(node)) \
+			if not Catalog.ITEMS[id].has("theme") and (node == "" or (Kitchen.is_root(node) and not Kitchen.TOP_LINKS.has(node))) \
 					and (treat == "" or (Treatments.is_box(id) and Treatments.is_root(treat))) \
 					and (Catalog.STAFF_ON_SALE or not Catalog.ITEMS[id].get("staff", false)):
 				assert_true(ids.has(id), "%s is sold everywhere" % id)

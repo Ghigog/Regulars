@@ -242,15 +242,18 @@ func _init(seed_value := 1) -> void:
 
 
 static func label(bp: Dictionary) -> String:
+	if bp.get("up", "") != "":   # a favourite built already upgraded
+		return str(Kitchen.NODES[bp.up].name)
 	if bp.get("base", "") != "":   # a counter sold already upgraded (a fridge)
 		return str(Kitchen.NODES[bp.base].name)
 	var tier: int = bp.tier
 	return str(ITEMS[bp.id].name) + (" " + "+".repeat(tier - 1) if tier > 1 else "")
 
 
-## Tree nodes the Kitchen tab also sells outright, as their root piece already upgraded:
-## a fridge is a counter at its fridge node, priced as both.
-const SHOP_NODES: Array[String] = ["fridge"]
+## Tree nodes the Kitchen tab also sells outright, as their root piece already upgraded.
+## None now: a fridge is bought as a counter and upgraded. Favourites (`fav_blueprint`)
+## sell any node this way instead, when the player has starred it.
+const SHOP_NODES: Array[String] = []
 
 
 ## The blueprint the shop shows for one of SHOP_NODES.
@@ -258,14 +261,50 @@ static func node_blueprint(node: String) -> Dictionary:
 	return {"id": Kitchen.family_of(Kitchen.root_of(node)), "tier": 1, "node": node, "base": node}
 
 
+## Whether a node of an upgrade tree can be starred, to be sold already upgraded on the
+## shop's Favourites tab: a tiered piece, or a kitchen piece that is not a cleaning
+## tool's home (their tools come with them in ways a blueprint does not carry).
+static func can_favourite(key: String) -> bool:
+	if Upgrades.is_tiered(key):
+		return true
+	return Kitchen.has_node(key) and not Kitchen.fit_of(key) in ["floor", "hook"]
+
+
+## The blueprint the Favourites tab sells for a starred node, upgrades and all: a tiered
+## piece at its tier; a counter at its node ("base", a fridge); a tool or wall piece
+## built as its node ("up"). A tool whose tree grows from a counter (a stove's line,
+## Kitchen.TOP_LINKS) comes on its own counter ("counter"), priced with it.
+static func fav_blueprint(key: String) -> Dictionary:
+	if Upgrades.is_tiered(key):
+		return {"id": Upgrades.catalog_id(key), "tier": Upgrades.tier_of(key), "fav": key}
+	var fit := Kitchen.fit_of(key)
+	if fit in ["counter", "tall"]:
+		if key == "counter":
+			return {"id": "counter", "tier": 1, "fav": key}
+		var bp := node_blueprint(key)
+		bp.fav = key
+		return bp
+	var id := Kitchen.family_of(key)
+	if Kitchen.is_root(key) and not Kitchen.TOP_LINKS.has(key):
+		return {"id": id, "tier": 1, "fav": key}
+	var out := {"id": id, "tier": 1, "node": key, "up": key, "fav": key}
+	if fit == "top" and Upgrades.root(key) == "counter":
+		out.counter = true
+	return out
+
+
 ## What a blueprint costs: a catalog piece at its tier, or a shop node's full price.
 static func bp_price(bp: Dictionary) -> int:
+	if bp.get("up", "") != "":
+		return Kitchen.price_of(bp.up) + (Kitchen.price_of("counter") if bp.get("counter", false) else 0)
 	if bp.get("base", "") != "":
 		return Kitchen.price_of(bp.base)
 	return price_of(bp.id, int(bp.tier))
 
 
 static func bp_blurb(bp: Dictionary) -> String:
+	if bp.get("up", "") != "":
+		return Upgrades.blurb(bp.up) + (". On its own counter" if bp.get("counter", false) else "")
 	if bp.get("base", "") != "":
 		return Upgrades.blurb(bp.base)
 	return blurb_of(bp.id, int(bp.tier))
@@ -379,8 +418,8 @@ static func search(query := "", category := "", theme := "", level := 0) -> Arra
 		if not sold_in(id, theme):
 			continue
 		var node := Kitchen.node_of(id)
-		if node != "" and not Kitchen.is_root(node):
-			continue   # reached only through its tree (PRD 8.3)
+		if node != "" and (not Kitchen.is_root(node) or Kitchen.TOP_LINKS.has(node)):
+			continue   # reached only through its tree (PRD 8.3), or a counter's (a stove)
 		if Treatments.is_laying_tool(id) or (Treatments.is_box(id) and not Treatments.is_root(Treatments.key_of(id))):
 			continue   # a laying tool is listed by the game while its box is stored (PRD 9.5)
 		offered.append({"id": id, "tier": 1})   # higher tiers are steps in the piece's tree now
@@ -420,6 +459,8 @@ static func unlocked_at(lvl: int, theme := "") -> Array[Dictionary]:
 
 ## The level a blueprint needs: a shop node needs its root piece's.
 static func bp_level(bp: Dictionary) -> int:
+	if bp.has("fav"):
+		return maxi(level_of(bp.id, int(bp.tier)), Upgrades.level(bp.fav))
 	return level_of(bp.id, int(bp.tier))
 
 

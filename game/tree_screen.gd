@@ -222,10 +222,24 @@ func move(action: String) -> void:
 		select(best)
 
 
+## Stars or unstars the chosen node for the shop's Favourites tab.
+func favourite(k := "") -> void:
+	if k == "":
+		k = selected
+	if not lay.has(k):
+		return
+	var on: bool = game.toggle_favourite(k)
+	if cards.has(k):
+		cards[k].show_star()
+	_state.text = ("Kept in Favourites" if on else "Taken out of Favourites") if Catalog.can_favourite(k) else _why(k)
+
+
 ## Buys the chosen node: the held piece becomes it, and the tree is drawn from there.
 ## A refusal shakes the card.
 func buy() -> bool:
 	if state_of(selected) == "next" and game.buy_upgrade(selected):
+		if Upgrades.is_link(selected):
+			return true   # a stove stood on the counter: the card has shut
 		set_root(selected)
 		var card: Control = cards[root_key]
 		card.pivot_offset = CARD / 2.0
@@ -445,6 +459,24 @@ class Card extends Control:
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if screen.state_of(key) == "next" and not Upgrades.can_buy(screen.root_key, key, screen.game.ledger.money, screen.game.ledger.level()):
 			price.add_theme_color_override("font_color", NO)
+		if Catalog.can_favourite(key):   # the star: click it to keep this in the shop's Favourites
+			star = Hud.Icon.new("star", 30)
+			star.position = Vector2(CARD.x - 34, 4)
+			star.mouse_filter = Control.MOUSE_FILTER_STOP
+			star.tooltip_text = "Favourite: sold already upgraded on the shop's Favourites tab"
+			star.gui_input.connect(func(event: InputEvent) -> void:
+				if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+					star.accept_event()
+					screen.favourite(key))
+			add_child(star)
+			show_star()
+
+	var star: Control
+
+	## Bright when starred, a faint outline of itself when not.
+	func show_star() -> void:
+		if star:
+			star.modulate = Color(1, 1, 1, 1.0) if screen.game.is_favourite(key) else Color(0.2, 0.3, 0.5, 0.45)
 
 	## A tool on a counter is framed closer than the shop's default, so its top (the part
 	## a step changes: a crank, a second pan, grill bars) reads at card size.

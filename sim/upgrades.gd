@@ -63,7 +63,12 @@ static func parent(key: String) -> String:
 	if is_treatment(key):
 		var up := Treatments.parent(Treatments.key_of(key))
 		return Treatments.box_id(up) if up != "" else ""
-	return Kitchen.parent_of(key)
+	return str(Kitchen.TOP_LINKS.get(key, Kitchen.parent_of(key)))
+
+
+## A tool grown from a bare counter (Kitchen.TOP_LINKS): the counter stays under it.
+static func is_link(key: String) -> bool:
+	return Kitchen.TOP_LINKS.has(key)
 
 
 static func children(key: String) -> Array[String]:
@@ -77,7 +82,11 @@ static func children(key: String) -> Array[String]:
 		for k: String in Treatments.children(Treatments.key_of(key)):
 			kids.append(Treatments.box_id(k))
 		return kids
-	return Kitchen.children_of(key)
+	var out := Kitchen.children_of(key)
+	for k: String in Kitchen.TOP_LINKS:
+		if Kitchen.TOP_LINKS[k] == key:
+			out.append(k)
+	return out
 
 
 static func root(key: String) -> String:
@@ -111,6 +120,8 @@ static func price(key: String) -> int:
 
 ## What buying this node from its parent costs: the new price less the old.
 static func step_price(key: String) -> int:
+	if is_link(key):
+		return price(key)   # the counter stays: the tool is paid in full
 	var up := parent(key)
 	return price(key) - (price(up) if up != "" else 0)
 

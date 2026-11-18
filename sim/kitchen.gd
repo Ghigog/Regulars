@@ -138,6 +138,10 @@ const CATALOG_IDS := {}
 ## A base that becomes another when one more of it is placed on it: a counter placed
 ## on a counter is a double counter, still one cell (PRD 8, "Decided").
 const STACKS := {"counter": "double_counter"}
+## Tools not sold in the shop: each grows from a bare counter, a branch of the counter's
+## tree, and is a tree of its own after that. Buying one stands it on the counter, which
+## stays under it, so its step costs the tool's whole price.
+const TOP_LINKS := {"stove": "counter"}
 
 ## Cells against a wall, which have a high layer: Vector2i -> true.
 var wall_cells := {}
@@ -544,11 +548,24 @@ func store_refusal(cell: Vector2i, kind: String) -> String:
 		return "No food with chemicals"
 	if holds_kind(cell, Pantry.kind_of(kind)):
 		return "One of each a cell"
-	if is_frozen(kind):
+	if is_frozen(kind) and not _has_slots(cell, "frozen"):
 		return "Needs a freezer"
-	if is_chilled(kind):
+	if is_chilled(kind) and not _has_slots(cell, "chilled"):
 		return "Needs a fridge"
+	if is_frozen(kind):
+		return "The freezer is full. Take a box out first"
+	if is_chilled(kind):
+		return "The fridge is full. Take a box out first"
 	return "No free slot"
+
+
+## Whether a piece on the cell has slots of this sort at all, full or not.
+func _has_slots(cell: Vector2i, sort: String) -> bool:
+	for layer: String in ["base", "high"]:
+		var id := get_piece(cell, layer)
+		if slots_of(id) > 0 and (freezes(id) if sort == "frozen" else chills(id)):
+			return true
+	return false
 
 
 ## The layer a kind would be stored in, or "" if there is no free slot that takes it.

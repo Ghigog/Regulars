@@ -660,7 +660,7 @@ class ModelView extends TextureRect:
 			Build.box(n, Vector3(0, 0.25, -0.14), Vector3(0.44, 0.014, 0.34), Build.CORAL).rotation.y = -0.04
 			Build.box(n, Vector3(0, 0.25, 0.2), Vector3(0.44, 0.014, 0.1), Build.TILE_TEAL).rotation.y = -0.04
 		else:
-			Build.station(n, bp.id, int(bp.tier), str(bp.get("base", "")), false, str(bp.get("node", "")))
+			Build.station(n, bp.id, int(bp.tier), "counter" if bp.get("counter", false) else str(bp.get("base", "")), false, str(bp.get("node", "")))
 			var tool := CleanTools.comes_with(str(bp.get("node", bp.id)))
 			if CleanTools.is_mop(tool):   # a bucket up its tree shows the mop it keeps (PRD 9.5)
 				Build.bucket_mop(n, 1.0, tool)
@@ -2068,7 +2068,7 @@ func show_review() -> void:
 	_pop_in(clip)
 
 
-const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
+const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras", "Favourites"]
 ## The storage card's tabs (E lifts a storage piece at night and opens it): what goes
 ## in it first, then its upgrade tree.
 const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades"]
@@ -2749,9 +2749,10 @@ func _refresh_catalog() -> void:
 		if not info.can:
 			price.add_theme_color_override("font_color", Color(INK, 0.6) if info.locked else Color("#b8473a"))
 	if _shop_items.is_empty():
-		var none := _label(_cards, 20, "Nothing in the shop matches.")
+		var fav := _category == "Favourites" and _search.strip_edges() == ""
+		var none := _label(_cards, 20, "Star a piece on its upgrade tree to keep it here, upgrades and all." if fav else "Nothing in the shop matches.")
 		none.modulate.a = 0.7
-		none.position = Vector2(BAND.x / 2.0 - 120, 196)
+		none.position = Vector2(BAND.x / 2.0 - (300 if fav else 120), 196)
 	var at := _shop_items.find(keep)
 	_select(clampi(_shop_index, 0, maxi(_shop_items.size() - 1, 0)) if at < 0 else at, 0)
 	if at >= 0:
@@ -2858,12 +2859,12 @@ func show_tree(key: String) -> void:
 		return
 	build_bar.visible = false
 	var p: int = maxi(game.chefs.find(game.shopper), 0)
-	var keys := "%s buy      %s choose      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p),
+	var keys := "%s buy      %s choose      %s favourite      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("sell", p), _g("back", p),
 		"back to ingredients" if game.storing() else "close"]
 	if game.shopper != null and game.shopper.hand.get("node") is Station:   # the piece in hand turns
 		keys += "      %s turn" % _g("turn", p)
 	if _mode(p) == "touch":
-		keys = "Tap a step, then tap it again to buy"
+		keys = "Tap a step, then tap it again to buy. Tap its star to favourite it"
 	_tree = TreeScreen.new(game, self, key, keys)
 	root.add_child(_tree)
 	root.move_child(_tree, center.get_index())
@@ -2893,6 +2894,11 @@ func tree_selected() -> String:
 func tree_move(action: String) -> void:
 	if _tree:
 		_tree.move(action)
+
+
+func tree_favourite() -> void:
+	if _tree:
+		_tree.favourite()
 
 
 func tree_buy() -> void:
