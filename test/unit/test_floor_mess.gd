@@ -899,6 +899,38 @@ func test_e_at_a_dirty_cell_in_front_clears_a_level_and_held_e_repeats():
 	assert_eq(CleanKit.held_used(game.player), 2)
 
 
+func test_held_e_with_bare_hands_scrubs_slower_than_a_tool():
+	var game = _game()
+	var front := _stand(game, Vector2i(7, 2))
+	for i in 2:
+		game.floor_dirt.mess.add_dirt(front)
+	assert_null(game.station_at(game.player.target_cell()), "nothing stands in front")
+	assert_eq(game.clean_kit.floor_action(game.player), "Hold to scrub")
+	game.act(0, "use")
+	assert_eq(game.floor_dirt.mess.level(front), 2, "a tap by hand does nothing yet")
+	game.clean_kit.hold_use(game.player, true, CleanTools.HAND_TIME * 0.6)
+	assert_eq(game.floor_dirt.mess.level(front), 2)
+	assert_string_starts_with(game.clean_kit.floor_action(game.player), "Scrubbing")
+	game.clean_kit.hold_use(game.player, true, CleanTools.HAND_TIME * 0.5)
+	assert_eq(game.floor_dirt.mess.level(front), 1, "held long enough, a level comes off")
+	game.clean_kit.hold_use(game.player, false, 0.1)
+	game.clean_kit.hold_use(game.player, true, CleanTools.HAND_TIME * 2)
+	assert_eq(game.floor_dirt.mess.level(front), 1, "letting go stops the scrub: E starts it again")
+	for t: Dictionary in CleanTools.TOOLS.values():
+		assert_lt(float(t.time), CleanTools.HAND_TIME, "%s is faster than hands" % t.name)
+
+
+func test_dirty_cells_send_motes_up_more_when_dirtier():
+	var low := FloorDirt.cell_look(Vector2i(5, 5), 1, Vector2i.ZERO)
+	var high := FloorDirt.cell_look(Vector2i(5, 5), 4, Vector2i.ZERO)
+	var a: CPUParticles3D = low.get_node("motes")
+	var b: CPUParticles3D = high.get_node("motes")
+	assert_lt(a.amount, b.amount)
+	assert_gt(a.initial_velocity_min * a.lifetime, 1.2, "they rise over a counter")
+	low.free()
+	high.free()
+
+
 func test_a_dirty_mop_is_slow_until_rinsed_at_a_sink():
 	var game = _game()
 	var front := _stand(game, Vector2i(7, 2))

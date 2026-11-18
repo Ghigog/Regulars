@@ -423,7 +423,10 @@ Survive as many days as you can; three walkouts in one day ends the run.
     who loves it.
   - *Cleaning tools (9.4).* A mop bucket comes with a mop (a level a press, dirty after
     4); a sponge comes on its own wall hook (fast, dirty after 2). Hold E on a dirty cell
-    with the tool in hand. A dirty tool spreads dirt to a cell beside instead of clearing
+    with the tool in hand; with bare hands, hold E to scrub (a level every 1.8 s, slower
+    than any tool; owner's review). Every dirty cell sends dusty motes up to about 1.8 m,
+    more the dirtier it is, so dirt behind a counter or under a table shows from above.
+    A dirty tool spreads dirt to a cell beside instead of clearing
     it; rinse it at its bucket or a sink. Tools left lying about, and the robot sweeper,
     count as level 2 underfoot. Dirt under furniture can't be reached until the piece is
     moved at night. The robot sweeper (a dock) drifts to the nearest dirt at 0.7 m/s and
@@ -476,8 +479,9 @@ Survive as many days as you can; three walkouts in one day ends the run.
     chance 0.6 x fit x how much they like the place, at most four new CVs a night. Fit
     is their skill over the post's kinds, less a penalty per duty in a kind they are
     weak at (1 or 2 stars). Applicants wait in a line outside the door; their CVs (face,
-    three skills, overall rating, ask, post) go on a pile on the desk. Swipe right (or
-    Hire) at the ask, left to dismiss; an unread CV waits. Haggle offers less: the
+    three skills, overall rating, ask, post) go on the desk as a list to scroll, every
+    CV at once (owner's review). Swipe any one right (or Hire the chosen one) at the ask,
+    left to dismiss; an unread CV waits. Haggle offers less: the
     chance they accept falls 0.3 for every 10% under the ask, less with low
     satisfaction; after two refused counters they take the last offer (satisfaction 0.5
     or more) or walk.

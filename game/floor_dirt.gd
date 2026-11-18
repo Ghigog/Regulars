@@ -33,7 +33,8 @@ static var _meshes := {}   # outline -> its flat mesh
 static var _mote_mesh: Mesh
 ## Motes rising off dirt, so a dirty cell behind a counter or under a table still shows
 ## from the camera above (review): more and higher the dirtier the cell. (tunable)
-const MOTES: Array[int] = [0, 3, 4, 6, 8]   # by level
+const MOTES: Array[int] = [0, 4, 6, 8, 11]   # by level
+const MOTE := "#8c7448"    # a dusty grime, paler than the puddles so it reads over wood and tile
 const MOTE_RISE := 0.75    # metres a second
 const MOTE_LIFE := 2.4     # seconds: tops out near 1.8 m, over counters and tables
 
@@ -528,8 +529,8 @@ static func motes(lvl: int, seed_value := 0) -> CPUParticles3D:
 	p.name = "motes"
 	if _mote_mesh == null:
 		var m := SphereMesh.new()
-		m.radius = 0.035
-		m.height = 0.07
+		m.radius = 0.06
+		m.height = 0.12
 		m.radial_segments = 6
 		m.rings = 3
 		var mat := StandardMaterial3D.new()
@@ -555,7 +556,7 @@ static func motes(lvl: int, seed_value := 0) -> CPUParticles3D:
 	p.scale_amount_min = 0.7
 	p.scale_amount_max = 1.3 + 0.15 * lvl
 	var ramp := Gradient.new()
-	var c := Color(GRIME).lightened(0.1)
+	var c := Color(MOTE)
 	ramp.set_color(0, Color(c, 0.0))
 	ramp.set_color(1, Color(c, 0.0))
 	ramp.add_point(0.15, Color(c, 0.9))
