@@ -21,9 +21,6 @@ const HELP_UP_GUEST := 6.0       # a guest within one cell who is not seated
 const GET_UP_ALONE_GUEST := 20.0
 const GET_UP_ALONE_CHEF := 4.0
 const WITNESS_RADIUS := 1
-## After a slip, the walkout chance runs from this (opinion 0) to this (opinion 1). (tunable)
-const SLIP_WALKOUT_HATED := 0.9
-const SLIP_WALKOUT_LOVED := 0.1
 ## What a slip does to mood (9.3). The fallen guest loses about a walkout's worth; each
 ## witness within WITNESS_RADIUS a little; left on the floor until GET_UP_ALONE_GUEST, a
 ## guest gets up angrier still. (tunable)
@@ -235,23 +232,6 @@ static func slip_chance(lvl: int, chef: bool = false) -> float:
 func rolls_slip(cell: Vector2i, chef: bool = false) -> bool:
 	var p := slip_chance(level(cell), chef)
 	return p > 0.0 and rng.randf() < p
-
-
-## The chance a guest walks out on getting up, from their opinion of the place (town
-## affinity and current mood, 0 to 1): low for one who loves it, very high otherwise.
-static func slip_walkout_chance(opinion: float) -> float:
-	return lerpf(SLIP_WALKOUT_HATED, SLIP_WALKOUT_LOVED, clampf(opinion, 0.0, 1.0))
-
-
-## A guest's opinion of the place, 0 to 1, for the walkout roll after a slip: their town
-## affinity (-1 to 1) and how the visit feels now (GuestMood.satisfaction, -1 to 1), equally.
-static func slip_opinion(affinity: float, satisfaction: float) -> float:
-	return clampf(0.25 * (clampf(affinity, -1.0, 1.0) + 1.0) + 0.25 * (clampf(satisfaction, -1.0, 1.0) + 1.0), 0.0, 1.0)
-
-
-## Rolls whether a guest who slipped walks out on getting up.
-func rolls_slip_walkout(opinion: float) -> bool:
-	return rng.randf() < slip_walkout_chance(opinion)
 
 
 ## How long someone stays down: until helped (a chef 1 s, a guest 6 s, from when help

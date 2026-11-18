@@ -238,3 +238,11 @@ func test_the_first_days_are_a_little_longer_and_then_steady():
 	assert_eq(Town.day_length(3), Town.DAY_LENGTH)
 	assert_eq(Town.day_length(30), Town.DAY_LENGTH, "it never grows again")
 	assert_gt(Town.day_length(1), 55.0, "longer than the old first day")
+
+
+# ---------- Item 8: cleaning ----------
+
+func test_the_night_cleaner_is_priced_by_the_mess():
+	assert_eq(Cleaning.cleaner_price(0, 0), 0, "nothing to clean, nothing to pay")
+	assert_gt(Cleaning.cleaner_price(3, 0), Cleaning.cleaner_price(1, 0))
+	assert_gt(Cleaning.cleaner_price(1, 12), Cleaning.cleaner_price(1, 0))

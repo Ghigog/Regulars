@@ -997,6 +997,9 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 			ball(n, Vector3(0, 0.38, 0), 0.06, BAG)
 			for a: float in [-0.6, 0.6]:
 				ball(n, Vector3(sin(a) * 0.07, 0.45, 0), 0.04, BAG).scale = Vector3(0.7, 1.4, 0.7)
+	if kind.begins_with("tool:") and quality <= 0.001:   # worn out: a red wear pip, it works slower
+		ball(n, Vector3(0, 0.72, 0.12), 0.075, "#e0463a", 0.0, 0.5)
+		ball(n, Vector3(0, 0.72, 0.12), 0.045, "#ffffff", 0.0, 0.5).position.z = 0.17
 	return n
 
 

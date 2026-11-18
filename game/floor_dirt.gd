@@ -288,8 +288,8 @@ func tick_slips(delta: float) -> void:
 			get_up(who, true)
 
 
-## `who` gets up, helped or `alone`. A guest left alone is angrier; then, unless already
-## on the way out, they may walk out, the chance set by how they felt about the place.
+## `who` gets up, helped or `alone`. A guest left alone is angrier. A slip costs mood,
+## never a strike (review, item 8): they stay, sore, and the visit counts it.
 func get_up(who: Node3D, alone: bool) -> void:
 	if not down.has(who):
 		return
@@ -303,15 +303,6 @@ func get_up(who: Node3D, alone: bool) -> void:
 		g.mood.delight(-FloorMess.ALONE_JOY, FloorMess.ALONE_THOUGHT)
 	else:
 		g.mood.think(FloorMess.HELPED_THOUGHT)
-	if g.state in ["leaving", "browse"]:
-		return
-	if mess.rolls_slip_walkout(opinion(g)):
-		game.walk_out(g)
-
-
-## A guest's opinion of the place right now, 0 to 1 (FloorMess.slip_opinion).
-func opinion(g: Guest) -> float:
-	return FloorMess.slip_opinion(float(game.town.people[g.idx].affinity), g.mood.satisfaction())
 
 
 func _drop(who) -> void:

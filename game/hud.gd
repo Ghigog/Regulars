@@ -648,6 +648,9 @@ class ModelView extends TextureRect:
 				n.add_child(FloorDirt.sheen_look(c, Treatments.key_of(bp.id)))
 		elif Catalog.is_build_tool(bp.id):
 			Scenery.tool_preview(n, bp.id)
+		elif bp.id == "night_cleaner":   # a mop in its bucket: the cleaner's kit
+			Build.station(n, "mop_bucket", 1, "", false, "mop_bucket")
+			Build.bucket_mop(n, 1.0, "mop")
 		elif bp.id == "rug":
 			Scenery.rug(n)
 			n.scale = Vector3.ONE * 0.55
@@ -2365,7 +2368,7 @@ func _build_tip(p := 0) -> String:
 	if Treatments.is_laying_tool(hand.id):   # a floor treatment (PRD 9.5): laid free, paid each night
 		var k := Treatments.key_of(hand.id)
 		var off: bool = game.treat_off.has(k)
-		var what := "%s, $%d a cell a night%s." % [Treatments.name_of(k), Treatments.price_of(k), " (switched off)" if off else ""]
+		var what := "%s, %s%s." % [Treatments.name_of(k), Treatments.PRICE_WORDS, " (switched off)" if off else ""]
 		var flip := "%s switch %s" % ["Turn" if m == "touch" else _g("turn", p), "on" if off else "off"]
 		match m:
 			"touch":
@@ -2679,6 +2682,11 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		return {"name": "Flyers", "price": "Out" if game.flyers_out else "$%d" % Town.FLYER_PRICE,
 			"blurb": "More guests tomorrow",
 			"can": not game.flyers_out and l.money >= Town.FLYER_PRICE, "locked": false}
+	if bp.id == "night_cleaner":
+		var p: int = game.cleaner_price()
+		return {"name": "Night cleaner", "price": "Clean" if p <= 0 else "$%d" % p,
+			"blurb": "Clears every table, washes up, takes the bags out and mops the floor" if p > 0 else "Nothing to clean tonight",
+			"can": p > 0 and l.money >= p, "locked": false}
 	if game.storing():
 		return _storage_info(bp)
 	var id: String = bp.id
@@ -2689,7 +2697,7 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 	if Treatments.is_box(id):   # free; laying it costs a price a cell each night (PRD 9.5)
 		price = "Free"
 	elif Treatments.is_laying_tool(id):
-		price = "$%d a cell a night" % Treatments.price_of(Treatments.key_of(id))
+		price = Treatments.PRICE_WORDS
 	elif Catalog.is_box(id):   # a box is free to take; its kind costs a fee each night (PRD 8.4)
 		var b := Pantry.station_ingredient(id)
 		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)

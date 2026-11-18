@@ -85,8 +85,10 @@ static func never_dirty(tool: String) -> bool:
 	return TOOLS.has(tool) and dirty_after(tool) <= 0
 
 
-static func press_time(tool: String) -> float:
-	return float(TOOLS[tool].time)
+## Seconds between presses. A dirty tool still cleans, only slower (review, item 8).
+const DIRTY_SLOW := 2.0   # tunable: a dirty tool takes this many times as long a press
+static func press_time(tool: String, used := 0) -> float:
+	return float(TOOLS[tool].time) * (DIRTY_SLOW if is_dirty(tool, used) else 1.0)
 
 
 static func is_dirty(tool: String, used: int) -> bool:
@@ -156,13 +158,12 @@ static func refusal(mess: FloorMess, cell: Vector2i, tool: String, used: int) ->
 	return ""
 
 
-## One press of a tool on a cell. A clean tool clears its levels (the whole cell on a
-## floor cleaner, PRD 9.5) and is a press dirtier; a dirty one spreads instead: the cell
-## keeps its dirt and a level lands on a free floor cell beside it. A spill kit takes a
-## covered cell down two levels and spends a use. Covered (under furniture) or clean
-## cells, or a tool that refuses the cell: nothing. Returns {"did": "clean" | "spread" |
-## "refused" | "", "used": the tool's new count, "to": the cell the spread landed on, or
-## null, "why": the refusal}.
+## One press of a tool on a cell. It clears its levels (the whole cell on a floor
+## cleaner, PRD 9.5) and is a press dirtier; a dirty tool cleans as well, only slower
+## (press_time), shown by its wear pip. A spill kit takes a covered cell down two levels
+## and spends a use. Covered (under furniture) or clean cells, or a tool that refuses the
+## cell: nothing. Returns {"did": "clean" | "refused" | "", "used": the tool's new count,
+## "to": null, "why": the refusal}.
 static func press(mess: FloorMess, cell: Vector2i, tool: String, used: int) -> Dictionary:
 	var out := {"did": "", "used": used, "to": null, "why": ""}
 	if not TOOLS.has(tool) or mess.level(cell) <= 0 or not mess.can_clean(cell):
@@ -170,16 +171,6 @@ static func press(mess: FloorMess, cell: Vector2i, tool: String, used: int) -> D
 	out.why = refusal(mess, cell, tool, used)
 	if out.why != "":
 		out.did = "refused"
-		return out
-	if is_dirty(tool, used):
-		var around := []
-		for d in FloorMess.NEIGHBOURS:
-			var c: Vector2i = cell + d
-			if mess.is_floor(c) and not mess.is_covered(c):
-				around.append(c)
-		if not around.is_empty():
-			out.to = mess.add_dirt(around[mess.rng.randi() % around.size()], false, mess.is_grease(cell))
-		out.did = "spread"
 		return out
 	var levels := int(TOOLS[tool].levels)
 	if mess.one_press(cell) and uses_of(tool) == 0:

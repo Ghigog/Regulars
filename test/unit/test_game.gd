@@ -1996,7 +1996,7 @@ func test_night_cleaning_takes_the_bag_out():
 	bin.count = Station.BIN_HOLDS
 	_face(Vector2i(1, 5), Vector2i(-1, 0))
 	assert_eq(game.build_action(), "Take the bag out")
-	assert_eq(game.dirty_note(), "Still dirty: the bin.")
+	assert_true(game.dirty_note().begins_with("Still dirty: the bin."))
 	game.build_interact()
 	assert_eq(game.player.held, "rubbish_bag")
 	assert_eq(bin.count, 0)
@@ -2716,10 +2716,10 @@ func test_a_second_sink_and_bin_each_have_their_own_mess():
 	var bin2: Station = game.add_station("bin", Vector2i(1, 5))
 	game.find_station("sink").dirty = 1
 	sink2.dirty = 1
-	assert_eq(game.dirty_note(), "Still dirty: 2 sinks.")
+	assert_true(game.dirty_note().begins_with("Still dirty: 2 sinks."))
 	sink2.dirty = 0
 	bin2.count = 2
-	assert_eq(game.dirty_note(), "Still dirty: the sink, the bin.")
+	assert_true(game.dirty_note().begins_with("Still dirty: the sink, the bin."))
 	game._collect_gross()
 	var keys := {}
 	for g: Dictionary in game._gross:
@@ -3242,3 +3242,28 @@ func test_a_party_left_too_long_leaves_without_paying_and_no_strike():
 	assert_eq(int(game.ledger.today.unpaid_bills), 1)
 	assert_eq(int(game.ledger.today.sales), 0)
 	assert_eq(game.ledger.strikes(), 0, "not a walkout")
+
+
+func test_the_night_cleaner_clears_everything_in_one_press():
+	_to_build()
+	var table: Station = game.stations[Vector2i(8, 3)]
+	table.dirty = 2
+	table.dirty_cups = 1
+	game.find_station("bin").count = 3
+	game.floor_dirt.mess.add_dirt(Vector2i(7, 4))
+	game.ledger.money = 100
+	var price: int = game.cleaner_price()
+	assert_gt(price, 0)
+	assert_true(game.dirty_note().contains("night cleaner"), "the dirty note offers it")
+	game.open_shop()
+	var plates: int = game.find_station("plates").count
+	assert_true(game.buy(game.CLEANER))
+	assert_eq(game.ledger.money, 100 - price)
+	assert_eq(table.dirty, 0)
+	assert_eq(game.find_station("bin").count, 0)
+	assert_eq(game.floor_dirt.mess.total(), 0)
+	assert_eq(game.find_station("plates").count, plates + 1, "the plates go back on their stack")
+	assert_eq(game.dirty_note(), "")
+	assert_eq(game.cleaner_price(), 0)
+	assert_false(game.buy(game.CLEANER), "nothing left to clean")
+	game.close_shop()

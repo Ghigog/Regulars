@@ -48,6 +48,7 @@ const DOORWAY := Vector3(W, 0, DOOR.y + 0.5)   # the middle of the doorway, on t
 const DOOR_REACH := 1.25
 const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
 const FLYERS := {"id": "flyers", "tier": 1}   # sold in the shop's Extras, never placed
+const CLEANER := {"id": "night_cleaner", "tier": 1}   # the night's clean-up, paid for in Extras (review, item 8)
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
 ## Taking orders (DESIGN.md section 9). A seated guest waits to order, then for food.
 const ORDER_PATIENCE_SCALE := 0.8   # waiting to order drains patience 1.25x as fast as waiting for food
@@ -2471,6 +2472,11 @@ func shop_items(query := "", category := "") -> Array[Dictionary]:
 			hit = hit and "flyers extras more guests tomorrow".contains(w)
 		if hit:
 			found.append(FLYERS)
+		var hit_c := true
+		for w in query.strip_edges().to_lower().split(" ", false):
+			hit_c = hit_c and "cleaner extras clean up tidy mop wash".contains(w)
+		if hit_c:
+			found.append(CLEANER)
 	return found
 
 
@@ -3040,6 +3046,9 @@ func buy(bp: Dictionary) -> bool:
 		return card_act(bp.act, bp) if bp.has("act") else _storage_buy(bp)
 	if bp.id == FLYERS.id:
 		if buy_flyers():
+			return true
+	elif bp.id == CLEANER.id:
+		if hire_cleaner():
 			return true
 	elif bp.get("locked", false):
 		hud.say("The %s needs level %d." % [Catalog.label(bp), Catalog.bp_level(bp)])
@@ -3725,8 +3734,7 @@ func drag_summary(ch: Player = null) -> String:
 		return "Remove"
 	var n := spots.size() if floor_kind(ch.hand.id) != "" else spots.filter(func(sp: Vector3i) -> bool: return can_place(sp, ch)).size()
 	if Treatments.is_laying_tool(ch.hand.id):
-		var each := Treatments.price_of(Treatments.key_of(ch.hand.id))
-		return "Lay %d cell%s  $%d a night" % [n, "" if n == 1 else "s", n * each]
+		return "Lay %d tile%s  $%d a night" % [n, "" if n == 1 else "s", Treatments.cost_of_tiles(n)]
 	var price := int(ch.hand.price)
 	var noun: String = "tile" if floor_kind(ch.hand.id) != "" else ("wall" if ch.hand.id == "wall" or Catalog.is_finish(ch.hand.id) else ch.hand.id)
 	var verb := "Lay" if floor_kind(ch.hand.id) != "" else ("Paint" if ch.hand.id == "paint" else ("Paper" if Catalog.is_finish(ch.hand.id) else "Build"))
@@ -3842,7 +3850,10 @@ func dirty_note() -> String:
 			tables += 1 if Station.is_table(st.type) else 0
 			sinks += 1 if st.type == "sink" else 0
 			bins += 1 if st.type == "bin" else 0
-	return Cleaning.dirty_note(tables, sinks, bins)
+	var note := Cleaning.dirty_note(tables, sinks, bins)
+	if note != "":   # or one press: the night cleaner (review, item 8)
+		note += " Or hire the night cleaner in the shop's Extras ($%d)." % cleaner_price()
+	return note
 
 
 func build_interact(ch: Player = null) -> void:
@@ -4009,6 +4020,40 @@ func _update_tool_ghost(ch: Player = null) -> void:
 
 
 ## Flyers: bought from the shop's Extras at night for a bigger crowd tomorrow. One batch a night.
+## What the night cleaner charges tonight: 0 when there is nothing to clean.
+func cleaner_price() -> int:
+	var pieces := 0
+	for st: Station in stations.values():
+		if needs_cleaning(st):
+			pieces += 1
+	return Cleaning.cleaner_price(pieces, floor_dirt.mess.total())
+
+
+## The night cleaner: every table cleared and washed up, every bag out, the floor mopped,
+## in one press (review, item 8). The plates and cups go back on their stacks.
+func hire_cleaner() -> bool:
+	var price := cleaner_price()
+	if phase != Phase.BUILD or price <= 0 or not ledger.spend(price):
+		if price <= 0:
+			hud.say("Nothing to clean tonight.")
+		return false
+	for st: Station in stations.values():
+		if Station.is_table(st.type) or st.type == "sink":
+			while st.dirty > 0:
+				wash_one(st)
+		elif st.type == "bin" and st.count > 0:
+			st.count = 0
+			st.refresh()
+	var m: FloorMess = floor_dirt.mess
+	for c: Vector2i in m.dirt.keys():
+		m.clean(c, FloorMess.MAX_LEVEL)
+	floor_dirt.redraw()
+	sfx("wash")
+	hud.say("The cleaner came: everything is clean for tomorrow.")
+	hud.show_build()
+	return true
+
+
 func buy_flyers() -> bool:
 	if phase != Phase.BUILD or flyers_out or not ledger.spend(Town.FLYER_PRICE):
 		return false
