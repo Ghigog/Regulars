@@ -2837,8 +2837,9 @@ func test_a_storage_card_shows_boxes_first_and_dims_what_needs_a_fridge():
 	var items: Array[Dictionary] = game.shop_items("", "Ingredients").slice(acts)
 	var patty := items.filter(func(bp: Dictionary) -> bool: return bp.id == "box_patty")
 	assert_eq(patty.size(), 1, "a fridge-only kind is still listed, so the player learns of fridges")
-	assert_eq(game.hud._storage_info(patty[0]).price, "Needs a fridge")
-	assert_false(game.hud._storage_info(patty[0]).can)
+	assert_eq(game.hud._storage_info(patty[0]).price, "Fridge $%d" % Upgrades.step_price("fridge"),
+		"a fridge-only kind offers to make the counter a fridge in one press")
+	assert_string_contains(game.hud._storage_info(patty[0]).blurb, "Needs a fridge")
 	assert_true(game.kitchen.store_refusal(c, items[0].id) == "", "what fits comes first")
 	assert_true(game.buy({"id": "box_bun", "tier": 1}))
 	assert_true(game.kitchen.stock(c).has("box_bun"), "put straight in, the card still open")
@@ -3267,3 +3268,55 @@ func test_the_night_cleaner_clears_everything_in_one_press():
 	assert_eq(game.cleaner_price(), 0)
 	assert_false(game.buy(game.CLEANER), "nothing left to clean")
 	game.close_shop()
+
+
+func test_one_press_makes_a_counter_the_fridge_a_box_needs():
+	_to_build()
+	game.ledger.money = 200
+	var c := _plain_counter()
+	assert_true(game.open_storage(c))
+	var price: int = game.fridge_offer("box_patty")
+	assert_eq(price, Upgrades.step_price("fridge"))
+	assert_true(game.buy({"id": "box_patty", "tier": 1}))
+	assert_eq(game.stations[c].base, "fridge", "the counter is a fridge now")
+	assert_true(game.kitchen.stock(c).has("box_patty"), "with the box in")
+	assert_eq(game.ledger.money, 200 - price)
+	assert_true(game.storing(), "the card stays open")
+	game.close_shop()
+	assert_true(game.open_storage(_plain_counter()))
+	assert_string_contains(game.hud._storage_info({"id": "box_bun", "tier": 1}).blurb, "Unlimited tonight", "a box says it never runs out")
+	game.close_shop()
+
+
+func test_the_door_refusing_for_money_offers_remedies():
+	_to_build()
+	game.ledger.money = 0
+	var why: String = game.open_block()
+	assert_string_contains(why, "Tomorrow's stock costs")
+	assert_string_contains(why, "dearest box")
+	assert_string_contains(why, "sell something")
+
+
+func test_one_wash_clears_the_whole_sink_onto_each_stack():
+	_to_build()
+	var sink: Station = game.find_station("sink")
+	sink.dirty = 3
+	sink.dirty_cups = 1
+	var plates: int = game.find_station("plates").count
+	game.wash_one(sink)   # the old one-at-a-time, for the count below
+	sink.dirty = 3
+	sink.dirty_cups = 1
+	plates = game.find_station("plates").count
+	game.player.position = sink.position + Vector3(0, 0, 1)
+	game.player.look(Vector2i(0, -1))
+	game.use_station(sink, false)
+	assert_eq(sink.dirty, 0, "one press washes it all")
+	assert_eq(game.find_station("plates").count, plates + 2)
+
+
+func test_the_receipt_names_a_side_nobody_ordered():
+	game.menu.add("side", [game.fixed_main().bread], "Plain Roll")
+	game.ledger.today.served = 1
+	var nudges: Array[String] = game.unordered_nudges()
+	assert_eq(nudges.size(), 1)
+	assert_string_contains(nudges[0], "Plain Roll: no orders.")

@@ -1986,6 +1986,11 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 		if unpaid > 0:
 			var ul := _label(box, 15, "%s not paid: no debt, but they mind." % ("1 wage" if unpaid == 1 else "%d wages" % unpaid))
 			ul.add_theme_color_override("font_color", CORAL.darkened(0.25))
+	for line: String in rec.get("unordered", []):   # review, item 11: a side or drink nobody ordered
+		var ul := _label(box, 15, line)
+		ul.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ul.custom_minimum_size = Vector2(360, 0)
+		ul.modulate.a = 0.75
 	var nothing := int(rec.get("found_nothing", 0))
 	if nothing > 0:
 		var nl := _label(box, 15, "%d %s nothing they liked." % [nothing, "person found" if nothing == 1 else "people found"])
@@ -2751,7 +2756,12 @@ func _storage_info(bp: Dictionary) -> Dictionary:
 		return {"name": Catalog.label(bp), "blurb": "Stored here. Take it out", "locked": false,
 			"price": "Take out", "can": true}
 	var why: String = game.kitchen.store_refusal(game.storing_cell, bp.id)
-	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp) if why == "" else why,
+	var fridge: int = game.fridge_offer(bp.id)
+	if fridge > 0:   # review, item 11: one press makes this counter the fridge it needs
+		return {"name": Catalog.label(bp), "blurb": "%s: E makes this counter one ($%d), with the box in" % [why, fridge],
+			"locked": false, "price": "Fridge $%d" % fridge, "can": game.ledger.money >= fridge}
+	var plenty := "Unlimited tonight, %s" % fee.trim_suffix(" a night") if fee != "Free" else Catalog.bp_blurb(bp)
+	return {"name": Catalog.label(bp), "blurb": plenty if why == "" else why + (": upgrade the counter (Upgrades)" if why.begins_with("Needs a") else ""),
 		"locked": why != "", "price": fee if why == "" else why, "can": why == ""}
 
 

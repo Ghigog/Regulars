@@ -30,7 +30,7 @@ var history: Array[Dictionary] = []
 
 
 static func _blank() -> Dictionary:
-	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0, "unpaid_bills": 0, "perfect": 0, "best_streak": 0, "rep_change": 0.0}
+	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0, "unpaid_bills": 0, "perfect": 0, "best_streak": 0, "rep_change": 0.0, "ordered": {}}
 
 
 func level() -> int:
@@ -70,6 +70,12 @@ func record_perfect(streak: int) -> void:
 	today.best_streak = maxi(int(today.best_streak), streak)
 	if streak >= 3:
 		move_reputation(REP_PERFECT)
+
+
+## A menu item was ordered (for the receipt's nudge on what nobody ordered).
+func record_order(item_id: int) -> void:
+	var o: Dictionary = today.ordered
+	o[item_id] = int(o.get(item_id, 0)) + 1
 
 
 ## Moves the reputation meter by `amount`, kept between 0 and REP_MAX.

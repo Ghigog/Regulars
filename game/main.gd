@@ -3017,9 +3017,34 @@ func _storage_rank(bp: Dictionary) -> int:
 	return 1 if kitchen.store_refusal(storing_cell, bp.id) == "" else 2
 
 
-## Takes a box out of the open card's cell, or puts one in. The card stays open.
+## What making the open card's counter a fridge would cost, when that is all that keeps
+## box `id` out of it (review, item 11); 0 when it is not on offer.
+func fridge_offer(id: String) -> int:
+	var st := card_station()
+	if st == null or card_layer != "base" or st.type != "counter" or st.item != "":
+		return 0
+	var why := kitchen.store_refusal(storing_cell, id)
+	if why != "Needs a fridge":
+		return 0
+	var key := storage_tree()
+	if key == "" or not Upgrades.can_buy(key, "fridge", 999999, ledger.level()):
+		return 0
+	return Upgrades.step_price("fridge")
+
+
+## Takes a box out of the open card's cell, or puts one in. The card stays open. A box
+## that needs a fridge, on a counter that can become one, makes it one first.
 func _storage_buy(bp: Dictionary) -> bool:
 	var ok := false
+	if not bp.get("stored", false) and fridge_offer(bp.id) > 0:
+		var ch := shopper
+		var st := card_station()
+		ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
+			"node": st, "in_place": true, "layer": "base", "from": Vector3i(st.cell.x, st.cell.y, 0), "from_facing": st.facing}
+		var made := buy_upgrade("fridge", ch)
+		ch.hand = {}
+		if not made:
+			return false
 	if bp.get("stored", false):
 		ok = kitchen.unstore(storing_cell, bp.id)
 	else:
@@ -4181,7 +4206,10 @@ func _end_day() -> void:
 	phase = Phase.SUMMARY
 	play_music("night")
 	inspect(null)
+	var unordered := unordered_nudges()
 	last_day = ledger.end_day()
+	if not unordered.is_empty():
+		last_day["unordered"] = unordered
 	if not _critic_rated.is_empty():   # the paper prints the review with tonight's receipt
 		last_day["review"] = critic.publish(_critic_rated.ratings, _critic_rated.walked, town, int(last_day.day))
 		_critic_rated = {}
@@ -4997,8 +5025,42 @@ func open_block() -> String:
 			return NIGHT_ZERO_BLOCK
 		return "No main on the menu can be made. Check the menu (%s)." % controls.glyph("menu")
 	if night_cost() > ledger.money:
-		return "Tomorrow's stock costs $%d. You have $%d." % [night_cost(), ledger.money]
+		return "Tomorrow's stock costs $%d. You have $%d. %s" % [night_cost(), ledger.money, money_remedy()]
 	return ""
+
+
+## The receipt's nudges (review, item 11): each side or drink on tonight's menu that
+## nobody ordered, and why that may be: a side or drink is ordered only by someone who
+## likes something in it, so it names what is in it that nobody who came likes.
+func unordered_nudges() -> Array[String]:
+	var out: Array[String] = []
+	if int(ledger.today.served) == 0:
+		return out
+	var ordered: Dictionary = ledger.today.get("ordered", {})
+	for it: Dictionary in tonight_menu():
+		if it.course == "main" or int(ordered.get(int(it.id), 0)) > 0:
+			continue
+		var tag := ""
+		for ing: String in it.ingredients:
+			for t: String in Pantry.tags_of(ing):
+				if t != "drink" and tag == "":
+					tag = t
+		var why := "Nobody who came likes %s." % Menu.tag_word(tag) if tag != "" \
+			else "A %s is ordered only by someone who likes something in it." % it.course
+		out.append("%s: no orders. %s" % [it.name, why])
+	return out
+
+
+## What to do when tomorrow's stock costs more than there is (review, item 11): the
+## dearest line to take out, and selling something.
+func money_remedy() -> String:
+	var lines := stock_lines()
+	var dear := ""
+	if not lines.is_empty() and int(lines[0].fee) > 0:
+		dear = "Take out the dearest box, %s ($%d a night), or a" % [str(lines[0].name).to_lower(), int(lines[0].fee)]
+	else:
+		dear = "Take a"
+	return "%s dish off the menu (%s), or sell something: E on a piece, then Sell." % [dear, controls.glyph("menu")]
 
 
 ## Night zero's three hints, one at a time as the player goes; "" once they are done
@@ -5306,6 +5368,7 @@ func take_orders(table: Station) -> void:
 			if not (o.get(c, {}) as Dictionary).is_empty():
 				items.append(o[c])
 				town.record_order(g.idx, int(o[c].id))
+				ledger.record_order(int(o[c].id))
 		o["ticket"] = -1
 		if not items.is_empty():
 			o.ticket = _next_ticket
@@ -6273,7 +6336,8 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			if not dry_run:
 				st.refresh()
 		"sink":
-			# Plates and cups soak until they are washed, one at a time, back onto their stacks.
+			# Plates and cups soak until they are washed: one press washes the whole sink, each
+			# back onto its own stack (review, item 11: three stacks, less upkeep).
 			if held == "dirty_dishes":
 				act = "Put in sink"
 				if not dry_run:
@@ -6284,7 +6348,8 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			elif held == "" and st.dirty > 0:
 				act = "Wash"
 				if not dry_run:
-					wash_one(st)
+					while st.dirty > 0:
+						wash_one(st)
 		"bin":
 			# Every scrap fills it; full, it overflows until the bag goes out the front.
 			var scraps := ch.dishes.filter(func(d: Dish) -> bool: return not d.is_empty()) if held == "dishes" else []
