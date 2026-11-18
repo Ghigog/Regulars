@@ -2075,7 +2075,7 @@ func show_review() -> void:
 	_pop_in(clip)
 
 
-const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras", "Favourites"]
+const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
 ## The storage card's tabs (E lifts a storage piece at night and opens it): what goes
 ## in it first, then its upgrade tree.
 const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades"]
@@ -2690,7 +2690,8 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		return _storage_info(bp)
 	var id: String = bp.id
 	var tier: int = bp.tier
-	var locked: bool = game.buy_level(id) < Catalog.level_of(id, tier)
+	var need := Catalog.bp_level(bp)
+	var locked: bool = bp.get("locked", false) or game.buy_level(id) < need
 	var price := "$%d" % Catalog.bp_price(bp)
 	if Treatments.is_box(id):   # free; laying it costs a price a cell each night (PRD 9.5)
 		price = "Free"
@@ -2700,8 +2701,8 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		var b := Pantry.station_ingredient(id)
 		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
 	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp), "locked": locked,
-		"price": "Level %d" % Catalog.level_of(id, tier) if locked else price,
-		"can": game.catalog.can_buy(id, l.money, game.buy_level(id), tier) and l.money >= Catalog.bp_price(bp)}
+		"price": "Level %d" % need if locked else price,
+		"can": not locked and game.catalog.can_buy(id, l.money, game.buy_level(id), tier) and l.money >= Catalog.bp_price(bp)}
 
 
 ## A box on the storage card: one stored here is taken out; one that may go in shows
@@ -2745,7 +2746,7 @@ func _refresh_catalog() -> void:
 		_cards.add_child(item)
 		_items.append(item)
 		var view := ModelView.new(int(ITEM.x), true)
-		view.modulate = Color(1, 1, 1, 0.45) if info.locked else Color.WHITE
+		view.modulate = Color(0.22, 0.17, 0.14, 0.5) if info.locked else Color.WHITE   # a silhouette (review, item 10)
 		item.add_child(view)
 		view.show_piece(game, bp)
 		_views.append(view)
@@ -2756,10 +2757,9 @@ func _refresh_catalog() -> void:
 		if not info.can:
 			price.add_theme_color_override("font_color", Color(INK, 0.6) if info.locked else Color("#b8473a"))
 	if _shop_items.is_empty():
-		var fav := _category == "Favourites" and _search.strip_edges() == ""
-		var none := _label(_cards, 20, "Star a piece on its upgrade tree to keep it here, upgrades and all." if fav else "Nothing in the shop matches.")
+		var none := _label(_cards, 20, "Nothing in the shop matches.")
 		none.modulate.a = 0.7
-		none.position = Vector2(BAND.x / 2.0 - (300 if fav else 120), 196)
+		none.position = Vector2(BAND.x / 2.0 - 120, 196)
 	var at := _shop_items.find(keep)
 	_select(clampi(_shop_index, 0, maxi(_shop_items.size() - 1, 0)) if at < 0 else at, 0)
 	if at >= 0:
@@ -2866,12 +2866,12 @@ func show_tree(key: String) -> void:
 		return
 	build_bar.visible = false
 	var p: int = maxi(game.chefs.find(game.shopper), 0)
-	var keys := "%s buy      %s choose      %s favourite      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("sell", p), _g("back", p),
+	var keys := "%s buy      %s choose      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p),
 		"back to ingredients" if game.storing() else "close"]
 	if game.shopper != null and game.shopper.hand.get("node") is Station:   # the piece in hand turns
 		keys += "      %s turn" % _g("turn", p)
 	if _mode(p) == "touch":
-		keys = "Tap a step, then tap it again to buy. Tap its star to favourite it"
+		keys = "Tap a step, then tap it again to buy"
 	_tree = TreeScreen.new(game, self, key, keys)
 	root.add_child(_tree)
 	root.move_child(_tree, center.get_index())
@@ -2901,11 +2901,6 @@ func tree_selected() -> String:
 func tree_move(action: String) -> void:
 	if _tree:
 		_tree.move(action)
-
-
-func tree_favourite() -> void:
-	if _tree:
-		_tree.favourite()
 
 
 func tree_buy() -> void:

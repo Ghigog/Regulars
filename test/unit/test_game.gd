@@ -12,8 +12,6 @@ func before_each():
 	game.set_process(false)
 	game.best_path = "user://regulars_best_test.json"
 	game.theme_path = THEME_TEST_PATH
-	game.fav_path = "user://regulars_favourites_test.cfg"
-	game.favourites.clear()   # not the player's own stars
 	DirAccess.remove_absolute(THEME_TEST_PATH)   # no theme remembered: the card starts on the diner
 	# One guest far in the future keeps the day open while a test works.
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
@@ -309,11 +307,15 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	game.open_shop()
 	assert_true(game.shopping)
 	assert_eq(game.hud._category, "Kitchen", "there is no All tab")
-	var kitchen: int = game.shop_items("", "Kitchen").size()
-	assert_lt(kitchen, Catalog.search("", "Kitchen", Scenery.theme_id).size(), "pieces above the level are hidden")
+	var all: Array[Dictionary] = game.shop_items("", "Kitchen")
+	var kitchen: int = all.size()
+	assert_lt(all.filter(func(bp: Dictionary) -> bool: return not bp.get("locked", false)).size(), kitchen,
+		"pieces above the level are shown, as silhouettes")
 	assert_eq(game.hud._cards.get_child_count(), kitchen)
 	game.hud.set_search("fern")
-	assert_eq(game.hud._cards.get_child_count(), 1, "a search looks through every category")
+	var ferns: int = game.shop_items("fern").size()
+	assert_gt(ferns, 0)
+	assert_eq(game.hud._cards.get_child_count(), ferns, "a search looks through every category")
 	game.hud.set_search("zzz")
 	assert_eq(game.hud._cards.get_child_count(), 1, "only the nothing-matches line")
 	game.hud._set_category("Kitchen")
@@ -1251,7 +1253,9 @@ func test_booth_and_table_for_four_are_sold_under_dining():
 	assert_false(cat.can_buy("table4", 500, 2), "a table for four needs level 3")
 	assert_true(cat.can_buy("table4", 500, 3))
 	assert_true(cat.can_buy("booth", 500, 2))
-	assert_eq(Catalog.search("four").size(), 1, "the table for four turns up (its tiers are its upgrade tree)")
+	var fours := Catalog.search("four")
+	assert_eq(fours.filter(func(bp: Dictionary) -> bool: return not bp.has("tree")).size(), 1, "the table for four turns up")
+	assert_gt(fours.size(), 1, "and its tiers, sold outright up its tree")
 
 
 func test_seats_of_a_booth_turn_and_a_table_for_four_has_one_each_side():
@@ -2924,12 +2928,16 @@ func test_a_fridge_on_the_pass_shows_its_door_in_front_of_the_pass():
 	on_pass.free()
 
 
-func test_the_fridge_and_stove_are_not_in_the_shop_a_counter_grows_them():
+func test_the_fridge_and_stove_are_sold_as_a_counter_grown_already():
 	_to_build()
-	var ids: Array = game.shop_items("", "Kitchen").map(func(bp: Dictionary) -> String: return str(bp.get("base", bp.id)))
-	assert_does_not_have(ids, "fridge")
-	assert_does_not_have(ids, "stove")
-	assert_has(ids, "counter")
+	var items: Array[Dictionary] = game.shop_items("", "Kitchen")
+	var plain: Array = items.filter(func(bp: Dictionary) -> bool: return not bp.has("tree")).map(func(bp: Dictionary) -> String: return str(bp.get("base", bp.id)))
+	assert_does_not_have(plain, "fridge", "not a piece of its own")
+	assert_does_not_have(plain, "stove")
+	assert_has(plain, "counter")
+	var stove := _shop_bp("stove")
+	assert_true(stove.get("counter", false), "a stove comes on its own counter")
+	assert_eq(Catalog.bp_price(stove), Kitchen.price_of("counter") + Kitchen.price_of("stove"))
 
 
 func test_a_counter_on_its_card_grows_a_stove_where_it_stands():
@@ -2969,29 +2977,32 @@ func test_a_stove_opens_like_a_counter_and_upgrades_where_it_stands():
 	assert_eq(game.stations[c], st)
 
 
-func test_a_starred_fridge_is_sold_in_favourites_as_a_counter_already_upgraded():
+func _shop_bp(key: String) -> Dictionary:
+	for bp: Dictionary in game.shop_items("", "Kitchen"):
+		if bp.get("tree", "") == key:
+			return bp
+	return {}
+
+
+func test_the_shop_sells_a_fridge_as_a_counter_already_upgraded():
 	_to_build()
 	game.ledger.money = 200
-	assert_true(game.shop_items("", "Favourites").is_empty())
-	assert_true(game.toggle_favourite("fridge"))
-	var items: Array[Dictionary] = game.shop_items("", "Favourites")
-	assert_eq(items.size(), 1)
-	assert_eq(Catalog.bp_price(items[0]), Kitchen.price_of("fridge"), "priced as counter and fridge both")
+	var bp := _shop_bp("fridge")
+	assert_false(bp.is_empty(), "every tree node is in the shop, no stars needed")
+	assert_eq(Catalog.bp_price(bp), Kitchen.price_of("fridge"), "priced as counter and fridge both")
 	game.open_shop()
-	assert_true(game.buy(items[0]))
+	assert_true(game.buy(bp))
 	assert_eq(int(game.hand.price), Kitchen.price_of("fridge"))
 	assert_true(game.place(Vector3i(3, 4, 0)))
 	assert_eq(game.stations[Vector2i(3, 4)].base, "fridge", "placed as a fridge, not stacked onto a counter")
 	assert_eq(game.ledger.money, 200 - Kitchen.price_of("fridge"))
-	assert_false(game.toggle_favourite("fridge"), "starred again: taken out")
-	DirAccess.remove_absolute(game.fav_path)
 
 
-func test_a_starred_char_grill_comes_on_its_own_counter_at_the_whole_price():
+func test_a_char_grill_from_the_shop_comes_on_its_own_counter_at_the_whole_price():
 	_to_build()
 	game.ledger.money = 400
-	game.toggle_favourite("char_grill")
-	var bp: Dictionary = game.shop_items("", "Favourites")[0]
+	game.ledger.xp = Ledger.XP_PER_LEVEL * 20   # every level, so nothing is a silhouette
+	var bp := _shop_bp("char_grill")
 	var whole := Kitchen.price_of("counter") + Kitchen.price_of("char_grill")
 	assert_eq(Catalog.bp_price(bp), whole)
 	assert_eq(Catalog.label(bp), "Char grill")
@@ -3005,22 +3016,26 @@ func test_a_starred_char_grill_comes_on_its_own_counter_at_the_whole_price():
 	assert_eq(st.base, "counter")
 	assert_eq(game.kitchen.get_piece(Vector2i(3, 4), "top"), "char_grill")
 	assert_eq(game.ledger.money, 400 - whole)
-	var again := TreeScreen.new(game, game.hud, "counter", "")   # the counter's tree shows the star
-	assert_true(again.cards.has("char_grill"))
-	again.free()
-	game.favourites.clear()
-	DirAccess.remove_absolute(game.fav_path)
 
 
-func test_favourites_are_kept_across_runs():
-	game.favourites.clear()
-	game.toggle_favourite("wide_shelf")
-	game.toggle_favourite("mop_bucket")   # a cleaning home: refused
-	game.favourites.clear()
-	game.load_favourites()
-	assert_eq(game.favourites, ["wide_shelf"] as Array[String])
-	game.favourites.clear()
-	DirAccess.remove_absolute(game.fav_path)
+func test_pieces_above_the_level_are_silhouettes_in_the_shop_and_the_tree():
+	_to_build()
+	game.ledger.money = 999
+	var locked: Array = game.shop_items("", "").filter(func(bp: Dictionary) -> bool: return bp.get("locked", false))
+	assert_false(locked.is_empty(), "something is out of reach at level 1, and shown")
+	var bp: Dictionary = locked[0]
+	game.open_shop()
+	assert_false(game.buy(bp), "a silhouette cannot be bought")
+	assert_eq(game.hud._shop_info(bp).price, "Level %d" % Catalog.bp_level(bp))
+	var high := ""
+	for b: Dictionary in locked:
+		if b.has("tree") and Upgrades.level(b.tree) > game.ledger.level():
+			high = b.tree
+	assert_ne(high, "", "a step up a tree is out of reach")
+	var tree := TreeScreen.new(game, game.hud, Upgrades.root(high), "")
+	assert_true(tree.cards.has(high), "the tree shows it too, marked with its level")
+	tree.free()
+	game.close_shop()
 
 
 func test_crates_stand_on_open_counters_and_closed_ones_keep_a_tag():

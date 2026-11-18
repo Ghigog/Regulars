@@ -554,10 +554,14 @@ func test_a_step_costs_the_new_price_less_the_old_and_only_from_its_parent():
 func test_tools_lose_their_catalog_tiers_and_later_nodes_leave_the_shop():
 	for id: String in ["stove", "fryer", "pot", "board", "slicer"]:
 		assert_eq(int(Catalog.ITEMS[id].tiers), 1, id)
-	var ids := Catalog.search("", "Kitchen", "diner").map(func(bp: Dictionary) -> String: return bp.id)
+	var roots := Catalog.search("", "Kitchen", "diner").filter(func(bp: Dictionary) -> bool: return not bp.has("tree"))
+	var ids := roots.map(func(bp: Dictionary) -> String: return bp.id)
 	assert_has(ids, "board")
 	for id: String in ["stove", "fryer", "pot", "slicer"]:
-		assert_does_not_have(ids, id, id + " is reached through the counter, stove or board")
+		assert_does_not_have(ids, id, id + " is a step up the counter's, stove's or board's tree")
+	var nodes := Catalog.search("", "Kitchen", "diner").map(func(bp: Dictionary) -> String: return str(bp.get("tree", "")))
+	for k: String in ["stove", "fryer", "slicer"]:
+		assert_has(nodes, k, k + " is sold outright too, the whole way there")
 
 
 func test_a_stove_grows_from_a_bare_counter_for_its_whole_price():
@@ -1216,8 +1220,8 @@ func test_the_new_jobs_sit_in_the_trees_as_the_prd_sketches_them():
 	for id: String in want:
 		assert_eq([Kitchen.parent_of(id), Kitchen.step_of(id)], want[id], id)
 		assert_eq(Kitchen.fit_of(id), "top", id + " stands on a counter")
-		assert_false(Catalog.search(Kitchen.NODES[id].name).any(func(bp: Dictionary) -> bool: return bp.id == id),
-			id + " is bought only in its tree")
+		assert_false(Catalog.search(Kitchen.NODES[id].name).any(func(bp: Dictionary) -> bool: return bp.id == id and not bp.has("tree")),
+			id + " is a step up its tree (sold outright as one)")
 	assert_eq(Kitchen.jobs_of("grater"), {"grate": Kitchen.SPECIALIST, "slice": Kitchen.STAND_IN})
 	assert_almost_eq(Kitchen.quality("rotary_grater", "grate"), 1.8, 0.001)
 	assert_eq(Kitchen.jobs_of("bread_knife"), {"saw": Kitchen.SPECIALIST, "chop": Kitchen.STAND_IN})

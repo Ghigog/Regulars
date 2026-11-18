@@ -175,10 +175,6 @@ var _drag: Dictionary:            # chef 1's mouse drag, for tests and demos
 	set(v): player.drag = v
 var _door_turn: Node3D
 var best_path := "user://regulars_best.json"
-var fav_path := "user://regulars_favourites.cfg"   # starred tree nodes: kept across runs
-## Upgrade-tree nodes the player starred: the shop's Favourites tab sells each already
-## upgraded, at the whole price of the way there.
-var favourites: Array[String] = []
 var player: Player               # chef 1; `chefs` holds every chef, by player index
 const MAX_CHEFS := 2             # trims exist for four; two are shipped and tested (PRD 4)
 var ready_chefs: Array[Player] = []   # co-op: who has confirmed the receipt, or used the door card
@@ -208,7 +204,6 @@ var _shot_time := 0.0
 
 
 func _ready() -> void:
-	load_favourites()
 	var seed_value := int(Time.get_unix_time_from_system())
 	grid = Grid.new(W + 2 - LOT.position.x, LOT.size.y, LOT.position)   # columns W and W + 1 are the pavement outside
 	town = Town.new(seed_value, Scenery.theme_id)
@@ -1914,7 +1909,7 @@ static func hand_node(h: Dictionary) -> String:
 	if h.get("id", "") == "sponge":
 		return "hook"   # sold hanging on its own hook (PRD 9.4)
 	if h.get("up", "") != "":
-		return h.up   # a favourite, built already upgraded
+		return h.up   # a tree node the shop sold, built already upgraded
 	if h.get("base", "") != "":
 		return h.base   # a counter sold as a fridge
 	return Kitchen.node_of(str(h.get("id", "")))
@@ -2425,13 +2420,11 @@ func shop_items(query := "", category := "") -> Array[Dictionary]:
 		found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:   # what fits first
 			return _storage_rank(a) < _storage_rank(b))
 		return found
-	if category == "Favourites":
-		return favourite_items(query)
 	if category != "Extras":
-		found = Catalog.search(query, category, Scenery.theme_id, ledger.level())
-		for bp in Catalog.search(query, category, Scenery.theme_id):   # a missing essential, at any level
-			if missing(bp.id) and not found.has(bp):
-				found.append(bp)
+		found = Catalog.search(query, category, Scenery.theme_id, ledger.level(), true)
+		for i in found.size():   # a missing essential, at any level
+			if found[i].get("locked", false) and not found[i].has("tree") and missing(found[i].id):
+				found[i] = {"id": found[i].id, "tier": found[i].tier}
 	if category == "" or category == "Build":
 		for k: String in Treatments.ITEMS:
 			var id := Treatments.tool_id(k)
@@ -2501,57 +2494,11 @@ func close_shop() -> void:
 		pick_up(Grid.center(Vector2i(carried.from.x, carried.from.y)), ch, true, str(carried.layer))
 
 
-# ---------------------------------------------------------------- favourites
+# ---------------------------------------------------------------- tree nodes in the shop
 
-func load_favourites() -> void:
-	favourites.clear()
-	var cfg := ConfigFile.new()
-	if cfg.load(fav_path) == OK:
-		for k in cfg.get_value("shop", "favourites", []):
-			if Catalog.can_favourite(str(k)) and not favourites.has(str(k)):
-				favourites.append(str(k))
-
-
-func is_favourite(key: String) -> bool:
-	return favourites.has(key)
-
-
-## Stars or unstars a tree node. Returns whether it is a favourite now.
-func toggle_favourite(key: String) -> bool:
-	if not Catalog.can_favourite(key):
-		sfx("fail")
-		hud.say("Cleaning tools can't be favourites.")
-		return false
-	if favourites.has(key):
-		favourites.erase(key)
-	else:
-		favourites.append(key)
-	var cfg := ConfigFile.new()
-	cfg.set_value("shop", "favourites", favourites.duplicate())
-	cfg.save(fav_path)
-	sfx("tick", 0.1)
-	return favourites.has(key)
-
-
-## The Favourites tab: each starred node this run's theme sells, at the level reached.
-func favourite_items(query := "") -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
-	var words := query.strip_edges().to_lower().split(" ", false)
-	for k: String in favourites:
-		var bp := Catalog.fav_blueprint(k)
-		if not Catalog.sold_in(bp.id, Scenery.theme_id) or Catalog.bp_level(bp) > ledger.level():
-			continue
-		var text := ("%s favourite %s" % [Catalog.label(bp), Catalog.bp_blurb(bp)]).to_lower()
-		var hit := true
-		for w in words:
-			hit = hit and text.contains(w)
-		if hit:
-			out.append(bp)
-	return out
-
-
-## Picks a favourite to place, already upgraded. Nothing is paid until it is placed.
-func pick_favourite(bp: Dictionary, ch: Player = null) -> bool:
+## Picks a tree node the shop sells outright, already upgraded (review, item 4). Nothing
+## is paid until it is placed; the price is the whole way there.
+func pick_tree(bp: Dictionary, ch: Player = null) -> bool:
 	ch = _me(ch)
 	if ledger.money < Catalog.bp_price(bp) or Catalog.bp_level(bp) > ledger.level() \
 			or not pick_catalog(bp.id, int(bp.tier), ch, bp.get("base", "")):
@@ -2887,7 +2834,9 @@ func buy(bp: Dictionary) -> bool:
 	if bp.id == FLYERS.id:
 		if buy_flyers():
 			return true
-	elif pick_favourite(bp, shopper) if bp.has("fav") else pick_catalog(bp.id, int(bp.tier), shopper, bp.get("base", "")):
+	elif bp.get("locked", false):
+		hud.say("The %s needs level %d." % [Catalog.label(bp), Catalog.bp_level(bp)])
+	elif pick_tree(bp, shopper) if bp.has("tree") else pick_catalog(bp.id, int(bp.tier), shopper, bp.get("base", "")):
 		sfx("pickup")
 		close_shop()
 		return true
@@ -6811,7 +6760,6 @@ func shop_action(action: String) -> bool:
 			"shop" when storing(): storage_ingredients()
 			"back", "shop": close_shop()
 			"use", "confirm": hud.tree_buy()
-			"sell": hud.tree_favourite()   # X: star the chosen node for the Favourites tab
 			"turn" when shopper.hand.get("node") is Station:   # turn it round to see its back
 				rotate_hand(shopper)
 			_: return false

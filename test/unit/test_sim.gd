@@ -427,12 +427,17 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 	assert_false(c.can_buy("stove", 9999, 9, 4))
 
 
+func _roots(found: Array[Dictionary]) -> Array[Dictionary]:
+	return found.filter(func(bp: Dictionary) -> bool: return not bp.has("tree"))
+
+
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 74, "one entry a piece, the plate, cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
-	var ferns := Catalog.search("FERN")
+	assert_gt(Catalog.search().size(), _roots(Catalog.search()).size(), "every tree node is sold outright too")
+	assert_eq(_roots(Catalog.search()).size(), 74, "one entry a piece, the plate, cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
+	var ferns := _roots(Catalog.search("FERN"))
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
-	var kitchen := Catalog.search("", "Kitchen", "diner")
+	var kitchen := _roots(Catalog.search("", "Kitchen", "diner"))
 	assert_eq(kitchen.size(), 17, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, the plate, cup and tray stacks, a till, board, the soda fountain, a mop bucket, a hook, a sponge and the desk (PRD 10.6); the fridge and stove are counter upgrades")
 	assert_eq(kitchen.map(func(bp: Dictionary) -> String: return Catalog.label(bp)).slice(0, 3),
 		["Wall shelf", "Counter", "Wall cabinet"],
