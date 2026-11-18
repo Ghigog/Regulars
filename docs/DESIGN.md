@@ -727,8 +727,10 @@ Where an older paragraph above disagrees, this list wins.
   (to +50%), and from three in a row the guest and friends think better of the cooking
   and the meter rises. The receipt counts perfect plates. The minigames are unchanged.
 - **Cleaning**: a slip costs mood, never a strike. A dirty mop or sponge cleans at half
-  pace with a red wear pip, never spreading dirt. Every floor treatment is $0.25 a tile
-  a night, rounded up for the night. The shop's Extras sell a night cleaner (one press:
+  pace with a red wear pip, never spreading dirt. Laying a floor treatment is free; its box is
+  restocked each night for a flat fee like a food box, whatever the tiles (cleaner $2,
+  strong cleaner $3, primer $3, sealing primer $5, finish $4, high gloss $6; switched
+  off, not restocked), on the restock note with the food. The shop's Extras sell a night cleaner (one press:
   every table cleared, washed up, bags out, floor mopped, priced by the mess). One Wash
   clears the whole sink.
 - **Reputation** (`Ledger.reputation`): 0 to 100, starting at 50, carried over the

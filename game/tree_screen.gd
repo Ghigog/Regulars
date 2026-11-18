@@ -495,7 +495,7 @@ class Card extends Control:
 			var n: Label = screen._text(row, 16, "x%d" % Kitchen.slots_of(key), LINE)
 			n.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		if Upgrades.is_treatment(key):   # a floor treatment's box (PRD 9.5): what laying it costs
-			var each: Label = screen._text(row, 16, "$0.25 a tile", LINE)
+			var each: Label = screen._text(row, 16, Treatments.fee_words(Treatments.key_of(key)), LINE)
 			each.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			return
 		var pans := int(Kitchen.NODES[key].get("pans", 1))

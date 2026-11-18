@@ -2,37 +2,37 @@ class_name Treatments
 extends RefCounted
 ## Floor treatments (PRD 9.5): cleaner, primer and finish, and their tree steps. Each is
 ## laid a cell at a time with the floor drag at night, one per cell, and lasts one day of
-## service; while switched on it is re-laid every night at $0.25 a tile, whichever it is
-## (review, item 8), paid at the door with the stock: the night's tiles added up and
-## rounded up to whole dollars. It is laid only while its box is stored somewhere (a
-## storage slot, never with food, never in a fridge). The box is stocked from a counter's
-## card, like food, and upgraded on that card's tree. Pure data and lookups.
+## service; while switched on it is re-laid every night. Laying is free, however many
+## tiles: the cost is the product. A treatment's box is restocked every night like a
+## food box, for a flat nightly fee ("fee") whatever the number of tiles, paid at the
+## door with the stock and listed on the restock note (review, item 8, as changed by the
+## owner). Switched off, it is not restocked and costs nothing. It is laid only while its
+## box is stored somewhere (a storage slot, never with food, never in a fridge). The box
+## is stocked from a counter's card, like food, and upgraded on that card's tree.
+## Pure data and lookups.
 
-const CENTS_A_TILE := 25   # tunable: every treatment, a tile a night
-const PRICE_WORDS := "$0.25 a tile a night"
-
-## Each treatment: its name, its place in the tree ("parent",
-## "step"), what the box's tree step costs ("unlock", the whole price from the root,
-## which is free), and its effects. (all tunable)
+## Each treatment: its name, its nightly box fee ("fee", in line with the food boxes'
+## $2 to $8), its place in the tree ("parent", "step"), what the box's tree step costs
+## ("unlock", the whole price from the root, which is free), and its effects. (all tunable)
 ## "one_press": dirt mops off in one press, whatever its level.
 ## "no_track": dirt is not carried off the cell by feet.
 ## "block": the chance a level landing here does not (tracked dirt still comes in).
 ## "speed": the multiplier on anyone's speed on it. "joy": decor joy, like a floor.
 ## "shows": how much more dirt on it puts guests off by sight (it shows more on a shine).
 const ITEMS := {
-	"cleaner": {"name": "Floor cleaner", "unlock": 0, "one_press": true,
+	"cleaner": {"fee": 2, "name": "Floor cleaner", "unlock": 0, "one_press": true,
 		"blurb": "Dirt mops off in one press, whatever the level"},
-	"strong_cleaner": {"name": "Strong cleaner", "unlock": 25, "parent": "cleaner",
+	"strong_cleaner": {"fee": 3, "name": "Strong cleaner", "unlock": 25, "parent": "cleaner",
 		"step": "efficient", "one_press": true, "no_track": true,
 		"blurb": "Mops off in one press, and feet do not track dirt off it"},
-	"primer": {"name": "Primer", "unlock": 40, "parent": "cleaner", "step": "specialist",
+	"primer": {"fee": 3, "name": "Primer", "unlock": 40, "parent": "cleaner", "step": "specialist",
 		"block": 0.4, "blurb": "Two in five spills do not land on it. Tracked dirt still does"},
-	"sealing_primer": {"name": "Sealing primer", "unlock": 90, "parent": "primer",
+	"sealing_primer": {"fee": 5, "name": "Sealing primer", "unlock": 90, "parent": "primer",
 		"step": "efficient", "block": 0.6, "blurb": "Three in five spills do not land on it"},
-	"finish": {"name": "Floor finish", "unlock": 60, "parent": "cleaner", "step": "specialist",
+	"finish": {"fee": 4, "name": "Floor finish", "unlock": 60, "parent": "cleaner", "step": "specialist",
 		"speed": 1.1, "joy": 0.05, "shows": 1.25,
 		"blurb": "Everyone a little faster on it, and a little joy. Dirt shows more"},
-	"high_gloss": {"name": "High gloss", "unlock": 150, "parent": "finish", "step": "specialist",
+	"high_gloss": {"fee": 6, "name": "High gloss", "unlock": 150, "parent": "finish", "step": "specialist",
 		"speed": 1.2, "joy": 0.1, "shows": 1.5,
 		"blurb": "Faster still and more joy. Dirt shows a lot more"},
 }
@@ -49,9 +49,13 @@ static func name_of(key: String) -> String:
 	return str(ITEMS[key].name) if ITEMS.has(key) else ""
 
 
-## What laying `tiles` tiles costs a night, in whole dollars, rounded up.
-static func cost_of_tiles(tiles: int) -> int:
-	return ceili(maxi(tiles, 0) * CENTS_A_TILE / 100.0)
+## A treatment's box fee a night, whatever the number of tiles it is laid on.
+static func fee_of(key: String) -> int:
+	return int(ITEMS[key].fee) if ITEMS.has(key) else 0
+
+
+static func fee_words(key: String) -> String:
+	return "$%d a night" % fee_of(key)
 
 
 ## The catalog id of a treatment's box ("box_cleaner") and of its laying tool ("treat_cleaner").
@@ -136,28 +140,32 @@ static func shows(key: String) -> float:
 
 ## What re-laying costs tonight. `laid` is Vector2i -> key; `off` is key -> true for the
 ## treatments switched off; `boxed` is key -> true for those with a box in storage.
-## Returns key -> {"cells": n, "fee": its tiles' cost, rounded up}, for every treatment
-## laid anywhere; one switched off or with no box stored costs nothing ("cells" still counted).
+## Returns key -> {"cells": n, "fee": its box's nightly fee, "on"}, for every treatment
+## laid anywhere or with a box stored. The fee is flat, however many tiles ("cells" is
+## only counted for the note); one switched off or with no box stored costs nothing.
 static func night_lines(laid: Dictionary, off: Dictionary, boxed: Dictionary) -> Dictionary:
 	var out := {}
 	for c: Vector2i in laid:
 		var k: String = laid[c]
 		if not out.has(k):
-			out[k] = {"cells": 0, "fee": 0, "on": not off.has(k) and boxed.has(k)}
+			out[k] = {"cells": 0, "fee": 0, "on": false}
 		out[k].cells += 1
+	for k: String in boxed:
+		if not out.has(k):
+			out[k] = {"cells": 0, "fee": 0, "on": false}
 	for k: String in out:
-		out[k].fee = cost_of_tiles(int(out[k].cells)) if out[k].on else 0
+		out[k].on = not off.has(k) and boxed.has(k)
+		out[k].fee = fee_of(k) if out[k].on else 0
 	return out
 
 
-## The night's whole treatment bill: every tile laid and switched on, rounded up once.
+## The night's whole treatment bill: each stocked box switched on, its flat fee.
 static func night_cost(laid: Dictionary, off: Dictionary, boxed: Dictionary) -> int:
 	var lines := night_lines(laid, off, boxed)
-	var tiles := 0
+	var sum := 0
 	for k: String in lines:
-		if lines[k].on:
-			tiles += int(lines[k].cells)
-	return cost_of_tiles(tiles)
+		sum += int(lines[k].fee)
+	return sum
 
 
 ## The cells that are treated for a day of service: laid, switched on, box stored.

@@ -2409,7 +2409,7 @@ func _build_tip(p := 0) -> String:
 	if Treatments.is_laying_tool(hand.id):   # a floor treatment (PRD 9.5): laid free, paid each night
 		var k := Treatments.key_of(hand.id)
 		var off: bool = game.treat_off.has(k)
-		var what := "%s, %s%s." % [Treatments.name_of(k), Treatments.PRICE_WORDS, " (switched off)" if off else ""]
+		var what := "%s, laying free, its box %s%s." % [Treatments.name_of(k), Treatments.fee_words(k), " (switched off)" if off else ""]
 		var flip := "%s switch %s" % ["Turn" if m == "touch" else _g("turn", p), "on" if off else "off"]
 		match m:
 			"touch":
@@ -2735,10 +2735,10 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 	var need := Catalog.bp_level(bp)
 	var locked: bool = bp.get("locked", false) or game.buy_level(id) < need
 	var price := "$%d" % Catalog.bp_price(bp)
-	if Treatments.is_box(id):   # free; laying it costs a price a cell each night (PRD 9.5)
-		price = "Free"
+	if Treatments.is_box(id):   # restocked each night for a flat fee, like food (review, item 8)
+		price = Treatments.fee_words(Treatments.key_of(id))
 	elif Treatments.is_laying_tool(id):
-		price = Treatments.PRICE_WORDS
+		price = "Free to lay"
 	elif Catalog.is_box(id):   # a box is free to take; its kind costs a fee each night (PRD 8.4)
 		var b := Pantry.station_ingredient(id)
 		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
@@ -2753,7 +2753,8 @@ func _storage_info(bp: Dictionary) -> Dictionary:
 	if bp.has("act"):
 		return _card_act_info(bp)
 	var b := Pantry.station_ingredient(bp.id)
-	var fee := "Free" if Treatments.is_box(bp.id) or b.is_empty() else "$%d a night" % Pantry.fee_of(b.id, b.ready)
+	var fee := Treatments.fee_words(Treatments.key_of(bp.id)) if Treatments.is_box(bp.id) \
+		else ("Free" if b.is_empty() else "$%d a night" % Pantry.fee_of(b.id, b.ready))
 	if bp.get("stored", false):
 		return {"name": Catalog.label(bp), "blurb": "Stored here. Take it out", "locked": false,
 			"price": "Take out", "can": true}

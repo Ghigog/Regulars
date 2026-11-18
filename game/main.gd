@@ -3758,7 +3758,7 @@ func drag_summary(ch: Player = null) -> String:
 		return "Remove"
 	var n := spots.size() if floor_kind(ch.hand.id) != "" else spots.filter(func(sp: Vector3i) -> bool: return can_place(sp, ch)).size()
 	if Treatments.is_laying_tool(ch.hand.id):
-		return "Lay %d tile%s  $%d a night" % [n, "" if n == 1 else "s", Treatments.cost_of_tiles(n)]
+		return "Lay %d tile%s  free" % [n, "" if n == 1 else "s"]
 	var price := int(ch.hand.price)
 	var noun: String = "tile" if floor_kind(ch.hand.id) != "" else ("wall" if ch.hand.id == "wall" or Catalog.is_finish(ch.hand.id) else ch.hand.id)
 	var verb := "Lay" if floor_kind(ch.hand.id) != "" else ("Paint" if ch.hand.id == "paint" else ("Paper" if Catalog.is_finish(ch.hand.id) else "Build"))
@@ -4991,7 +4991,7 @@ func stock_lines() -> Array[Dictionary]:
 	for k: String in lines:   # floor treatments, re-laid each night (PRD 9.5)
 		var l: Dictionary = lines[k]
 		var why := "" if l.on else (", off" if treat_off.has(k) else ", no box")
-		out.append({"name": "%s, %d cell%s%s" % [Treatments.name_of(k), l.cells, "" if l.cells == 1 else "s", why],
+		out.append({"name": "%s box, %d tile%s%s" % [Treatments.name_of(k), l.cells, "" if l.cells == 1 else "s", why],
 			"fee": l.fee})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.fee) > int(b.fee))
 	return out
