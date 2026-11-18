@@ -5595,6 +5595,33 @@ func full_tray_for(g: Guest, q := 1.0) -> Tray:
 
 
 ## Kindness: half price to say sorry for the wait. The town remembers it.
+## Deals at a table (review, item 11): E starts a hold and the deal is given once E has
+## been held DEAL_HOLD, with the same fill bar as every hold. Let go, or walk off, and
+## nothing is given away.
+const DEAL_HOLD := 0.6   # tunable
+var _deal_hold := {}     # Player -> {g: Guest, kind: "half" | "comp", t: seconds held}
+
+
+func _tick_deal(ch: Player, held: bool, delta: float) -> void:
+	if not _deal_hold.has(ch):
+		return
+	var d: Dictionary = _deal_hold[ch]
+	var g: Guest = d.g
+	if not held or not is_instance_valid(g) or g.table == null or station_at(ch.target_cell()) != g.table:
+		_deal_hold.erase(ch)
+		ch.stop_giving()
+		return
+	d.t = float(d.t) + delta
+	ch.show_hold(g.table.global_position, float(d.t) / DEAL_HOLD, "coin")
+	if float(d.t) >= DEAL_HOLD:
+		_deal_hold.erase(ch)
+		ch.stop_giving()
+		if d.kind == "half":
+			offer_discount(g)
+		else:
+			offer_comp(g)
+
+
 func offer_discount(g: Guest) -> void:
 	if not g.mood.offer_discount():
 		return
@@ -5634,13 +5661,17 @@ func finish_meal(g: Guest) -> void:
 
 
 ## One guest pays their share of the table's bill: what `finish_meal` paid before PRD 11.
+## They pay what the slip says, less any deal (review, item 11: the amount paid never
+## differs from the slip). How happy they are still moves the money: "ordered extras"
+## (or, in a hurry, skimping) goes with the tip, never below nothing.
 func _pay_guest(g: Guest) -> void:
-	var bill := g.mood.pay_for(g.bill_base)
+	var bill := g.mood.bill_for(g.bill_base)
+	var extras := g.mood.pay_for(g.bill_base) - bill
 	if g.mood.paid_full():   # someone used to deals is let down by full price
 		var letdown := town.paid_full_price(g.idx)
 		if letdown > 0.0:
 			g.mood.delight(-letdown, "Full price this time? Hm")
-	var tip := g.mood.tip_for(bill, town.tip_bonus(g.idx) * Prep.streak_tip(g.perfect_streak))
+	var tip := maxi(0, g.mood.tip_for(bill, town.tip_bonus(g.idx) * Prep.streak_tip(g.perfect_streak)) + extras)
 	var was_sore: bool = g.info.sore
 	var was_regular := town.is_regular(g.idx)
 	ledger.record_sale(bill, tip)
@@ -6214,6 +6245,7 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				act = "Grill"
 				if not dry_run:
 					st.set_item(held)
+					st.set_meta("used_by", chefs.find(ch))
 					ch.set_held("")
 			elif held == "" and st.item != "":
 				act = "Take off the heat"
@@ -6225,11 +6257,14 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 					_prep_done(chefs.find(ch), st, "grill", res.result)
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go on the grill" % Pantry.name_of(held_ing.id)
+			elif not held_ing.is_empty() and chefs.size() > 1 and int(st.get_meta("used_by", -1)) not in [-1, chefs.find(ch)]:
+				why = "Chef %d has it" % (int(st.get_meta("used_by", 0)) + 1)   # co-op: the losing press says who won
 		"fryer":
 			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "fry":
 				act = "Fry"
 				if not dry_run:
 					st.set_item(held)
+					st.set_meta("used_by", chefs.find(ch))
 					ch.set_held("")
 			elif held == "" and st.on_rack():
 				if st.draining():
@@ -6277,7 +6312,7 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			if pj[0] != "":
 				tool = pj[0]
 			if st.prep_by >= 0:
-				why = "In use"
+				why = _in_use_by(st)
 			elif pj[0] != "":
 				act = str(PRESS_VERBS[tool])
 				if not dry_run:
@@ -6404,13 +6439,13 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 					while st.dirty > 0 and ch.has_room(true):
 						clear_one(st, ch)
 			elif held == "" and g != null and not g.mood.discounted and g.mood.patience < DISCOUNT_BELOW:
-				act = "Half price for %s" % g.info.name
+				act = "Hold for half price for %s" % g.info.name   # a hold, so a stray E gives nothing away
 				if not dry_run:
-					offer_discount(g)
+					_deal_hold[ch] = {"g": g, "kind": "half", "t": 0.0}
 			elif held == "" and g != null and not g.mood.comped and g.mood.very_unhappy():
-				act = "Free meal for %s" % g.info.name   # after half price, or for disgust
+				act = "Hold for a free meal for %s" % g.info.name   # after half price, or for disgust
 				if not dry_run:
-					offer_comp(g)
+					_deal_hold[ch] = {"g": g, "kind": "comp", "t": 0.0}
 	if act == "" and not st.type in ["counter", "pass"]:
 		var r := _use_storage(st, dry_run, ch)   # what the tool cannot do, storage below may
 		if r[0] != "":
@@ -6627,6 +6662,16 @@ func wash_one(st: Station) -> void:
 	if stack != null:
 		stack.count += 1
 		stack.refresh()
+
+
+## Who is working a tool another press found busy (review, item 11): "Chef 2 has it" in
+## co-op, "A helper has it" for staff.
+func _in_use_by(st: Station) -> String:
+	if st.prep_by == Crew.HELPER_PREP:
+		return "A helper has it"
+	if st.prep_by >= 0 and chefs.size() > 1:
+		return "Chef %d has it" % (st.prep_by + 1)
+	return "In use"
 
 
 ## Takes one dirty dish off a table into the hands: plates first.
@@ -6983,6 +7028,7 @@ func _process(delta: float) -> void:
 			clean_kit.hold_use(ch, controls.holding(p, "use"))   # held E keeps mopping
 		if phase == Phase.SERVICE and not (hud.bill_open() and hud.bill.chef == ch):
 			_tick_giving(ch, controls.holding(p, "use"), delta)   # held E hands a bill over (PRD 11)
+			_tick_deal(ch, controls.holding(p, "use"), delta)     # held E gives a deal (review, item 11)
 	if phase == Phase.BUILD:
 		_refresh_openings()
 	step(delta)

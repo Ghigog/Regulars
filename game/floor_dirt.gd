@@ -334,17 +334,13 @@ func _down_mark(who: Node3D) -> Node3D:
 	who.add_child(mark)
 	var stars := Fx.play(mark, "dizzy", Vector3.ZERO, 0.42, true)
 	stars.fps = 8.0
-	var bar := Node3D.new()
+	var bar := Player.hold_bar("heart")   # the one hold bar every held action shows (review, item 11)
 	bar.name = "bar"
+	bar.top_level = false
 	bar.position = Vector3(0, 0.55, 0)
-	bar.basis = Build.CAM_BASIS
+	bar.scale = Vector3.ONE * 0.75
 	bar.visible = false
 	mark.add_child(bar)
-	Build.flat(bar, Icons.rect(0, 0, 0.67, 0.17), Build.TRIM)
-	Build.flat(bar, Icons.rect(0, 0, 0.6, 0.1), "#6b5647", 0.003)
-	var fill := Build.flat(bar, Icons.rect(0, 0, 0.6, 0.1), Build.GOOD, 0.006)
-	fill.name = "fill"
-	Build.on_top(bar, -bar.position.z)
 	return mark
 
 
@@ -353,10 +349,7 @@ func _show_help(d: Dictionary, share: float) -> void:
 		return
 	var bar: Node3D = d.mark.get_node("bar")
 	bar.visible = true
-	var fill: Node3D = bar.get_node("fill")
-	var k := clampf(share, 0.001, 1.0)
-	fill.scale.x = k
-	fill.position.x = (k - 1.0) * 0.3
+	Player.set_hold(bar, share)
 
 
 # ---------------------------------------------------------------- drawing

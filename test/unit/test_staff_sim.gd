@@ -403,18 +403,6 @@ func test_on_break():
 
 # ---------- Chat and training ----------
 
-func test_chat_pulls_together():
-	var s := _staff()
-	_hire(s, 1, ["grill"])
-	_hire(s, 2, ["grill"])
-	s.employee(1).satisfaction = 0.9
-	s.employee(2).satisfaction = 0.1
-	s.chat(1, 2, 2.0)
-	assert_true(s.employee(1).satisfaction < 0.9)
-	assert_true(s.employee(2).satisfaction > 0.1)
-	assert_almost_eq(s.employee(1).satisfaction + s.employee(2).satisfaction, 1.0, 0.001)
-
-
 func test_training_raises_skill_and_lowers_tolerance():
 	var s := _staff()
 	_hire(s, 1, ["mop"], {"food": 3, "service": 3, "clean": 5})
@@ -1006,3 +994,29 @@ func test_a_wipe_clears_what_the_tool_and_a_cleaner_allow():
 	assert_eq(HelperWork.wipe_levels(2.0, "spill_kit"), 2)
 	assert_eq(HelperWork.wipe_levels(2.0, "mop", true), FloorMess.MAX_LEVEL, "laid with cleaner: one press")
 	assert_eq(HelperWork.wipe_levels(2.0, "spill_kit", true), 2, "the spill kit's uses are its own")
+
+
+# ---------- Review, item 11 ----------
+
+func test_the_staff_list_gives_two_or_three_reasons():
+	var s := _staff()
+	_hire(s, 1, ["grill", "fetch"])
+	s.employee(1).wage = 1
+	var why := s.reasons(1)
+	assert_between(why.size(), 1, Staff.REASON_MAX)
+	assert_true(why.has("Underpaid"), "paid far under their worth")
+	assert_true(why.has("No days off"))
+	s.nudge(1, -0.1, "mess")
+	assert_true(s.reasons(1).has("Hates the mess"), "worn down by the floor at work")
+	s.end_night(0)
+	assert_eq(s.reasons(1)[0], "Not paid last night", "the worst first")
+	assert_lte(s.reasons(1).size(), Staff.REASON_MAX)
+
+
+func test_mistakes_are_never_on_purpose_and_chat_moves_nothing():
+	var s := _staff()
+	_hire(s, 1, ["grill"])
+	s.employee(1).satisfaction = 0.0
+	for i in 200:
+		assert_true(s.roll_mistake(1) in ["", "slip"])
+	assert_false(s.has_method("chat"), "chat no longer pulls satisfaction together")

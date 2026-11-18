@@ -723,7 +723,9 @@ class ModelView extends TextureRect:
 		var rig := Peg.rigged(peg)
 		rig.position.y = -0.2
 		spin.add_child(rig)
-		tilt.basis = Basis(LEAN, -0.6)   # leaned back, so the face shows under a hat brim
+		# Leaned back to face level (review, item 11), so the eyes show under a hat brim
+		# and over a beard: a portrait is the face, not the top of the head.
+		tilt.basis = Basis(LEAN, -0.8)
 		for c in vp.get_children():
 			if c is Camera3D:
 				c.size = 1.5
@@ -1165,16 +1167,16 @@ func _update_guest() -> void:
 
 ## "Paying $14 · ordered extras": the served guest's bill, and why it moved.
 static func _bill_words(m: GuestMood, base: int) -> String:
-	var text := "Paying $%d" % m.pay_for(base)
-	var scaled := m.scaled_price(base)
+	var text := "Paying $%d" % m.bill_for(base)   # the slip's total, less any deal
+	var extra := m.pay_for(base) - m.bill_for(base)
 	if m.comped:
 		text += "  ·  on the house"
 	elif m.discounted:
 		text += "  ·  half price"
-	if scaled > base:
-		text += "  ·  ordered extras"
-	elif scaled < base:
-		text += "  ·  in a hurry"
+	if extra > 0:
+		text += "  ·  +$%d extras with the tip" % extra
+	elif extra < 0:
+		text += "  ·  in a hurry: less tip"
 	return text
 
 

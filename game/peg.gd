@@ -89,6 +89,8 @@ static func look_for(person_name: String) -> Dictionary:
 	if hat != "":
 		look.hat = hat
 	var extra: String = extras[r.randi_range(0, extras.size() - 1)]
+	if extra == "beard" and (hat != "" or not look.hair in ["bald", "short"]):
+		extra = "glasses"   # a beard under a hat or a fringe hides the whole face at 60 px
 	if extra != "":
 		look.extra = extra
 	return look
@@ -171,8 +173,9 @@ func _build(look: Dictionary, is_chef: bool, player: int) -> void:
 				_stroke(_head, pts, 0.011, "#2b2523")
 			_stroke(_head, [Vector2(-0.035, -0.005), Vector2(0.035, -0.005)], 0.011, "#2b2523")
 		"beard":
-			var beard := Build.lathe(_head, Vector3.ZERO, _dome(HEAD_R + 0.02, 38.0), hair_col)
-			beard.rotation.x = deg_to_rad(128.0)
+			# Low on the chin, so the eyes and smile still show above it (a portrait faces it).
+			var beard := Build.lathe(_head, Vector3.ZERO, _dome(HEAD_R + 0.02, 52.0), hair_col)
+			beard.rotation.x = deg_to_rad(145.0)
 	set_face("neutral")
 
 

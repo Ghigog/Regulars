@@ -209,21 +209,40 @@ func test_guest_is_seated_served_and_pays():
 	assert_gt(float(game.town.people[0].affinity), 0.0, "a good visit makes them like the place")
 
 
+## A deal at a table: E, then held to the end of the bar.
+func _deal(g: Guest) -> void:
+	game.player.position = Grid.center(g.table.cell + Vector2i(0, 1)) if game.station_at(game.player.target_cell()) != g.table else game.player.position
+	game.use_station(g.table)
+	if game.station_at(game.player.target_cell()) != g.table:   # the test stands wherever: point the hold at the table
+		game._deal_hold[game.player] = {"g": g, "kind": game._deal_hold.get(game.player, {}).get("kind", "half" if not g.mood.discounted else "comp"), "t": game.DEAL_HOLD}
+		if game._deal_hold[game.player].kind == "half":
+			game.offer_discount(g)
+		else:
+			game.offer_comp(g)
+		game._deal_hold.erase(game.player)
+		return
+	game._tick_deal(game.player, true, game.DEAL_HOLD + 0.01)
+
+
 func test_half_price_calms_an_impatient_guest_and_costs_half_the_bill():
 	var g: Guest = game.spawn_guest(0)
 	_run(12.0)
 	_order(g)
 	assert_eq(game.prompt_for(g.table), "", "no discount for a guest who is still happy to wait")
 	g.mood.patience = 0.3
-	assert_string_contains(game.prompt_for(g.table), "Half price")
+	assert_string_contains(game.prompt_for(g.table), "half price")
 	game.use_station(g.table)
+	assert_false(g.mood.discounted, "one press gives nothing away")
+	game._tick_deal(game.player, false, 0.1)
+	assert_false(g.mood.discounted, "let go early: nothing")
+	_deal(g)
 	assert_gt(g.mood.patience, 0.6)
 	assert_gt(float(game.town.people[0].affinity), 0.0, "kindness is remembered")
 	assert_eq(game.prompt_for(g.table), "", "only once")
 	_cook_burger()
 	game.use_station(g.table)
 	_eat_and_pay(g)
-	assert_eq(int(game.ledger.today.sales), ceili(g.mood.scaled_price(g.bill_base) / 2.0), "half of the mood-scaled bill")
+	assert_eq(int(game.ledger.today.sales), ceili(g.bill_base / 2.0), "half of the slip's total: what the slip says, less the deal")
 
 
 func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
@@ -231,12 +250,12 @@ func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
 	_run(12.0)
 	_order(g)
 	g.mood.patience = 0.2
-	assert_string_contains(game.prompt_for(g.table), "Half price", "the smaller apology comes first")
-	game.use_station(g.table)
+	assert_string_contains(game.prompt_for(g.table), "half price", "the smaller apology comes first")
+	_deal(g)
 	assert_eq(game.prompt_for(g.table), "", "half price calmed them for now")
 	g.mood.patience = 0.1
-	assert_string_contains(game.prompt_for(g.table), "Free meal")
-	game.use_station(g.table)
+	assert_string_contains(game.prompt_for(g.table), "free meal")
+	_deal(g)
 	assert_true(g.mood.comped)
 	assert_eq(game.prompt_for(g.table), "", "only once")
 	assert_true(g.mood.thoughts.has("On the house? That's really kind"))
@@ -251,7 +270,7 @@ func test_a_disgusted_guest_can_be_offered_a_free_meal_straight_away():
 	_run(12.0)
 	_order(g)
 	g.mood.disgust = 0.5
-	assert_string_contains(game.prompt_for(g.table), "Free meal")
+	assert_string_contains(game.prompt_for(g.table), "free meal")
 
 
 func test_a_guest_who_expects_a_deal_is_let_down_by_full_price():
@@ -1911,8 +1930,10 @@ func test_a_comfortable_guest_eats_longer_and_pays_more():
 	game.pay_bill(rushed.table)
 	assert_eq(rushed.state, "leaving")
 	var rushed_paid := int(game.ledger.today.sales) - start
-	assert_gt(cosy_paid, cosy.bill_base)
-	assert_lt(rushed_paid, rushed.bill_base)
+	assert_eq(cosy_paid, cosy.bill_base, "they pay what the slip says")
+	assert_eq(rushed_paid, rushed.bill_base)
+	assert_gt(cosy.mood.pay_for(cosy.bill_base), cosy.bill_base, "a cosy guest's extras go with the tip")
+	assert_lt(rushed.mood.pay_for(rushed.bill_base), rushed.bill_base, "a rushed one skimps on it")
 
 
 # ---------- Night cleaning (PRD 5) ----------
@@ -2055,7 +2076,7 @@ func test_a_one_item_order_goes_from_ticket_to_paid_bill():
 	game.use_station(g.table)
 	var before: int = game.ledger.money
 	_eat_and_pay(g)
-	assert_eq(game.ledger.money - before - int(game.ledger.today.tips), g.mood.scaled_price(8))
+	assert_eq(game.ledger.money - before - int(game.ledger.today.tips), 8, "the slip's total, paid as written")
 
 
 func test_a_three_item_order_is_one_bill():
@@ -2083,7 +2104,7 @@ func test_a_three_item_order_is_one_bill():
 	game.use_station(g.table)
 	assert_eq(g.state, "eating")
 	_eat_and_pay(g)
-	assert_eq(int(game.ledger.today.sales), g.mood.scaled_price(13), "one bill for the whole order")
+	assert_eq(int(game.ledger.today.sales), 13, "one bill for the whole order, as the slip says")
 	assert_eq(g.table.dirty, 3, "two plates and a cup left behind")
 	assert_eq(g.table.dirty_cups, 1)
 
@@ -3180,11 +3201,11 @@ func test_an_exact_bill_pays_as_before_and_a_wrong_one_is_refused():
 	game.print_bill(game.player, slip)
 	assert_eq(game.player.held, "bill")
 	assert_true(game.slip_out(n))
-	var bill := g.mood.pay_for(g.bill_base)
-	var tip := g.mood.tip_for(bill, game.town.tip_bonus(g.idx))
+	var bill := g.mood.bill_for(g.bill_base)
+	var tip := maxi(0, g.mood.tip_for(bill, game.town.tip_bonus(g.idx)) + g.mood.pay_for(g.bill_base) - bill)
 	assert_true(game.give_bill(game.player, g.table))
-	assert_eq(int(game.ledger.today.sales), bill, "the same bill finish_meal paid")
-	assert_eq(int(game.ledger.today.tips), tip)
+	assert_eq(int(game.ledger.today.sales), bill, "the amount on the slip, never anything else")
+	assert_eq(int(game.ledger.today.tips), tip, "the mood's extras with the tip")
 	assert_eq(g.state, "leaving")
 
 

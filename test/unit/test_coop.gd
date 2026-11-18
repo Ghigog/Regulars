@@ -97,6 +97,7 @@ func test_the_first_use_at_a_station_wins():
 		ch.position = Grid.center(Vector2i(1, 3))
 	assert_ne(game.use_station(stove, false, one), "", "chef 1 puts a patty on")
 	assert_eq(game.use_station(stove, true, two).begins_with("Grill"), false, "chef 2 cannot put a second one on")
+	assert_eq(game.use_station(stove, true, two), "Chef 1 has it", "and is told who won")
 
 
 # ---------------------------------------------------------------- building together
