@@ -1474,17 +1474,12 @@ func test_turned_fridge_lifted_with_its_card_keeps_its_turn():
 	assert_eq(f.facing, 1)
 
 
-func test_turning_a_lifted_fridge_with_its_card_open_sticks():
+func test_turning_a_fridge_on_its_card_sticks():
 	_game()
 	game.open_build()
 	var f: Station = game.add_station("fridge", Vector2i(2, 5), 1, 0, "fridge")
-	var ch: Player = game.player
-	ch.hand = {"id": f.type, "tier": f.tier, "price": 0, "facing": f.facing, "moving": true, "node": f,
-		"in_place": true, "carry": true, "layer": "base", "y": f.position.y,
-		"from": Vector3i(2, 5, 0), "from_facing": f.facing}
-	f.position.y += game.LIFT
 	game.open_storage(Vector2i(2, 5))
-	assert_true(game.shop_action("turn"))
-	game.storage_put_down()
+	assert_true(game.card_act("turn"))
+	game.shop_action("back")
 	assert_eq(f.facing, 1)
-	assert_almost_eq(f.position.y, 0.0, 0.001)
+	assert_almost_eq(f.position.y, 0.0, 0.001, "never lifted")

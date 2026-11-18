@@ -159,7 +159,10 @@ var upgrading := false           # the shop is showing the upgrade tree of what 
 var treat_laid := {}
 var treat_off := {}
 const NO_CELL := Vector2i(-99, -99)
-var storing_cell := NO_CELL      # the storage card is open on this cell (E on a counter, shelf or fridge)
+var storing_cell := NO_CELL      # a piece's card is open on this cell (E on any piece at night, review item 4)
+var card_layer := "base"         # which piece on the cell the card is for: "base", "top" (a tool on a counter) or "high"
+var _card_hold := {}             # Player -> seconds E has been held since it opened the card (hold E: move)
+const HOLD_MOVE := 0.5           # tunable: seconds of held E that move the piece instead
 var shopping: bool:              # the shop is open over the build phase
 	get: return shopper != null
 var door_open := true            # which side of the door card faces the street
@@ -877,14 +880,14 @@ func _demo_storage(demo: String) -> void:
 				plain = c
 		player.position = Grid.center(plain + side)
 		player.look(-side)
-		lift()   # E: the counter rises with its card open
+		open_card()   # E: the counter's card opens where it stands
 		if demo == "storage_card_up":
 			storage_upgrades()
-		elif demo == "storage_fridge":   # upgraded to a fridge while lifted, back on its card
+		elif demo == "storage_fridge":   # upgraded to a fridge on its card, back on its boxes
 			storage_upgrades()
 			buy_upgrade("fridge")
 			storage_ingredients()
-			rotate_hand()   # turned on its card, the door toward the camera
+			card_act("turn")   # turned on its card, the door toward the camera
 		else:
 			get_tree().create_timer(0.3).timeout.connect(hud.shop_move.bind(1))
 		return
@@ -1246,7 +1249,8 @@ func _demo_build(demo: String) -> void:
 	elif demo == "build_till":  # the till lifted off the pass and held over the next counter down
 		player.position = Grid.center(Vector2i(5, 2))
 		player.look(Vector2i(-1, 0))
-		lift()
+		open_card()
+		card_act("till")
 		_demo_hover = Vector3(4.5, 0, 4.5)
 	else:   # a stove from the shop, held over a good spot or (build_no) a refused one
 		pick_catalog("stove", 2)
@@ -2411,7 +2415,10 @@ func open_build() -> void:
 ## each floor treatment with its box stored (PRD 9.5) under Build, and the flyers under Extras.
 func shop_items(query := "", category := "") -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
-	if storing():   # the storage card: what is stored here, then every box there is
+	if storing():   # a piece's card: its actions, then what is stored here, then every box there is
+		var acts := card_actions()
+		if not card_keeps_boxes():
+			return acts
 		for box: String in kitchen.stock(storing_cell):
 			found.append({"id": box, "tier": 1, "stored": true})
 		for bp in Catalog.search(query, "Pantry", Scenery.theme_id, ledger.level()):
@@ -2419,7 +2426,7 @@ func shop_items(query := "", category := "") -> Array[Dictionary]:
 				found.append(bp)
 		found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:   # what fits first
 			return _storage_rank(a) < _storage_rank(b))
-		return found
+		return acts + found
 	if category != "Extras":
 		found = Catalog.search(query, category, Scenery.theme_id, ledger.level(), true)
 		for i in found.size():   # a missing essential, at any level
@@ -2533,7 +2540,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 	var link := Upgrades.is_link(to)   # a stove grown on a counter where it stands
 	if link and not (ch.hand.get("in_place", false) and ch.hand.node is Station and (ch.hand.node as Station).item == ""):
 		sfx("fail")
-		hud.say("Put the counter down first, then upgrade it where it stands.")
+		hud.say("Clear the counter first, then grow it where it stands.")
 		return false
 	if phase != Phase.BUILD or from == "" or not Upgrades.can_buy(from, to, ledger.money, ledger.level()) \
 			or not ledger.spend(Upgrades.step_price(to)):
@@ -2552,6 +2559,11 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		sfx("coin")
 		return true
 	if Upgrades.is_treatment(to):   # a box: it is the new treatment's now (PRD 9.5)
+		if ch.hand.get("in_place", false):   # still in its slot, upgraded from the card
+			var cell := Vector2i(ch.hand.from.x, ch.hand.from.y)
+			kitchen.unstore(cell, from)
+			kitchen.store(cell, to)
+			_show_boxes(cell)
 		ch.hand.id = to
 		_swap_treatment(Treatments.key_of(from), Treatments.key_of(to))
 		sfx("coin")
@@ -2566,11 +2578,27 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 			sfx("fail")
 			hud.say("A tall fridge needs the wall above clear. Take down what hangs there first.")
 			return false
-		if Kitchen.is_top(st.type):   # a stove up its tree where it stands: made anew in place
-			_remake_in_place(st, to, ch)
-		else:
-			st.set_base(to)
+		if Upgrades.is_tiered(to):   # a table or fern a tier up where it stands
+			st.tier = Upgrades.tier_of(to)
+			st.set_base(st.base)
+		elif st.type == "hook" and Kitchen.tool_of(to) != "":   # the hook's tool is swapped
+			clean_kit.upgrade_tool(st, Kitchen.tool_of(to))
+		elif st.high:   # what hangs on the wall a step up: made anew and hung back
+			var up := Station.new()
+			add_child(up)
+			up.setup(to, st.cell, st.tier, st.facing, st.base, st.pass_look)
+			highs.erase(st.cell)
+			kitchen.cells[st.cell].high = ""
+			_hang(up, st.cell)
+			_bought_tonight(up, spent_tonight(st))
+			st.queue_free()
+			ch.hand.node = up
+			ch.hand.id = up.type
+		elif st.type == "counter" or (Kitchen.slots_of(to) > 0 and not Kitchen.is_top(st.type)):
+			st.set_base(to)   # a counter or fridge a step up: the same piece, redrawn
 			kitchen.set_cell(st.cell, to)
+		else:   # a stove or any other tool up its tree where it stands: made anew in place
+			_remake_in_place(st, to, ch)
 		_show_boxes(st.cell)
 		menu_changed()
 		sfx("coin")
@@ -2617,8 +2645,8 @@ func _remake_in_place(st: Station, to: String, ch: Player) -> void:
 		till.reparent(up, false)
 	_register(up)
 	kitchen.give_stock(up.cell, held)
-	up.position.y = st.position.y   # still lifted while its card is open
 	_bought_tonight(up, spent_tonight(st))
+	clean_kit.upgrade_home(st, up, Kitchen.tool_of(to))   # a bucket's mop goes with it (PRD 9.5)
 	st.queue_free()
 	ch.hand.node = up
 	ch.hand.id = up.type
@@ -2641,99 +2669,261 @@ func storing() -> bool:
 	return shopping and storing_cell != NO_CELL
 
 
-## The storage cell in front of a chef with empty hands: a bare counter (or its fridge
-## line) or a piece on the wall that keeps boxes. A tool on a counter is picked up, so
-## it is not one. NO_CELL if none.
-func _storage_in_front(ch: Player) -> Vector2i:
-	if not ch.hand.is_empty():
-		return NO_CELL
-	var c := ch.target_cell()
-	if kitchen.slots(c) == 0 or (stations.has(c) and needs_cleaning(stations[c])):
-		return NO_CELL
+## The piece a card would open for on a cell: what hangs on the wall, else what stands
+## there (a tool on a counter before the counter). Once a wall piece's card has been
+## shut, the next E there takes what stands under it, so a sink under a shelf is reached.
+func _card_layer_at(c: Vector2i, ch: Player) -> String:
 	var st: Station = stations.get(c)
-	if st != null and not st.type in ["counter", "shelf"] and not Kitchen.grows_from_counter(st.node):
-		return NO_CELL
-	return c
+	if highs.has(c) and (st == null or ch.get_meta("low_next", NO_CELL) != c):
+		return "high"
+	if st == null:
+		return ""
+	return "top" if Kitchen.is_top(st.type) and not Kitchen.grows_from_counter(st.node) else "base"
 
 
-## Opens the storage card on a cell: its boxes first, then its upgrades.
-func open_storage(cell: Vector2i, ch: Player = null) -> bool:
+## Whether E in front of a chef opens a card (a station, or a piece on the wall). A rug
+## or a partition has neither contents nor upgrades: E just picks it up.
+func _card_in_front(ch: Player) -> bool:
+	var p := _piece_in_front(ch)
+	if p == Vector3.INF or wall_nodes.has(snap_edge(p)):
+		return false
+	return _card_layer_at(Grid.to_cell(p), ch) != ""
+
+
+## E on a piece at night (review, item 4): its one card opens where it stands, nothing
+## lifted: what is in it, its upgrades, and Move, Turn and Sell. Holding E moves it.
+## `at`: a point on the piece (a mouse click); by default the one in front of the chef.
+func open_card(ch: Player = null, at := Vector3.INF) -> bool:
 	ch = _me(ch)
-	if phase != Phase.BUILD or shopping or cell == NO_CELL or hud.card_open():
+	var p := _piece_in_front(ch) if at == Vector3.INF else at
+	if p == Vector3.INF or shopping or hud.card_open() or not ch.hand.is_empty():
+		return false
+	var c := Grid.to_cell(p)
+	var layer := _card_layer_at(c, ch)
+	if wall_nodes.has(snap_edge(p)) or layer == "":
+		return pick_up(p, ch, true)   # a partition or a rug: nothing to show, so it is just picked up
+	if stations.has(c) and needs_cleaning(stations[c]) and layer != "high":
+		sfx("fail")
+		hud.say(Cleaning.CLEAN_FIRST)
+		return false
+	return _open_card_at(c, layer, ch)
+
+
+func _open_card_at(c: Vector2i, layer: String, ch: Player) -> bool:
+	if phase != Phase.BUILD or shopping or c == NO_CELL or hud.card_open():
 		return false
 	shopper = ch
-	storing_cell = cell
+	storing_cell = c
+	card_layer = layer
+	_card_hold.erase(ch)
+	ch.set_meta("low_next", c if layer == "high" else NO_CELL)   # a wall piece's card shut: next E, what is under it
 	sfx("slide")
 	hud.show_shop()
 	return true
 
 
-## The tree key of the storage piece standing at the open card's cell ("" when it has
-## no tree, or only a piece on the wall keeps boxes there).
+## Opens the card on a cell for the piece E would take there. For tests and demos.
+func open_storage(cell: Vector2i, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if cell == NO_CELL:
+		return false
+	var layer := _card_layer_at(cell, ch)
+	return layer != "" and _open_card_at(cell, layer, ch)
+
+
+## The piece the open card is for.
+func card_station() -> Station:
+	if not storing():
+		return null
+	return highs.get(storing_cell) if card_layer == "high" else stations.get(storing_cell)
+
+
+## Whether the open card's piece keeps boxes (a counter, shelf, cabinet or fridge, or a
+## stove, which keeps its counter's). A tool on a counter does not: that is the counter's.
+func card_keeps_boxes() -> bool:
+	var st := card_station()
+	if st == null or card_layer == "top":
+		return false
+	return Kitchen.slots_of(kitchen.get_piece(st.cell, "high" if card_layer == "high" else "base")) > 0
+
+
+## The card's action cards, in the row before any boxes: Upgrades (when the piece has a
+## tree), the upgrade of each stored treatment box, Move, Turn and Sell, and the till's
+## Move when the till stands here. Each is {id, tier, ..., act}, drawn as the piece itself.
+func card_actions() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var st := card_station()
+	if st == null:
+		return out
+	var look := {"id": st.type, "tier": st.tier, "node": st.node,
+		"base": st.base if st.type == "counter" else "", "counter": Kitchen.grows_from_counter(st.node)}
+	if storage_tree() != "":
+		out.append(look.merged({"act": "upgrades"}))
+	if card_keeps_boxes():
+		for box: String in kitchen.stock(storing_cell):
+			if Treatments.is_box(box) and Upgrades.has_tree(box):
+				out.append({"id": box, "tier": 1, "act": "box_tree", "box": box})
+	out.append(look.merged({"act": "move"}))
+	if card_layer != "high":
+		out.append(look.merged({"act": "turn"}))
+	out.append(look.merged({"act": "sell"}))
+	if st.has_node("till"):
+		out.append({"id": "till", "tier": 1, "act": "till"})
+	return out
+
+
+func _probe_of(st: Station) -> Player:
+	var probe := Player.new()
+	probe.hand = {"id": st.type, "tier": st.tier, "moving": true, "node": st}
+	return probe
+
+
+## What the card's Sell would pay, worked out as if the piece were in hand; -1 when it
+## cannot be sold (`card_sell_block` says why).
+func card_sell_value() -> int:
+	var st := card_station()
+	if st == null:
+		return -1
+	var probe := _probe_of(st)
+	var v := sell_value(probe) if sell_block(probe) == "" else -1
+	probe.free()
+	return v
+
+
+func card_sell_block() -> String:
+	var st := card_station()
+	if st == null:
+		return "Nothing here"
+	var probe := _probe_of(st)
+	var why := sell_block(probe)
+	probe.free()
+	return why
+
+
+## Does what an action card on the open card says. The card shuts for Move, Sell and the
+## till; Turn turns the piece where it stands and the card stays open.
+func card_act(act: String, bp := {}) -> bool:
+	if not storing():
+		return false
+	var ch := shopper
+	var c := storing_cell
+	var layer := card_layer
+	match act:
+		"upgrades":
+			storage_upgrades()
+			return true
+		"box_tree":
+			ch.hand = {"id": bp.box, "tier": 1, "price": 0, "facing": 0, "moving": true, "in_place": true,
+				"from": Vector3i(c.x, c.y, 0), "from_facing": 0}
+			hud.hide_shop()
+			upgrading = true
+			sfx("tab", 0.08)
+			hud.show_tree(bp.box)
+			return true
+		"move":
+			close_shop()
+			return pick_up(Grid.center(c), ch, true, layer)
+		"till":
+			close_shop()
+			return pick_up(Grid.center(c), ch, true, "till")
+		"sell":
+			var why := card_sell_block()
+			if why != "":
+				hud.say(why + ".")
+				sfx("fail")
+				return false
+			close_shop()
+			if not pick_up(Grid.center(c), ch, true, layer):
+				return false
+			return sell_hand(ch)
+		"turn":
+			return _card_turn(ch, c, layer)
+	return false
+
+
+## Turns the card's piece a quarter where it stands. A piece that keeps boxes turns on
+## the spot; anything else is taken up, turned and put back if it fits that way round.
+func _card_turn(ch: Player, c: Vector2i, layer: String) -> bool:
+	var st := card_station()
+	if st == null:
+		return false
+	if card_keeps_boxes() or st.type == "counter" or Kitchen.grows_from_counter(st.node):
+		st.place_at(st.cell, (st.facing + 1) % 4)
+		sfx("pickup")
+		return true
+	if not pick_up(Grid.center(c), ch, true, layer):
+		return false
+	var from_facing := int(ch.hand.from_facing)
+	rotate_hand(ch)
+	var spot: Vector3i = ch.hand.from
+	if int(ch.hand.facing) != from_facing and can_place(spot, ch):
+		var h: Dictionary = ch.hand
+		_put_down(h, spot, int(h.facing))
+	else:
+		sfx("fail")
+		hud.say("It will not fit that way round here.")
+		_put_down(ch.hand, spot, from_facing)
+	ch.hand = {}
+	return true
+
+
+## The tree key of the open card's piece ("" when it has no tree).
 func storage_tree() -> String:
-	var st: Station = stations.get(storing_cell)
-	if st == null or not (st.type == "counter" or Kitchen.grows_from_counter(st.node)) \
-			or (shopper != null and shopper.hand.get("layer", "") == "high"):
+	var st := card_station()
+	if st == null:
 		return ""
-	var key := Upgrades.key_of(st.type, st.tier, st.base if st.type == "counter" else st.node)
+	var key := ""
+	if st.type == "hook" and Kitchen.has_node(st.kit_tool):
+		key = st.kit_tool   # a hook's tree is its tool's: sponge, scourer and on (PRD 9.5)
+	else:
+		key = Upgrades.key_of(st.type, st.tier, st.base if st.type == "counter" else st.node)
 	return key if Upgrades.has_tree(key) else ""
 
 
-## The card's Upgrades tab: the tree of the piece where it stands, nothing lifted.
+## The card's Upgrades: the tree of the piece where it stands, nothing lifted.
 func storage_upgrades() -> void:
 	var key := storage_tree()
 	if key == "" or not storing():
 		sfx("fail")
 		return
 	var ch := shopper
-	var st: Station = stations[storing_cell]
-	if not ch.hand.get("carry", false):
-		ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
-			"node": st, "in_place": true, "from": Vector3i(st.cell.x, st.cell.y, 0), "from_facing": st.facing}
+	var st := card_station()
+	ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
+		"node": st, "in_place": true, "layer": card_layer, "from": Vector3i(st.cell.x, st.cell.y, 0), "from_facing": st.facing}
 	hud.hide_shop()
 	upgrading = true
 	sfx("tab", 0.08)
 	hud.show_tree(key)
 
 
-## Back from the Upgrades tab to the card's Ingredients.
+## Back from the tree to the card.
 func storage_ingredients() -> void:
 	if not upgrading:
 		return
-	if not shopper.hand.get("carry", false):
-		shopper.hand = {}
+	shopper.hand = {}
 	upgrading = false
 	hud.hide_tree()
 	sfx("tab", 0.08)
 	hud.show_shop()
 
 
-## E on a piece in the build phase: it is picked up. A piece that keeps boxes (a counter,
-## shelf, cabinet or fridge, PRD 8.4) rises where it stands with its storage card open:
-## choose a box and E puts the piece back down with it in (`storage_put_down`); Tab or Esc
-## keeps it in hand, its boxes with it, to carry elsewhere.
-## `at`: a point on the piece (a mouse click); by default the one in front of the chef.
-func lift(ch: Player = null, at := Vector3.INF) -> bool:
-	ch = _me(ch)
-	var p := _piece_in_front(ch) if at == Vector3.INF else at
-	if p == Vector3.INF:
-		return false
-	var c := Grid.to_cell(p)
-	var layer := _lift_layer(c, ch)
-	var st: Station = highs.get(c) if layer == "high" else stations.get(c)
-	if wall_nodes.has(snap_edge(p)) or st == null or not _keeps_boxes(st, layer) or needs_cleaning(st) \
-			or shopping or hud.card_open() or not ch.hand.is_empty():
-		return pick_up(p, ch, true)
-	ch.set_meta("low_next", NO_CELL)
-	ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true, "node": st,
-		"in_place": true, "carry": true, "layer": layer, "y": st.position.y,
-		"from": Vector3i(c.x, c.y, 0), "from_facing": st.facing}
-	st.position.y += LIFT
-	sfx("pickup")
-	if not open_storage(c, ch):
-		_settle(ch)
-		return false
-	return true
+## Held E after it opened a card (review, item 4): once held HOLD_MOVE, the card shuts
+## and the piece is picked up to move. The same fill bar as every hold shows it.
+func _tick_card_hold(ch: Player, held: bool, delta: float) -> void:
+	if not _card_hold.has(ch):
+		return
+	if not held or shopper != ch or not storing() or upgrading:
+		_card_hold.erase(ch)
+		ch.stop_giving()
+		return
+	_card_hold[ch] = float(_card_hold[ch]) + delta
+	var st := card_station()
+	if st != null:
+		ch.show_hold(st.global_position, float(_card_hold[ch]) / HOLD_MOVE, "move")
+	if float(_card_hold[ch]) >= HOLD_MOVE:
+		_card_hold.erase(ch)
+		ch.stop_giving()
+		card_act("move")
 
 
 ## Whether the piece E would lift there keeps boxes itself (a double counter being split
@@ -2775,17 +2965,12 @@ func lift_name(ch: Player = null) -> String:
 	return piece_name({"id": st.type, "tier": st.tier}).to_lower()
 
 
-## E on a lifted piece's card: the chosen box goes in (if it is not in already and
-## fits), the piece settles back where it stood, and the card shuts.
-func storage_put_down() -> void:
-	var bp: Dictionary = hud.shop_selected()
-	if not bp.is_empty() and not bp.get("stored", false):
-		if kitchen.store_refusal(storing_cell, bp.id) != "" or not _storage_buy(bp):
-			hud.shop_buy()   # shakes it, with the reason on the card
-			return
-	_settle(shopper)
-	sfx("putdown")
-	close_shop()
+## The name of the piece E would open a card for ("sink", "wall shelf").
+func _card_name(ch: Player) -> String:
+	var c := Grid.to_cell(_piece_in_front(ch))
+	var layer := _card_layer_at(c, ch)
+	var st: Station = highs.get(c) if layer == "high" else stations.get(c)
+	return "" if st == null else piece_name({"id": st.type, "tier": st.tier}).to_lower()
 
 
 ## A piece lifted for its card comes down where it stood, nothing moved.
@@ -2830,7 +3015,7 @@ func _storage_buy(bp: Dictionary) -> bool:
 ## be carried to its place.
 func buy(bp: Dictionary) -> bool:
 	if storing():
-		return _storage_buy(bp)
+		return card_act(bp.act, bp) if bp.has("act") else _storage_buy(bp)
 	if bp.id == FLYERS.id:
 		if buy_flyers():
 			return true
@@ -3067,10 +3252,9 @@ func rotate_hand(ch: Player = null) -> void:
 	if not ch.hand.is_empty() and not on_edge(ch.hand.id) and not Catalog.is_build_tool(ch.hand.id) \
 			and not Kitchen.is_high_only(hand_node(ch.hand)):   # a hung piece faces off its wall
 		ch.hand.facing = (int(ch.hand.facing) + 1) % 4
-		if ch.hand.get("carry", false) and ch.hand.get("node") is Station:   # lifted in place: turn it now
+		if ch.hand.get("in_place", false) and ch.hand.get("node") is Station:   # on its card: turn it where it stands
 			var st: Station = ch.hand.node
 			st.place_at(st.cell, int(ch.hand.facing))
-			st.position.y = float(ch.hand.get("y", 0.0)) + LIFT
 		sfx("pickup")
 
 
@@ -3600,7 +3784,7 @@ func build_action(ch: Player = null) -> String:
 	if desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
 		return "Use desk"
 	if not Cleaning.carrying_mess(ch.held) and not CleanKit.holding(ch) and _piece_in_front(ch) != Vector3.INF:
-		return "Pick up"
+		return "Open" if _card_in_front(ch) else "Pick up"
 	return door_action(ch)
 
 
@@ -3658,12 +3842,11 @@ func build_interact(ch: Player = null) -> void:
 			ch.last_paint = snap(_hover_point(ch), ch)
 			if not place(ch.last_paint, ch):
 				sfx("fail")
-		"Pick up":
-			lift(ch)
+		"Pick up", "Open":
+			if open_card(ch) and storing():
+				_card_hold[ch] = 0.0   # E still held from here moves it (review, item 4)
 		"Use desk":
 			open_desk(ch)
-		"Open":
-			open_storage(_storage_in_front(ch), ch)
 		"Open up", "Take out rubbish":
 			use_door(ch)
 			hud.show_build()
@@ -6658,6 +6841,7 @@ func _process(delta: float) -> void:
 			if ch.aim_mouse:
 				ch.mouse_point = floor_point(get_viewport().get_mouse_position())
 			_paint_held(p)
+			_tick_card_hold(ch, controls.holding(p, "use"), delta)
 		if phase in [Phase.SERVICE, Phase.BUILD] and shopper != ch and not preps.has(p):
 			clean_kit.hold_use(ch, controls.holding(p, "use"))   # held E keeps mopping
 		if phase == Phase.SERVICE and not (hud.bill_open() and hud.bill.chef == ch):
@@ -6733,9 +6917,9 @@ func _update_cursor(ch: Player = null) -> void:
 		var p := DOORWAY + Vector3(0, 2.9, 0)
 		if not ch.hand.is_empty() and _hover_point(ch) != Vector3.INF:
 			p = _hover_point(ch) + Vector3(0, 2.9 if hand_layer(ch) == "high" else 2.0, 0)
-		elif action == "Pick up":
+		elif action in ["Pick up", "Open"]:
 			p = _piece_in_front(ch) + Vector3(0, 2.0, 0)
-			action = "Pick up %s" % lift_name(ch)
+			action = "%s %s" % [action, _card_name(ch) if action == "Open" else lift_name(ch)]
 		elif action == "Use desk":
 			p = desk_in_front(ch).position + Vector3(0, 1.9, 0)
 		at = cam.unproject_position(p)
@@ -6764,17 +6948,6 @@ func shop_action(action: String) -> bool:
 				rotate_hand(shopper)
 			_: return false
 		return true
-	if storing() and shopper.hand.get("carry", false):
-		match action:   # a lifted piece's card: E puts it down, Enter or X puts in or takes out
-			"use":
-				storage_put_down()
-				return true
-			"sell":
-				hud.shop_buy()
-				return true
-			"turn":   # the lifted piece turns where it hangs; E sets it down that way round
-				rotate_hand(shopper)
-				return true
 	match action:
 		"left": hud.shop_move(-1)
 		"right": hud.shop_move(1)
@@ -6854,7 +7027,7 @@ func _build_mouse(event: InputEvent, ch: Player) -> void:
 			if not place(snap(p, ch), ch):
 				sfx("fail")
 		else:
-			lift(ch, p)   # as E does: a piece that keeps boxes rises with its card open
+			open_card(ch, p)   # as E does: the piece's card opens where it stands
 	elif not ch.drag.is_empty() and (right == bool(ch.drag.remove) or erase):
 		finish_drag(ch.drag.from, p, ch.drag.remove, ch)
 

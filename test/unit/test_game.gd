@@ -349,8 +349,9 @@ func test_furniture_is_carried_and_put_down_in_front_of_the_chef():
 	_to_build()
 	game.player.position = Grid.center(Vector2i(8, 2))
 	game.player.look(Vector2i(0, 1))            # facing the table at (8, 3)
-	assert_eq(game.build_action(), "Pick up")
+	assert_eq(game.build_action(), "Open")
 	game.build_interact()
+	assert_true(game.card_act("move"), "Move on its card")
 	assert_eq(game.hand.id, "table")
 	assert_eq(game.build_action(), "Put down")
 	game.build_interact()
@@ -2829,7 +2830,9 @@ func test_a_storage_card_shows_boxes_first_and_dims_what_needs_a_fridge():
 	assert_true(game.storing())
 	assert_eq(game.hud._category, "Ingredients", "ingredients come first")
 	assert_eq(game.hud.shop_tabs(), ["Ingredients", "Upgrades"])
-	var items: Array[Dictionary] = game.shop_items("", "Ingredients")
+	var acts: int = game.card_actions().size()
+	assert_gt(acts, 0, "the card's Upgrades, Move, Turn and Sell come before the boxes")
+	var items: Array[Dictionary] = game.shop_items("", "Ingredients").slice(acts)
 	var patty := items.filter(func(bp: Dictionary) -> bool: return bp.id == "box_patty")
 	assert_eq(patty.size(), 1, "a fridge-only kind is still listed, so the player learns of fridges")
 	assert_eq(game.hud._storage_info(patty[0]).price, "Needs a fridge")
@@ -2838,7 +2841,7 @@ func test_a_storage_card_shows_boxes_first_and_dims_what_needs_a_fridge():
 	assert_true(game.buy({"id": "box_bun", "tier": 1}))
 	assert_true(game.kitchen.stock(c).has("box_bun"), "put straight in, the card still open")
 	assert_true(game.storing())
-	assert_true(game.shop_items("", "Ingredients")[0].get("stored", false), "what is stored is listed first")
+	assert_true(game.shop_items("", "Ingredients")[acts].get("stored", false), "what is stored is listed first")
 	assert_true(game.buy({"id": "box_bun", "tier": 1, "stored": true}))
 	assert_false(game.kitchen.stock(c).has("box_bun"), "and taken out again")
 	game.close_shop()
@@ -2877,32 +2880,33 @@ func _pass_counter_faced() -> Vector2i:
 	return game.NO_CELL
 
 
-func test_a_lifted_counter_turns_on_its_upgrade_tree_and_comes_down_a_fridge_that_lifts_again():
+func test_a_counter_turns_on_its_upgrade_tree_and_becomes_a_fridge_where_it_stands():
 	_to_build()
 	game.ledger.money = 200
 	var c := _pass_counter_faced()
 	assert_ne(c, game.NO_CELL, "the start has a bare length of pass")
-	assert_true(game.lift())
-	game.shop_action("shop")   # Tab: the Upgrades tab
+	assert_eq(game.build_action(), "Open")
+	assert_true(game.open_card())
+	game.shop_action("shop")   # Tab: the Upgrades tab (or its Upgrades card)
 	assert_true(game.upgrading)
 	assert_true(game.buy_upgrade("fridge"))
 	var st: Station = game.stations[c]
-	assert_not_null(st._vis.get_node_or_null("door"), "drawn a fridge while still lifted")
+	assert_not_null(st._vis.get_node_or_null("door"), "drawn a fridge where it stands")
 	game.shop_action("turn")
 	assert_eq(st.facing, 1, "R turns it on the tree too, to see its back")
 	assert_true(game.upgrading, "and the tree stays open")
-	game.shop_action("shop")   # back to the ingredients
-	game.shop_action("use")    # E: down with the chosen box in
-	assert_false(game.shopping)
-	assert_eq(st.facing, 1, "set down the way it was turned")
-	assert_false(game.kitchen.stock(c).is_empty(), "a box went in")
-	assert_eq(game.build_action(), "Pick up")
-	assert_true(game.lift(), "the fridge lifts again")
+	game.shop_action("back")   # back to the card
 	assert_true(game.storing())
-	assert_eq(game.player.hand.node, st)
+	game.shop_action("use")    # E: the chosen box goes in
+	assert_false(game.kitchen.stock(c).is_empty(), "a box went in")
+	game.shop_action("back")
+	assert_false(game.shopping)
+	assert_eq(st.facing, 1, "it stays turned")
+	assert_true(game.open_card(), "the fridge's card opens again")
+	assert_eq(game.card_station(), st)
 
 
-func test_a_click_on_a_stocked_fridge_lifts_it_whole_as_e_does():
+func test_a_click_on_a_stocked_fridge_opens_its_card_as_e_does():
 	_to_build()
 	var c := _pass_counter_faced()
 	game.player.position = Grid.center(Vector2i(1, 1))   # away from it: the click reaches
@@ -2910,9 +2914,10 @@ func test_a_click_on_a_stocked_fridge_lifts_it_whole_as_e_does():
 	st.set_base("fridge")
 	game.kitchen.set_cell(c, "fridge")
 	game._store_box(c, "box_patty")
-	assert_true(game.lift(game.player, Grid.center(c)))
+	assert_true(game.open_card(game.player, Grid.center(c)))
 	assert_true(game.storing(), "its card opens, the box still in it")
-	assert_eq(game.player.hand.node, st)
+	assert_eq(game.card_station(), st)
+	assert_true(game.player.hand.is_empty())
 	assert_true(game.kitchen.stock(c).has("box_patty"))
 
 

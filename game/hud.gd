@@ -2076,18 +2076,18 @@ func show_review() -> void:
 
 
 const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
-## The storage card's tabs (E lifts a storage piece at night and opens it): what goes
-## in it first, then its upgrade tree.
+## A piece's card (E on any piece at night, review item 4): its boxes (or just the piece,
+## when it keeps none), then its upgrade tree when it has one.
 const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades"]
 
 
-## The tabs of the tray now open: the shop's, or a storage card's.
+## The tabs of the tray now open: the shop's, or a piece's card's.
 func shop_tabs() -> Array[String]:
 	if not game.storing():
 		return SHOP_TABS
-	var tabs := STORAGE_TABS.duplicate()
-	if game.storage_tree() == "":
-		tabs.erase("Upgrades")
+	var tabs: Array[String] = ["Ingredients" if game.card_keeps_boxes() else "This piece"]
+	if game.storage_tree() != "":
+		tabs.append("Upgrades")
 	return tabs
 const TRAY_DROP := 260.0   # how far below its place the shop tray waits
 
@@ -2333,20 +2333,13 @@ func _hint_text(p := 0) -> String:
 
 
 func _shop_keys_text() -> String:
-	if game.storing() and game.shopper.hand.get("carry", false):   # the piece is lifted
+	if game.storing():   # a piece's card: only E and Back (review, item 4)
 		match _mode():
 			"pad":
-				return "A put down with it in      X put in or take out      %s turn      B carry it" % _g("turn")
+				return "A choose      D-pad browse      B back"
 			"touch":
-				return "Tap a box to put it in or take it out      Use put down"
-		return "E put down with it in      Enter put in or take out      R turn      Tab carry it"
-	if game.storing():
-		match _mode():
-			"pad":
-				return "A put in or take out      D-pad browse      B close"
-			"touch":
-				return "Tap a box, then tap it again to put it in"
-		return "E put in or take out      Up/Down tabs      Tab close"
+				return "Tap a card, then tap it again"
+		return "E choose      Arrows browse      Esc back"
 	match _mode():
 		"pad":
 			return "A buy      D-pad browse      B close"
@@ -2540,7 +2533,7 @@ func show_shop() -> void:
 		return
 	_search = ""
 	_category = shop_tabs()[0]
-	_shop_index = 0
+	_shop_index = game.card_actions().size() if game.storing() and game.card_keeps_boxes() else 0   # the boxes first
 	build_bar.visible = false
 	_shop = Control.new()
 	_shop.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2708,6 +2701,8 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 ## A box on the storage card: one stored here is taken out; one that may go in shows
 ## its nightly fee; one that may not is dimmed with why ("Needs a fridge").
 func _storage_info(bp: Dictionary) -> Dictionary:
+	if bp.has("act"):
+		return _card_act_info(bp)
 	var b := Pantry.station_ingredient(bp.id)
 	var fee := "Free" if Treatments.is_box(bp.id) or b.is_empty() else "$%d a night" % Pantry.fee_of(b.id, b.ready)
 	if bp.get("stored", false):
@@ -2716,6 +2711,35 @@ func _storage_info(bp: Dictionary) -> Dictionary:
 	var why: String = game.kitchen.store_refusal(game.storing_cell, bp.id)
 	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp) if why == "" else why,
 		"locked": why != "", "price": fee if why == "" else why, "can": why == ""}
+
+
+## An action card on a piece's card: Upgrades, Move, Turn, Sell, the till's Move, or the
+## upgrade of a stored treatment box.
+func _card_act_info(bp: Dictionary) -> Dictionary:
+	var st: Station = game.card_station()
+	var what: String = game.piece_name({"id": st.type, "tier": st.tier}).to_lower() if st != null else "piece"
+	match str(bp.act):
+		"upgrades":
+			return {"name": "Upgrades", "blurb": "Its upgrade tree: upgrade the %s where it stands" % what,
+				"price": "Upgrade", "can": true, "locked": false}
+		"box_tree":
+			return {"name": "Upgrade the %s" % Catalog.label(bp).to_lower(), "blurb": "Its tree: a better treatment, kept in its slot",
+				"price": "Upgrade", "can": true, "locked": false}
+		"move":
+			return {"name": "Move", "blurb": "Pick the %s up to carry it somewhere else (or hold E)" % what,
+				"price": "Move", "can": true, "locked": false}
+		"turn":
+			return {"name": "Turn", "blurb": "A quarter turn where it stands", "price": "Turn", "can": true, "locked": false}
+		"till":
+			return {"name": "Move the till", "blurb": "Lift the till off to put it on another counter",
+				"price": "Move", "can": true, "locked": false}
+		"sell":
+			var v: int = game.card_sell_value()
+			if v < 0:
+				return {"name": "Sell", "blurb": game.card_sell_block(), "price": "Can't sell", "can": false, "locked": true}
+			return {"name": "Sell", "blurb": "Half back; whatever was bought tonight comes back whole",
+				"price": "+$%d" % v, "can": true, "locked": false}
+	return {"name": "", "blurb": "", "price": "", "can": false, "locked": false}
 
 
 ## Rebuilds the row for the current search and category, keeping the selection on
@@ -2867,7 +2891,7 @@ func show_tree(key: String) -> void:
 	build_bar.visible = false
 	var p: int = maxi(game.chefs.find(game.shopper), 0)
 	var keys := "%s buy      %s choose      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p),
-		"back to ingredients" if game.storing() else "close"]
+		"back to the card" if game.storing() else "close"]
 	if game.shopper != null and game.shopper.hand.get("node") is Station:   # the piece in hand turns
 		keys += "      %s turn" % _g("turn", p)
 	if _mode(p) == "touch":
