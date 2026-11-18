@@ -722,7 +722,9 @@ func test_comfort_rises_with_joy_and_patience_and_falls_with_disgust():
 	assert_eq(m.comfort(), 0.0)
 	m.joy = 1.0
 	m.patience = 1.0
-	assert_eq(m.comfort(), 1.0)
+	m.savour = 1.0
+	assert_almost_eq(m.comfort(), 1.0, 0.0001)
+	m.savour = 0.0
 	m.joy = 0.5
 	var base := m.comfort()
 	m.joy = 0.6
@@ -734,8 +736,11 @@ func test_comfort_rises_with_joy_and_patience_and_falls_with_disgust():
 	assert_lt(m.comfort(), before)
 	m.disgust = 1.0
 	assert_eq(m.comfort(), 0.0, "never below 0")
+	m.disgust = 0.0
+	var plain := m.comfort()
 	m.savour = 1.0
-	assert_eq(m.comfort(), 0.0, "the dish does not count")
+	assert_gt(m.comfort(), plain, "one score: the dish counts too")
+	assert_almost_eq(m.comfort(), m.satisfaction() / GuestMood.HAPPY_FULL, 0.0001)
 
 
 func test_bill_and_stay_scales_hit_their_ends_and_only_rise():
@@ -752,16 +757,19 @@ func test_comfort_is_fixed_when_the_food_arrives():
 	var m := GuestMood.new()
 	m.joy = 1.0
 	m.patience = 1.0
+	m.savour = 1.0
 	assert_eq(m.settle_comfort(), GuestMood.COSY_THOUGHTS[0])
 	m.joy = 0.0
 	m.patience = 0.0
-	assert_eq(m.served_comfort, 1.0, "the bill and the stay agree")
+	m.savour = 0.0
+	assert_almost_eq(m.served_comfort, 1.0, 0.0001, "the bill and the stay agree")
 	assert_eq(m.scaled_price(12), 15)
 	assert_eq(m.settle_comfort(4), GuestMood.HURRIED_THOUGHTS[1])
 	assert_eq(m.scaled_price(12), 11)
 	assert_eq(m.scaled_price(1), 1, "never below 1")
 	m.joy = 0.5
 	m.patience = 0.5
+	m.savour = 0.5
 	assert_eq(m.settle_comfort(), "", "nothing to say in the middle")
 
 
@@ -769,6 +777,7 @@ func test_deals_apply_after_the_mood_scale():
 	var m := GuestMood.new()
 	m.joy = 1.0
 	m.patience = 1.0
+	m.savour = 1.0
 	m.settle_comfort()
 	assert_eq(m.pay_for(12), 15)
 	assert_true(m.paid_full())

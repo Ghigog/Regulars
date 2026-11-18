@@ -1875,14 +1875,14 @@ func test_guest_card_says_waiting_to_order():
 	assert_eq(Hud.STATE_WORDS.ordering, "Waiting to order")
 
 
-func _serve_one(idx: int, joy: float, patience: float) -> Guest:
+func _serve_one(idx: int, joy: float, patience: float, disgust := 0.0) -> Guest:
 	var g: Guest = game.spawn_guest(idx)
 	_run(12.0)
 	_order(g)
 	_cook_burger()
 	g.mood.joy = joy
 	g.mood.patience = patience
-	g.mood.disgust = 0.0
+	g.mood.disgust = disgust
 	game.use_station(g.table)
 	return g
 
@@ -1896,7 +1896,7 @@ func test_a_comfortable_guest_eats_longer_and_pays_more():
 	_run(cosy.eat_time + Guest.CHAT_TIME)
 	game.pay_bill(cosy.table)
 	var cosy_paid := int(game.ledger.today.sales) - start
-	var rushed := _serve_one(1, 0.0, 0.1)
+	var rushed := _serve_one(1, 0.0, 0.1, 0.7)   # one score: good food alone keeps them from rushing
 	assert_true(rushed.mood.thoughts.has(GuestMood.HURRIED_THOUGHTS[1]))
 	assert_lt(rushed.eat_time, cosy.eat_time)
 	start = int(game.ledger.today.sales)

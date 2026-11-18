@@ -162,3 +162,34 @@ func test_an_all_dear_menu_is_not_free_money():
 	var fair := _sat_with(2, 0)
 	var dear := _sat_with(2, 3)
 	assert_gt(fair - dear, 0.25, "three Dear items cost a real share of the visit")
+
+
+# ---------- Item 5: one happiness score ----------
+
+func test_one_score_sets_the_bill_the_stay_the_tip_and_the_opinion():
+	var happy := GuestMood.new()
+	happy.joy = 0.9
+	happy.patience = 0.9
+	happy.taste(1.0)
+	happy.settle_comfort()
+	var glum := GuestMood.new()
+	glum.joy = 0.9
+	glum.patience = 0.9
+	glum.taste(0.2)   # same room, same wait, worse food
+	glum.settle_comfort()
+	assert_gt(happy.satisfaction(), glum.satisfaction())
+	assert_gt(happy.scaled_price(20), glum.scaled_price(20), "the food now moves the bill too")
+	assert_gt(GuestMood.stay_scale(happy.served_comfort), GuestMood.stay_scale(glum.served_comfort))
+	assert_gt(happy.tip_for(20), glum.tip_for(20))
+	var t := Town.new(2)
+	assert_gt(t.record_visit(0, happy.satisfaction()), t.record_visit(1, glum.satisfaction()))
+
+
+func test_dear_prices_also_trim_the_bill_scale():
+	var m := GuestMood.new()
+	m.joy = 0.8
+	m.patience = 0.8
+	m.taste(0.9)
+	var before := m.comfort()
+	m.read_prices(2)
+	assert_lt(m.comfort(), before, "one score: prices count everywhere")

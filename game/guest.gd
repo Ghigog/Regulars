@@ -215,12 +215,12 @@ func want_icon() -> String:
 var eat_time := EAT_TIME
 
 
-## Comfort is read here, as the food arrives and before they taste it. Returns the
-## thought it prompts ("" for none).
+## Happiness is fixed here, as the food arrives and they take the first taste: it sets
+## the stay and the bill (GuestMood.comfort). Returns the thought it prompts ("" for none).
 func start_eating(quality: float, tray: Tray = null) -> String:
+	mood.taste(quality)
 	var said := mood.settle_comfort(idx)
 	eat_time = EAT_TIME * GuestMood.stay_scale(mood.served_comfort)
-	mood.taste(quality)
 	if quality > 0.95:
 		_heart_time = 2.5
 	state = "eating"

@@ -203,11 +203,11 @@ func offer_comp() -> bool:
 	return true
 
 
-## Comfort: how they feel about the room and the service, from 0 to 1. Read once,
-## when the food arrives, and kept in `served_comfort` so the bill and the stay agree.
-## Savour is left out on purpose: comfort is about the place, not the dish.
-const COMFORT_JOY := 0.6        # tunable
-const COMFORT_PATIENCE := 0.4   # tunable
+## One happiness score (review, item 5): satisfaction() drives the bill scale, the
+## eating time, the tip and the opinion. Comfort is that same score out of the most it
+## can reach (HAPPY_FULL), 0 to 1, read once as the food lands (after the first taste)
+## and kept in `served_comfort` so the bill and the stay agree.
+const HAPPY_FULL := 0.85        # satisfaction with perfect food, joy and patience
 const BILL_LOW := 0.90    # tunable: bill scale at comfort 0 ("let's eat and go")
 const BILL_HIGH := 1.25   # tunable: bill scale at comfort 1 ("they ordered extras")
 const STAY_LOW := 0.80    # tunable: eating-time scale at comfort 0
@@ -221,7 +221,7 @@ var served_comfort := -1.0   # below 0 until the food has arrived
 
 
 func comfort() -> float:
-	return clampf(COMFORT_JOY * joy + COMFORT_PATIENCE * patience - felt_disgust(), 0.0, 1.0)
+	return clampf(satisfaction() / HAPPY_FULL, 0.0, 1.0)
 
 
 ## Called as the food lands on the table. Returns the thought it prompts, or "".
