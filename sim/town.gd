@@ -91,6 +91,7 @@ func _init(seed_value := 1, theme_id := "diner") -> void:
 	make_tastes(theme)
 	make_tolerances()
 	make_ratings()
+	make_wealth()
 
 
 ## The town's names: the fourteen drawn ones, then the theme's pool shuffled by the seed.
@@ -120,6 +121,19 @@ func make_tolerances() -> void:
 		for topic in GuestMood.TOL_TOPICS:
 			tol[topic] = roundi((r.randi_range(TOL_MIN, TOL_MAX) + r.randi_range(TOL_MIN, TOL_MAX)) / 2.0)
 		p.tolerance = tol
+
+
+## Everyone's means, 1 (poor) to 5 (rich), from the town's seed on its own generator
+## (review, item 3). Two dice averaged, like tolerances.
+func make_wealth() -> void:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("%d:wealth" % taste_seed)
+	for p in people:
+		p.wealth = roundi((r.randi_range(TOL_MIN, TOL_MAX) + r.randi_range(TOL_MIN, TOL_MAX)) / 2.0)
+
+
+func wealth(i: int) -> int:
+	return int(people[i].get("wealth", 3))
 
 
 func tolerance(i: int, topic: String) -> int:

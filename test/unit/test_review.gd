@@ -102,3 +102,63 @@ func test_the_critic_gets_stricter_with_each_review():
 
 func test_the_variety_rule_is_written_down():
 	assert_string_contains(Critic.VARIETY_RULE, "full menu")
+
+
+# ---------- Item 3: wealth, and what Dear costs ----------
+
+func _dear(n: int) -> Dictionary:
+	var o := {"main": {}, "side": {}, "drink": {}}
+	var keys := ["main", "side", "drink"]
+	for k in n:
+		o[keys[k]] = {"course": keys[k], "price_level": "dear", "ingredients": []}
+	return o
+
+
+func _sat_with(wealth: int, dear: int) -> float:
+	var m := GuestMood.new()
+	m.wealth = wealth
+	m.joy = 0.6
+	m.taste(0.9)
+	m.read_prices(Menu.dear_count(_dear(dear)))
+	return m.satisfaction()
+
+
+func test_everyone_has_a_wealth():
+	var t := Town.new(9)
+	var seen := {}
+	for i in t.people.size():
+		var w := t.wealth(i)
+		assert_between(w, 1, 5)
+		seen[w] = true
+	assert_gt(seen.size(), 2, "the town is a mix of means")
+
+
+func test_dear_items_cost_happiness_more_for_the_poor():
+	assert_eq(_sat_with(1, 0), _sat_with(5, 0), "no Dear items, no difference")
+	assert_lt(_sat_with(3, 1), _sat_with(3, 0), "a Dear item costs something")
+	assert_lt(_sat_with(3, 3), _sat_with(3, 1), "more Dear items cost more")
+	assert_lt(_sat_with(1, 2), _sat_with(3, 2), "the poor mind more")
+	assert_lt(_sat_with(3, 2), _sat_with(5, 2), "the rich mind less")
+	assert_lt(_sat_with(5, 2), _sat_with(5, 0), "but even the rich notice")
+
+
+func test_wealth_is_hinted_on_the_card_like_a_tolerance():
+	var poor := GuestMood.new()
+	poor.wealth = 1
+	poor.read_prices(1)
+	assert_eq(poor.tolerance_hints(), ["Watches the pennies"] as Array[String])
+	assert_true(poor.thoughts.has("Pricey for what it is"))
+	var rich := GuestMood.new()
+	rich.wealth = 5
+	rich.read_prices(2)
+	assert_eq(rich.tolerance_hints(), ["Money's no object"] as Array[String])
+	var mid := GuestMood.new()
+	mid.read_prices(0)
+	assert_eq(mid.tolerance_hints(), [] as Array[String], "nothing Dear, nothing to hint")
+
+
+func test_an_all_dear_menu_is_not_free_money():
+	# A poor regular paying Dear for three items loses enough happiness to sour the visit.
+	var fair := _sat_with(2, 0)
+	var dear := _sat_with(2, 3)
+	assert_gt(fair - dear, 0.25, "three Dear items cost a real share of the visit")

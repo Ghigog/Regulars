@@ -4092,6 +4092,7 @@ func _plan_orders(party: Array[Guest]) -> Dictionary:
 			town.record_found_nothing(g.idx)
 			ledger.record_found_nothing()
 		else:
+			g.mood.read_prices(Menu.dear_count(g.planned))   # Dear for their means costs happiness
 			g.hint_tag = Menu.tag_hint(available, g.info.liked_tags)
 			if g.hint_tag != "":
 				g.mood.think(Menu.hint_thought(g.hint_tag))
