@@ -75,3 +75,30 @@ func test_picking_the_theme_later_brings_its_townsfolk():
 	var t := Town.new(3)
 	t.make_tastes("seaside")
 	assert_eq(t.people[30].name, Town.new(3, "seaside").people[30].name)
+
+
+# ---------- Item 2: the critic blends in, gets stricter, and says the variety rule ----------
+
+func test_a_review_moves_opinion_part_way_and_never_wipes_it():
+	var t := Town.new(5)
+	for k in 6:
+		t.record_visit(2, 1.0, {"speed": 0.35})
+	var before := t.opinion(2, "speed")
+	assert_gt(before, 0.1)
+	Critic.new(5).publish({"speed": 1, "clean": 3, "quality": 3, "variety": 3}, false, t, 5)
+	assert_gt(t.opinion(2, "speed"), 0.0, "one slow meal does not undo a run of good ones")
+	assert_lt(t.opinion(2, "speed"), before)
+
+
+func test_the_critic_gets_stricter_with_each_review():
+	var c := Critic.new(1)
+	assert_eq(c.strictness(), 0.0)
+	assert_eq(Critic.speed_rating(0.86), 5)
+	for d in [5, 10, 15, 20, 25, 30]:
+		c.publish({"speed": 3, "clean": 3, "quality": 3, "variety": 3}, false, Town.new(1), d)
+	assert_almost_eq(c.strictness(), Critic.STRICTEST, 0.0001, "capped")
+	assert_lt(Critic.speed_rating(0.86, c.strictness()), 5, "the same wait earns less later")
+
+
+func test_the_variety_rule_is_written_down():
+	assert_string_contains(Critic.VARIETY_RULE, "full menu")

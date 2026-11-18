@@ -1421,16 +1421,19 @@ func test_stars_are_the_rounded_mean_and_a_walkout_caps_them():
 	assert_eq(int(r.clean), 5, "the rest from what they saw")
 
 
-func test_a_review_resets_the_four_topics_only():
+func test_a_review_blends_into_the_four_topics_only():
 	var t := Town.new(5)
 	t.record_disgust(3, 2)
 	t.record_kindness(3, "comp")
 	var other := t.opinion(3, "other")
 	assert_lt(t.opinion(3, "clean"), 0.0)
 	var c := Critic.new(5)
+	var clean_before := t.opinion(3, "clean")
+	var speed_before := t.opinion(3, "speed")
 	var review := c.publish({"speed": 2, "clean": 5, "quality": 4, "variety": 3}, false, t, 5)
-	assert_almost_eq(t.opinion(3, "clean"), 0.2, 0.0001, "the critic found it clean")
-	assert_almost_eq(t.opinion(3, "speed"), -0.1, 0.0001)
+	assert_almost_eq(t.opinion(3, "clean"), lerpf(clean_before, Critic.opinion_for(5), Critic.BLEND), 0.0001,
+		"the critic found it clean: the town moves 30% their way")
+	assert_almost_eq(t.opinion(3, "speed"), lerpf(speed_before, Critic.opinion_for(2), Critic.BLEND), 0.0001)
 	assert_almost_eq(t.opinion(3, "other"), other, 0.0001, "other is untouched")
 	assert_almost_eq(float(t.people[3].affinity), _sum_parts(t, 3), 0.0001)
 	assert_eq(int(review.stars), 4)

@@ -140,6 +140,8 @@ func _list() -> void:
 			none.modulate.a = 0.5
 		var add: Button = hud._button(col, "Add a %s" % course, _new.bind(course))
 		_target(add, "add:" + course)
+	var crit := _label(_content, 17, "The critic is due on day %d. %s." % [game.critic.next_visit, Critic.VARIETY_RULE])
+	crit.modulate.a = 0.65
 	_rule()
 	var srow := HBoxContainer.new()
 	srow.add_theme_constant_override("separation", 12)
@@ -155,7 +157,7 @@ func _list() -> void:
 	for l in lines:
 		_label(chips, 20, "%s  $%d" % [l.name, int(l.fee)])
 	if lines.is_empty():
-		var none := _label(chips, 20, "No boxes yet: buy them in the shop's Pantry.")
+		var none := _label(chips, 20, "No boxes yet: E on a counter at night to stock one.")
 		none.modulate.a = 0.6
 	var done: Button = hud._button(srow, "Done", game.close_menu)
 	done.size_flags_horizontal = Control.SIZE_SHRINK_END

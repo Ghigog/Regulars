@@ -399,15 +399,15 @@ func topic_average(topic: String) -> float:
 	return sum / people.size()
 
 
-## A review replaces everyone's opinion on the topics it rated (topic -> value) and
-## leaves the rest alone. Affinity is the clamped sum again; anything past the clamp
-## comes out of `other`, so the parts always add up. Grudges and "never coming back"
-## stay as they are.
-func reset_topics(values: Dictionary) -> void:
+## A review moves everyone's opinion on the topics it rated (topic -> value) `share` of
+## the way toward it and leaves the rest alone, so one meal never wipes out what the town
+## learned. Affinity is the clamped sum again; anything past the clamp comes out of
+## `other`, so the parts always add up. Grudges and "never coming back" stay as they are.
+func blend_topics(values: Dictionary, share := 1.0) -> void:
 	for p in people:
 		var op: Dictionary = p.opinion
 		for t: String in values:
-			op[t] = float(values[t])
+			op[t] = lerpf(float(op[t]), float(values[t]), share)
 		var sum := 0.0
 		for t: String in op:
 			sum += float(op[t])

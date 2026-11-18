@@ -2,8 +2,9 @@ class_name Critic
 extends RefCounted
 ## The food critic (PRD 2). One townsperson, the same all run, eats as a critic every
 ## fifth day. They rate speed, cleanliness, food quality and variety, give stars out of
-## five, and the review in the paper replaces what the town thinks on those four things
-## and moves the crowd for the next few days. Pure: the game feeds in what happened.
+## five, and the review in the paper moves what the town thinks on those four things
+## (BLEND of the way toward the review) and moves the crowd for the next few days.
+## Each review makes them a little harder to please on speed. Pure: the game feeds in what happened.
 
 const TOPICS: Array[String] = ["speed", "clean", "quality", "variety"]
 const TOPIC_WORDS := {"speed": "Speed", "clean": "Cleanliness", "quality": "Food", "variety": "Variety"}
@@ -14,7 +15,12 @@ const NOTICED := 0.02             # tunable: disgust below this means they notic
 const VARIETY_WIDE := 3           # tunable: items in one course for the "wide course" point
 const VARIETY_INGREDIENTS := 8    # tunable: distinct ingredients for the last point
 const WALKOUT_CAP := 2            # tunable: the most stars a walkout can earn
-const RESET_STEP := 0.1           # tunable: opinion per star above or below 3 after a review
+const RESET_STEP := 0.12          # tunable: the opinion a review points at, per star above or below 3
+const BLEND := 0.3                # tunable: how far each topic moves toward the review
+const STRICTER := 0.025           # tunable: speed steps rise this much per review given
+const STRICTEST := 0.1            # tunable: and no further
+## The variety rule, said where the player can read it (the review and the menu screen).
+const VARIETY_RULE := "The critic likes a full menu: every course, three of one, eight ingredients"
 const AGREE_GAP := 0.05           # tunable: gap below which the town and the critic agree
 ## Extra visit chance for the days after a review, by stars (index = stars).
 const BOOST: Array[float] = [0.0, -0.1, -0.04, 0.0, 0.04, 0.1]   # tunable: per person, in a town of forty
@@ -66,6 +72,7 @@ const THOUGHTS := {
 var critic_idx := 0
 var next_visit := EVERY
 var known := false               # true once a review has named them
+var reviews := 0                 # reviews given so far: each makes them stricter
 var last_review := {}            # the latest review, for the town book
 var _boost := 0.0
 var _boost_from := 0
@@ -77,6 +84,11 @@ var _rng := RandomNumberGenerator.new()
 func _init(seed_value := 1, people := Town.TOWN_SIZE) -> void:
 	_rng.seed = hash("critic:%d" % seed_value)
 	critic_idx = _rng.randi_range(0, people - 1)
+
+
+## How much higher the speed steps sit now: STRICTER for each review given, to STRICTEST.
+func strictness() -> float:
+	return minf(STRICTEST, STRICTER * reviews)
 
 
 ## Whether the critic comes on `day`.
@@ -121,9 +133,9 @@ static func order(available: Array, likes: Array, dislikes: Array, rng: RandomNu
 
 # ---------------------------------------------------------------- ratings
 
-static func speed_rating(patience: float) -> int:
+static func speed_rating(patience: float, strict := 0.0) -> int:
 	for k in SPEED_STEPS.size():
-		if patience >= SPEED_STEPS[k] - 0.0001:
+		if patience >= SPEED_STEPS[k] + strict - 0.0001:
 			return 5 - k
 	return 1
 
@@ -161,9 +173,9 @@ static func variety_rating(available: Array) -> int:
 ## the tray's (negative if they never ate), `disgust` and `level` as they left.
 ## A walkout (out of patience, or revolted) rates speed 1.
 static func rate(patience: float, quality: float, disgust: float, level: int, available: Array,
-		walked_out: bool) -> Dictionary:
+		walked_out: bool, strict := 0.0) -> Dictionary:
 	return {
-		"speed": 1 if walked_out else speed_rating(patience),
+		"speed": 1 if walked_out else speed_rating(patience, strict),
 		"clean": clean_rating(disgust, level),
 		"quality": quality_rating(quality) if quality >= 0.0 else 1,
 		"variety": variety_rating(available),
@@ -179,7 +191,7 @@ static func stars(ratings: Dictionary, walked_out := false) -> int:
 	return mini(s, WALKOUT_CAP) if walked_out else s
 
 
-## The opinion everyone holds on a topic after a review with `rating`.
+## The opinion a review with `rating` pulls everyone toward on a topic.
 static func opinion_for(rating: int) -> float:
 	return (rating - 3) * RESET_STEP
 
@@ -203,8 +215,8 @@ static func verdict_line(ratings: Dictionary, averages: Dictionary) -> String:
 	return AGREE[strongest][1 if int(ratings[strongest]) >= 3 else 0]
 
 
-## Prints the review: works out the line against what the town thinks, resets the four
-## topics for everyone, starts the visit boost, names the critic and books the next
+## Prints the review: works out the line against what the town thinks, moves the four
+## topics for everyone BLEND of the way toward it, starts the visit boost, names the critic and books the next
 ## visit. Returns the review: {day, name, ratings, stars, walked_out, headline, line, first}.
 func publish(ratings: Dictionary, walked_out: bool, town: Town, day: int) -> Dictionary:
 	var s := stars(ratings, walked_out)
@@ -219,7 +231,8 @@ func publish(ratings: Dictionary, walked_out: bool, town: Town, day: int) -> Dic
 	var opinions := {}
 	for t in TOPICS:
 		opinions[t] = opinion_for(int(ratings[t]))
-	town.reset_topics(opinions)
+	town.blend_topics(opinions, BLEND)
+	reviews += 1
 	_boost = BOOST[s]
 	_boost_from = day + 1
 	_boost_to = day + BOOST_DAYS

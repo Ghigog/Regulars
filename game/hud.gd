@@ -2030,6 +2030,11 @@ func clipping(review: Dictionary) -> Control:
 		var pips := Rating.new(int(review.ratings[t]))
 		pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(pips)
+		if t == "variety":   # the one rating that is a rule, not a taste: say it
+			var rule := _label(box, 12, Critic.VARIETY_RULE + ".")
+			rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			rule.custom_minimum_size = Vector2(300, 0)
+			rule.modulate.a = 0.65
 	_rule(box)
 	var said := _label(box, 17, "\"%s\"" % review.line)
 	said.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

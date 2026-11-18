@@ -2252,7 +2252,7 @@ func _critic_leaves(g: Guest, walked: bool) -> void:
 		return
 	walked = walked or g.mood.disgust_level() >= 3
 	_critic_rated = {"walked": walked, "ratings": Critic.rate(float(_critic_seen.get("patience", 0.0)),
-		float(_critic_seen.get("quality", -1.0)), g.mood.disgust, g.mood.disgust_level(), tonight_menu(), walked)}
+		float(_critic_seen.get("quality", -1.0)), g.mood.disgust, g.mood.disgust_level(), tonight_menu(), walked, critic.strictness())}
 	g.mood.think(Critic.thought("leave"))
 	critic_guest = null
 
