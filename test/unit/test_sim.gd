@@ -433,7 +433,7 @@ func _roots(found: Array[Dictionary]) -> Array[Dictionary]:
 
 
 func test_catalog_search_by_word_and_category():
-	assert_gt(Catalog.search().size(), _roots(Catalog.search()).size(), "every tree node is sold outright too")
+	assert_eq(Catalog.search().size(), _roots(Catalog.search()).size(), "only roots: a step up a tree is bought on the piece, lifted")
 	assert_eq(_roots(Catalog.search()).size(), 74, "one entry a piece, the plate, cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
 	var ferns := _roots(Catalog.search("FERN"))
 	assert_eq(ferns.size(), 1)
@@ -458,6 +458,18 @@ func test_catalog_search_by_word_and_category():
 	assert_eq(Catalog.search("partition")[0].id, "screen")
 	assert_eq(Catalog.search("", "Build").size(), 11, "four floors, wall, three finishes, door, archway and the partition")
 	assert_eq(Catalog.search("build", "Dining").size(), 0, "matches the category name")
+	# The shop's tabs (owner's review of night zero).
+	assert_eq(Catalog.tab_of("counter"), "Furniture")
+	assert_eq(Catalog.tab_of("table"), "Furniture")
+	assert_eq(Catalog.tab_of("plant"), "Furniture")
+	assert_eq(Catalog.tab_of("board"), "Tools")
+	assert_eq(Catalog.tab_of("sponge"), "Tools")
+	assert_eq(Catalog.tab_of("box_bun"), "Ingredients")
+	assert_eq(Catalog.tab_of("box_cleaner"), "Ingredients")
+	assert_eq(Catalog.tab_of("wall"), "Build")
+	assert_eq(Catalog.search("", "Ingredients", "diner").size(), pantry.size(), "Ingredients is the pantry")
+	assert_true(Catalog.search("", "Tools", "diner").all(func(bp: Dictionary) -> bool:
+		return Catalog.tab_of(bp.id) == "Tools"), "a tab lists its own")
 
 
 func test_shelved_blueprint_returns_upgraded_after_two_days():

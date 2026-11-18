@@ -34,20 +34,20 @@ Survive as many days as you can; three walkouts in one day ends the run.
   then of what stands below (a tool on a counter before the counter). High slots are storage like any other; a cabinet hung over bare
   floor is reached from below or beside it. Floor laid behind a wall, or a door or
   archway through it, is refused while a piece hangs on it alone.
-- **Storage (PRD 8.4) and the piece card.** Ingredients live in storage the player
-  builds. At night, E (or a click) on any piece opens its one **card where it stands**
-  (review, item 4); nothing is lifted to stock it. The card's row starts with action
-  cards drawn as the piece: Upgrades (its tree, bought where it stands), the tree of
-  each stored floor treatment's box, Move, Turn, Sell (with what it pays, or why not)
-  and, on the till's counter, Move the till. A piece that keeps boxes lists them after:
-  what is stored there, then every box, what fits first, the rest dimmed with why
-  ("Needs a fridge: upgrade the counter"). On a bare counter a box that needs a fridge
-  offers "Fridge $35": one press makes the counter a fridge with the box in. A box says
-  "Unlimited tonight, $3": its kind's fee is flat, however much is sold. The card needs
-  only E and Back (arrows browse); holding E moves the piece, with the hold bar. Rugs
-  and partitions have no card: E picks them up. On a cell with a wall piece over a floor
-  piece the wall piece's card comes first; once shut, the next E there opens the one
-  below. Every piece sells, the start's pieces and the last sink, bin, plate stack and
+- **Storage (PRD 8.4) and lifting a piece.** Ingredients live in storage the player
+  builds. At night (owner's review of night zero, which replaced review item 4's card),
+  E (or a click) **lifts** a piece: the till off its counter first, a tool off its
+  counter, what hangs on the wall before what stands under it; a counter lifts whole,
+  its boxes with it. While a piece is lifted a **strip along the bottom** shows the
+  upgrades it can take at this level (Z and X choose, Space buys; LB, RB and Y on a pad)
+  and then the boxes it carries (Space takes one out, stopping its fee). R turns it, C
+  sells it (X on a pad), E puts it down, Esc puts it back. A lifted counter can grow a
+  stove in hand. Boxes are bought in the shop's Ingredients tab (free; their kind's fee
+  is paid each night) and put into a counter or fridge with E; a chilled box needs a
+  fridge, made by lifting a counter and upgrading it. The shop's tabs are Furniture,
+  Tools, Ingredients, Build and Extras, listing only base pieces that can be bought at
+  this level (tree steps are bought on the lifted piece). The old card code
+  (`open_card`, `card_act`) remains for the storage demos only. Every piece sells, the start's pieces and the last sink, bin, plate stack and
   till too; while the kitchen has none of one of those four the shop sells it at any
   level and the door card stays shut (`ESSENTIALS`). The till is its own piece: it
   stands on a counter (or a tool on one), and there is one at a time.

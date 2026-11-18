@@ -8,6 +8,11 @@ extends RefCounted
 const MAX_TIER := 3
 const SHELF_DAYS := 2
 const CATEGORIES: Array[String] = ["Kitchen", "Pantry", "Dining", "Decor", "Build"]
+## The shop's tabs (owner's review of night zero): what the categories are shopped under.
+## Furniture is what stands in the room; Tools are what sits on a counter, the cleaning
+## kit and the service stacks; Ingredients are the boxes, food and chemicals alike.
+const TABS: Array[String] = ["Furniture", "Tools", "Ingredients", "Build"]
+const TOOLS_TAB: Array[String] = ["mop_bucket", "hook", "sponge", "robot_dock", "plates", "cups", "tray_stack", "till"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## PRD 10: the desk was kept out of the shop until helpers could work; since 10.6 it is
 ## on sale. The one switch that puts every "staff" piece on sale.
@@ -401,13 +406,26 @@ func can_buy(id: String, money: int, level: int, tier := 1) -> bool:
 ## then cheapest first. `query` is matched against the name, the category and what the
 ## piece does; an empty query or category matches all. `level` above 0 leaves out what
 ## needs a higher level (the shop hides it).
+## The shop tab a catalog piece is under (TABS).
+static func tab_of(id: String) -> String:
+	var cat: String = ITEMS[id].category
+	match cat:
+		"Pantry":
+			return "Ingredients"
+		"Build":
+			return "Build"
+		"Kitchen":
+			return "Tools" if Kitchen.is_top(id) or TOOLS_TAB.has(id) else "Furniture"
+	return "Furniture"
+
+
 static func search(query := "", category := "", theme := "", level := 0, show_locked := false) -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	var words := query.strip_edges().to_lower().split(" ", false)
 	var offered: Array[Dictionary] = []
 	for id: String in ITEMS:
 		var item: Dictionary = ITEMS[id]
-		if category != "" and item.category != category:
+		if category != "" and item.category != category and tab_of(id) != category:
 			continue
 		if not sold_in(id, theme):
 			continue
@@ -417,12 +435,8 @@ static func search(query := "", category := "", theme := "", level := 0, show_lo
 		if Treatments.is_laying_tool(id) or (Treatments.is_box(id) and not Treatments.is_root(Treatments.key_of(id))):
 			continue   # a laying tool is listed by the game while its box is stored (PRD 9.5)
 		offered.append({"id": id, "tier": 1})
-		# Every step up its tree is sold outright too, priced as the whole way there
-		# (review, item 4): a Twin fryer stands up whole, its counter and all.
-		var root := Upgrades.key_of(id, 1, node)
-		for k: String in tree_nodes(root):
-			if sells_node(k) and sold_in(tree_blueprint(k).id, theme):
-				offered.append(tree_blueprint(k))
+		# The steps up a tree are bought on the piece itself, lifted (owner's review of
+		# night zero): the shop sells the roots only.
 	for bp in offered:
 		if level > 0 and bp_level(bp) > level:
 			if not show_locked:

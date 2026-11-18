@@ -554,15 +554,12 @@ func test_a_step_costs_the_new_price_less_the_old_and_only_from_its_parent():
 func test_tools_lose_their_catalog_tiers_and_later_nodes_leave_the_shop():
 	for id: String in ["stove", "fryer", "pot", "board", "slicer"]:
 		assert_eq(int(Catalog.ITEMS[id].tiers), 1, id)
-	var roots := Catalog.search("", "Kitchen", "diner").filter(func(bp: Dictionary) -> bool: return not bp.has("tree"))
-	var ids := roots.map(func(bp: Dictionary) -> String: return bp.id)
+	var ids := Catalog.search("", "Kitchen", "diner").map(func(bp: Dictionary) -> String: return bp.id)
 	assert_has(ids, "board")
 	for id: String in ["stove", "fryer", "pot", "slicer"]:
 		assert_does_not_have(ids, id, id + " is a step up the counter's, stove's or board's tree")
-	var nodes := Catalog.search("", "Kitchen", "diner").map(func(bp: Dictionary) -> String: return str(bp.get("tree", "")))
-	for k: String in ["stove", "fryer", "slicer"]:
-		assert_has(nodes, k, k + " is sold outright too, the whole way there")
-
+	var nodes := Catalog.search("", "Kitchen", "diner").filter(func(bp: Dictionary) -> bool: return bp.has("tree"))
+	assert_eq(nodes, [], "steps are bought on the lifted piece, not in the shop")
 
 func test_a_stove_grows_from_a_bare_counter_for_its_whole_price():
 	assert_true(Upgrades.children("counter").has("stove"), "a branch of the counter's tree")
@@ -608,7 +605,7 @@ func test_quality_is_the_minigames_difficulty():
 
 # ---------- 8.3: upgrade trees (in the game) ----------
 
-func test_the_shop_with_a_piece_in_hand_opens_its_tree():
+func test_a_lifted_piece_shows_its_upgrades_along_the_bottom():
 	_game()
 	game.open_shop()
 	assert_true(game.shopping and not game.upgrading, "empty hands: the shop")
@@ -618,20 +615,16 @@ func test_the_shop_with_a_piece_in_hand_opens_its_tree():
 	assert_true(game.pick_up(_at(2, 5)))
 	assert_eq(game.hand_key(), "board")
 	game.open_shop()
-	assert_true(game.upgrading)
-	assert_true(game.hud.tree_open())
-	assert_false(game.hud._shop != null, "not the shop")
-	assert_eq(game.hud._tree.root_key, "board", "the held piece on the left")
-	assert_eq(game.hud.tree_selected(), "sharp_knife", "the straight-on step first")
-	game.act(0, "down")
-	assert_eq(game.hud.tree_selected(), "slicer", "down to the fork")
-	game.act(0, "right")
-	assert_eq(game.hud.tree_selected(), "auto_slicer")
-	game.act(0, "back")
-	assert_false(game.shopping)
-	assert_false(game.hud.tree_open())
+	assert_false(game.shopping, "Tab with a piece in hand: put it down to shop")
+	var keys: Array = game.strip_choices().map(func(c: Dictionary) -> String: return str(c.key))
+	assert_eq(keys, Upgrades.children("board").filter(func(k: String) -> bool: return Upgrades.level(k) <= 1))
+	assert_eq(str(game.strip_chosen().key), keys[0])
+	game.act(0, "next")
+	assert_eq(str(game.strip_chosen().key), keys[1 % keys.size()], "X: the next")
+	game.act(0, "prev")
+	game.act(0, "prev")
+	assert_eq(str(game.strip_chosen().key), keys[-1], "Z from the first wraps to the last")
 	assert_eq(game.hand_key(), "board", "still in hand")
-
 
 func test_a_piece_with_no_tree_does_not_open_the_shop():
 	_game()
@@ -645,17 +638,14 @@ func test_buying_a_step_turns_the_held_piece_into_it():
 	game.add_station("counter", Vector2i(2, 5))
 	game.add_station("board", Vector2i(2, 5))
 	assert_true(game.pick_up(_at(2, 5)))
-	game.open_shop()
 	assert_false(game.buy_upgrade("auto_slicer"), "not before the slicer")
 	assert_eq(game.ledger.money, 500)
-	game.act(0, "down")
-	game.act(0, "use")   # buys the slicer
+	while str(game.strip_chosen().key) != "slicer":
+		game.act(0, "next")
+	game.act(0, "buy")   # Space buys the slicer
 	assert_eq(game.ledger.money, 500 - 35)
 	assert_eq(game.hand_key(), "slicer")
 	assert_eq(game.hand.id, "slicer", "it works as a slicer now")
-	assert_eq(game.hud._tree.root_key, "slicer", "the tree is drawn on from it")
-	assert_eq(game.hud.tree_selected(), "auto_slicer")
-	game.close_shop()
 	assert_true(game.place(Vector3i(2, 5, 0)), "back onto its counter")
 	var st: Station = game.stations[Vector2i(2, 5)]
 	assert_eq([st.type, st.node], ["slicer", "slicer"])
@@ -663,7 +653,6 @@ func test_buying_a_step_turns_the_held_piece_into_it():
 	assert_true(game.pick_up(_at(2, 5)))
 	game.ledger.day += 1   # a later night: no same-night return
 	assert_eq(game.sell_value(), Kitchen.price_of("slicer") / 2, "sold for its whole price, as before: half")
-
 
 func test_an_upgraded_counter_becomes_a_fridge_and_does_not_stack():
 	_game()
@@ -701,8 +690,7 @@ func test_a_fern_climbs_its_short_tree():
 	game.ledger.xp = 1000
 	game.add_station("plant", Vector2i(5, 5))
 	assert_true(game.pick_up(_at(5, 5)))
-	game.open_shop()
-	assert_eq(game.hud._tree.root_key, "plant@1")
+	assert_eq(game.hand_key(), "plant@1")
 	assert_true(game.buy_upgrade("plant@2"))
 	assert_eq((game.hand.node as Station).tier, 2)
 	assert_eq(int(game.hand.tier), 2)
@@ -833,10 +821,8 @@ func test_a_fridge_is_needed_for_a_chilled_box_and_is_reached_through_the_counte
 	game.cancel_hand()
 	game.player.position = _at(2, 5)
 	assert_true(game.pick_up(_at(2, 6)))
-	game.open_shop()
-	assert_true(game.upgrading)
+	assert_true(game.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "fridge"))
 	assert_true(game.buy_upgrade("fridge"))
-	game.close_shop()
 	assert_true(game.place(Vector3i(2, 6, 0)))
 	assert_eq(game.stations[Vector2i(2, 6)].base, "fridge")
 	game.kitchen.unstore(Vector2i(0, 2), box)   # the test kitchen's own box goes, so the fee shows
@@ -1042,7 +1028,9 @@ func test_first_room_hangs_its_fixtures_as_pieces_in_both_themes():
 		for at: Vector2i in [Vector2i(0, 5), Vector2i(0, 6)]:
 			assert_eq(game.kitchen.get_piece(at, "high"), "cabinet", theme)
 		assert_eq(game.kitchen.get_piece(Vector2i(3, 2), "high"), "shelf", theme + ": the jar shelf over the sink")
-		assert_eq(game.highs.size(), 5)
+		assert_eq(game.highs.size(), 6, "and a sponge's hook")
+		assert_eq(game.highs.values().filter(func(h: Station) -> bool: return h.kit_tool == "sponge").size(), 1,
+			theme + ": a sponge to wipe the first spills with")
 		assert_eq(game.highs[Vector2i(0, 3)].facing, 1, "faces off the left wall")
 		assert_eq(game.highs[Vector2i(3, 2)].facing, 0, "faces off the back wall")
 		assert_true(game.pick_up(_at(0, 4), game.player, true, "high"), "the hood over the starter's bread counter")
@@ -1465,12 +1453,3 @@ func test_turned_fridge_lifted_with_its_card_keeps_its_turn():
 	assert_eq(f.facing, 1)
 
 
-func test_turning_a_fridge_on_its_card_sticks():
-	_game()
-	game.open_build()
-	var f: Station = game.add_station("fridge", Vector2i(2, 5), 1, 0, "fridge")
-	game.open_storage(Vector2i(2, 5))
-	assert_true(game.card_act("turn"))
-	game.shop_action("back")
-	assert_eq(f.facing, 1)
-	assert_almost_eq(f.position.y, 0.0, 0.001, "never lifted")

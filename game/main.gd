@@ -2294,7 +2294,7 @@ func _open_first_night() -> void:
 
 
 ## Night zero's starting goodies (review, item 7): the starting main's stove and fridge,
-## built already, its two boxes stocked, and a cup stack beside the plates. Only in a new
+## built already, its two boxes stocked, a cup stack beside the plates and a sponge on a hook. Only in a new
 ## kitchen that has none of them yet.
 func _starter_kitchen() -> void:
 	if not ledger.history.is_empty() or find_station("stove") != null:
@@ -2308,6 +2308,13 @@ func _starter_kitchen() -> void:
 		stock_box(fm.bread, Vector2i(0, 4), false, 1)
 	if find_station("cups") == null and not stations.has(Vector2i(1, 2)):
 		add_station("cups", Vector2i(1, 2))
+	# A sponge on its hook by the sink (owner's review of night zero): something to wipe
+	# the first spills with, before a mop is bought.
+	if highs.values().all(func(h: Station) -> bool: return h.node != "hook"):
+		for c: Vector2i in [Vector2i(2, 2), Vector2i(1, 2), Vector2i(4, 1)]:
+			if not highs.has(c) and kitchen.can_hang(c, "hook"):
+				clean_kit.on_built(add_high("hook", c), "sponge")
+				break
 	menu_changed()
 
 
@@ -2450,10 +2457,13 @@ func shop_items(query := "", category := "") -> Array[Dictionary]:
 			return _storage_rank(a) < _storage_rank(b))
 		return acts + found
 	if category != "Extras":
-		found = Catalog.search(query, category, Scenery.theme_id, ledger.level(), true)
-		for i in found.size():   # a missing essential, at any level
-			if found[i].get("locked", false) and not found[i].has("tree") and missing(found[i].id):
-				found[i] = {"id": found[i].id, "tier": found[i].tier}
+		# What can be bought tonight only (owner's review of night zero): a piece above the
+		# level is left out, but a missing essential is sold at any level.
+		for bp in Catalog.search(query, category, Scenery.theme_id, ledger.level(), true):
+			if not bp.get("locked", false):
+				found.append(bp)
+			elif not bp.has("tree") and missing(bp.id):
+				found.append({"id": bp.id, "tier": bp.tier})
 	if category == "" or category == "Build":
 		for k: String in Treatments.ITEMS:
 			var id := Treatments.tool_id(k)
@@ -2491,16 +2501,9 @@ func open_shop(ch: Player = null) -> void:
 		sfx("fail")
 		hud.say(Cleaning.HANDS_FULL)
 		return
-	if ch.hand.get("moving", false):   # a piece in hand: its upgrade tree instead (PRD 8.3)
-		var key := hand_key(ch)
-		if not Upgrades.has_tree(key):
-			sfx("fail")
-			hud.say("Nothing to upgrade the %s to. Put it down to shop." % piece_name(ch.hand).to_lower())
-			return
-		shopper = ch
-		upgrading = true
-		sfx("slide")
-		hud.show_tree(key)
+	if ch.hand.get("moving", false):   # a piece in hand: its upgrades are on the strip
+		sfx("fail")
+		hud.say("Put the %s down to shop. Its upgrades are along the bottom." % piece_name(ch.hand).to_lower())
 		return
 	shopper = ch
 	sfx("slide")
@@ -2564,15 +2567,30 @@ func hand_key(ch: Player = null) -> String:
 func buy_upgrade(to: String, ch: Player = null) -> bool:
 	ch = shopper if ch == null and shopper != null else _me(ch)
 	var from := hand_key(ch)
-	var link := Upgrades.is_link(to)   # a stove grown on a counter where it stands
-	if link and not (ch.hand.get("in_place", false) and ch.hand.node is Station and (ch.hand.node as Station).item == ""):
+	var link := Upgrades.is_link(to)   # a stove grown on a counter
+	if link and not (ch.hand.node is Station and (ch.hand.node as Station).item == ""):
 		sfx("fail")
-		hud.say("Clear the counter first, then grow it where it stands.")
+		hud.say("Clear the counter first, then grow it into a %s." % Upgrades.name_of(to).to_lower())
 		return false
 	if phase != Phase.BUILD or from == "" or not Upgrades.can_buy(from, to, ledger.money, ledger.level()) \
 			or not ledger.spend(Upgrades.step_price(to)):
 		sfx("fail")
 		return false
+	if link and not ch.hand.get("in_place", false):   # a lifted counter grows in hand
+		var was: Station = ch.hand.node
+		var grown := Station.new()
+		add_child(grown)
+		grown.setup(to, was.cell, 1, was.facing, was.base, was.pass_look)
+		grown.visible = false
+		_bought_tonight(grown, spent_tonight(was) + Upgrades.step_price(to))
+		was.queue_free()
+		ch.hand.node = grown
+		ch.hand.id = grown.type
+		ch.hand.tier = 1
+		menu_changed()
+		sfx("coin")
+		hud.show_build()
+		return true
 	if link:
 		var under: Station = ch.hand.node
 		var cell := under.cell
@@ -2687,6 +2705,79 @@ func _swap_treatment(was: String, now: String) -> void:
 	if treat_off.has(was):
 		treat_off.erase(was)
 		treat_off[now] = true
+
+
+# ---------------------------------------------------------------- the lifted piece's strip
+
+## A lifted piece's strip along the bottom (owner's review of night zero): the upgrades it
+## can take at this level, then the boxes it carries. Z and X (LB and RB) choose, Space
+## (Y) buys the upgrade or takes the box out, which stops its nightly fee. Each is
+## {"kind": "up", "key": tree key} or {"kind": "box", "id": box id}.
+func strip_choices(ch: Player = null) -> Array[Dictionary]:
+	ch = _me(ch)
+	var out: Array[Dictionary] = []
+	if phase != Phase.BUILD or not ch.hand.get("moving", false) or shopper == ch:
+		return out
+	var key := hand_key(ch)
+	if key != "" and Upgrades.has_tree(key):
+		for to: String in Upgrades.children(key):
+			if Upgrades.level(to) <= ledger.level():
+				out.append({"kind": "up", "key": to})
+	for box: String in ch.hand.get("stock", []):
+		out.append({"kind": "box", "id": box})
+	return out
+
+
+## Whether player p's chef has a strip to choose on.
+func strip_open(p: int) -> bool:
+	return phase == Phase.BUILD and p >= 0 and p < chefs.size() and not strip_choices(chefs[p]).is_empty()
+
+
+## The choice the strip is on, or {} when there is none.
+func strip_chosen(ch: Player = null) -> Dictionary:
+	ch = _me(ch)
+	var list := strip_choices(ch)
+	if list.is_empty():
+		return {}
+	ch.strip_pick = clampi(ch.strip_pick, 0, list.size() - 1)
+	return list[ch.strip_pick]
+
+
+func strip_move(d: int, ch: Player = null) -> bool:
+	ch = _me(ch)
+	var n := strip_choices(ch).size()
+	if n == 0:
+		return false
+	ch.strip_pick = posmod(ch.strip_pick + d, n)
+	sfx("tab", 0.08)
+	hud.show_build()
+	return true
+
+
+## Buys the chosen upgrade for the piece in hand, or takes the chosen box out of it.
+func strip_buy(ch: Player = null) -> bool:
+	ch = _me(ch)
+	var c := strip_chosen(ch)
+	if c.is_empty():
+		sfx("fail")
+		return false
+	if c.kind == "box":
+		(ch.hand.stock as Array).erase(c.id)
+		menu_changed()
+		sfx("putdown")
+		hud.say("%s taken out: it is not stocked any more." % Catalog.label({"id": c.id, "tier": 1}))
+		hud.show_build()
+		return true
+	var price := Upgrades.step_price(c.key)
+	if ledger.money < price:
+		sfx("fail")
+		hud.say("The %s costs $%d." % [Upgrades.name_of(c.key).to_lower(), price])
+		return false
+	if not buy_upgrade(c.key, ch):
+		return false
+	ch.strip_pick = 0
+	hud.show_build()
+	return true
 
 
 # ---------------------------------------------------------------- the storage card
@@ -3838,7 +3929,7 @@ func build_action(ch: Player = null) -> String:
 	if desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
 		return "Use desk"
 	if not Cleaning.carrying_mess(ch.held) and not CleanKit.holding(ch) and _piece_in_front(ch) != Vector3.INF:
-		return "Open" if _card_in_front(ch) else "Pick up"
+		return "Pick up"
 	return door_action(ch)
 
 
@@ -3899,9 +3990,10 @@ func build_interact(ch: Player = null) -> void:
 			ch.last_paint = snap(_hover_point(ch), ch)
 			if not place(ch.last_paint, ch):
 				sfx("fail")
-		"Pick up", "Open":
-			if open_card(ch) and storing():
-				_card_hold[ch] = 0.0   # E still held from here moves it (review, item 4)
+		"Pick up":
+			ch.strip_pick = 0
+			if not pick_up(_piece_in_front(ch), ch, true):
+				sfx("fail")
 		"Use desk":
 			open_desk(ch)
 		"Open up", "Take out rubbish":
@@ -4321,6 +4413,7 @@ func _plan_orders(party: Array[Guest]) -> Dictionary:
 		if plan.walk:
 			continue   # they think it at the board (read_board)
 		if plan.found_nothing.has(k):   # stays with the group, with a drink or nothing
+			g.orders_nothing = Menu.COURSES.all(func(c: String) -> bool: return (g.planned.get(c, {}) as Dictionary).is_empty())
 			g.mood.think(Menu.NOTHING_THOUGHT)
 			town.record_found_nothing(g.idx)
 			ledger.record_found_nothing()
@@ -5353,7 +5446,7 @@ func _refresh_desks() -> void:
 ## What this guest orders: {main, side, drink}. Chosen at the door with their group
 ## (`planned`); a guest who came in some other way chooses now.
 func order_for(g: Guest) -> Dictionary:
-	if not g.planned.is_empty():
+	if not g.planned.is_empty() or g.orders_nothing:
 		return g.planned
 	return Menu.order(tonight_menu(), g.info.likes, g.info.dislikes, town.rng)
 
@@ -6348,6 +6441,17 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				if not dry_run:
 					st.count -= 1
 					ch.take_dish(Dish.make(v))
+			elif st.count > 0 and not held_ing.is_empty() and held_ing.state != "burnt":
+				# Food in hand goes straight onto a plate (or into a cup) off the stack.
+				var d := Dish.make(v)
+				why = d.refusal(held, menu.items)
+				if why == "":
+					act = "Plate it" if v == Dish.PLATE else "Pour into cup"
+					if not dry_run:
+						st.count -= 1
+						d.add(held, q)
+						ch.set_held("")
+						ch.take_dish(d)
 			elif st.count <= 0 and held in ["", "tray", "dishes"]:
 				why = "No clean %ss. Wash some up" % noun
 			elif held == "dishes":
@@ -7100,9 +7204,9 @@ func _update_cursor(ch: Player = null) -> void:
 		var p := DOORWAY + Vector3(0, 2.9, 0)
 		if not ch.hand.is_empty() and _hover_point(ch) != Vector3.INF:
 			p = _hover_point(ch) + Vector3(0, 2.9 if hand_layer(ch) == "high" else 2.0, 0)
-		elif action in ["Pick up", "Open"]:
+		elif action == "Pick up":
 			p = _piece_in_front(ch) + Vector3(0, 2.0, 0)
-			action = "%s %s" % [action, _card_name(ch) if action == "Open" else lift_name(ch)]
+			action = "%s %s" % [action, lift_name(ch)]
 		elif action == "Use desk":
 			p = desk_in_front(ch).position + Vector3(0, 1.9, 0)
 		at = cam.unproject_position(p)
@@ -7210,7 +7314,8 @@ func _build_mouse(event: InputEvent, ch: Player) -> void:
 			if not place(snap(p, ch), ch):
 				sfx("fail")
 		else:
-			open_card(ch, p)   # as E does: the piece's card opens where it stands
+			ch.strip_pick = 0
+			pick_up(p, ch, true)   # as E does: the piece is lifted whole
 	elif not ch.drag.is_empty() and (right == bool(ch.drag.remove) or erase):
 		finish_drag(ch.drag.from, p, ch.drag.remove, ch)
 
@@ -7410,6 +7515,13 @@ func _refresh_ready() -> void:
 func act(p: int, action: String, echo := false) -> void:
 	if action == "aim":
 		return   # held, not pressed: read each frame (`Controls.aiming`)
+	if action in ["buy", "prev", "next"] and not strip_open(p):
+		if action == "buy":
+			action = "use"   # Space is E everywhere but the lifted piece's strip
+		elif controls and p < controls.players.size() and controls.players[p].mode == "pad":
+			action = "turn"   # LB and RB turn the piece when there is nothing to choose
+		else:
+			return
 	if hud.options_open():
 		hud.options_action(action, echo)
 		return
@@ -7501,8 +7613,17 @@ func _build_act(action: String, ch: Player = null) -> void:
 				cancel_hand(ch)
 		"turn":
 			rotate_hand(ch)
+		"prev":
+			strip_move(-1, ch)
+		"next":
+			strip_move(1, ch)
+		"buy":
+			strip_buy(ch)
 		"shop":
-			open_shop(ch)
+			if strip_open(chefs.find(ch)) and controls and controls.players[chefs.find(ch)].mode == "pad":
+				strip_buy(ch)   # Y on a pad buys the chosen upgrade
+			else:
+				open_shop(ch)
 		"menu":
 			open_menu(ch)
 		"sell":

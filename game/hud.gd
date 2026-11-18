@@ -75,6 +75,7 @@ var _door_ready: Control                # the ready markers over the door card
 var _door_ready_row: HBoxContainer
 var _shop_tag: Control                  # "Chef 1 is shopping", over the shop in co-op
 var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, over the slip
+var _strip: VBoxContainer  # build phase: a lifted piece's upgrades and boxes, over the slip
 var _dirty_label: Label
 var menu: MenuScreen           # the menu screen, while it is open
 var bill: BillScreen           # the bill screen at the till (PRD 11.3), while it is open
@@ -2119,7 +2120,7 @@ func show_review() -> void:
 	_pop_in(clip)
 
 
-const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
+const SHOP_TABS: Array[String] = ["Furniture", "Tools", "Ingredients", "Build", "Extras"]
 ## A piece's card (E on any piece at night, review item 4): its boxes (or just the piece,
 ## when it keeps none), then its upgrade tree when it has one.
 const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades"]
@@ -2405,7 +2406,7 @@ func _build_tip(p := 0) -> String:
 	if hand.is_empty():
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % game.ledger.day
-		return "%s walk      %s open a piece (hold to move)      %s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
+		return "%s walk      %s pick up a piece (its upgrades show)      %s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
 	if Treatments.is_laying_tool(hand.id):   # a floor treatment (PRD 9.5): laid free, paid each night
 		var k := Treatments.key_of(hand.id)
 		var off: bool = game.treat_off.has(k)
@@ -2437,7 +2438,7 @@ func _build_tip(p := 0) -> String:
 		return "%s      %s put in      %s" % [what, "Tap the shelf" if m == "touch" else use, away]
 	if Catalog.is_box(hand.id):   # PRD 8.4: a box goes into a storage slot
 		var b := Pantry.station_ingredient(hand.id)
-		var where := "a fridge (pick up a counter, open the shop, upgrade it)" if Kitchen.is_chilled(hand.id) else "a counter or a fridge"
+		var where := "a fridge (pick up a counter and upgrade it)" if Kitchen.is_chilled(hand.id) else "a counter or a fridge"
 		var what := "%s, $%d a night.      Put it in %s" % [Catalog.label(hand), Pantry.fee_of(b.id, b.ready), where]
 		var away := ("%s sell stops the fee" % ("Sell" if m == "touch" else _g("sell", p))) if hand.get("moving", false) else "%s drop" % ("Drop" if m == "touch" else _g("back", p))
 		return "%s      %s put in      %s" % [what, "Tap the counter" if m == "touch" else use, away]
@@ -2525,6 +2526,11 @@ func show_build() -> void:
 		menu_notes = MenuScreen.BuildNotes.new(game, self)
 		stack.add_child(menu_notes)
 		stack.move_child(menu_notes, 0)
+		_strip = VBoxContainer.new()
+		_strip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		_strip.add_theme_constant_override("separation", 6)
+		_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stack.add_child(_strip)
 		var slip := Sheet.new("paper", 22, 10)
 		slip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		stack.add_child(slip)
@@ -2550,8 +2556,89 @@ func show_build() -> void:
 			d.label.text = _build_tip(p) + _aim_note(p)
 	_dirty_label.text = game.dirty_note()
 	_dirty_note.visible = _dirty_label.text != ""
+	_fill_strip()
 	menu_notes.refresh()
 	_refresh_catalog()
+
+
+## The lifted piece's strip (one row a chef who has one): a chip for each upgrade it can
+## take now and each box it carries, the chosen one raised, its blurb and keys under it.
+func _fill_strip() -> void:
+	for c in _strip.get_children():
+		_strip.remove_child(c)
+		c.queue_free()
+	var n: int = game.chefs.size()
+	for p in n:
+		var ch: Player = game.chefs[p]
+		var list: Array[Dictionary] = game.strip_choices(ch)
+		if list.is_empty():
+			continue
+		var chosen: Dictionary = game.strip_chosen(ch)
+		var sheet := Sheet.new("paper", 16, 8)
+		sheet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		_strip.add_child(sheet)
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 6)
+		sheet.add_child(box)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 10)
+		box.add_child(head)
+		if n > 1:
+			head.add_child(ChefTag.new(p))
+		_label(head, 18, "Upgrades for the %s" % game.piece_name(ch.hand).to_lower()).modulate = Color(INK, 0.7)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		box.add_child(row)
+		for i in list.size():
+			row.add_child(_strip_chip(ch, i, list[i], list[i] == chosen))
+		var m := _mode(p)
+		var keys := ""
+		var act := "take out" if chosen.kind == "box" else "buy"
+		if m == "touch":
+			keys = "Tap a card, tap it again to %s" % act
+		else:
+			keys = "%s %s choose      %s %s" % [_g("prev", p), _g("next", p), _g("buy", p), act]
+		var what := ""
+		if chosen.kind == "box":
+			what = "Stocked every night for $%d. Take it out to stop that." % _box_fee(chosen.id)
+		else:
+			what = Upgrades.blurb(chosen.key)
+		_label(box, 18, "%s      %s" % [what, keys])
+
+
+func _box_fee(id: String) -> int:
+	if Treatments.is_box(id):
+		return int(Treatments.ITEMS[Treatments.key_of(id)].fee)
+	var b := Pantry.station_ingredient(id)
+	return Pantry.fee_of(b.id, b.ready)
+
+
+func _strip_chip(ch: Player, i: int, c: Dictionary, on: bool) -> Control:
+	var chip := Sheet.new("label" if on else "inset", 12, 6)
+	chip.mouse_filter = Control.MOUSE_FILTER_STOP
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	chip.add_child(col)
+	if c.kind == "box":
+		_label(col, 20, Catalog.label({"id": c.id, "tier": 1}))
+		_label(col, 16, "In it: take out").modulate = Color(INK, 0.7)
+	else:
+		var price := Upgrades.step_price(c.key)
+		_label(col, 20, Upgrades.name_of(c.key))
+		var tag := _label(col, 16, "$%d" % price)
+		tag.modulate = Color(CORAL) if price > game.ledger.money else Color(INK, 0.7)
+	if not on:
+		chip.modulate = Color(1, 1, 1, 0.8)
+	chip.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT) or (e is InputEventScreenTouch and e.pressed):
+			if ch.strip_pick == i:
+				game.strip_buy(ch)
+			else:
+				ch.strip_pick = i
+				game.sfx("tab", 0.08)
+				show_build()
+			chip.accept_event())
+	return chip
 
 
 const SLOT := 88.0                  # the gap between the small pieces along the row
