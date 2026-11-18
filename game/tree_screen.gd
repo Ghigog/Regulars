@@ -123,9 +123,8 @@ func set_root(key: String) -> void:
 	cards.clear()
 	_views.clear()
 	lay = Upgrades.layout(key)
-	for k: String in lay.keys():   # what needs a higher level is hidden, as in the shop
-		if k != key and Upgrades.level(k) > game.ledger.level():
-			lay.erase(k)
+	# What needs a higher level stays, as a dimmed silhouette marked with its level
+	# (review, item 10), so the player can see what to aim for.
 	var ext := Upgrades.extent(lay)
 	_content.size = Vector2(PAD.x * 2 + (ext.x - 1) * COL + CARD.x, PAD.y * 2 + (ext.y - 1) * ROW + CARD.y)
 	view = Vector2(VIEW.x, minf(VIEW.y, _content.size.y))
@@ -220,18 +219,6 @@ func move(action: String) -> void:
 	if best != "":
 		game.sfx("tick", 0.1)
 		select(best)
-
-
-## Stars or unstars the chosen node for the shop's Favourites tab.
-func favourite(k := "") -> void:
-	if k == "":
-		k = selected
-	if not lay.has(k):
-		return
-	var on: bool = game.toggle_favourite(k)
-	if cards.has(k):
-		cards[k].show_star()
-	_state.text = ("Kept in Favourites" if on else "Taken out of Favourites") if Catalog.can_favourite(k) else _why(k)
 
 
 ## Buys the chosen node: the held piece becomes it, and the tree is drawn from there.
@@ -435,7 +422,8 @@ class Card extends Control:
 		var later: bool = screen.state_of(key) == "later"
 		var view := Hud.ModelView.new(112, false)
 		view.position = Vector2((CARD.x - 112) / 2.0, 2)
-		view.modulate = Color(1, 1, 1, 0.6 if later else 1.0)
+		var locked: bool = screen.game.ledger.level() < Upgrades.level(key)
+		view.modulate = Color(0.12, 0.2, 0.36, 0.7) if locked else Color(1, 1, 1, 0.6 if later else 1.0)
 		add_child(view)
 		view.tree_entered.connect(func() -> void:
 			view.show_piece(screen.game, _blueprint())
@@ -459,24 +447,6 @@ class Card extends Control:
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if screen.state_of(key) == "next" and not Upgrades.can_buy(screen.root_key, key, screen.game.ledger.money, screen.game.ledger.level()):
 			price.add_theme_color_override("font_color", NO)
-		if Catalog.can_favourite(key):   # the star: click it to keep this in the shop's Favourites
-			star = Hud.Icon.new("star", 30)
-			star.position = Vector2(CARD.x - 34, 4)
-			star.mouse_filter = Control.MOUSE_FILTER_STOP
-			star.tooltip_text = "Favourite: sold already upgraded on the shop's Favourites tab"
-			star.gui_input.connect(func(event: InputEvent) -> void:
-				if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-					star.accept_event()
-					screen.favourite(key))
-			add_child(star)
-			show_star()
-
-	var star: Control
-
-	## Bright when starred, a faint outline of itself when not.
-	func show_star() -> void:
-		if star:
-			star.modulate = Color(1, 1, 1, 1.0) if screen.game.is_favourite(key) else Color(0.2, 0.3, 0.5, 0.45)
 
 	## A tool on a counter is framed closer than the shop's default, so its top (the part
 	## a step changes: a crank, a second pan, grill bars) reads at card size.
@@ -525,7 +495,7 @@ class Card extends Control:
 			var n: Label = screen._text(row, 16, "x%d" % Kitchen.slots_of(key), LINE)
 			n.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		if Upgrades.is_treatment(key):   # a floor treatment's box (PRD 9.5): what laying it costs
-			var each: Label = screen._text(row, 16, "$%d a cell" % Treatments.price_of(Treatments.key_of(key)), LINE)
+			var each: Label = screen._text(row, 16, "$0.25 a tile", LINE)
 			each.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			return
 		var pans := int(Kitchen.NODES[key].get("pans", 1))

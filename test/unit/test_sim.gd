@@ -320,7 +320,7 @@ func test_roll_guests_has_minimum_and_no_duplicates():
 	for p in t.people:
 		p.affinity = -1.0
 	var guests := t.roll_guests(2)
-	assert_gte(guests.size(), 5)
+	assert_gte(guests.size(), Town.crowd_floor(2))
 	var seen := {}
 	for g in guests:
 		assert_false(seen.has(g))
@@ -367,11 +367,12 @@ func test_cannot_overspend():
 	assert_eq(l.money, 0)
 
 
-func test_three_walkouts_close_the_restaurant():
+func test_the_restaurant_closes_when_reputation_bottoms_out():
 	var l := Ledger.new()
-	l.record_walkout()
-	l.record_walkout()
-	assert_false(l.is_closed_down())
+	for i in 3:
+		l.record_walkout()
+	assert_false(l.is_closed_down(), "three walkouts no longer end the run on their own")
+	l.reputation = Ledger.REP_WALKOUT
 	l.record_walkout()
 	assert_true(l.is_closed_down())
 
@@ -427,12 +428,17 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 	assert_false(c.can_buy("stove", 9999, 9, 4))
 
 
+func _roots(found: Array[Dictionary]) -> Array[Dictionary]:
+	return found.filter(func(bp: Dictionary) -> bool: return not bp.has("tree"))
+
+
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), 74, "one entry a piece, the plate, cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
-	var ferns := Catalog.search("FERN")
+	assert_gt(Catalog.search().size(), _roots(Catalog.search()).size(), "every tree node is sold outright too")
+	assert_eq(_roots(Catalog.search()).size(), 74, "one entry a piece, the plate, cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); eight boxes of PRD 8.6; three cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
+	var ferns := _roots(Catalog.search("FERN"))
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
-	var kitchen := Catalog.search("", "Kitchen", "diner")
+	var kitchen := _roots(Catalog.search("", "Kitchen", "diner"))
 	assert_eq(kitchen.size(), 17, "the counter, a shelf, a wall cabinet, a hood, a bin, a dish rack, a sink, the plate, cup and tray stacks, a till, board, the soda fountain, a mop bucket, a hook, a sponge and the desk (PRD 10.6); the fridge and stove are counter upgrades")
 	assert_eq(kitchen.map(func(bp: Dictionary) -> String: return Catalog.label(bp)).slice(0, 3),
 		["Wall shelf", "Counter", "Wall cabinet"],
@@ -722,7 +728,9 @@ func test_comfort_rises_with_joy_and_patience_and_falls_with_disgust():
 	assert_eq(m.comfort(), 0.0)
 	m.joy = 1.0
 	m.patience = 1.0
-	assert_eq(m.comfort(), 1.0)
+	m.savour = 1.0
+	assert_almost_eq(m.comfort(), 1.0, 0.0001)
+	m.savour = 0.0
 	m.joy = 0.5
 	var base := m.comfort()
 	m.joy = 0.6
@@ -734,8 +742,11 @@ func test_comfort_rises_with_joy_and_patience_and_falls_with_disgust():
 	assert_lt(m.comfort(), before)
 	m.disgust = 1.0
 	assert_eq(m.comfort(), 0.0, "never below 0")
+	m.disgust = 0.0
+	var plain := m.comfort()
 	m.savour = 1.0
-	assert_eq(m.comfort(), 0.0, "the dish does not count")
+	assert_gt(m.comfort(), plain, "one score: the dish counts too")
+	assert_almost_eq(m.comfort(), m.satisfaction() / GuestMood.HAPPY_FULL, 0.0001)
 
 
 func test_bill_and_stay_scales_hit_their_ends_and_only_rise():
@@ -752,16 +763,19 @@ func test_comfort_is_fixed_when_the_food_arrives():
 	var m := GuestMood.new()
 	m.joy = 1.0
 	m.patience = 1.0
+	m.savour = 1.0
 	assert_eq(m.settle_comfort(), GuestMood.COSY_THOUGHTS[0])
 	m.joy = 0.0
 	m.patience = 0.0
-	assert_eq(m.served_comfort, 1.0, "the bill and the stay agree")
+	m.savour = 0.0
+	assert_almost_eq(m.served_comfort, 1.0, 0.0001, "the bill and the stay agree")
 	assert_eq(m.scaled_price(12), 15)
 	assert_eq(m.settle_comfort(4), GuestMood.HURRIED_THOUGHTS[1])
 	assert_eq(m.scaled_price(12), 11)
 	assert_eq(m.scaled_price(1), 1, "never below 1")
 	m.joy = 0.5
 	m.patience = 0.5
+	m.savour = 0.5
 	assert_eq(m.settle_comfort(), "", "nothing to say in the middle")
 
 
@@ -769,6 +783,7 @@ func test_deals_apply_after_the_mood_scale():
 	var m := GuestMood.new()
 	m.joy = 1.0
 	m.patience = 1.0
+	m.savour = 1.0
 	m.settle_comfort()
 	assert_eq(m.pay_for(12), 15)
 	assert_true(m.paid_full())
@@ -1412,7 +1427,8 @@ func test_critic_ratings_at_their_thresholds():
 
 
 func test_stars_are_the_rounded_mean_and_a_walkout_caps_them():
-	assert_eq(Critic.stars({"speed": 5, "clean": 5, "quality": 4, "variety": 4}), 5, "4.5 rounds up")
+	assert_eq(Critic.stars({"speed": 5, "clean": 4, "quality": 5, "variety": 4}), 5, "4.6 (food twice) rounds up")
+	assert_eq(Critic.stars({"speed": 5, "clean": 5, "quality": 4, "variety": 4}), 4, "4.4: the food counts twice")
 	assert_eq(Critic.stars({"speed": 4, "clean": 4, "quality": 3, "variety": 4}), 4)
 	assert_eq(Critic.stars({"speed": 1, "clean": 2, "quality": 1, "variety": 1}), 1)
 	assert_eq(Critic.stars({"speed": 5, "clean": 5, "quality": 5, "variety": 5}, true), 2)
@@ -1421,16 +1437,19 @@ func test_stars_are_the_rounded_mean_and_a_walkout_caps_them():
 	assert_eq(int(r.clean), 5, "the rest from what they saw")
 
 
-func test_a_review_resets_the_four_topics_only():
+func test_a_review_blends_into_the_four_topics_only():
 	var t := Town.new(5)
 	t.record_disgust(3, 2)
 	t.record_kindness(3, "comp")
 	var other := t.opinion(3, "other")
 	assert_lt(t.opinion(3, "clean"), 0.0)
 	var c := Critic.new(5)
+	var clean_before := t.opinion(3, "clean")
+	var speed_before := t.opinion(3, "speed")
 	var review := c.publish({"speed": 2, "clean": 5, "quality": 4, "variety": 3}, false, t, 5)
-	assert_almost_eq(t.opinion(3, "clean"), 0.2, 0.0001, "the critic found it clean")
-	assert_almost_eq(t.opinion(3, "speed"), -0.1, 0.0001)
+	assert_almost_eq(t.opinion(3, "clean"), lerpf(clean_before, Critic.opinion_for(5), Critic.BLEND), 0.0001,
+		"the critic found it clean: the town moves 30% their way")
+	assert_almost_eq(t.opinion(3, "speed"), lerpf(speed_before, Critic.opinion_for(2), Critic.BLEND), 0.0001)
 	assert_almost_eq(t.opinion(3, "other"), other, 0.0001, "other is untouched")
 	assert_almost_eq(float(t.people[3].affinity), _sum_parts(t, 3), 0.0001)
 	assert_eq(int(review.stars), 4)
@@ -1456,7 +1475,7 @@ func test_review_boost_lasts_four_days_and_stacks_with_flyers():
 	c.publish({"speed": 5, "clean": 5, "quality": 5, "variety": 5}, false, Town.new(1), 5)
 	assert_eq(c.visit_boost(5), 0.0, "not on the day itself")
 	for d in [6, 7, 8, 9]:
-		assert_eq(c.visit_boost(d), 0.25)
+		assert_eq(c.visit_boost(d), Critic.BOOST[5])
 	assert_eq(c.visit_boost(10), 0.0)
 	var plain := 0
 	var both := 0
@@ -1465,7 +1484,7 @@ func test_review_boost_lasts_four_days_and_stacks_with_flyers():
 		both += Town.new(s).roll_guests(1, Town.FLYER_BOOST + c.visit_boost(6)).size()
 	assert_gt(both, plain, "a good review on top of flyers brings more")
 	c.publish({"speed": 1, "clean": 1, "quality": 1, "variety": 1}, false, Town.new(1), 10)
-	assert_eq(c.visit_boost(11), -0.25, "the next review replaces it")
+	assert_eq(c.visit_boost(11), Critic.BOOST[1], "the next review replaces it")
 
 
 func test_a_clean_review_does_not_bring_back_the_revolted():

@@ -110,27 +110,47 @@ func set_held(kind: String, quality := 1.0, dishes_: Array = [], tray_ := false)
 ## Handing a bill over (PRD 11): the fill bar over `at` (a table or the till), `share`
 ## of the way full.
 func show_giving(at: Node3D, share: float) -> void:
+	show_hold(at.global_position, share, "bill")
+
+
+## The one fill bar every held action shows (review, item 11): handing a bill, holding E
+## to move a piece, helping someone up. Over `at`, `share` full, `icon` at its left end.
+var _bar_icon := ""
+func show_hold(at: Vector3, share: float, icon := "bill") -> void:
+	if _give_bar != null and _bar_icon != icon:
+		_give_bar.queue_free()
+		_give_bar = null
 	if _give_bar == null:
-		_give_bar = Node3D.new()
-		_give_bar.top_level = true
-		_give_bar.basis = Build.CAM_BASIS
+		_give_bar = hold_bar(icon)
+		_bar_icon = icon
 		add_child(_give_bar)
-		# Wider and taller than a patience bar, with the slip at its left end, so the two
-		# never read as one another.
-		Build.flat(_give_bar, Icons.rect(0, 0, 1.0, 0.24), Build.TRIM)
-		Build.flat(_give_bar, Icons.rect(0, 0, 0.92, 0.15), "#6b5647", 0.003)
-		var fill := Build.flat(_give_bar, Icons.rect(0, 0, 0.92, 0.15), Build.GOOD, 0.006)
-		fill.name = "fill"
-		var icon := Node3D.new()
-		icon.position = Vector3(-0.62, 0, 0.009)
-		_give_bar.add_child(icon)
-		var layers := Icons.icon("bill")
-		for i in layers.size():
-			Build.flat(icon, Icons._moved([layers[i]], Vector2.ZERO, 0.2)[0][0], layers[i][1], i * 0.002)
-		Build.on_top(_give_bar, 0.0)
 	_give_bar.visible = true
-	_give_bar.global_position = at.global_position + Vector3(0, 2.05, 0)
-	var fill: Node3D = _give_bar.get_node("fill")
+	_give_bar.global_position = at + Vector3(0, 2.05, 0)
+	set_hold(_give_bar, share)
+
+
+## A hold bar: wider and taller than a patience bar, with an icon at its left end, so the
+## two never read as one another. Top level, facing the camera; fill it with set_hold.
+static func hold_bar(icon: String) -> Node3D:
+	var bar := Node3D.new()
+	bar.top_level = true
+	bar.basis = Build.CAM_BASIS
+	Build.flat(bar, Icons.rect(0, 0, 1.0, 0.24), Build.TRIM)
+	Build.flat(bar, Icons.rect(0, 0, 0.92, 0.15), "#6b5647", 0.003)
+	var fill := Build.flat(bar, Icons.rect(0, 0, 0.92, 0.15), Build.GOOD, 0.006)
+	fill.name = "fill"
+	var mark := Node3D.new()
+	mark.position = Vector3(-0.62, 0, 0.009)
+	bar.add_child(mark)
+	var layers := Icons.icon(icon)
+	for i in layers.size():
+		Build.flat(mark, Icons._moved([layers[i]], Vector2.ZERO, 0.2)[0][0], layers[i][1], i * 0.002)
+	Build.on_top(bar, 0.0)
+	return bar
+
+
+static func set_hold(bar: Node3D, share: float) -> void:
+	var fill: Node3D = bar.get_node("fill")
 	var k := clampf(share, 0.001, 1.0)
 	fill.scale.x = k
 	fill.position.x = (k - 1.0) * 0.46

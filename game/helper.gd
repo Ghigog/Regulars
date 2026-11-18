@@ -52,7 +52,7 @@ func speed() -> float:
 ## Slipping hurts their mood a little too (PRD 10, section 6).
 func fall() -> void:
 	super.fall()
-	game.staff.nudge(person, -HelperWork.SLIP_HIT)
+	game.staff.nudge(person, -HelperWork.SLIP_HIT, "slip")
 
 
 ## Sets off for a cell. Returns false when there is no way there.

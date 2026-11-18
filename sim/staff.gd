@@ -77,7 +77,6 @@ const VISIT_FROM := 0.6         # above this, on a day off they may come in to e
 const LOW_FROM := 0.5           # tunable: below this they start to slow and slip up
 const SLOW_MAX := 0.6           # tunable: extra reaction time at 0 satisfaction (1.6x)
 const MISTAKE_MAX := 0.3        # tunable: mistake chance at 0 satisfaction
-const SPITE_SHARE := 0.3        # tunable: share of mistakes made on purpose
 
 # ---------- Haggling ----------
 const HAGGLE_DROP := 3.0        # tunable: chance lost per whole ask below it (10% under = -0.3)
@@ -94,7 +93,6 @@ const FIRE_FRIEND_SHARE := 0.5  # tunable: share of a harsh firing their friends
 # ---------- The week, breaks, chat, training ----------
 const WEEK := 5
 const BREAK_SECONDS := 8.0      # tunable: a break in game seconds
-const CHAT_SHARE := 0.05        # tunable: share of the gap closed per second of chat
 const TRAIN_PER_TASK := 0.02    # tunable: skill gained per task done in that kind
 
 var rng := RandomNumberGenerator.new()
@@ -379,11 +377,63 @@ func target(person: int) -> float:
 	return _target_for(e, e.duties, e.wage, e.breaks, e.days_off)
 
 
-## A change during the day: their own tolerances at work, a slip (PRD 9).
-func nudge(person: int, amount: float) -> void:
+## A change during the day: their own tolerances at work, a slip (PRD 9). `why` files
+## it ("mess", "slip") so the staff list can say what is wearing them down.
+func nudge(person: int, amount: float, why := "") -> void:
 	var e := employee(person)
 	if not e.is_empty():
 		e.satisfaction = clampf(e.satisfaction + amount, 0.0, 1.0)
+		if why != "":
+			var hits: Dictionary = e.get("hits", {})
+			hits[why] = float(hits.get(why, 0.0)) + amount
+			e.hits = hits
+
+
+## Two or three reasons for how someone feels, worst first, for the staff list (review,
+## item 11): the pay against what their duties are worth, a duty in a kind they are
+## weak at, breaks and days off, a wage not paid, and what wore them down at work.
+const REASON_MAX := 3
+const UNDERPAID_BELOW := 0.9    # tunable: pay under this share of their worth reads "Underpaid"
+const WELL_PAID_FROM := 1.15
+const HIT_NOTED := 0.04         # tunable: a day's wear this big is worth a word
+func reasons(person: int) -> Array[String]:
+	var e := employee(person)
+	var bad: Array[String] = []
+	var good: Array[String] = []
+	if e.is_empty():
+		return bad
+	if bool(e.get("unpaid_last", false)):
+		bad.append("Not paid last night")
+	var w := worth(e.skills, e.rating, e.duties)
+	var ratio := float(e.wage) / w if w > 0.0 else 1.0
+	if ratio < UNDERPAID_BELOW:
+		bad.append("Underpaid")
+	elif ratio >= WELL_PAID_FROM:
+		good.append("Well paid")
+	for k in kinds_of(e.duties):
+		if is_weak(e.skills, k):
+			bad.append("Dislikes the %s" % KIND_WORDS[k].to_lower())
+			break
+	var hits: Dictionary = e.get("hits", {})
+	if float(hits.get("mess", 0.0)) <= -HIT_NOTED:
+		bad.append("Hates the mess")
+	if float(hits.get("slip", 0.0)) < 0.0:
+		bad.append("Slipped at work")
+	if int(e.breaks) == 0 and e.duties.size() > 1:
+		bad.append("No breaks")
+	elif int(e.breaks) > 0:
+		good.append("Likes the breaks")
+	if int(e.days_off) == 0:
+		bad.append("No days off")
+	else:
+		good.append("Days off")
+	var out: Array[Array] = [bad, good]
+	var all: Array[String] = []
+	for l: Array in out:
+		for r: String in l:
+			if all.size() < REASON_MAX:
+				all.append(r)
+	return all
 
 
 ## The end of the night: wages are paid from `cash` in hiring order while it lasts (days
@@ -397,10 +447,13 @@ func end_night(cash: int) -> Dictionary:
 	for person in employees.keys():
 		var e: Dictionary = employees[person]
 		e.satisfaction += (target(person) - e.satisfaction) * SAT_STEP
+		e.hits = {}   # a new day's wear
+		e.unpaid_last = false
 		if cash - paid >= e.wage:
 			paid += e.wage
 		else:
 			unpaid.append(person)
+			e.unpaid_last = true
 			e.satisfaction -= UNPAID_HIT
 		e.satisfaction = clampf(e.satisfaction, 0.0, 1.0)
 		if e.satisfaction <= BOTTOM:
@@ -447,13 +500,13 @@ static func mistake_chance(satisfaction: float) -> float:
 	return MISTAKE_MAX * low_factor(satisfaction)
 
 
-## Rolls one task for a mistake: "" (none), "slip" (burnt food, a dropped plate, dirt left
-## behind) or "spite" (the same, on purpose).
+## Rolls one task for a mistake: "" (none) or "slip" (burnt food, a dropped plate, dirt
+## left behind). Never on purpose (review, item 11: no deliberate sabotage).
 func roll_mistake(person: int) -> String:
 	var e := employee(person)
 	if e.is_empty() or rng.randf() >= mistake_chance(e.satisfaction):
 		return ""
-	return "spite" if rng.randf() < SPITE_SHARE else "slip"
+	return "slip"
 
 
 # ---------- Managing staff ----------
@@ -686,20 +739,6 @@ func on_break(person: int, t: float, day_length: float) -> bool:
 		if t >= s and t < s + BREAK_SECONDS:
 			return true
 	return false
-
-
-# ---------- Chat ----------
-
-## Two helpers chatting for `delta` seconds: their satisfaction moves toward each other's.
-func chat(a: int, b: int, delta: float) -> void:
-	var ea := employee(a)
-	var eb := employee(b)
-	if ea.is_empty() or eb.is_empty():
-		return
-	var f := clampf(CHAT_SHARE * delta, 0.0, 0.5)
-	var gap: float = eb.satisfaction - ea.satisfaction
-	ea.satisfaction += gap * f
-	eb.satisfaction -= gap * f
 
 
 # ---------- Training ----------

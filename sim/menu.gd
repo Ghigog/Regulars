@@ -222,6 +222,16 @@ static func pick(course: String, available: Array, likes: Array, dislikes: Array
 	return pool[-1]
 
 
+## How many of an order's items ({main, side, drink}) are at the Dear price level.
+static func dear_count(o: Dictionary) -> int:
+	var n := 0
+	for k: String in o:
+		var it = o[k]
+		if it is Dictionary and not (it as Dictionary).is_empty() and it.get("price_level", "fair") == "dear":
+			n += 1
+	return n
+
+
 ## What one guest orders: {main, side, drink}, each an item or {}. The main is any
 ## acceptable one; a side and a drink are added only when one has a liked ingredient.
 static func order(available: Array, likes: Array, dislikes: Array, rng: RandomNumberGenerator) -> Dictionary:

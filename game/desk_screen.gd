@@ -374,7 +374,7 @@ func _cv_sheet(cv: Dictionary) -> Control:
 	for_l.modulate.a = 0.75
 	for k in Staff.KINDS:
 		_star_row(info, Staff.KIND_WORDS[k], Staff.stars(float(cv.skills[k])), false)
-	_star_row(info, "Overall", int(cv.rating), true)
+	_star_row(info, "Pace", int(cv.rating), true)   # how fast they walk and work (review, item 11: not an average)
 	var ask := HBoxContainer.new()
 	ask.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ask.add_theme_constant_override("separation", 8)
@@ -821,6 +821,10 @@ func _person_row(row: HBoxContainer, person: int, face_px: int) -> void:
 	if int(e.bottom_nights) > 0:
 		word.text += "  (%d of %d nights)" % [int(e.bottom_nights), Staff.QUIT_NIGHTS]
 		word.add_theme_color_override("font_color", Hud.CORAL.darkened(0.3))
+	var why := staff.reasons(person)   # review, item 11: what makes them feel so
+	if not why.is_empty():
+		var wl2 := _label(md, 13, "\n".join(why))
+		wl2.modulate.a = 0.75
 	var sk := VBoxContainer.new()
 	sk.add_theme_constant_override("separation", 0)
 	sk.size_flags_vertical = Control.SIZE_SHRINK_CENTER

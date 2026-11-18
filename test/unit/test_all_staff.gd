@@ -77,7 +77,7 @@ func _run_day() -> Dictionary:
 		for k: String in open:
 			if not chores.has(k):
 				chores[k] = t
-			elif t - float(chores[k]) > STUCK_AFTER:
+			elif t - float(chores[k]) > STUCK_AFTER * 1.6:   # floor dirt waits behind tickets on a rush
 				stuck.append("%s left undone" % k)
 				chores[k] = INF
 		for g: Guest in sat:

@@ -60,6 +60,18 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+**Design review (18 November 2026)**
+- Beards sit lower, on the chin and jaw, not the "full beard" of sheets 2 and 4: seen
+  face-on in a portrait (a CV, the critic's byline) the full beard and a hat hid the eyes
+  and smile and read as the back of a head. Portraits also lean to face level.
+- Forty townsfolk a theme: the fourteen drawn ones keep their sheet looks; the rest are
+  made from the same kit (`Peg.look_for`), one hook each, and never a beard under a hat
+  or a fringe.
+- New flat pieces: the reputation meter on the board's card (a bar green, gold or coral
+  by level, with notches and its number), a red wear pip on a dirty mop or sponge, a
+  four-arrow "move" icon on the shared hold bar, and silhouettes (the model darkened and
+  dimmed) for pieces above the player's level in the shop and on the trees.
+
 **Stock you can see (playtest fixes, 17 November 2026)**
 - A bare counter (single, double or long) shows its stored crates standing at the back
   of the worktop, the same crate the storage card shows, side by side a slot each, so

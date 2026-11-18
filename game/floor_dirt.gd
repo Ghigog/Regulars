@@ -288,8 +288,8 @@ func tick_slips(delta: float) -> void:
 			get_up(who, true)
 
 
-## `who` gets up, helped or `alone`. A guest left alone is angrier; then, unless already
-## on the way out, they may walk out, the chance set by how they felt about the place.
+## `who` gets up, helped or `alone`. A guest left alone is angrier. A slip costs mood,
+## never a strike (review, item 8): they stay, sore, and the visit counts it.
 func get_up(who: Node3D, alone: bool) -> void:
 	if not down.has(who):
 		return
@@ -303,15 +303,6 @@ func get_up(who: Node3D, alone: bool) -> void:
 		g.mood.delight(-FloorMess.ALONE_JOY, FloorMess.ALONE_THOUGHT)
 	else:
 		g.mood.think(FloorMess.HELPED_THOUGHT)
-	if g.state in ["leaving", "browse"]:
-		return
-	if mess.rolls_slip_walkout(opinion(g)):
-		game.walk_out(g)
-
-
-## A guest's opinion of the place right now, 0 to 1 (FloorMess.slip_opinion).
-func opinion(g: Guest) -> float:
-	return FloorMess.slip_opinion(float(game.town.people[g.idx].affinity), g.mood.satisfaction())
 
 
 func _drop(who) -> void:
@@ -343,17 +334,13 @@ func _down_mark(who: Node3D) -> Node3D:
 	who.add_child(mark)
 	var stars := Fx.play(mark, "dizzy", Vector3.ZERO, 0.42, true)
 	stars.fps = 8.0
-	var bar := Node3D.new()
+	var bar := Player.hold_bar("heart")   # the one hold bar every held action shows (review, item 11)
 	bar.name = "bar"
+	bar.top_level = false
 	bar.position = Vector3(0, 0.55, 0)
-	bar.basis = Build.CAM_BASIS
+	bar.scale = Vector3.ONE * 0.75
 	bar.visible = false
 	mark.add_child(bar)
-	Build.flat(bar, Icons.rect(0, 0, 0.67, 0.17), Build.TRIM)
-	Build.flat(bar, Icons.rect(0, 0, 0.6, 0.1), "#6b5647", 0.003)
-	var fill := Build.flat(bar, Icons.rect(0, 0, 0.6, 0.1), Build.GOOD, 0.006)
-	fill.name = "fill"
-	Build.on_top(bar, -bar.position.z)
 	return mark
 
 
@@ -362,10 +349,7 @@ func _show_help(d: Dictionary, share: float) -> void:
 		return
 	var bar: Node3D = d.mark.get_node("bar")
 	bar.visible = true
-	var fill: Node3D = bar.get_node("fill")
-	var k := clampf(share, 0.001, 1.0)
-	fill.scale.x = k
-	fill.position.x = (k - 1.0) * 0.3
+	Player.set_hold(bar, share)
 
 
 # ---------------------------------------------------------------- drawing

@@ -26,6 +26,20 @@ const WALK_OVER := "Walk over and press Use"        # the mouse over a messy pie
 const HANDS_FULL := "Put that down first."          # opening the shop with mess in hand
 
 
+## The night cleaner (review, item 8): one press in the shop's Extras pays someone to
+## clear every table, wash up, take every bag out and mop the floor, instead of walking
+## to each piece. A call-out fee, then so much a messy piece and a little for the floor.
+const CLEANER_BASE := 5           # tunable
+const CLEANER_PIECE := 2          # tunable: each table, sink or bin with something on it
+const CLEANER_FLOOR_LEVELS := 4   # tunable: a dollar for every this many levels of floor dirt
+
+
+static func cleaner_price(pieces: int, floor_levels: int) -> int:
+	if pieces <= 0 and floor_levels <= 0:
+		return 0
+	return CLEANER_BASE + CLEANER_PIECE * pieces + ceili(floor_levels / float(CLEANER_FLOOR_LEVELS))
+
+
 ## Whether a piece has anything left to clean: plates on a table, plates soaking
 ## in a sink, scraps in a bin. `dirty` is plates (tables, sinks); `count` is scraps (bins).
 static func needs_cleaning(kind: String, dirty: int, count: int) -> bool:

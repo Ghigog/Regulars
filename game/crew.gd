@@ -864,7 +864,8 @@ func _wait_by_desk(h: Helper) -> void:
 		h.go_to(c)
 
 
-## Free helpers near each other chat: speech bubbles, and their satisfaction moves together.
+## Free helpers near each other chat: speech bubbles. It no longer moves their
+## satisfaction (review, item 11: one fewer hidden lever).
 func _chat(delta: float) -> void:
 	var free := []
 	for h in helpers:
@@ -873,7 +874,6 @@ func _chat(delta: float) -> void:
 				and not game.floor_dirt.is_down(h):
 			free.append({"id": h.person, "cell": h.cell()})
 	for pair: Array in HelperWork.chat_pairs(free):
-		game.staff.chat(pair[0], pair[1], delta)
 		var a := helper_of(pair[0])
 		var b := helper_of(pair[1])
 		a.chatting = true
@@ -892,7 +892,7 @@ func _wear(h: Helper, delta: float) -> void:
 		lvl = maxi(lvl, mess.level(h.cell() + d))
 	var drain := HelperWork.work_drain(game.staff.tolerance(h.person, "clean"), lvl, delta)
 	if drain > 0.0:
-		game.staff.nudge(h.person, -drain)
+		game.staff.nudge(h.person, -drain, "mess")
 
 
 # ---------------------------------------------------------------- demos

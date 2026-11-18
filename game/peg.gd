@@ -63,8 +63,37 @@ static func rigged(peg: Peg) -> Node3D:
 
 static func guest(person_name: String) -> Peg:
 	var p := Peg.new()
-	p._build(LOOKS.get(person_name, LOOKS.Mabel), false, 0)
+	p._build(look_for(person_name), false, 0)
 	return p
+
+
+## The drawn look for the fourteen on the sheets; anyone else's is made from the same
+## kit, fixed by their name: one hook each, a hat, a bold pattern or a face extra.
+static func look_for(person_name: String) -> Dictionary:
+	if LOOKS.has(person_name):
+		return LOOKS[person_name]
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("look:" + person_name)
+	var hairs := ["bun", "bald", "twin_buns", "short", "top_knot", "wavy", "curls", "bob", "side_swept"]
+	var hats := ["", "", "", "flat_cap", "beanie", "sun_hat", "bowler", "bobble", "beret"]
+	var extras := ["", "", "", "glasses", "beard"]
+	var patterns := ["plain", "collar", "stripe", "apron", "dungarees"]
+	var look := {
+		"skin": r.randi_range(0, SKINS.size() - 1),
+		"hair": hairs[r.randi_range(0, hairs.size() - 1)],
+		"hair_col": HAIR_COLS.keys()[r.randi_range(0, HAIR_COLS.size() - 1)],
+		"outfit": OUTFITS.keys()[r.randi_range(0, OUTFITS.size() - 1)],
+		"pattern": patterns[r.randi_range(0, patterns.size() - 1)],
+	}
+	var hat: String = hats[r.randi_range(0, hats.size() - 1)]
+	if hat != "":
+		look.hat = hat
+	var extra: String = extras[r.randi_range(0, extras.size() - 1)]
+	if extra == "beard" and (hat != "" or not look.hair in ["bald", "short"]):
+		extra = "glasses"   # a beard under a hat or a fringe hides the whole face at 60 px
+	if extra != "":
+		look.extra = extra
+	return look
 
 
 static func chef(player := 0) -> Peg:
@@ -144,8 +173,9 @@ func _build(look: Dictionary, is_chef: bool, player: int) -> void:
 				_stroke(_head, pts, 0.011, "#2b2523")
 			_stroke(_head, [Vector2(-0.035, -0.005), Vector2(0.035, -0.005)], 0.011, "#2b2523")
 		"beard":
-			var beard := Build.lathe(_head, Vector3.ZERO, _dome(HEAD_R + 0.02, 38.0), hair_col)
-			beard.rotation.x = deg_to_rad(128.0)
+			# Low on the chin, so the eyes and smile still show above it (a portrait faces it).
+			var beard := Build.lathe(_head, Vector3.ZERO, _dome(HEAD_R + 0.02, 52.0), hair_col)
+			beard.rotation.x = deg_to_rad(145.0)
 	set_face("neutral")
 
 

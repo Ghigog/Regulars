@@ -30,43 +30,40 @@ Survive as many days as you can; three walkouts in one day ends the run.
   fridge (three kinds) or the freezer (two kinds; takes frozen kinds, of which there are
   ice cream since 8.6). The first room starts with two hoods over the cooking line, two
   cabinets by the back door and the jar shelf over the sink, each sellable; the kitchen
-  sconce is gone. At night E lifts the tool, then the boxes, then the wall piece, then
-  what stands below. High slots are storage like any other; a cabinet hung over bare
+  sconce is gone. At night E opens the card of what hangs on the wall first,
+  then of what stands below (a tool on a counter before the counter). High slots are storage like any other; a cabinet hung over bare
   floor is reached from below or beside it. Floor laid behind a wall, or a door or
   archway through it, is refused while a piece hangs on it alone.
-- **Storage (PRD 8.4).** Ingredients live in storage the player builds. At night, E on
-  a counter, its fridge line or a shelf **lifts it** where it stands and opens its
-  **storage card** (fixes after the first playtest, 17 November 2026; reworked the same
-  day): an Ingredients tab first, then Upgrades (the counter's tree, bought where it
-  stands). E puts the piece back down with the chosen box in; Enter (pad X) puts a box
-  in or takes it out and keeps the card open; Tab keeps the piece in hand to carry, its
-  boxes going with it (any that do not fit where it lands are left out, with a note).
-  E picks up every piece, hoods over bare floor included; on a cell with a wall piece
-  over a floor piece the wall piece comes first, and once it is put back the next E
-  there takes the one below. The prompt names the piece ("Pick up sink"). Everything
-  sells, the start's pieces and the last sink, bin, plate stack and till too (the plate
-  stack and the till are in the Kitchen tab now); while the kitchen has none of one of
-  those four the shop sells it at any level and the door card stays shut (`ESSENTIALS`).
-  The till is its own piece: it stands on a counter (or a tool on one), comes off before
-  what it stands on, and there is one at a time. The
-  Ingredients tab lists what is stored there, then every box: what fits first, then the
-  rest dimmed with why ("Needs a fridge"), so the player learns a fridge exists. The
-  shop's Pantry tab is gone. The Kitchen tab sells no counter upgrades: a fridge is
-  bought as a counter and upgraded on its card, and the stove is a branch of the
-  counter's tree too (`Kitchen.TOP_LINKS`: buying it stands a stove on that counter for
-  the stove's whole price; the stove is a tree of its own from there). A stove and
-  everything up its tree is the counter upgraded, not a tool on it
-  (`Kitchen.grows_from_counter`): E opens its card like a counter's (its boxes, and its
-  own tree, bought where it stands), it lifts, moves and sells as one piece with its
-  counter (worth both), and goes on open floor, never onto another counter. Tools (board,
-  fountain, wine barrel) still stand on a counter and lift off it. A full fridge
-  says so ("The fridge is full") rather than "Needs a fridge". The shop's Favourites
-  tab sells any starred tree node (X or the card's star on a tree, kept in
-  `user://regulars_favourites.cfg` across runs) already upgraded at the whole price of
-  the way there; a stove-line favourite comes on its own counter, and cleaning homes
-  cannot be starred. The Kitchen tab runs in kitchen order: storage, cooking
-  tools, drinks, the hood, washing up, cleaning, the desk (`Catalog.KITCHEN_GROUPS`).
-  Pieces above the player's level are hidden in the shop, the card and the trees; a day
+- **Storage (PRD 8.4) and the piece card.** Ingredients live in storage the player
+  builds. At night, E (or a click) on any piece opens its one **card where it stands**
+  (review, item 4); nothing is lifted to stock it. The card's row starts with action
+  cards drawn as the piece: Upgrades (its tree, bought where it stands), the tree of
+  each stored floor treatment's box, Move, Turn, Sell (with what it pays, or why not)
+  and, on the till's counter, Move the till. A piece that keeps boxes lists them after:
+  what is stored there, then every box, what fits first, the rest dimmed with why
+  ("Needs a fridge: upgrade the counter"). On a bare counter a box that needs a fridge
+  offers "Fridge $35": one press makes the counter a fridge with the box in. A box says
+  "Unlimited tonight, $3": its kind's fee is flat, however much is sold. The card needs
+  only E and Back (arrows browse); holding E moves the piece, with the hold bar. Rugs
+  and partitions have no card: E picks them up. On a cell with a wall piece over a floor
+  piece the wall piece's card comes first; once shut, the next E there opens the one
+  below. Every piece sells, the start's pieces and the last sink, bin, plate stack and
+  till too; while the kitchen has none of one of those four the shop sells it at any
+  level and the door card stays shut (`ESSENTIALS`). The till is its own piece: it
+  stands on a counter (or a tool on one), and there is one at a time.
+  A stove and everything up its tree is the counter upgraded (`Kitchen.TOP_LINKS`,
+  `Kitchen.grows_from_counter`): its card is a counter's (its boxes, its own tree), it
+  moves and sells as one piece with its counter (worth both), and goes on open floor,
+  never onto another counter (held over one, it is refused with the red cross, no
+  message). Tools (board, fountain, wine barrel) stand on a counter and come off it. A
+  full fridge says so ("The fridge is full").
+  The shop sells every tree node outright, priced as the whole way there: "buy a Twin
+  fryer" stands one up, on its own counter for the stove line (`Catalog.tree_blueprint`;
+  cleaning homes are bought as their root and upgraded). There is no Favourites tab.
+  The Kitchen tab runs in kitchen order: storage, cooking tools, drinks, the hood,
+  washing up, cleaning, the desk (`Catalog.KITCHEN_GROUPS`). Pieces and tree nodes above
+  the player's level show as dimmed silhouettes marked "Level N" in the shop and on the
+  trees (review, item 10), and cannot be bought; a day
   that ends on a new level says "LEVEL N: NEW IN THE SHOP" on the receipt. There is a box per food kind of the run's theme (free to take; its kind costs
   its nightly fee) and, from level 2, ready-made boxes of the chopped kinds and cheese
   (prepped, always plain, 1.5x the fee: `READY_FEE`). A box goes into a free slot: a
@@ -140,11 +137,14 @@ Survive as many days as you can; three walkouts in one day ends the run.
   restock note on the build slip lists tomorrow's cost by station. The door will not
   flip with no makeable main or when the stock cannot be paid. Tonight's item names are
   chalked on the A-frame board by the door (`game/menu_board.gd`).
-- **The empty start.** A run opens on night zero with $150 and a kitchen holding only
-  the sink, the bin, the plate stack and the counters. Three hints lead the way, one at
-  a time ("Buy an ingredient and a tool in the shop.", "Write a menu.", "Flip the door
-  card to open."). Tests and most demos start from `test_kitchen()`: the theme's fixed
-  main (diner Burger: bun and patty; seaside Fish roll: roll and fish) with its stations.
+- **The starter kitchen.** A run opens on night zero with $150 and a kitchen holding
+  the sink, the bin, the plate stack, the counters and a starter set (review, item 7):
+  the first main's stove under the hood, a corner fridge with its chilled kind, its
+  bread's box on a counter and a cup stack (`_starter_kitchen`). The hints lead on from
+  there ("Write a menu: N, or the board by the door.", "Flip the door card to open.");
+  a kitchen sold bare is told the main needs a stove and a fridge, both a counter
+  upgraded. Tests and most demos start from `test_kitchen()`: the theme's fixed main
+  (diner Burger: bun and patty; seaside Fish roll: roll and fish) with its stations.
 - **Seaside food.** Its own stations (a sea-blue icebox for fish and calamari, a
   wicker bread basket, a wine barrel, crates and sacks) and food models (salmon
   fillet, calamari rings, lemon wheels, courgette rounds, pepper strips, new potatoes,
@@ -214,7 +214,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   takes one off the count, so the habit wears off. Constants are at the top of
   `sim/town.gd`.
 - **Night 0.** The game opens in the build phase, on the night before day 1, with the door
-  card on CLOSED and the starting $50 to spend. Tests and `REGULARS_DEMO` shots skip it
+  card on CLOSED and the starting $150 to spend. Tests and `REGULARS_DEMO` shots skip it
   (`first_night` in `game/main.gd`).
 - **Build phase, between days only, played from the keyboard.** Receipt, then Enter. The
   chef walks the room (WASD or arrows). E picks up the piece in front (a partition on the
@@ -294,7 +294,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     a little round table with one stool, so only a guest alone sits there (the smallest
     free table that fits is chosen, so a single takes a stool first). Kitchen: a bin
     ($30, level 2) and a sink ($70, level 3), which are now catalog pieces like any other
-    (the last of each cannot be sold), and a dish rack ($50, level 3): a sink with one
+    (every one can be sold; while there is none the shop sells one at any level), and a dish rack ($50, level 3): a sink with one
     beside it piles at 10 dishes, not 6. Each sink and bin has its own mess and sightline,
     and the "still dirty" note counts them ("2 sinks").
 - **Keyboard, controller or touch** (`game/controls.gd`, `game/player_input.gd`). Each
@@ -350,8 +350,8 @@ Survive as many days as you can; three walkouts in one day ends the run.
   back; a piece still carried when the day opens goes back too. Sell (button or X)
   refunds half the catalog price, except same-night returns: whatever was paid for a
   piece since the last day ended (buying it, or an upgrade step) comes back in full if
-  it is sold before the door opens (`spent_tonight` in `game/main.gd`). Fixtures (fridge, sink, bin, plate stack, pass
-  counters) can be moved but not sold, and the last stove and last table cannot be sold.
+  it is sold before the door opens (`spent_tonight` in `game/main.gd`). Every piece can be moved and
+  sold, the start's fixtures and the last of anything included.
   Player-built partitions move and sell the same way; the entrance wall does not.
 - **Upgrade trees (PRD 8.3).** Nothing is upgraded in the shop. At night, pick a piece
   up and open the shop (Tab, Y, the Shop button): with a piece in hand the shop shows its
@@ -698,6 +698,53 @@ Survive as many days as you can; three walkouts in one day ends the run.
 Code map: `sim/` is pure logic with no scene dependencies (unit-tested with GUT).
 `game/` is the scene layer. `tools/make_sfx.py` regenerates the placeholder sounds.
 
+### Outside design review (18 November 2026)
+
+The owner went through an outside review and decided each finding; these are now built.
+Where an older paragraph above disagrees, this list wins.
+
+- **Crowd** (`sim/town.gd`): each theme's town is forty named people (the fourteen drawn
+  ones and a seeded pool, `Town.MORE_NAMES`; looks from the peg kit, `Peg.look_for`).
+  Visit chance is 0.1 + 0.45 x affinity; flyers add 0.1 each and a review +-0.1 at most.
+  A thin day is topped up to `crowd_floor` = 2 + day / 2. The day is 75 s every day
+  (95 and 85 s on days 1 and 2); later days are harder for the crowd, shorter patience,
+  and bigger parties (more bring every friend; from day 8 a friend brings a friend).
+  Repeat visits in a day were not needed with forty people.
+- **Critic**: the same critic every fifth day. A review moves each topic 30% toward
+  it (`Town.blend_topics`, `Critic.BLEND`) instead of replacing it, each review raises
+  their speed steps a little (to +0.1), the food counts twice in the stars, and the
+  variety rule is written on the review and the menu screen ("The critic likes a full
+  menu"). Stars also move the reputation meter.
+- **Wealth**: everyone has a means, 1 (poor) to 5 (rich), read like a tolerance. Each
+  Dear item a guest orders costs happiness, 0.08 at middling means, x1.6 to x0.4; the
+  card hints "Watches the pennies" / "Money's no object". Dear is no longer simply best.
+- **One happiness score**: `GuestMood.satisfaction()` (savour, joy, patience, disgust,
+  prices) is the one score; comfort is it out of its best (`HAPPY_FULL`), read after the
+  first taste, and sets the bill scale and eating time; the same score sets the tip and
+  the opinion. The town keeps its per-topic opinions, because the critic's review
+  blends into each topic: one affinity plus a "known for" tag would lose that.
+- **Prep pays**: perfect trays in a row make a streak ("Perfect! xN"): +10% tip a step
+  (to +50%), and from three in a row the guest and friends think better of the cooking
+  and the meter rises. The receipt counts perfect plates. The minigames are unchanged.
+- **Cleaning**: a slip costs mood, never a strike. A dirty mop or sponge cleans at half
+  pace with a red wear pip, never spreading dirt. Every floor treatment is $0.25 a tile
+  a night, rounded up for the night. The shop's Extras sell a night cleaner (one press:
+  every table cleared, washed up, bags out, floor mopped, priced by the mess). One Wash
+  clears the whole sink.
+- **Reputation** (`Ledger.reputation`): 0 to 100, starting at 50, carried over the
+  nights. Walkouts -8, unpaid bills -3, unhappy guests -1.5, found nothing -0.5; happy
+  guests +1, perfect streaks +0.5, reviews +-4 a star. The board's card shows it; the
+  receipt shows it and the day's change. A bad day costs a good run about a third.
+- **Paying**: a guest pays what the slip says, less any deal; how happy they are adds
+  "extras" to the tip (or, in a hurry, takes from it). Half price and a free meal take a
+  0.6 s hold at the table, so a stray E gives nothing away. Every hold shows the one
+  bar (`Player.show_hold`).
+- **Small fixes**: the door refusing for money names the dearest box, a dish off the
+  menu or selling something; the receipt names a side or drink nobody ordered; staff
+  CVs say Pace (not Overall); the staff list gives two or three reasons for a mood; staff
+  chat no longer moves satisfaction and no mistake is on purpose; a co-op press that
+  loses a tool says "Chef N has it".
+
 ## 2. Parked systems that already have code
 
 These were built in the first prototype and then unhooked from the game to keep the slice
@@ -711,6 +758,9 @@ focused. The logic and tests still exist.
 | Word of mouth between friends | `sim/town.gd` | **Built**, see section 1. |
 | Kindness / discounts | `GuestMood.offer_discount` / `offer_comp`, `Town.record_kindness` / `paid_full_price` | **Built**, see section 1: half price, free meals, and guests who come to expect them. |
 | Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
+
+- **Bill screen**: consider filling the slip from the tickets if testers find writing
+  the bill tedious.
 
 Everything else in this table is back in the game. Not built: upgrading a piece already
 placed. (Floors, walls and doors are built; ceilings are not planned.)
@@ -798,11 +848,12 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   stations they own; new dishes need new ingredient and tool stations (grill, fry,
   boil, chop, slice, pour). Two themes have their content (diner, seaside); the theme
   is picked on the theme card at the start of a run (PRD 7).
-- **Night zero**: *built*: the run opens on an empty kitchen and $150; the first
-  ingredient, tool and menu are the player's.
+- **Night zero**: *built*: the run opens with $150 and a starter kitchen (the first
+  main's stove, fridge and boxes, and cups); the menu is the player's.
 - **Local co-op**: *built* for two chefs (PRD 4, section 1); chefs 3 and 4 and online play are later.
-- **Lose condition** today is three walkouts in a day. Alternatives to test: reputation
-  stars, rent you must make each week.
+- **Lose condition**: *built* (review, item 9): a rolling reputation meter, 0 to 100,
+  that ends the run when it hits 0 (`Ledger.reputation`). Rent you must make each week
+  is still an idea.
 
 ## 8. Art and audio
 

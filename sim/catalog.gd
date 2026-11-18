@@ -242,7 +242,7 @@ func _init(seed_value := 1) -> void:
 
 
 static func label(bp: Dictionary) -> String:
-	if bp.get("up", "") != "":   # a favourite built already upgraded
+	if bp.get("up", "") != "":   # a tree node, built already upgraded
 		return str(Kitchen.NODES[bp.up].name)
 	if bp.get("base", "") != "":   # a counter sold already upgraded (a fridge)
 		return str(Kitchen.NODES[bp.base].name)
@@ -250,44 +250,38 @@ static func label(bp: Dictionary) -> String:
 	return str(ITEMS[bp.id].name) + (" " + "+".repeat(tier - 1) if tier > 1 else "")
 
 
-## Tree nodes the Kitchen tab also sells outright, as their root piece already upgraded.
-## None now: a fridge is bought as a counter and upgraded. Favourites (`fav_blueprint`)
-## sell any node this way instead, when the player has starred it.
-const SHOP_NODES: Array[String] = []
-
-
-## The blueprint the shop shows for one of SHOP_NODES.
+## The blueprint the shop shows for a counter sold already upgraded (a fridge).
 static func node_blueprint(node: String) -> Dictionary:
 	return {"id": Kitchen.family_of(Kitchen.root_of(node)), "tier": 1, "node": node, "base": node}
 
 
-## Whether a node of an upgrade tree can be starred, to be sold already upgraded on the
-## shop's Favourites tab: a tiered piece, or a kitchen piece that is not a cleaning
-## tool's home (their tools come with them in ways a blueprint does not carry).
-static func can_favourite(key: String) -> bool:
+## Whether the shop sells a node of an upgrade tree outright (review, item 4): a tiered
+## piece's tier, or a kitchen piece that is not a cleaning tool's home (their tools come
+## with them in ways a blueprint does not carry).
+static func sells_node(key: String) -> bool:
 	if Upgrades.is_tiered(key):
 		return true
 	return Kitchen.has_node(key) and not Kitchen.fit_of(key) in ["floor", "hook"]
 
 
-## The blueprint the Favourites tab sells for a starred node, upgrades and all: a tiered
-## piece at its tier; a counter at its node ("base", a fridge); a tool or wall piece
-## built as its node ("up"). A tool whose tree grows from a counter (a stove's line,
-## Kitchen.TOP_LINKS) comes on its own counter ("counter"), priced with it.
-static func fav_blueprint(key: String) -> Dictionary:
+## The blueprint the shop sells for a tree node, upgrades and all, priced as the whole
+## way there: a tiered piece at its tier; a counter at its node ("base", a fridge); a
+## tool or wall piece built as its node ("up"). A tool whose tree grows from a counter
+## (a stove's line, Kitchen.TOP_LINKS) comes on its own counter ("counter"), priced with it.
+static func tree_blueprint(key: String) -> Dictionary:
 	if Upgrades.is_tiered(key):
-		return {"id": Upgrades.catalog_id(key), "tier": Upgrades.tier_of(key), "fav": key}
+		return {"id": Upgrades.catalog_id(key), "tier": Upgrades.tier_of(key), "tree": key}
 	var fit := Kitchen.fit_of(key)
 	if fit in ["counter", "tall"]:
 		if key == "counter":
-			return {"id": "counter", "tier": 1, "fav": key}
+			return {"id": "counter", "tier": 1, "tree": key}
 		var bp := node_blueprint(key)
-		bp.fav = key
+		bp.tree = key
 		return bp
 	var id := Kitchen.family_of(key)
 	if Kitchen.is_root(key) and not Kitchen.TOP_LINKS.has(key):
-		return {"id": id, "tier": 1, "fav": key}
-	var out := {"id": id, "tier": 1, "node": key, "up": key, "fav": key}
+		return {"id": id, "tier": 1, "tree": key}
+	var out := {"id": id, "tier": 1, "node": key, "up": key, "tree": key}
 	if fit == "top" and Upgrades.root(key) == "counter":
 		out.counter = true
 	return out
@@ -407,7 +401,7 @@ func can_buy(id: String, money: int, level: int, tier := 1) -> bool:
 ## then cheapest first. `query` is matched against the name, the category and what the
 ## piece does; an empty query or category matches all. `level` above 0 leaves out what
 ## needs a higher level (the shop hides it).
-static func search(query := "", category := "", theme := "", level := 0) -> Array[Dictionary]:
+static func search(query := "", category := "", theme := "", level := 0, show_locked := false) -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	var words := query.strip_edges().to_lower().split(" ", false)
 	var offered: Array[Dictionary] = []
@@ -422,14 +416,19 @@ static func search(query := "", category := "", theme := "", level := 0) -> Arra
 			continue   # reached only through its tree (PRD 8.3), or a counter's (a stove)
 		if Treatments.is_laying_tool(id) or (Treatments.is_box(id) and not Treatments.is_root(Treatments.key_of(id))):
 			continue   # a laying tool is listed by the game while its box is stored (PRD 9.5)
-		offered.append({"id": id, "tier": 1})   # higher tiers are steps in the piece's tree now
-		if node != "":
-			for n in SHOP_NODES:
-				if Kitchen.root_of(n) == node:
-					offered.append(node_blueprint(n))
+		offered.append({"id": id, "tier": 1})
+		# Every step up its tree is sold outright too, priced as the whole way there
+		# (review, item 4): a Twin fryer stands up whole, its counter and all.
+		var root := Upgrades.key_of(id, 1, node)
+		for k: String in tree_nodes(root):
+			if sells_node(k) and sold_in(tree_blueprint(k).id, theme):
+				offered.append(tree_blueprint(k))
 	for bp in offered:
 		if level > 0 and bp_level(bp) > level:
-			continue
+			if not show_locked:
+				continue
+			bp = bp.duplicate()
+			bp.locked = true   # shown dimmed, a silhouette with its level (review, item 10)
 		var text := ("%s %s %s" % [label(bp), ITEMS[bp.id].category, bp_blurb(bp)]).to_lower()
 		var hit := true
 		for w in words:
@@ -445,10 +444,30 @@ static func search(query := "", category := "", theme := "", level := 0) -> Arra
 		var gb := group_of(b)
 		if ga != gb:
 			return ga < gb
+		var la := bool(a.get("locked", false))
+		var lb := bool(b.get("locked", false))
+		if la != lb:
+			return lb   # what can be bought first, the silhouettes after
 		var pa := bp_price(a)
 		var pb := bp_price(b)
 		return pa < pb if pa != pb else label(a) < label(b))
 	return found
+
+
+## Every node above `root` in its upgrade tree, the root itself left out, in tree order.
+## Stove lines grown from a counter (Kitchen.TOP_LINKS) are included under the counter.
+static func tree_nodes(root: String) -> Array[String]:
+	var out: Array[String] = []
+	if root == "" or not Upgrades.has_tree(root):
+		return out
+	var todo: Array[String] = Upgrades.children(root)
+	while not todo.is_empty():
+		var k: String = todo.pop_front()
+		if out.has(k):
+			continue
+		out.append(k)
+		todo.append_array(Upgrades.children(k))
+	return out
 
 
 ## What a theme's shop first offers at a level: pieces needing exactly that level,
@@ -459,8 +478,8 @@ static func unlocked_at(lvl: int, theme := "") -> Array[Dictionary]:
 
 ## The level a blueprint needs: a shop node needs its root piece's.
 static func bp_level(bp: Dictionary) -> int:
-	if bp.has("fav"):
-		return maxi(level_of(bp.id, int(bp.tier)), Upgrades.level(bp.fav))
+	if bp.has("tree"):
+		return maxi(level_of(bp.id, int(bp.tier)), Upgrades.level(bp.tree))
 	return level_of(bp.id, int(bp.tier))
 
 

@@ -221,6 +221,14 @@ static func icon(id: String) -> Array:
 			o.append([PackedVector2Array([Vector2(0, 0.74), Vector2(-0.8, -0.66), Vector2(0.8, -0.66)]), GOLD])
 			o.append([rect(0, 0.06, 0.2, 0.62), INK])
 			o.append([ell(0, -0.44, 0.12), INK])
+		"move":  # four ink arrows from a gold middle: pick it up and carry it (review, item 4)
+			for k in 4:
+				var a := k * PI / 2.0
+				var d := Vector2.from_angle(a)
+				var s := d.orthogonal()
+				o.append([PackedVector2Array([d * 1.0, d * 0.5 + s * 0.38, d * 0.5 - s * 0.38]), INK])
+				o.append([rect(d.x * 0.3, d.y * 0.3, 0.6 if k % 2 == 0 else 0.22, 0.22 if k % 2 == 0 else 0.6), INK])
+			o.append([ell(0, 0, 0.3), GOLD])
 		"zzz":
 			for i in 3:
 				o.append([ell(-0.62 + i * 0.36, -0.55, 0.14), INK])

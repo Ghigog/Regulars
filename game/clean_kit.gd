@@ -259,7 +259,7 @@ func floor_action(ch: Player) -> String:
 		var nm := CleanTools.name_of(tool).to_lower()
 		if clean_target(ch) != null:
 			var verb := "Mop" if CleanTools.is_mop(tool) else ("Scrape" if tool == "grease_scraper" else "Wipe")
-			return verb + (" (dirty: spreads)" if CleanTools.is_dirty(tool, held_used(ch)) else "")
+			return verb + (" (dirty: slow)" if CleanTools.is_dirty(tool, held_used(ch)) else "")
 		if drop_target(ch) != null:
 			return "Put %s down" % nm
 		return ""
@@ -302,20 +302,19 @@ func press(ch: Player) -> String:
 	var c: Variant = clean_target(ch)
 	if tool == "" or c == null:
 		return ""
-	var r := CleanTools.press(game.floor_dirt.mess, c, tool, held_used(ch))
+	var used_before := held_used(ch)
+	var r := CleanTools.press(game.floor_dirt.mess, c, tool, used_before)
 	hold(ch, tool, r.used)
 	if c != ch.cell():
 		ch.look_at_cell(c)
 	ch.punch()
-	_wait[ch] = CleanTools.press_time(tool)
+	_wait[ch] = CleanTools.press_time(tool, held_used(ch))
 	var at := Grid.center(c) + Vector3(0, 0.2, 0)
 	if r.did == "clean":
 		game.sfx("wash", 0.1, 1.2)
 		game.burst(at, "bubbles", 0.3)
-		if CleanTools.is_dirty(tool, r.used):
-			game.hud.say("The %s is dirty: rinse it at the bucket or a sink." % CleanTools.name_of(tool).to_lower())
-	elif r.did == "spread":
-		game.sfx("fail")
+		if CleanTools.is_dirty(tool, r.used) and not CleanTools.is_dirty(tool, used_before):
+			game.hud.say("The %s is dirty: it works slower until it is rinsed at the bucket or a sink." % CleanTools.name_of(tool).to_lower())
 	elif r.did == "refused":   # the scraper on guest mess, a spill kit on a small spill (PRD 9.5)
 		game.sfx("fail")
 		game.hud.say(r.why)

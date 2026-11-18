@@ -36,6 +36,7 @@ var toast: Label
 var money: Label
 var money_tag: Sheet
 var stamps: Array[Punch] = []
+var rep_meter: RepMeter
 var hint: Label
 var ticket_rail: HBoxContainer
 const RAIL_MAX := 5   # tickets shown on the rail; more are counted on a last tab
@@ -534,6 +535,45 @@ class Dangle extends Control:
 
 ## The cork board that holds the walkout card. It hangs on two ropes from the
 ## top of the screen and sways when it lands or is stamped.
+## The reputation meter on the board (review, item 9): a bar that fills from 0 to
+## Ledger.REP_MAX, green when healthy, gold in the middle and coral near the bottom, with
+## the number on it. A change wobbles it, so a walkout is felt.
+class RepMeter extends Control:
+	var value := Ledger.REP_START
+	var _shake := 0.0
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(190, 40)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func set_value(v: float) -> void:
+		if v < value - 0.5:
+			_shake = 0.5
+		value = v
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		if _shake > 0.0:
+			_shake = maxf(0.0, _shake - delta)
+			queue_redraw()
+
+	func _draw() -> void:
+		var off := Vector2(sin(_shake * 60.0) * 4.0 * _shake, 0)
+		var r := Rect2(Vector2(4, 8) + off, Vector2(size.x - 8, 26))
+		draw_rect(r.grow(3), Color(Hud.INK), true)
+		draw_rect(r, Color("#6b5647"), true)
+		var k := clampf(value / Ledger.REP_MAX, 0.0, 1.0)
+		var col := Color(Build.GOOD) if value >= 60.0 else (Color("#f2b632") if value >= Ledger.REP_LOW else Color(Hud.CORAL))
+		draw_rect(Rect2(r.position, Vector2(r.size.x * k, r.size.y)), col, true)
+		for t: float in [0.25, 0.5, 0.75]:   # notches, so it reads without the number
+			draw_line(r.position + Vector2(r.size.x * t, 0), r.position + Vector2(r.size.x * t, 6), Color(Hud.INK, 0.6), 2.0)
+		var font := get_theme_default_font()
+		var txt := "%d" % roundi(value)
+		var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+		draw_string_outline(font, Vector2(r.get_center().x - w / 2.0, r.end.y - 5), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 5, Color(Hud.INK))
+		draw_string(font, Vector2(r.get_center().x - w / 2.0, r.end.y - 5), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(Hud.PAPER))
+
+
 class Board extends Sheet:
 	var angle := 0.0
 	var spin := 0.0
@@ -648,6 +688,9 @@ class ModelView extends TextureRect:
 				n.add_child(FloorDirt.sheen_look(c, Treatments.key_of(bp.id)))
 		elif Catalog.is_build_tool(bp.id):
 			Scenery.tool_preview(n, bp.id)
+		elif bp.id == "night_cleaner":   # a mop in its bucket: the cleaner's kit
+			Build.station(n, "mop_bucket", 1, "", false, "mop_bucket")
+			Build.bucket_mop(n, 1.0, "mop")
 		elif bp.id == "rug":
 			Scenery.rug(n)
 			n.scale = Vector3.ONE * 0.55
@@ -680,7 +723,9 @@ class ModelView extends TextureRect:
 		var rig := Peg.rigged(peg)
 		rig.position.y = -0.2
 		spin.add_child(rig)
-		tilt.basis = Basis(LEAN, -0.6)   # leaned back, so the face shows under a hat brim
+		# Leaned back to face level (review, item 11), so the eyes show under a hat brim
+		# and over a beard: a portrait is the face, not the top of the head.
+		tilt.basis = Basis(LEAN, -0.8)
 		for c in vp.get_children():
 			if c is Camera3D:
 				c.size = 1.5
@@ -898,7 +943,7 @@ func setup(game_) -> void:
 	root.add_child(toast_sheet)
 	toast = _label(toast_sheet, 18)
 
-	# Top right: the cork board with the walkout card, hung on ropes.
+	# Top right: the cork board with the reputation card, hung on ropes (review, item 9).
 	board = Board.new()
 	board.anchor_left = 1.0
 	board.anchor_right = 1.0
@@ -911,15 +956,9 @@ func setup(game_) -> void:
 	var cbox := VBoxContainer.new()
 	cbox.add_theme_constant_override("separation", 2)
 	card.add_child(cbox)
-	_label(cbox, 24, "WALKOUTS").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var slots := HBoxContainer.new()
-	slots.alignment = BoxContainer.ALIGNMENT_CENTER
-	slots.add_theme_constant_override("separation", 12)
-	cbox.add_child(slots)
-	for i in Ledger.MAX_STRIKES:
-		var stamp := Punch.new(52)
-		slots.add_child(stamp)
-		stamps.append(stamp)
+	_label(cbox, 24, "REPUTATION").horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rep_meter = RepMeter.new()
+	cbox.add_child(rep_meter)
 
 	# Top middle: the rail of open tickets, oldest on the left.
 	ticket_rail = HBoxContainer.new()
@@ -1128,16 +1167,16 @@ func _update_guest() -> void:
 
 ## "Paying $14 · ordered extras": the served guest's bill, and why it moved.
 static func _bill_words(m: GuestMood, base: int) -> String:
-	var text := "Paying $%d" % m.pay_for(base)
-	var scaled := m.scaled_price(base)
+	var text := "Paying $%d" % m.bill_for(base)   # the slip's total, less any deal
+	var extra := m.pay_for(base) - m.bill_for(base)
 	if m.comped:
 		text += "  ·  on the house"
 	elif m.discounted:
 		text += "  ·  half price"
-	if scaled > base:
-		text += "  ·  ordered extras"
-	elif scaled < base:
-		text += "  ·  in a hurry"
+	if extra > 0:
+		text += "  ·  +$%d extras with the tip" % extra
+	elif extra < 0:
+		text += "  ·  in a hurry: less tip"
 	return text
 
 
@@ -1182,11 +1221,8 @@ func update_status() -> void:
 		_shown_money = l.money
 		money.text = "$%d" % l.money
 		money_tag.reset_size()
-	var strikes := l.strikes()
-	if strikes > _shown_strikes:   # one stamp per new walkout, in turn
-		for i in range(_shown_strikes, mini(strikes, stamps.size())):
-			_stamp(stamps[i], (i - _shown_strikes) * 0.8)
-	_shown_strikes = strikes   # a new day's reset is wiped when the board comes back down
+	if rep_meter and absf(rep_meter.value - l.reputation) > 0.01:
+		rep_meter.set_value(l.reputation)
 
 
 func _process(delta: float) -> void:
@@ -1932,6 +1968,11 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_row(box, "", "SALES:", "$%d" % rec.sales)
 	_row(box, "", "TIPS:", "$%d" % rec.tips)
 	_row(box, "", "WALKOUTS:", str(rec.walkouts))
+	if rec.has("reputation"):   # review, item 9: the meter, and how today moved it
+		var ch := float(rec.get("rep_change", 0.0))
+		_row(box, "", "REPUTATION:", "%d  (%s%d)" % [roundi(float(rec.reputation)), "+" if ch >= 0.0 else "-", absi(roundi(ch))])
+	if int(rec.get("perfect", 0)) > 0:   # review, item 6: good prep shows on the books
+		_row(box, "", "PERFECT PLATES:", "%d   (best run %d)" % [int(rec.perfect), int(rec.get("best_streak", 0))])
 	var unpaid_bills := int(rec.get("unpaid_bills", 0))
 	if unpaid_bills > 0:   # PRD 11: parties who left without paying, an open-purse stamp each
 		var ub := _row(box, "", "LEFT UNPAID:", str(unpaid_bills))
@@ -1947,6 +1988,11 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 		if unpaid > 0:
 			var ul := _label(box, 15, "%s not paid: no debt, but they mind." % ("1 wage" if unpaid == 1 else "%d wages" % unpaid))
 			ul.add_theme_color_override("font_color", CORAL.darkened(0.25))
+	for line: String in rec.get("unordered", []):   # review, item 11: a side or drink nobody ordered
+		var ul := _label(box, 15, line)
+		ul.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ul.custom_minimum_size = Vector2(360, 0)
+		ul.modulate.a = 0.75
 	var nothing := int(rec.get("found_nothing", 0))
 	if nothing > 0:
 		var nl := _label(box, 15, "%d %s nothing they liked." % [nothing, "person found" if nothing == 1 else "people found"])
@@ -2030,6 +2076,11 @@ func clipping(review: Dictionary) -> Control:
 		var pips := Rating.new(int(review.ratings[t]))
 		pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(pips)
+		if t == "variety":   # the one rating that is a rule, not a taste: say it
+			var rule := _label(box, 12, Critic.VARIETY_RULE + ".")
+			rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			rule.custom_minimum_size = Vector2(300, 0)
+			rule.modulate.a = 0.65
 	_rule(box)
 	var said := _label(box, 17, "\"%s\"" % review.line)
 	said.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2068,19 +2119,19 @@ func show_review() -> void:
 	_pop_in(clip)
 
 
-const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras", "Favourites"]
-## The storage card's tabs (E lifts a storage piece at night and opens it): what goes
-## in it first, then its upgrade tree.
+const SHOP_TABS: Array[String] = ["Kitchen", "Dining", "Decor", "Build", "Extras"]
+## A piece's card (E on any piece at night, review item 4): its boxes (or just the piece,
+## when it keeps none), then its upgrade tree when it has one.
 const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades"]
 
 
-## The tabs of the tray now open: the shop's, or a storage card's.
+## The tabs of the tray now open: the shop's, or a piece's card's.
 func shop_tabs() -> Array[String]:
 	if not game.storing():
 		return SHOP_TABS
-	var tabs := STORAGE_TABS.duplicate()
-	if game.storage_tree() == "":
-		tabs.erase("Upgrades")
+	var tabs: Array[String] = ["Ingredients" if game.card_keeps_boxes() else "This piece"]
+	if game.storage_tree() != "":
+		tabs.append("Upgrades")
 	return tabs
 const TRAY_DROP := 260.0   # how far below its place the shop tray waits
 
@@ -2326,20 +2377,13 @@ func _hint_text(p := 0) -> String:
 
 
 func _shop_keys_text() -> String:
-	if game.storing() and game.shopper.hand.get("carry", false):   # the piece is lifted
+	if game.storing():   # a piece's card: only E and Back (review, item 4)
 		match _mode():
 			"pad":
-				return "A put down with it in      X put in or take out      %s turn      B carry it" % _g("turn")
+				return "A choose      D-pad browse      B back"
 			"touch":
-				return "Tap a box to put it in or take it out      Use put down"
-		return "E put down with it in      Enter put in or take out      R turn      Tab carry it"
-	if game.storing():
-		match _mode():
-			"pad":
-				return "A put in or take out      D-pad browse      B close"
-			"touch":
-				return "Tap a box, then tap it again to put it in"
-		return "E put in or take out      Up/Down tabs      Tab close"
+				return "Tap a card, then tap it again"
+		return "E choose      Arrows browse      Esc back"
 	match _mode():
 		"pad":
 			return "A buy      D-pad browse      B close"
@@ -2361,11 +2405,11 @@ func _build_tip(p := 0) -> String:
 	if hand.is_empty():
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % game.ledger.day
-		return "%s walk      %s open a counter for stock      %s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
+		return "%s walk      %s open a piece (hold to move)      %s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
 	if Treatments.is_laying_tool(hand.id):   # a floor treatment (PRD 9.5): laid free, paid each night
 		var k := Treatments.key_of(hand.id)
 		var off: bool = game.treat_off.has(k)
-		var what := "%s, $%d a cell a night%s." % [Treatments.name_of(k), Treatments.price_of(k), " (switched off)" if off else ""]
+		var what := "%s, %s%s." % [Treatments.name_of(k), Treatments.PRICE_WORDS, " (switched off)" if off else ""]
 		var flip := "%s switch %s" % ["Turn" if m == "touch" else _g("turn", p), "on" if off else "off"]
 		match m:
 			"touch":
@@ -2533,7 +2577,7 @@ func show_shop() -> void:
 		return
 	_search = ""
 	_category = shop_tabs()[0]
-	_shop_index = 0
+	_shop_index = game.card_actions().size() if game.storing() and game.card_keeps_boxes() else 0   # the boxes first
 	build_bar.visible = false
 	_shop = Control.new()
 	_shop.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2679,35 +2723,77 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		return {"name": "Flyers", "price": "Out" if game.flyers_out else "$%d" % Town.FLYER_PRICE,
 			"blurb": "More guests tomorrow",
 			"can": not game.flyers_out and l.money >= Town.FLYER_PRICE, "locked": false}
+	if bp.id == "night_cleaner":
+		var p: int = game.cleaner_price()
+		return {"name": "Night cleaner", "price": "Clean" if p <= 0 else "$%d" % p,
+			"blurb": "Clears every table, washes up, takes the bags out and mops the floor" if p > 0 else "Nothing to clean tonight",
+			"can": p > 0 and l.money >= p, "locked": false}
 	if game.storing():
 		return _storage_info(bp)
 	var id: String = bp.id
 	var tier: int = bp.tier
-	var locked: bool = game.buy_level(id) < Catalog.level_of(id, tier)
+	var need := Catalog.bp_level(bp)
+	var locked: bool = bp.get("locked", false) or game.buy_level(id) < need
 	var price := "$%d" % Catalog.bp_price(bp)
 	if Treatments.is_box(id):   # free; laying it costs a price a cell each night (PRD 9.5)
 		price = "Free"
 	elif Treatments.is_laying_tool(id):
-		price = "$%d a cell a night" % Treatments.price_of(Treatments.key_of(id))
+		price = Treatments.PRICE_WORDS
 	elif Catalog.is_box(id):   # a box is free to take; its kind costs a fee each night (PRD 8.4)
 		var b := Pantry.station_ingredient(id)
 		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
 	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp), "locked": locked,
-		"price": "Level %d" % Catalog.level_of(id, tier) if locked else price,
-		"can": game.catalog.can_buy(id, l.money, game.buy_level(id), tier) and l.money >= Catalog.bp_price(bp)}
+		"price": "Level %d" % need if locked else price,
+		"can": not locked and game.catalog.can_buy(id, l.money, game.buy_level(id), tier) and l.money >= Catalog.bp_price(bp)}
 
 
 ## A box on the storage card: one stored here is taken out; one that may go in shows
 ## its nightly fee; one that may not is dimmed with why ("Needs a fridge").
 func _storage_info(bp: Dictionary) -> Dictionary:
+	if bp.has("act"):
+		return _card_act_info(bp)
 	var b := Pantry.station_ingredient(bp.id)
 	var fee := "Free" if Treatments.is_box(bp.id) or b.is_empty() else "$%d a night" % Pantry.fee_of(b.id, b.ready)
 	if bp.get("stored", false):
 		return {"name": Catalog.label(bp), "blurb": "Stored here. Take it out", "locked": false,
 			"price": "Take out", "can": true}
 	var why: String = game.kitchen.store_refusal(game.storing_cell, bp.id)
-	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp) if why == "" else why,
+	var fridge: int = game.fridge_offer(bp.id)
+	if fridge > 0:   # review, item 11: one press makes this counter the fridge it needs
+		return {"name": Catalog.label(bp), "blurb": "%s: E makes this counter one ($%d), with the box in" % [why, fridge],
+			"locked": false, "price": "Fridge $%d" % fridge, "can": game.ledger.money >= fridge}
+	var plenty := "Unlimited tonight, %s" % fee.trim_suffix(" a night") if fee != "Free" else Catalog.bp_blurb(bp)
+	return {"name": Catalog.label(bp), "blurb": plenty if why == "" else why + (": upgrade the counter (Upgrades)" if why.begins_with("Needs a") else ""),
 		"locked": why != "", "price": fee if why == "" else why, "can": why == ""}
+
+
+## An action card on a piece's card: Upgrades, Move, Turn, Sell, the till's Move, or the
+## upgrade of a stored treatment box.
+func _card_act_info(bp: Dictionary) -> Dictionary:
+	var st: Station = game.card_station()
+	var what: String = game.piece_name({"id": st.type, "tier": st.tier}).to_lower() if st != null else "piece"
+	match str(bp.act):
+		"upgrades":
+			return {"name": "Upgrades", "blurb": "Its upgrade tree: upgrade the %s where it stands" % what,
+				"price": "Upgrade", "can": true, "locked": false}
+		"box_tree":
+			return {"name": "Upgrade the %s" % Catalog.label(bp).to_lower(), "blurb": "Its tree: a better treatment, kept in its slot",
+				"price": "Upgrade", "can": true, "locked": false}
+		"move":
+			return {"name": "Move", "blurb": "Pick the %s up to carry it somewhere else (or hold E)" % what,
+				"price": "Move", "can": true, "locked": false}
+		"turn":
+			return {"name": "Turn", "blurb": "A quarter turn where it stands", "price": "Turn", "can": true, "locked": false}
+		"till":
+			return {"name": "Move the till", "blurb": "Lift the till off to put it on another counter",
+				"price": "Move", "can": true, "locked": false}
+		"sell":
+			var v: int = game.card_sell_value()
+			if v < 0:
+				return {"name": "Sell", "blurb": game.card_sell_block(), "price": "Can't sell", "can": false, "locked": true}
+			return {"name": "Sell", "blurb": "Half back; whatever was bought tonight comes back whole",
+				"price": "+$%d" % v, "can": true, "locked": false}
+	return {"name": "", "blurb": "", "price": "", "can": false, "locked": false}
 
 
 ## Rebuilds the row for the current search and category, keeping the selection on
@@ -2738,7 +2824,7 @@ func _refresh_catalog() -> void:
 		_cards.add_child(item)
 		_items.append(item)
 		var view := ModelView.new(int(ITEM.x), true)
-		view.modulate = Color(1, 1, 1, 0.45) if info.locked else Color.WHITE
+		view.modulate = Color(0.22, 0.17, 0.14, 0.5) if info.locked else Color.WHITE   # a silhouette (review, item 10)
 		item.add_child(view)
 		view.show_piece(game, bp)
 		_views.append(view)
@@ -2749,10 +2835,9 @@ func _refresh_catalog() -> void:
 		if not info.can:
 			price.add_theme_color_override("font_color", Color(INK, 0.6) if info.locked else Color("#b8473a"))
 	if _shop_items.is_empty():
-		var fav := _category == "Favourites" and _search.strip_edges() == ""
-		var none := _label(_cards, 20, "Star a piece on its upgrade tree to keep it here, upgrades and all." if fav else "Nothing in the shop matches.")
+		var none := _label(_cards, 20, "Nothing in the shop matches.")
 		none.modulate.a = 0.7
-		none.position = Vector2(BAND.x / 2.0 - (300 if fav else 120), 196)
+		none.position = Vector2(BAND.x / 2.0 - 120, 196)
 	var at := _shop_items.find(keep)
 	_select(clampi(_shop_index, 0, maxi(_shop_items.size() - 1, 0)) if at < 0 else at, 0)
 	if at >= 0:
@@ -2859,12 +2944,12 @@ func show_tree(key: String) -> void:
 		return
 	build_bar.visible = false
 	var p: int = maxi(game.chefs.find(game.shopper), 0)
-	var keys := "%s buy      %s choose      %s favourite      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("sell", p), _g("back", p),
-		"back to ingredients" if game.storing() else "close"]
+	var keys := "%s buy      %s choose      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p),
+		"back to the card" if game.storing() else "close"]
 	if game.shopper != null and game.shopper.hand.get("node") is Station:   # the piece in hand turns
 		keys += "      %s turn" % _g("turn", p)
 	if _mode(p) == "touch":
-		keys = "Tap a step, then tap it again to buy. Tap its star to favourite it"
+		keys = "Tap a step, then tap it again to buy"
 	_tree = TreeScreen.new(game, self, key, keys)
 	root.add_child(_tree)
 	root.move_child(_tree, center.get_index())
@@ -2894,11 +2979,6 @@ func tree_selected() -> String:
 func tree_move(action: String) -> void:
 	if _tree:
 		_tree.move(action)
-
-
-func tree_favourite() -> void:
-	if _tree:
-		_tree.favourite()
 
 
 func tree_buy() -> void:
@@ -2933,26 +3013,30 @@ func show_town() -> void:
 	_ribbon(box, "THE TOWN", INK)
 	var town: Town = game.town
 	var cols := GridContainer.new()
-	cols.columns = 2
-	cols.add_theme_constant_override("h_separation", 34)
-	cols.add_theme_constant_override("v_separation", 7)
+	var ncol := 2 if town.people.size() <= 16 else 3
+	cols.columns = ncol
+	cols.add_theme_constant_override("h_separation", 24)
+	cols.add_theme_constant_override("v_separation", 2 if ncol > 2 else 7)
 	box.add_child(cols)
-	# Fill down the two columns, not across.
-	var half := ceili(town.people.size() / 2.0)
-	for n in town.people.size():
-		var i := (n / 2) + (half if n % 2 == 1 else 0)
+	# Fill down the columns, not across.
+	var rows := ceili(town.people.size() / float(ncol))
+	for n in rows * ncol:
+		var i := (n / ncol) + rows * (n % ncol)
+		if i >= town.people.size():
+			cols.add_child(Control.new())
+			continue
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		cols.add_child(row)
-		var name_label := _label(row, 18, town.people[i].name)
-		name_label.custom_minimum_size = Vector2(86, 0)
+		var name_label := _label(row, 18 if ncol == 2 else 15, town.people[i].name)
+		name_label.custom_minimum_size = Vector2(86 if ncol == 2 else 78, 0)
 		if game.critic.known and i == game.critic.critic_idx:   # after the first review only
 			var quill := Icon.new("quill", 20, false)   # inside the name's column, so the pips stay in line
 			quill.position = Vector2(name_label.get_minimum_size().x + 4, 2)
 			name_label.add_child(quill)
 		row.add_child(Pips.new(town.standing(i) + 1, town.trend(i)))
-		var word := _label(row, 13, town.status_word(i, game.ledger.day))
-		word.custom_minimum_size = Vector2(150, 0)
+		var word := _label(row, 13 if ncol == 2 else 11, town.status_word(i, game.ledger.day))
+		word.custom_minimum_size = Vector2(150 if ncol == 2 else 118, 0)
 		word.modulate.a = 0.7
 	_rule(box)
 	var key := _label(box, 13, "Arrows show who changed their mind today. Friends talk to each other.")
@@ -2974,7 +3058,7 @@ func show_closed(days: int, earned: int, best: Dictionary, is_record: bool) -> v
 	box.add_theme_constant_override("separation", 12)
 	menu.add_child(box)
 	_ribbon(box, "CLOSED DOWN", INK)
-	var why := _label(box, 17, "Three guests walked out in one day.")
+	var why := _label(box, 17, "The town's opinion hit rock bottom: nobody will come.")
 	why.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	why.modulate.a = 0.75
 	_ornament(box, "day")

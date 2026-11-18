@@ -35,6 +35,11 @@ const REACT_FOOD_GOOD := 0.8   # tunable: food quality at or above which it was 
 const REACT_FOOD_POOR := 0.4   # tunable: food quality at or below which it was felt
 
 var tolerance := {"food": 3, "service": 3, "clean": 3}
+## Wealth (review, item 3), 1 (poor) to 5 (rich), from Town, read like a tolerance: a
+## Dear item on their order costs happiness, PRICEY_HIT each at 3, scaled 1.6 to 0.4.
+var wealth := 3
+var pricey := 0.0                 # happiness lost to the prices they ordered at
+const PRICEY_HIT := 0.08          # tunable: per Dear item, for a guest of middling means
 var reacted: Array[String] = []   # topics they have reacted strongly to, in order
 var waited := 0.0                 # waiting so far, as a share of a full bar at tolerance 3
 
@@ -43,12 +48,14 @@ const TOL_HINTS := {
 	"food": ["Fussy about the food", "Not fussy about food"],
 	"service": ["Hates to wait", "Happy to wait"],
 	"clean": ["Can't stand a mess", "Doesn't mind a mess"],
+	"wealth": ["Watches the pennies", "Money's no object"],
 }
 ## What they think as the hint is revealed, by topic: [fussy, easy-going].
 const TOL_THOUGHTS := {
 	"food": ["I'm particular about my food", "Food's food, I'm not fussy"],
 	"service": ["I hate waiting around", "No rush, I've got all day"],
 	"clean": ["I can't stand a mess", "A bit of mess never hurt anyone"],
+	"wealth": ["Pricey for what it is", "Treat yourself, I say"],
 }
 
 
@@ -61,7 +68,26 @@ static func tolerance_scale(tol: int) -> float:
 
 
 func scale_for(topic: String) -> float:
-	return tolerance_scale(int(tolerance.get(topic, 3)))
+	return tolerance_scale(_tol(topic))
+
+
+## A topic's tolerance, wealth included (poor reads as fussy, rich as easy-going).
+func _tol(topic: String) -> int:
+	return wealth if topic == "wealth" else int(tolerance.get(topic, 3))
+
+
+## They read their order's prices: `dear` items at the Dear level. Each costs happiness,
+## more for a poorer guest; the first time they think a line that hints at their means.
+## Returns the happiness lost.
+func read_prices(dear: int) -> float:
+	pricey = 0.0
+	if dear <= 0:
+		return 0.0
+	pricey = PRICEY_HIT * dear * scale_for("wealth")
+	react("wealth")
+	if wealth == 3:
+		think(TOL_THOUGHTS.wealth[0])   # anyone notices a dear bill
+	return pricey
 
 
 ## Notes a strong reaction to `topic`. The first time, for a guest who is not middling
@@ -70,7 +96,7 @@ func react(topic: String) -> String:
 	if reacted.has(topic):
 		return ""
 	reacted.append(topic)
-	var tol := int(tolerance.get(topic, 3))
+	var tol := _tol(topic)
 	if tol == 3:
 		return ""
 	var line: String = TOL_THOUGHTS[topic][0 if tol < 3 else 1]
@@ -82,7 +108,7 @@ func react(topic: String) -> String:
 func tolerance_hints() -> Array[String]:
 	var out: Array[String] = []
 	for topic in reacted:
-		var tol := int(tolerance.get(topic, 3))
+		var tol := _tol(topic)
 		if tol != 3:
 			out.append(TOL_HINTS[topic][0 if tol < 3 else 1])
 	return out
@@ -177,11 +203,11 @@ func offer_comp() -> bool:
 	return true
 
 
-## Comfort: how they feel about the room and the service, from 0 to 1. Read once,
-## when the food arrives, and kept in `served_comfort` so the bill and the stay agree.
-## Savour is left out on purpose: comfort is about the place, not the dish.
-const COMFORT_JOY := 0.6        # tunable
-const COMFORT_PATIENCE := 0.4   # tunable
+## One happiness score (review, item 5): satisfaction() drives the bill scale, the
+## eating time, the tip and the opinion. Comfort is that same score out of the most it
+## can reach (HAPPY_FULL), 0 to 1, read once as the food lands (after the first taste)
+## and kept in `served_comfort` so the bill and the stay agree.
+const HAPPY_FULL := 0.85        # satisfaction with perfect food, joy and patience
 const BILL_LOW := 0.90    # tunable: bill scale at comfort 0 ("let's eat and go")
 const BILL_HIGH := 1.25   # tunable: bill scale at comfort 1 ("they ordered extras")
 const STAY_LOW := 0.80    # tunable: eating-time scale at comfort 0
@@ -195,7 +221,7 @@ var served_comfort := -1.0   # below 0 until the food has arrived
 
 
 func comfort() -> float:
-	return clampf(COMFORT_JOY * joy + COMFORT_PATIENCE * patience - felt_disgust(), 0.0, 1.0)
+	return clampf(satisfaction() / HAPPY_FULL, 0.0, 1.0)
 
 
 ## Called as the food lands on the table. Returns the thought it prompts, or "".
@@ -299,7 +325,7 @@ func expression(eating := false, stormed := false) -> String:
 
 ## Final verdict on the visit, from -1 (furious) to 1 (delighted).
 func satisfaction() -> float:
-	return clampf(0.35 * savour + 0.3 * joy + 0.2 * patience - 0.5 * felt_disgust(), -1.0, 1.0)
+	return clampf(0.35 * savour + 0.3 * joy + 0.2 * patience - 0.5 * felt_disgust() - pricey, -1.0, 1.0)
 
 
 ## The parts of satisfaction() that belong to a topic (Town.TOPICS), for filing the

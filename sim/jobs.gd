@@ -422,7 +422,7 @@ static func prep_odds(skill: float, quality: float) -> Dictionary:
 
 
 ## Rolls a helper's prep: "good", "plain" or "bad" (a mistake from low satisfaction is
-## bad; "spite" says it was on purpose). {result, spite, quality: the ingredient's}.
+## bad). {result, quality: the ingredient's}.
 ## A bad result drops grease as a chef's does: pass it to `FloorMess.drop_grease`.
 static func roll_prep(staff: Staff, person: int, quality: float) -> Dictionary:
 	var e := staff.employee(person)
@@ -434,14 +434,14 @@ static func roll_prep(staff: Staff, person: int, quality: float) -> Dictionary:
 		var odds := prep_odds(float(e.skills.food), quality)
 		var r := staff.rng.randf()
 		result = "good" if r < odds.good else ("bad" if r < odds.good + odds.bad else "plain")
-	return {"result": result, "spite": mistake == "spite", "quality": Prep.quality_of(result)}
+	return {"result": result, "quality": Prep.quality_of(result)}
 
 
-## Rolls any other task: {ok: bool, spite: bool}. Not ok is the task's slip: a dropped
-## plate, dirt left behind, an order misheard.
+## Rolls any other task: {ok: bool}. Not ok is the task's slip: a dropped plate, dirt
+## left behind, an order misheard.
 static func roll_task(staff: Staff, person: int) -> Dictionary:
 	var mistake := staff.roll_mistake(person)
-	return {"ok": mistake == "", "spite": mistake == "spite"}
+	return {"ok": mistake == ""}
 
 
 ## A helper's prep drops grease through the floor's own rules (PRD 9).

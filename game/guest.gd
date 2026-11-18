@@ -68,6 +68,7 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	var hello: Dictionary = game.town.greeting(idx)
 	mood.patience = hello.patience
 	mood.tolerance = info.tolerance   # shared, so training (PRD 10) carries into later visits
+	mood.wealth = int(info.get("wealth", 3))
 	mood.delight(hello.joy, hello.thought)
 	cell = start
 	position = Grid.center(start)
@@ -212,14 +213,15 @@ func want_icon() -> String:
 
 ## How long this guest eats, once served: longer when they are comfortable.
 var eat_time := EAT_TIME
+var perfect_streak := 0   # their tray's place in a run of perfect ones: raises their tip
 
 
-## Comfort is read here, as the food arrives and before they taste it. Returns the
-## thought it prompts ("" for none).
+## Happiness is fixed here, as the food arrives and they take the first taste: it sets
+## the stay and the bill (GuestMood.comfort). Returns the thought it prompts ("" for none).
 func start_eating(quality: float, tray: Tray = null) -> String:
+	mood.taste(quality)
 	var said := mood.settle_comfort(idx)
 	eat_time = EAT_TIME * GuestMood.stay_scale(mood.served_comfort)
-	mood.taste(quality)
 	if quality > 0.95:
 		_heart_time = 2.5
 	state = "eating"

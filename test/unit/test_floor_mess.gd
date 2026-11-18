@@ -168,13 +168,6 @@ func test_slip_rolls_follow_the_chance():
 	assert_between(slips, 400, 600, "about a quarter")
 
 
-func test_slip_walkout_from_opinion():
-	assert_almost_eq(FloorMess.slip_walkout_chance(0.0), 0.9, 0.001)
-	assert_almost_eq(FloorMess.slip_walkout_chance(1.0), 0.1, 0.001)
-	assert_almost_eq(FloorMess.slip_walkout_chance(0.5), 0.5, 0.001)
-	assert_almost_eq(FloorMess.slip_walkout_chance(2.0), 0.1, 0.001, "clamped")
-
-
 # ---------- Disgust ----------
 
 func test_sight_disgust_rises_with_level():
@@ -485,22 +478,6 @@ func test_dirt_stays_overnight():
 
 # ---------- Slipping in the room (9.3) ----------
 
-func test_slip_opinion_reads_affinity_and_mood_equally():
-	assert_almost_eq(FloorMess.slip_opinion(-1.0, -1.0), 0.0, 0.001)
-	assert_almost_eq(FloorMess.slip_opinion(1.0, 1.0), 1.0, 0.001)
-	assert_almost_eq(FloorMess.slip_opinion(1.0, -1.0), 0.5, 0.001)
-	assert_almost_eq(FloorMess.slip_opinion(0.0, 0.0), 0.5, 0.001)
-
-
-func test_slip_walkout_rolls_follow_the_chance():
-	var m := _room()
-	var out := 0
-	for i in 2000:
-		if m.rolls_slip_walkout(1.0):
-			out += 1
-	assert_between(out, 140, 260, "about one in ten for someone who loves the place")
-
-
 func test_getting_up_times():
 	assert_eq(FloorMess.help_time(true), 1.0)
 	assert_eq(FloorMess.help_time(false), 6.0)
@@ -674,34 +651,23 @@ func test_a_chef_takes_over_from_a_helping_guest():
 	assert_false(fd.is_down(g))
 
 
-func test_a_guest_who_already_disliked_the_place_mostly_walks_out_on_getting_up():
+func test_a_slip_costs_mood_but_is_never_a_strike():
 	var game = _game()
 	var c := Vector2i(6, 5)
 	var fd: FloorDirt = game.floor_dirt
-	var walked := false
+	var walkouts: int = game.ledger.strikes()
 	for k in 10:
 		var g := _guest_at(game, k, c)
 		game.town.people[k].affinity = -1.0
-		g.mood.joy = 0.0
+		g.mood.joy = 0.5
 		g.mood.patience = 0.6
 		g.state = "to_seat"
-		assert_lt(fd.opinion(g), 0.3)
+		var joy: float = g.mood.joy
 		fd.slip(g, c)
-		fd.get_up(g, true)
-		if g.state == "leaving" and g.stormed:
-			walked = true
-			break
-	assert_true(walked, "nine in ten walk out")
-
-
-func test_a_guest_already_leaving_is_not_rolled_again():
-	var game = _game()
-	var g := _guest_at(game, 0, Vector2i(6, 5))
-	g.state = "leaving"
-	var walkouts: int = game.ledger.strikes()
-	game.floor_dirt.slip(g, Vector2i(6, 5))
-	game.floor_dirt.get_up(g, true)
-	assert_eq(game.ledger.strikes(), walkouts)
+		fd.get_up(g, k % 2 == 0)
+		assert_lt(g.mood.joy, joy, "it hurts")
+		assert_false(g.stormed, "but nobody walks out over it")
+	assert_eq(game.ledger.strikes(), walkouts, "and it is never a strike")
 
 
 func test_a_chef_slips_cannot_move_and_gets_up_alone_after_four_seconds():
@@ -776,17 +742,17 @@ func test_a_mop_clears_a_level_a_press_and_is_dirty_after_four():
 	assert_false(CleanTools.is_dirty("mop", 3))
 
 
-func test_a_dirty_mop_spreads_instead_of_clearing():
+func test_a_dirty_mop_cleans_slower_and_never_spreads():
 	var m := _room()
 	var c := Vector2i(2, 2)
 	m.add_dirt(c)
 	m.add_dirt(c)
-	var r := CleanTools.press(m, c, "mop", CleanTools.dirty_after("mop"))
-	assert_eq(r.did, "spread")
-	assert_eq(m.level(c), 2, "the cell keeps its dirt")
-	assert_eq(m.total(), 3, "and a level lands beside it")
-	assert_not_null(r.to)
-	assert_eq(maxi(absi(r.to.x - c.x), absi(r.to.y - c.y)), 1)
+	var dirty := CleanTools.dirty_after("mop")
+	var r := CleanTools.press(m, c, "mop", dirty)
+	assert_eq(r.did, "clean", "a dirty mop still cleans")
+	assert_eq(m.total(), 1, "a level off, nothing landing beside it")
+	assert_null(r.to)
+	assert_gt(CleanTools.press_time("mop", dirty), CleanTools.press_time("mop", 0), "only slower")
 
 
 func test_a_sponge_is_dirty_after_two_and_quicker_than_a_mop():
@@ -933,16 +899,15 @@ func test_e_at_a_dirty_cell_in_front_clears_a_level_and_held_e_repeats():
 	assert_eq(CleanKit.held_used(game.player), 2)
 
 
-func test_a_dirty_mop_spreads_until_rinsed_at_a_sink():
+func test_a_dirty_mop_is_slow_until_rinsed_at_a_sink():
 	var game = _game()
 	var front := _stand(game, Vector2i(7, 2))
 	game.floor_dirt.mess.add_dirt(front)
 	CleanKit.hold(game.player, "mop", 4)
-	assert_string_contains(game.clean_kit.floor_action(game.player), "spreads")
+	assert_string_contains(game.clean_kit.floor_action(game.player), "slow")
 	var before: int = game.floor_dirt.mess.total()
 	game.act(0, "use")
-	assert_eq(game.floor_dirt.mess.level(front), 1)
-	assert_eq(game.floor_dirt.mess.total(), before + 1)
+	assert_eq(game.floor_dirt.mess.total(), before - 1, "it still mops")
 	var sink: Station = game.find_station("sink")
 	assert_eq(game.use_station(sink, true), "Rinse mop")
 	game.use_station(sink)
@@ -1106,9 +1071,7 @@ func test_the_treatment_tree_and_its_prices_a_cell():
 	assert_eq(Treatments.step("primer"), Kitchen.SPECIALIST_STEP)
 	assert_eq(Treatments.parent("sealing_primer"), "primer")
 	assert_eq(Treatments.parent("high_gloss"), "finish")
-	var want := {"cleaner": 3, "strong_cleaner": 5, "primer": 6, "sealing_primer": 10, "finish": 8, "high_gloss": 15}
-	for k: String in want:
-		assert_eq(Treatments.price_of(k), want[k], k + " a cell a night, as the PRD's tree")
+	for k: String in Treatments.ITEMS:
 		assert_true(Catalog.ITEMS.has(Treatments.box_id(k)) and Catalog.ITEMS.has(Treatments.tool_id(k)), k)
 		assert_eq(Treatments.key_of(Treatments.box_id(k)), k)
 		assert_eq(Treatments.key_of(Treatments.tool_id(k)), k)
@@ -1129,7 +1092,7 @@ func test_a_box_climbs_its_tree_like_any_piece():
 	var lay := Upgrades.layout("box_cleaner")
 	assert_eq(lay.size(), 6)
 	assert_eq(lay["box_strong_cleaner"], Vector2i(1, 0), "the efficient step runs on along the row")
-	assert_true(Upgrades.blurb("box_primer").contains("$6 a cell a night"))
+	assert_true(Upgrades.blurb("box_primer").contains("$0.25 a tile a night"))
 	var shop := Catalog.search("", "Pantry")
 	assert_true(shop.any(func(bp: Dictionary) -> bool: return bp.id == "box_cleaner"), "the cleaner's box is sold")
 	for id: String in ["box_primer", "box_finish", "treat_cleaner"]:
@@ -1141,12 +1104,14 @@ func test_a_nights_laying_costs_its_price_a_cell_while_on_and_boxed():
 	var laid := {Vector2i(0, 0): "cleaner", Vector2i(1, 0): "cleaner", Vector2i(2, 0): "cleaner",
 		Vector2i(0, 1): "primer", Vector2i(1, 1): "primer"}
 	var boxed := {"cleaner": true, "primer": true}
-	assert_eq(Treatments.night_cost(laid, {}, boxed), 3 * 3 + 2 * 6)
-	assert_eq(Treatments.night_cost(laid, {"primer": true}, boxed), 9, "switched off: not paid for")
-	assert_eq(Treatments.night_cost(laid, {}, {"cleaner": true}), 9, "no box stored: not laid")
+	assert_eq(Treatments.night_cost(laid, {}, boxed), 2, "five tiles at $0.25, every treatment the same, rounded up")
+	assert_eq(Treatments.night_cost(laid, {"primer": true}, boxed), 1, "switched off: not paid for")
+	assert_eq(Treatments.night_cost(laid, {}, {"cleaner": true}), 1, "no box stored: not laid")
 	var lines := Treatments.night_lines(laid, {}, {"cleaner": true})
 	assert_eq(lines.primer, {"cells": 2, "fee": 0, "on": false})
-	assert_eq(lines.cleaner, {"cells": 3, "fee": 9, "on": true})
+	assert_eq(lines.cleaner, {"cells": 3, "fee": 1, "on": true})
+	assert_eq(Treatments.cost_of_tiles(20), 5, "a twenty-tile kitchen is $5 a night")
+	assert_eq(Treatments.cost_of_tiles(0), 0)
 	assert_eq(Treatments.active(laid, {"cleaner": true}, boxed).keys().size(), 2, "only the primer's cells tomorrow")
 
 
@@ -1392,21 +1357,21 @@ func test_laid_at_night_a_treatment_is_paid_at_the_door_each_night_while_on():
 	assert_eq(game.finish_drag(Grid.center(Vector2i(4, 2)), Grid.center(Vector2i(5, 3)), false), 4)
 	assert_eq(game.ledger.money, money, "laying is free: the price comes at the door")
 	assert_eq(game.treat_laid.size(), 4)
-	assert_eq(game.night_cost(), base + 4 * 3)
-	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner, 4 cells" and l.fee == 12))
+	assert_eq(game.night_cost(), base + 1, "four tiles at $0.25")
+	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner, 4 cells" and l.fee == 1))
 	assert_eq(game.floor_dirt.sheen_cells().size(), 4, "a sheen where it is laid")
 	game.rotate_hand()
 	assert_true(game.treat_off.has("cleaner"), "turning the tool switches it off")
 	assert_eq(game.night_cost(), base)
 	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner, 4 cells, off" and l.fee == 0))
 	game.rotate_hand()
-	assert_eq(game.night_cost(), base + 12)
+	assert_eq(game.night_cost(), base + 1)
 	assert_eq(game.finish_drag(Grid.center(Vector2i(5, 3)), Grid.center(Vector2i(5, 3)), true), 1, "a right-drag lifts it")
-	assert_eq(game.night_cost(), base + 9)
+	assert_eq(game.night_cost(), base + 1, "three tiles round up to a dollar too")
 	game.cancel_hand()
 	money = game.ledger.money
 	game.start_day()
-	assert_eq(game.ledger.money, money - base - 9)
+	assert_eq(game.ledger.money, money - base - 1)
 	assert_eq(game.floor_dirt.mess.treat.size(), 3, "laid for the day")
 	game.floor_dirt.mess.add_dirt(Vector2i(4, 2))
 	game.floor_dirt.mess.add_dirt(Vector2i(4, 2))
@@ -1423,7 +1388,7 @@ func test_without_its_box_a_treatment_is_not_relaid():
 	var c := _shelf_for(game)
 	game.kitchen.store(c, "box_finish")
 	game.treat_laid = {Vector2i(4, 2): "finish", Vector2i(4, 3): "finish"}
-	assert_eq(game.night_cost(), base + 16)
+	assert_eq(game.night_cost(), base + 1, "two tiles of finish, the same $0.25 a tile")
 	game.kitchen.unstore(c, "box_finish")
 	assert_eq(game.night_cost(), base)
 	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name.ends_with("no box")))

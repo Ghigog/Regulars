@@ -12,8 +12,6 @@ func before_each():
 	game.set_process(false)
 	game.best_path = "user://regulars_best_test.json"
 	game.theme_path = THEME_TEST_PATH
-	game.fav_path = "user://regulars_favourites_test.cfg"
-	game.favourites.clear()   # not the player's own stars
 	DirAccess.remove_absolute(THEME_TEST_PATH)   # no theme remembered: the card starts on the diner
 	# One guest far in the future keeps the day open while a test works.
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
@@ -211,21 +209,40 @@ func test_guest_is_seated_served_and_pays():
 	assert_gt(float(game.town.people[0].affinity), 0.0, "a good visit makes them like the place")
 
 
+## A deal at a table: E, then held to the end of the bar.
+func _deal(g: Guest) -> void:
+	game.player.position = Grid.center(g.table.cell + Vector2i(0, 1)) if game.station_at(game.player.target_cell()) != g.table else game.player.position
+	game.use_station(g.table)
+	if game.station_at(game.player.target_cell()) != g.table:   # the test stands wherever: point the hold at the table
+		game._deal_hold[game.player] = {"g": g, "kind": game._deal_hold.get(game.player, {}).get("kind", "half" if not g.mood.discounted else "comp"), "t": game.DEAL_HOLD}
+		if game._deal_hold[game.player].kind == "half":
+			game.offer_discount(g)
+		else:
+			game.offer_comp(g)
+		game._deal_hold.erase(game.player)
+		return
+	game._tick_deal(game.player, true, game.DEAL_HOLD + 0.01)
+
+
 func test_half_price_calms_an_impatient_guest_and_costs_half_the_bill():
 	var g: Guest = game.spawn_guest(0)
 	_run(12.0)
 	_order(g)
 	assert_eq(game.prompt_for(g.table), "", "no discount for a guest who is still happy to wait")
 	g.mood.patience = 0.3
-	assert_string_contains(game.prompt_for(g.table), "Half price")
+	assert_string_contains(game.prompt_for(g.table), "half price")
 	game.use_station(g.table)
+	assert_false(g.mood.discounted, "one press gives nothing away")
+	game._tick_deal(game.player, false, 0.1)
+	assert_false(g.mood.discounted, "let go early: nothing")
+	_deal(g)
 	assert_gt(g.mood.patience, 0.6)
 	assert_gt(float(game.town.people[0].affinity), 0.0, "kindness is remembered")
 	assert_eq(game.prompt_for(g.table), "", "only once")
 	_cook_burger()
 	game.use_station(g.table)
 	_eat_and_pay(g)
-	assert_eq(int(game.ledger.today.sales), ceili(g.mood.scaled_price(g.bill_base) / 2.0), "half of the mood-scaled bill")
+	assert_eq(int(game.ledger.today.sales), ceili(g.bill_base / 2.0), "half of the slip's total: what the slip says, less the deal")
 
 
 func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
@@ -233,12 +250,12 @@ func test_free_meal_follows_half_price_for_a_guest_still_fed_up():
 	_run(12.0)
 	_order(g)
 	g.mood.patience = 0.2
-	assert_string_contains(game.prompt_for(g.table), "Half price", "the smaller apology comes first")
-	game.use_station(g.table)
+	assert_string_contains(game.prompt_for(g.table), "half price", "the smaller apology comes first")
+	_deal(g)
 	assert_eq(game.prompt_for(g.table), "", "half price calmed them for now")
 	g.mood.patience = 0.1
-	assert_string_contains(game.prompt_for(g.table), "Free meal")
-	game.use_station(g.table)
+	assert_string_contains(game.prompt_for(g.table), "free meal")
+	_deal(g)
 	assert_true(g.mood.comped)
 	assert_eq(game.prompt_for(g.table), "", "only once")
 	assert_true(g.mood.thoughts.has("On the house? That's really kind"))
@@ -253,7 +270,7 @@ func test_a_disgusted_guest_can_be_offered_a_free_meal_straight_away():
 	_run(12.0)
 	_order(g)
 	g.mood.disgust = 0.5
-	assert_string_contains(game.prompt_for(g.table), "Free meal")
+	assert_string_contains(game.prompt_for(g.table), "free meal")
 
 
 func test_a_guest_who_expects_a_deal_is_let_down_by_full_price():
@@ -309,11 +326,15 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	game.open_shop()
 	assert_true(game.shopping)
 	assert_eq(game.hud._category, "Kitchen", "there is no All tab")
-	var kitchen: int = game.shop_items("", "Kitchen").size()
-	assert_lt(kitchen, Catalog.search("", "Kitchen", Scenery.theme_id).size(), "pieces above the level are hidden")
+	var all: Array[Dictionary] = game.shop_items("", "Kitchen")
+	var kitchen: int = all.size()
+	assert_lt(all.filter(func(bp: Dictionary) -> bool: return not bp.get("locked", false)).size(), kitchen,
+		"pieces above the level are shown, as silhouettes")
 	assert_eq(game.hud._cards.get_child_count(), kitchen)
 	game.hud.set_search("fern")
-	assert_eq(game.hud._cards.get_child_count(), 1, "a search looks through every category")
+	var ferns: int = game.shop_items("fern").size()
+	assert_gt(ferns, 0)
+	assert_eq(game.hud._cards.get_child_count(), ferns, "a search looks through every category")
 	game.hud.set_search("zzz")
 	assert_eq(game.hud._cards.get_child_count(), 1, "only the nothing-matches line")
 	game.hud._set_category("Kitchen")
@@ -347,8 +368,9 @@ func test_furniture_is_carried_and_put_down_in_front_of_the_chef():
 	_to_build()
 	game.player.position = Grid.center(Vector2i(8, 2))
 	game.player.look(Vector2i(0, 1))            # facing the table at (8, 3)
-	assert_eq(game.build_action(), "Pick up")
+	assert_eq(game.build_action(), "Open")
 	game.build_interact()
+	assert_true(game.card_act("move"), "Move on its card")
 	assert_eq(game.hand.id, "table")
 	assert_eq(game.build_action(), "Put down")
 	game.build_interact()
@@ -411,8 +433,10 @@ func test_game_opens_on_the_title_then_the_night_before_day_one():
 	assert_true(fresh.pick_catalog("counter"), "the room can be changed before anyone comes")
 	fresh.cancel_hand()
 	fresh.player.position = Grid.center(Vector2i(9, 4))
-	assert_eq(fresh.night_hint(), fresh.NIGHT_HINTS[0], "the kitchen starts empty")
-	assert_null(fresh.find_station("stove"))
+	assert_eq(fresh.night_hint(), fresh.NIGHT_HINTS[1], "the starter kitchen is built: next, the menu")
+	assert_not_null(fresh.find_station("stove"), "night zero starts with a stove")
+	assert_not_null(fresh.storage_of(fresh.fixed_main().grill), "and a fridge with the grilled kind")
+	assert_not_null(fresh.find_station("cups"), "and a cup stack")
 	fresh.build_interact()
 	assert_eq(fresh.phase, fresh.Phase.BUILD, "no menu yet: the door card stays shut")
 	assert_eq(fresh.hud.toast.text, fresh.NIGHT_ZERO_BLOCK)
@@ -869,8 +893,7 @@ func test_music_follows_day_night_and_closing():
 	assert_eq(game.music_id, "night", "the build phase keeps the night track")
 	game.start_day()
 	assert_eq(game.music_id, "day")
-	for i in Ledger.MAX_STRIKES:
-		game.ledger.record_walkout()
+	game.ledger.reputation = 0.0
 	_run(0.2)
 	assert_eq(game.music_id, "closed")
 	assert_false((game._music.stream as AudioStreamMP3).loop, "the closing track plays once")
@@ -887,12 +910,13 @@ func test_days_are_endless_and_get_harder():
 	var expected := 0
 	for a: Dictionary in game.arrivals:
 		expected += (a.group as Array).size()
-	assert_gte(expected, 5)
+	assert_gte(expected, Town.crowd_floor(2))
 	game.ledger.day = 9
 	assert_lt(game.table_patience(), patience_day_2)
 
 
-func test_three_walkouts_end_the_run():
+func test_walkouts_that_empty_the_reputation_meter_end_the_run():
+	game.ledger.reputation = 2.5 * Ledger.REP_WALKOUT
 	for i in 3:
 		game.spawn_guest(i)
 	for g: Guest in game.guests.duplicate():
@@ -1251,7 +1275,9 @@ func test_booth_and_table_for_four_are_sold_under_dining():
 	assert_false(cat.can_buy("table4", 500, 2), "a table for four needs level 3")
 	assert_true(cat.can_buy("table4", 500, 3))
 	assert_true(cat.can_buy("booth", 500, 2))
-	assert_eq(Catalog.search("four").size(), 1, "the table for four turns up (its tiers are its upgrade tree)")
+	var fours := Catalog.search("four")
+	assert_eq(fours.filter(func(bp: Dictionary) -> bool: return not bp.has("tree")).size(), 1, "the table for four turns up")
+	assert_gt(fours.size(), 1, "and its tiers, sold outright up its tree")
 
 
 func test_seats_of_a_booth_turn_and_a_table_for_four_has_one_each_side():
@@ -1875,14 +1901,14 @@ func test_guest_card_says_waiting_to_order():
 	assert_eq(Hud.STATE_WORDS.ordering, "Waiting to order")
 
 
-func _serve_one(idx: int, joy: float, patience: float) -> Guest:
+func _serve_one(idx: int, joy: float, patience: float, disgust := 0.0) -> Guest:
 	var g: Guest = game.spawn_guest(idx)
 	_run(12.0)
 	_order(g)
 	_cook_burger()
 	g.mood.joy = joy
 	g.mood.patience = patience
-	g.mood.disgust = 0.0
+	g.mood.disgust = disgust
 	game.use_station(g.table)
 	return g
 
@@ -1896,7 +1922,7 @@ func test_a_comfortable_guest_eats_longer_and_pays_more():
 	_run(cosy.eat_time + Guest.CHAT_TIME)
 	game.pay_bill(cosy.table)
 	var cosy_paid := int(game.ledger.today.sales) - start
-	var rushed := _serve_one(1, 0.0, 0.1)
+	var rushed := _serve_one(1, 0.0, 0.1, 0.7)   # one score: good food alone keeps them from rushing
 	assert_true(rushed.mood.thoughts.has(GuestMood.HURRIED_THOUGHTS[1]))
 	assert_lt(rushed.eat_time, cosy.eat_time)
 	start = int(game.ledger.today.sales)
@@ -1904,8 +1930,10 @@ func test_a_comfortable_guest_eats_longer_and_pays_more():
 	game.pay_bill(rushed.table)
 	assert_eq(rushed.state, "leaving")
 	var rushed_paid := int(game.ledger.today.sales) - start
-	assert_gt(cosy_paid, cosy.bill_base)
-	assert_lt(rushed_paid, rushed.bill_base)
+	assert_eq(cosy_paid, cosy.bill_base, "they pay what the slip says")
+	assert_eq(rushed_paid, rushed.bill_base)
+	assert_gt(cosy.mood.pay_for(cosy.bill_base), cosy.bill_base, "a cosy guest's extras go with the tip")
+	assert_lt(rushed.mood.pay_for(rushed.bill_base), rushed.bill_base, "a rushed one skimps on it")
 
 
 # ---------- Night cleaning (PRD 5) ----------
@@ -1989,7 +2017,7 @@ func test_night_cleaning_takes_the_bag_out():
 	bin.count = Station.BIN_HOLDS
 	_face(Vector2i(1, 5), Vector2i(-1, 0))
 	assert_eq(game.build_action(), "Take the bag out")
-	assert_eq(game.dirty_note(), "Still dirty: the bin.")
+	assert_true(game.dirty_note().begins_with("Still dirty: the bin."))
 	game.build_interact()
 	assert_eq(game.player.held, "rubbish_bag")
 	assert_eq(bin.count, 0)
@@ -2048,7 +2076,7 @@ func test_a_one_item_order_goes_from_ticket_to_paid_bill():
 	game.use_station(g.table)
 	var before: int = game.ledger.money
 	_eat_and_pay(g)
-	assert_eq(game.ledger.money - before - int(game.ledger.today.tips), g.mood.scaled_price(8))
+	assert_eq(game.ledger.money - before - int(game.ledger.today.tips), 8, "the slip's total, paid as written")
 
 
 func test_a_three_item_order_is_one_bill():
@@ -2076,7 +2104,7 @@ func test_a_three_item_order_is_one_bill():
 	game.use_station(g.table)
 	assert_eq(g.state, "eating")
 	_eat_and_pay(g)
-	assert_eq(int(game.ledger.today.sales), g.mood.scaled_price(13), "one bill for the whole order")
+	assert_eq(int(game.ledger.today.sales), 13, "one bill for the whole order, as the slip says")
 	assert_eq(g.table.dirty, 3, "two plates and a cup left behind")
 	assert_eq(g.table.dirty_cups, 1)
 
@@ -2709,10 +2737,10 @@ func test_a_second_sink_and_bin_each_have_their_own_mess():
 	var bin2: Station = game.add_station("bin", Vector2i(1, 5))
 	game.find_station("sink").dirty = 1
 	sink2.dirty = 1
-	assert_eq(game.dirty_note(), "Still dirty: 2 sinks.")
+	assert_true(game.dirty_note().begins_with("Still dirty: 2 sinks."))
 	sink2.dirty = 0
 	bin2.count = 2
-	assert_eq(game.dirty_note(), "Still dirty: the sink, the bin.")
+	assert_true(game.dirty_note().begins_with("Still dirty: the sink, the bin."))
 	game._collect_gross()
 	var keys := {}
 	for g: Dictionary in game._gross:
@@ -2825,16 +2853,19 @@ func test_a_storage_card_shows_boxes_first_and_dims_what_needs_a_fridge():
 	assert_true(game.storing())
 	assert_eq(game.hud._category, "Ingredients", "ingredients come first")
 	assert_eq(game.hud.shop_tabs(), ["Ingredients", "Upgrades"])
-	var items: Array[Dictionary] = game.shop_items("", "Ingredients")
+	var acts: int = game.card_actions().size()
+	assert_gt(acts, 0, "the card's Upgrades, Move, Turn and Sell come before the boxes")
+	var items: Array[Dictionary] = game.shop_items("", "Ingredients").slice(acts)
 	var patty := items.filter(func(bp: Dictionary) -> bool: return bp.id == "box_patty")
 	assert_eq(patty.size(), 1, "a fridge-only kind is still listed, so the player learns of fridges")
-	assert_eq(game.hud._storage_info(patty[0]).price, "Needs a fridge")
-	assert_false(game.hud._storage_info(patty[0]).can)
+	assert_eq(game.hud._storage_info(patty[0]).price, "Fridge $%d" % Upgrades.step_price("fridge"),
+		"a fridge-only kind offers to make the counter a fridge in one press")
+	assert_string_contains(game.hud._storage_info(patty[0]).blurb, "Needs a fridge")
 	assert_true(game.kitchen.store_refusal(c, items[0].id) == "", "what fits comes first")
 	assert_true(game.buy({"id": "box_bun", "tier": 1}))
 	assert_true(game.kitchen.stock(c).has("box_bun"), "put straight in, the card still open")
 	assert_true(game.storing())
-	assert_true(game.shop_items("", "Ingredients")[0].get("stored", false), "what is stored is listed first")
+	assert_true(game.shop_items("", "Ingredients")[acts].get("stored", false), "what is stored is listed first")
 	assert_true(game.buy({"id": "box_bun", "tier": 1, "stored": true}))
 	assert_false(game.kitchen.stock(c).has("box_bun"), "and taken out again")
 	game.close_shop()
@@ -2873,32 +2904,33 @@ func _pass_counter_faced() -> Vector2i:
 	return game.NO_CELL
 
 
-func test_a_lifted_counter_turns_on_its_upgrade_tree_and_comes_down_a_fridge_that_lifts_again():
+func test_a_counter_turns_on_its_upgrade_tree_and_becomes_a_fridge_where_it_stands():
 	_to_build()
 	game.ledger.money = 200
 	var c := _pass_counter_faced()
 	assert_ne(c, game.NO_CELL, "the start has a bare length of pass")
-	assert_true(game.lift())
-	game.shop_action("shop")   # Tab: the Upgrades tab
+	assert_eq(game.build_action(), "Open")
+	assert_true(game.open_card())
+	game.shop_action("shop")   # Tab: the Upgrades tab (or its Upgrades card)
 	assert_true(game.upgrading)
 	assert_true(game.buy_upgrade("fridge"))
 	var st: Station = game.stations[c]
-	assert_not_null(st._vis.get_node_or_null("door"), "drawn a fridge while still lifted")
+	assert_not_null(st._vis.get_node_or_null("door"), "drawn a fridge where it stands")
 	game.shop_action("turn")
 	assert_eq(st.facing, 1, "R turns it on the tree too, to see its back")
 	assert_true(game.upgrading, "and the tree stays open")
-	game.shop_action("shop")   # back to the ingredients
-	game.shop_action("use")    # E: down with the chosen box in
-	assert_false(game.shopping)
-	assert_eq(st.facing, 1, "set down the way it was turned")
-	assert_false(game.kitchen.stock(c).is_empty(), "a box went in")
-	assert_eq(game.build_action(), "Pick up")
-	assert_true(game.lift(), "the fridge lifts again")
+	game.shop_action("back")   # back to the card
 	assert_true(game.storing())
-	assert_eq(game.player.hand.node, st)
+	game.shop_action("use")    # E: the chosen box goes in
+	assert_false(game.kitchen.stock(c).is_empty(), "a box went in")
+	game.shop_action("back")
+	assert_false(game.shopping)
+	assert_eq(st.facing, 1, "it stays turned")
+	assert_true(game.open_card(), "the fridge's card opens again")
+	assert_eq(game.card_station(), st)
 
 
-func test_a_click_on_a_stocked_fridge_lifts_it_whole_as_e_does():
+func test_a_click_on_a_stocked_fridge_opens_its_card_as_e_does():
 	_to_build()
 	var c := _pass_counter_faced()
 	game.player.position = Grid.center(Vector2i(1, 1))   # away from it: the click reaches
@@ -2906,9 +2938,10 @@ func test_a_click_on_a_stocked_fridge_lifts_it_whole_as_e_does():
 	st.set_base("fridge")
 	game.kitchen.set_cell(c, "fridge")
 	game._store_box(c, "box_patty")
-	assert_true(game.lift(game.player, Grid.center(c)))
+	assert_true(game.open_card(game.player, Grid.center(c)))
 	assert_true(game.storing(), "its card opens, the box still in it")
-	assert_eq(game.player.hand.node, st)
+	assert_eq(game.card_station(), st)
+	assert_true(game.player.hand.is_empty())
 	assert_true(game.kitchen.stock(c).has("box_patty"))
 
 
@@ -2924,12 +2957,16 @@ func test_a_fridge_on_the_pass_shows_its_door_in_front_of_the_pass():
 	on_pass.free()
 
 
-func test_the_fridge_and_stove_are_not_in_the_shop_a_counter_grows_them():
+func test_the_fridge_and_stove_are_sold_as_a_counter_grown_already():
 	_to_build()
-	var ids: Array = game.shop_items("", "Kitchen").map(func(bp: Dictionary) -> String: return str(bp.get("base", bp.id)))
-	assert_does_not_have(ids, "fridge")
-	assert_does_not_have(ids, "stove")
-	assert_has(ids, "counter")
+	var items: Array[Dictionary] = game.shop_items("", "Kitchen")
+	var plain: Array = items.filter(func(bp: Dictionary) -> bool: return not bp.has("tree")).map(func(bp: Dictionary) -> String: return str(bp.get("base", bp.id)))
+	assert_does_not_have(plain, "fridge", "not a piece of its own")
+	assert_does_not_have(plain, "stove")
+	assert_has(plain, "counter")
+	var stove := _shop_bp("stove")
+	assert_true(stove.get("counter", false), "a stove comes on its own counter")
+	assert_eq(Catalog.bp_price(stove), Kitchen.price_of("counter") + Kitchen.price_of("stove"))
 
 
 func test_a_counter_on_its_card_grows_a_stove_where_it_stands():
@@ -2969,29 +3006,32 @@ func test_a_stove_opens_like_a_counter_and_upgrades_where_it_stands():
 	assert_eq(game.stations[c], st)
 
 
-func test_a_starred_fridge_is_sold_in_favourites_as_a_counter_already_upgraded():
+func _shop_bp(key: String) -> Dictionary:
+	for bp: Dictionary in game.shop_items("", "Kitchen"):
+		if bp.get("tree", "") == key:
+			return bp
+	return {}
+
+
+func test_the_shop_sells_a_fridge_as_a_counter_already_upgraded():
 	_to_build()
 	game.ledger.money = 200
-	assert_true(game.shop_items("", "Favourites").is_empty())
-	assert_true(game.toggle_favourite("fridge"))
-	var items: Array[Dictionary] = game.shop_items("", "Favourites")
-	assert_eq(items.size(), 1)
-	assert_eq(Catalog.bp_price(items[0]), Kitchen.price_of("fridge"), "priced as counter and fridge both")
+	var bp := _shop_bp("fridge")
+	assert_false(bp.is_empty(), "every tree node is in the shop, no stars needed")
+	assert_eq(Catalog.bp_price(bp), Kitchen.price_of("fridge"), "priced as counter and fridge both")
 	game.open_shop()
-	assert_true(game.buy(items[0]))
+	assert_true(game.buy(bp))
 	assert_eq(int(game.hand.price), Kitchen.price_of("fridge"))
 	assert_true(game.place(Vector3i(3, 4, 0)))
 	assert_eq(game.stations[Vector2i(3, 4)].base, "fridge", "placed as a fridge, not stacked onto a counter")
 	assert_eq(game.ledger.money, 200 - Kitchen.price_of("fridge"))
-	assert_false(game.toggle_favourite("fridge"), "starred again: taken out")
-	DirAccess.remove_absolute(game.fav_path)
 
 
-func test_a_starred_char_grill_comes_on_its_own_counter_at_the_whole_price():
+func test_a_char_grill_from_the_shop_comes_on_its_own_counter_at_the_whole_price():
 	_to_build()
 	game.ledger.money = 400
-	game.toggle_favourite("char_grill")
-	var bp: Dictionary = game.shop_items("", "Favourites")[0]
+	game.ledger.xp = Ledger.XP_PER_LEVEL * 20   # every level, so nothing is a silhouette
+	var bp := _shop_bp("char_grill")
 	var whole := Kitchen.price_of("counter") + Kitchen.price_of("char_grill")
 	assert_eq(Catalog.bp_price(bp), whole)
 	assert_eq(Catalog.label(bp), "Char grill")
@@ -3005,22 +3045,26 @@ func test_a_starred_char_grill_comes_on_its_own_counter_at_the_whole_price():
 	assert_eq(st.base, "counter")
 	assert_eq(game.kitchen.get_piece(Vector2i(3, 4), "top"), "char_grill")
 	assert_eq(game.ledger.money, 400 - whole)
-	var again := TreeScreen.new(game, game.hud, "counter", "")   # the counter's tree shows the star
-	assert_true(again.cards.has("char_grill"))
-	again.free()
-	game.favourites.clear()
-	DirAccess.remove_absolute(game.fav_path)
 
 
-func test_favourites_are_kept_across_runs():
-	game.favourites.clear()
-	game.toggle_favourite("wide_shelf")
-	game.toggle_favourite("mop_bucket")   # a cleaning home: refused
-	game.favourites.clear()
-	game.load_favourites()
-	assert_eq(game.favourites, ["wide_shelf"] as Array[String])
-	game.favourites.clear()
-	DirAccess.remove_absolute(game.fav_path)
+func test_pieces_above_the_level_are_silhouettes_in_the_shop_and_the_tree():
+	_to_build()
+	game.ledger.money = 999
+	var locked: Array = game.shop_items("", "").filter(func(bp: Dictionary) -> bool: return bp.get("locked", false))
+	assert_false(locked.is_empty(), "something is out of reach at level 1, and shown")
+	var bp: Dictionary = locked[0]
+	game.open_shop()
+	assert_false(game.buy(bp), "a silhouette cannot be bought")
+	assert_eq(game.hud._shop_info(bp).price, "Level %d" % Catalog.bp_level(bp))
+	var high := ""
+	for b: Dictionary in locked:
+		if b.has("tree") and Upgrades.level(b.tree) > game.ledger.level():
+			high = b.tree
+	assert_ne(high, "", "a step up a tree is out of reach")
+	var tree := TreeScreen.new(game, game.hud, Upgrades.root(high), "")
+	assert_true(tree.cards.has(high), "the tree shows it too, marked with its level")
+	tree.free()
+	game.close_shop()
 
 
 func test_crates_stand_on_open_counters_and_closed_ones_keep_a_tag():
@@ -3157,11 +3201,11 @@ func test_an_exact_bill_pays_as_before_and_a_wrong_one_is_refused():
 	game.print_bill(game.player, slip)
 	assert_eq(game.player.held, "bill")
 	assert_true(game.slip_out(n))
-	var bill := g.mood.pay_for(g.bill_base)
-	var tip := g.mood.tip_for(bill, game.town.tip_bonus(g.idx))
+	var bill := g.mood.bill_for(g.bill_base)
+	var tip := maxi(0, g.mood.tip_for(bill, game.town.tip_bonus(g.idx)) + g.mood.pay_for(g.bill_base) - bill)
 	assert_true(game.give_bill(game.player, g.table))
-	assert_eq(int(game.ledger.today.sales), bill, "the same bill finish_meal paid")
-	assert_eq(int(game.ledger.today.tips), tip)
+	assert_eq(int(game.ledger.today.sales), bill, "the amount on the slip, never anything else")
+	assert_eq(int(game.ledger.today.tips), tip, "the mood's extras with the tip")
 	assert_eq(g.state, "leaving")
 
 
@@ -3220,3 +3264,80 @@ func test_a_party_left_too_long_leaves_without_paying_and_no_strike():
 	assert_eq(int(game.ledger.today.unpaid_bills), 1)
 	assert_eq(int(game.ledger.today.sales), 0)
 	assert_eq(game.ledger.strikes(), 0, "not a walkout")
+
+
+func test_the_night_cleaner_clears_everything_in_one_press():
+	_to_build()
+	var table: Station = game.stations[Vector2i(8, 3)]
+	table.dirty = 2
+	table.dirty_cups = 1
+	game.find_station("bin").count = 3
+	game.floor_dirt.mess.add_dirt(Vector2i(7, 4))
+	game.ledger.money = 100
+	var price: int = game.cleaner_price()
+	assert_gt(price, 0)
+	assert_true(game.dirty_note().contains("night cleaner"), "the dirty note offers it")
+	game.open_shop()
+	var plates: int = game.find_station("plates").count
+	assert_true(game.buy(game.CLEANER))
+	assert_eq(game.ledger.money, 100 - price)
+	assert_eq(table.dirty, 0)
+	assert_eq(game.find_station("bin").count, 0)
+	assert_eq(game.floor_dirt.mess.total(), 0)
+	assert_eq(game.find_station("plates").count, plates + 1, "the plates go back on their stack")
+	assert_eq(game.dirty_note(), "")
+	assert_eq(game.cleaner_price(), 0)
+	assert_false(game.buy(game.CLEANER), "nothing left to clean")
+	game.close_shop()
+
+
+func test_one_press_makes_a_counter_the_fridge_a_box_needs():
+	_to_build()
+	game.ledger.money = 200
+	var c := _plain_counter()
+	assert_true(game.open_storage(c))
+	var price: int = game.fridge_offer("box_patty")
+	assert_eq(price, Upgrades.step_price("fridge"))
+	assert_true(game.buy({"id": "box_patty", "tier": 1}))
+	assert_eq(game.stations[c].base, "fridge", "the counter is a fridge now")
+	assert_true(game.kitchen.stock(c).has("box_patty"), "with the box in")
+	assert_eq(game.ledger.money, 200 - price)
+	assert_true(game.storing(), "the card stays open")
+	game.close_shop()
+	assert_true(game.open_storage(_plain_counter()))
+	assert_string_contains(game.hud._storage_info({"id": "box_bun", "tier": 1}).blurb, "Unlimited tonight", "a box says it never runs out")
+	game.close_shop()
+
+
+func test_the_door_refusing_for_money_offers_remedies():
+	_to_build()
+	game.ledger.money = 0
+	var why: String = game.open_block()
+	assert_string_contains(why, "Tomorrow's stock costs")
+	assert_string_contains(why, "dearest box")
+	assert_string_contains(why, "sell something")
+
+
+func test_one_wash_clears_the_whole_sink_onto_each_stack():
+	_to_build()
+	var sink: Station = game.find_station("sink")
+	sink.dirty = 3
+	sink.dirty_cups = 1
+	var plates: int = game.find_station("plates").count
+	game.wash_one(sink)   # the old one-at-a-time, for the count below
+	sink.dirty = 3
+	sink.dirty_cups = 1
+	plates = game.find_station("plates").count
+	game.player.position = sink.position + Vector3(0, 0, 1)
+	game.player.look(Vector2i(0, -1))
+	game.use_station(sink, false)
+	assert_eq(sink.dirty, 0, "one press washes it all")
+	assert_eq(game.find_station("plates").count, plates + 2)
+
+
+func test_the_receipt_names_a_side_nobody_ordered():
+	game.menu.add("side", [game.fixed_main().bread], "Plain Roll")
+	game.ledger.today.served = 1
+	var nudges: Array[String] = game.unordered_nudges()
+	assert_eq(nudges.size(), 1)
+	assert_string_contains(nudges[0], "Plain Roll: no orders.")
