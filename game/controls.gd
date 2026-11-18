@@ -17,12 +17,14 @@ extends CanvasLayer
 ## (`game.join`); holding Start a second, or unplugging, leaves (`game.leave`).
 ##
 ## Keys: WASD or arrows walk (and browse), E/Space use, Enter confirm, Esc back,
-## R turn, X sell, Tab shop, T town, O options, F search, M mute, N the menu screen
+## R turn, C sell, Tab shop, Z and X choose a lifted piece's upgrade and Space buys it
+## (Space is "use" everywhere else: `game.act` turns "buy" back into "use"), T town, O options, F search, M mute, N the menu screen
 ## (R on an ingredient station at night switches its stock). Shift held: the chef stands
 ## still and WASD only turns them, to aim (diagonals too at night).
 ## Controller: left stick or d-pad walk (the d-pad also browses), A use (confirm
 ## on the receipt and the end screen), B back, X sell, Y shop (town on the
-## receipt), LB/RB turn, either trigger held aims, Start options, Back the menu screen.
+## receipt; buys the chosen upgrade while a piece is lifted), LB/RB choose a lifted
+## piece's upgrade (turn otherwise), the right stick's click turns, either trigger held aims, Start options, Back the menu screen.
 ## Touch: a joystick bottom left, a column of round buttons on the right (Aim, beside
 ## Use, is held while the joystick turns the chef); taps on
 ## the room still pick guests and place pieces, as a mouse click would.
@@ -36,24 +38,27 @@ const BTN_R := 44.0
 const USE_R := 66.0
 ## What each action is called on screen, per mode.
 const GLYPHS := {
-	"keys": {"move": "WASD", "aim": "Shift", "use": "E", "back": "Esc", "turn": "R", "sell": "X", "shop": "Tab",
+	"keys": {"move": "WASD", "aim": "Shift", "use": "E", "back": "Esc", "turn": "R", "sell": "C", "shop": "Tab",
+		"prev": "Z", "next": "X", "buy": "Space",
 		"confirm": "Enter", "town": "T", "options": "O", "search": "F", "browse": "Arrows", "menu": "N"},
-	"pad": {"move": "Stick", "aim": "LT", "use": "A", "back": "B", "turn": "RB", "sell": "X", "shop": "Y",
+	"pad": {"move": "Stick", "aim": "LT", "use": "A", "back": "B", "turn": "RS", "sell": "X", "shop": "Y",
+		"prev": "LB", "next": "RB", "buy": "Y",
 		"confirm": "A", "town": "Y", "options": "Start", "search": "", "browse": "D-pad", "menu": "Back"},
 	"touch": {"move": "Joystick", "aim": "Aim", "use": "Use", "back": "Back", "turn": "Turn", "sell": "Sell", "shop": "Shop",
+		"prev": "", "next": "", "buy": "Tap it again",
 		"confirm": "Tap", "town": "Tap", "options": "Menu", "search": "", "browse": "Swipe", "menu": "Dishes"},
 }
 ## The keyboard's actions. WASD and the arrows also walk (read in move()).
 const KEY_ACTIONS := {
-	KEY_E: "use", KEY_SPACE: "use", KEY_ENTER: "confirm", KEY_KP_ENTER: "confirm",
-	KEY_ESCAPE: "back", KEY_R: "turn", KEY_X: "sell", KEY_TAB: "shop", KEY_T: "town",
+	KEY_E: "use", KEY_SPACE: "buy", KEY_ENTER: "confirm", KEY_KP_ENTER: "confirm",
+	KEY_ESCAPE: "back", KEY_R: "turn", KEY_C: "sell", KEY_Z: "prev", KEY_X: "next", KEY_TAB: "shop", KEY_T: "town",
 	KEY_O: "options", KEY_F: "search", KEY_SLASH: "search", KEY_M: "mute", KEY_N: "menu",
 	KEY_UP: "up", KEY_W: "up", KEY_DOWN: "down", KEY_S: "down",
 	KEY_LEFT: "left", KEY_A: "left", KEY_RIGHT: "right", KEY_D: "right",
 }
 const PAD_ACTIONS := {
 	JOY_BUTTON_A: "use", JOY_BUTTON_B: "back", JOY_BUTTON_X: "sell", JOY_BUTTON_Y: "shop",
-	JOY_BUTTON_LEFT_SHOULDER: "turn", JOY_BUTTON_RIGHT_SHOULDER: "turn", JOY_BUTTON_START: "options",
+	JOY_BUTTON_LEFT_SHOULDER: "prev", JOY_BUTTON_RIGHT_SHOULDER: "next", JOY_BUTTON_RIGHT_STICK: "turn", JOY_BUTTON_START: "options",
 	JOY_BUTTON_BACK: "menu",
 	JOY_BUTTON_DPAD_UP: "up", JOY_BUTTON_DPAD_DOWN: "down",
 	JOY_BUTTON_DPAD_LEFT: "left", JOY_BUTTON_DPAD_RIGHT: "right",
@@ -206,8 +211,9 @@ func holding(p: int, action: String) -> bool:
 		return true
 	if owner_of("keys") == p:
 		for key: Key in KEY_ACTIONS:
-			if KEY_ACTIONS[key] == action and Input.is_physical_key_pressed(key):
-				return true
+			var a: String = KEY_ACTIONS[key]
+			if (a == action or (a == "buy" and action == "use")) and Input.is_physical_key_pressed(key):
+				return true   # Space is held as "use" too
 	return false
 
 

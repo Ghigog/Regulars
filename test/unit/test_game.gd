@@ -325,11 +325,11 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	_to_build()
 	game.open_shop()
 	assert_true(game.shopping)
-	assert_eq(game.hud._category, "Kitchen", "there is no All tab")
-	var all: Array[Dictionary] = game.shop_items("", "Kitchen")
+	assert_eq(game.hud._category, "Furniture", "there is no All tab")
+	var all: Array[Dictionary] = game.shop_items("", "Furniture")
 	var kitchen: int = all.size()
-	assert_lt(all.filter(func(bp: Dictionary) -> bool: return not bp.get("locked", false)).size(), kitchen,
-		"pieces above the level are shown, as silhouettes")
+	assert_eq(all.filter(func(bp: Dictionary) -> bool: return not bp.get("locked", false)).size(), kitchen,
+		"only what can be bought tonight")
 	assert_eq(game.hud._cards.get_child_count(), kitchen)
 	game.hud.set_search("fern")
 	var ferns: int = game.shop_items("fern").size()
@@ -337,13 +337,15 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 	assert_eq(game.hud._cards.get_child_count(), ferns, "a search looks through every category")
 	game.hud.set_search("zzz")
 	assert_eq(game.hud._cards.get_child_count(), 1, "only the nothing-matches line")
-	game.hud._set_category("Kitchen")
+	game.hud._set_category("Furniture")
 	assert_eq(game.hud._search, "", "picking a category ends the search")
 	assert_eq(game.hud._cards.get_child_count(), kitchen)
 	game.hud.shop_move(-1)
 	assert_eq(game.hud._shop_index, kitchen - 1, "left from the first wraps to the last")
 	game.hud.shop_category(1)
-	assert_eq(game.hud._category, "Dining", "the Pantry tab went: boxes go in from a storage card")
+	assert_eq(game.hud._category, "Tools", "Furniture, Tools, Ingredients, Build")
+	game.hud.shop_category(1)
+	assert_eq(game.hud._category, "Ingredients", "boxes are bought here and put in a counter")
 	game.close_shop()
 	assert_null(game.hud._shop)
 	game.start_day()
@@ -368,10 +370,9 @@ func test_furniture_is_carried_and_put_down_in_front_of_the_chef():
 	_to_build()
 	game.player.position = Grid.center(Vector2i(8, 2))
 	game.player.look(Vector2i(0, 1))            # facing the table at (8, 3)
-	assert_eq(game.build_action(), "Open")
+	assert_eq(game.build_action(), "Pick up")
 	game.build_interact()
-	assert_true(game.card_act("move"), "Move on its card")
-	assert_eq(game.hand.id, "table")
+	assert_eq(game.hand.id, "table", "E lifts it")
 	assert_eq(game.build_action(), "Put down")
 	game.build_interact()
 	assert_true(game.hand.is_empty())
@@ -741,6 +742,28 @@ func test_one_with_nothing_stays_with_a_group_that_has_a_main():
 	assert_true(party[0].planned.main.is_empty())
 	assert_true(party[0].mood.thoughts.has(Menu.NOTHING_THOUGHT))
 	assert_eq(int(game.ledger.today.found_nothing), 1)
+
+
+func test_one_who_wants_nothing_shows_no_notepad_and_orders_nothing():
+	game.town.people[1].dislikes = ["patty"]
+	var party: Array[Guest] = game.spawn_group([1, 2])
+	var g := party[0]
+	var none := Menu.COURSES.all(func(c: String) -> bool: return (g.planned.get(c, {}) as Dictionary).is_empty())
+	assert_eq(g.orders_nothing, none, "decided at the door")
+	assert_eq(game.order_for(g), g.planned, "nothing is chosen afresh when the order is taken")
+	assert_false(party[1].orders_nothing, "the friend with a main waves for the order")
+
+
+func test_food_in_hand_is_plated_at_the_plate_stack():
+	var plates: Station = game.find_station("plates")
+	var n := plates.count
+	var food := Tray.kind("prep", "bun")
+	game.player.set_held(food)
+	assert_eq(game.prompt_for(plates), "Plate it")
+	game.use_station(plates, false, game.player)
+	assert_eq(game.player.held, "dishes", "a plate in hand now")
+	assert_eq(plates.count, n - 1, "off the stack")
+	assert_false(game.player.dishes[0].is_empty(), "with the food on it")
 
 
 func test_a_meal_with_a_liked_ingredient_says_so():
@@ -1277,7 +1300,7 @@ func test_booth_and_table_for_four_are_sold_under_dining():
 	assert_true(cat.can_buy("booth", 500, 2))
 	var fours := Catalog.search("four")
 	assert_eq(fours.filter(func(bp: Dictionary) -> bool: return not bp.has("tree")).size(), 1, "the table for four turns up")
-	assert_gt(fours.size(), 1, "and its tiers, sold outright up its tree")
+	assert_eq(fours.size(), 1, "its tiers are bought on the table, lifted")
 
 
 func test_seats_of_a_booth_turn_and_a_table_for_four_has_one_each_side():
@@ -2904,45 +2927,28 @@ func _pass_counter_faced() -> Vector2i:
 	return game.NO_CELL
 
 
-func test_a_counter_turns_on_its_upgrade_tree_and_becomes_a_fridge_where_it_stands():
+func test_e_lifts_a_counter_and_its_strip_makes_it_a_fridge():
 	_to_build()
 	game.ledger.money = 200
 	var c := _pass_counter_faced()
 	assert_ne(c, game.NO_CELL, "the start has a bare length of pass")
-	assert_eq(game.build_action(), "Open")
-	assert_true(game.open_card())
-	game.shop_action("shop")   # Tab: the Upgrades tab (or its Upgrades card)
-	assert_true(game.upgrading)
-	assert_true(game.buy_upgrade("fridge"))
-	var st: Station = game.stations[c]
-	assert_not_null(st._vis.get_node_or_null("door"), "drawn a fridge where it stands")
-	game.shop_action("turn")
-	assert_eq(st.facing, 1, "R turns it on the tree too, to see its back")
-	assert_true(game.upgrading, "and the tree stays open")
-	game.shop_action("back")   # back to the card
-	assert_true(game.storing())
-	game.shop_action("use")    # E: the chosen box goes in
-	assert_false(game.kitchen.stock(c).is_empty(), "a box went in")
-	game.shop_action("back")
-	assert_false(game.shopping)
-	assert_eq(st.facing, 1, "it stays turned")
-	assert_true(game.open_card(), "the fridge's card opens again")
-	assert_eq(game.card_station(), st)
-
-
-func test_a_click_on_a_stocked_fridge_opens_its_card_as_e_does():
-	_to_build()
-	var c := _pass_counter_faced()
-	game.player.position = Grid.center(Vector2i(1, 1))   # away from it: the click reaches
-	var st: Station = game.stations[c]
-	st.set_base("fridge")
-	game.kitchen.set_cell(c, "fridge")
-	game._store_box(c, "box_patty")
-	assert_true(game.open_card(game.player, Grid.center(c)))
-	assert_true(game.storing(), "its card opens, the box still in it")
-	assert_eq(game.card_station(), st)
+	assert_eq(game.build_action(), "Pick up")
+	game.act(0, "use")
+	var st: Station = game.player.hand.get("node")
+	assert_not_null(st, "E lifts the counter, no card")
+	var keys: Array = game.strip_choices().map(func(ch: Dictionary) -> String: return str(ch.get("key", "")))
+	assert_has(keys, "fridge", "the strip along the bottom offers its upgrades")
+	while str(game.strip_chosen().get("key", "")) != "fridge":
+		game.act(0, "next")   # X
+	assert_true(game.strip_open(0))
+	game.act(0, "buy")   # Space
+	assert_eq(game.ledger.money, 200 - Upgrades.step_price("fridge"))
+	assert_eq(st.base, "fridge", "still in hand, a fridge now")
+	game.act(0, "turn")
+	game.act(0, "use")   # E: put down where it was
 	assert_true(game.player.hand.is_empty())
-	assert_true(game.kitchen.stock(c).has("box_patty"))
+	assert_eq(game.stations[c], st)
+	assert_not_null(st._vis.get_node_or_null("door"), "drawn a fridge")
 
 
 func test_a_fridge_on_the_pass_shows_its_door_in_front_of_the_pass():
@@ -2957,16 +2963,14 @@ func test_a_fridge_on_the_pass_shows_its_door_in_front_of_the_pass():
 	on_pass.free()
 
 
-func test_the_fridge_and_stove_are_sold_as_a_counter_grown_already():
+func test_the_shop_sells_roots_only():
 	_to_build()
-	var items: Array[Dictionary] = game.shop_items("", "Kitchen")
-	var plain: Array = items.filter(func(bp: Dictionary) -> bool: return not bp.has("tree")).map(func(bp: Dictionary) -> String: return str(bp.get("base", bp.id)))
-	assert_does_not_have(plain, "fridge", "not a piece of its own")
-	assert_does_not_have(plain, "stove")
-	assert_has(plain, "counter")
-	var stove := _shop_bp("stove")
-	assert_true(stove.get("counter", false), "a stove comes on its own counter")
-	assert_eq(Catalog.bp_price(stove), Kitchen.price_of("counter") + Kitchen.price_of("stove"))
+	var items: Array[Dictionary] = game.shop_items("", "Furniture") + game.shop_items("", "Tools")
+	var ids: Array = items.map(func(bp: Dictionary) -> String: return str(bp.get("base", bp.id)))
+	assert_does_not_have(ids, "fridge", "a fridge is a counter upgraded, lifted")
+	assert_does_not_have(ids, "stove")
+	assert_has(ids, "counter")
+	assert_eq(items.filter(func(bp: Dictionary) -> bool: return bp.has("tree")).size(), 0, "no tree steps")
 
 
 func test_a_counter_on_its_card_grows_a_stove_where_it_stands():
@@ -3006,65 +3010,34 @@ func test_a_stove_opens_like_a_counter_and_upgrades_where_it_stands():
 	assert_eq(game.stations[c], st)
 
 
-func _shop_bp(key: String) -> Dictionary:
-	for bp: Dictionary in game.shop_items("", "Kitchen"):
-		if bp.get("tree", "") == key:
-			return bp
-	return {}
-
-
-func test_the_shop_sells_a_fridge_as_a_counter_already_upgraded():
-	_to_build()
-	game.ledger.money = 200
-	var bp := _shop_bp("fridge")
-	assert_false(bp.is_empty(), "every tree node is in the shop, no stars needed")
-	assert_eq(Catalog.bp_price(bp), Kitchen.price_of("fridge"), "priced as counter and fridge both")
-	game.open_shop()
-	assert_true(game.buy(bp))
-	assert_eq(int(game.hand.price), Kitchen.price_of("fridge"))
-	assert_true(game.place(Vector3i(3, 4, 0)))
-	assert_eq(game.stations[Vector2i(3, 4)].base, "fridge", "placed as a fridge, not stacked onto a counter")
-	assert_eq(game.ledger.money, 200 - Kitchen.price_of("fridge"))
-
-
-func test_a_char_grill_from_the_shop_comes_on_its_own_counter_at_the_whole_price():
+func test_a_lifted_counter_grows_a_stove_in_hand_and_is_put_down_as_one():
 	_to_build()
 	game.ledger.money = 400
-	game.ledger.xp = Ledger.XP_PER_LEVEL * 20   # every level, so nothing is a silhouette
-	var bp := _shop_bp("char_grill")
-	var whole := Kitchen.price_of("counter") + Kitchen.price_of("char_grill")
-	assert_eq(Catalog.bp_price(bp), whole)
-	assert_eq(Catalog.label(bp), "Char grill")
-	game.open_shop()
-	assert_true(game.buy(bp))
-	assert_false(game.can_place(Vector3i(_plain_counter().x, _plain_counter().y, 0)), "not onto a counter: it brings its own")
-	assert_true(game.place(Vector3i(3, 4, 0)))
-	var st: Station = game.stations[Vector2i(3, 4)]
+	var c := Vector2i(3, 4)
+	game.add_station("counter", c)
+	assert_true(game.pick_up(Grid.center(c), game.player, true))
+	assert_true(game.buy_upgrade("stove"))
+	assert_eq(game.player.hand.id, "stove", "a stove in hand, on its counter")
+	assert_eq(game.ledger.money, 400 - Upgrades.step_price("stove"))
+	assert_true(game.place(Vector3i(c.x, c.y, 0)))
+	var st: Station = game.stations[c]
 	assert_eq(st.type, "stove")
-	assert_eq(st.node, "char_grill")
 	assert_eq(st.base, "counter")
-	assert_eq(game.kitchen.get_piece(Vector2i(3, 4), "top"), "char_grill")
-	assert_eq(game.ledger.money, 400 - whole)
+	assert_eq(game.kitchen.get_piece(c, "top"), "stove")
 
 
-func test_pieces_above_the_level_are_silhouettes_in_the_shop_and_the_tree():
+func test_the_shop_and_the_strip_leave_out_what_is_above_the_level():
 	_to_build()
-	game.ledger.money = 999
-	var locked: Array = game.shop_items("", "").filter(func(bp: Dictionary) -> bool: return bp.get("locked", false))
-	assert_false(locked.is_empty(), "something is out of reach at level 1, and shown")
-	var bp: Dictionary = locked[0]
-	game.open_shop()
-	assert_false(game.buy(bp), "a silhouette cannot be bought")
-	assert_eq(game.hud._shop_info(bp).price, "Level %d" % Catalog.bp_level(bp))
-	var high := ""
-	for b: Dictionary in locked:
-		if b.has("tree") and Upgrades.level(b.tree) > game.ledger.level():
-			high = b.tree
-	assert_ne(high, "", "a step up a tree is out of reach")
-	var tree := TreeScreen.new(game, game.hud, Upgrades.root(high), "")
-	assert_true(tree.cards.has(high), "the tree shows it too, marked with its level")
-	tree.free()
-	game.close_shop()
+	assert_eq(game.ledger.level(), 1)
+	var locked: Array = game.shop_items("", "").filter(func(bp: Dictionary) -> bool:
+		return Catalog.ITEMS.has(bp.id) and Catalog.bp_level(bp) > 1 and not game.missing(bp.id))
+	assert_eq(locked, [], "nothing out of reach is listed")
+	var c := Vector2i(3, 4)
+	game.add_station("counter", c)
+	assert_true(game.pick_up(Grid.center(c), game.player, true))
+	for ch: Dictionary in game.strip_choices():
+		if ch.kind == "up":
+			assert_lte(Upgrades.level(ch.key), 1, ch.key)
 
 
 func test_crates_stand_on_open_counters_and_closed_ones_keep_a_tag():

@@ -36,6 +36,7 @@ var _boost_age := 0.0
 ## hand and its drag, where they aim, and the marks drawn for them in the room.
 var trim := 0                     # which PLAYER_TRIM colour the chef wears
 var hand := {}                    # build phase: the piece or tool in hand ({} for none)
+var strip_pick := 0               # the lifted piece's strip: which choice Z and X are on
 var drag := {}                    # a mouse drag with a build tool: {"from": Vector3, "remove": bool}
 var aim_mouse := false            # build phase: the mouse, not the chef, says where things go
 var aiming := false               # Shift (a trigger, the touch Aim button) held: standing still, turning

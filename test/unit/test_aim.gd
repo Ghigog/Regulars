@@ -39,10 +39,10 @@ func test_an_aimed_diagonal_piece_is_picked_up():
 	ch.position = Grid.center(Vector2i(5, 3))
 	ch.move(Vector2(-1, 0), 0.1, true)       # A: the cell up-left on screen is (4, 4)
 	assert_eq(ch.facing, Vector2i(-1, 1))
-	assert_eq(game.build_action(), "Open")
+	assert_eq(game.build_action(), "Pick up")
+	var counter: Station = game.stations[Vector2i(4, 4)]
 	game.build_interact()
-	assert_true(game.storing())
-	assert_eq(game.card_station(), game.stations[Vector2i(4, 4)], "the diagonal counter's card opens")
+	assert_eq(game.player.hand.get("node"), counter, "the diagonal counter is lifted")
 
 
 func test_aim_is_a_held_action_not_a_press():

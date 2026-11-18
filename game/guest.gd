@@ -28,6 +28,7 @@ var liked_meal := false   # their meal had something they like
 ## Empty until then. `planned` is what they will order, chosen at the door.
 var order := {}
 var planned := {}
+var orders_nothing := false   # found nothing on the menu at the door: no notepad, no ticket
 var bill_base := 0       # the order's price: what the bill is before mood and deals
 var _meal_tray: Tray
 var path: Array[Vector2i] = []
@@ -433,8 +434,8 @@ func _refresh(delta: float) -> void:
 		want = "warning"   # someone just fell beside them
 	elif stage > 0 and (seated_waiting() or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
 		want = GuestMood.DISGUST_ICONS[stage]
-	elif state == "ordering":
-		want = "order"   # a notepad: come and take my order
+	elif state == "ordering" and not orders_nothing:
+		want = "order"   # a notepad: come and take my order (not from one who wants nothing)
 	elif state == "waiting":
 		want = want_icon()
 	elif state == "at_till" or state == "to_till" or (state == "to_pay" and calling):

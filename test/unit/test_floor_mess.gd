@@ -1421,8 +1421,8 @@ func test_a_box_picked_up_climbs_its_tree_and_the_laid_cells_follow():
 	assert_true(game.pick_up(Grid.center(c)))
 	assert_eq(game.player.hand.id, "box_cleaner")
 	assert_eq(game.hand_key(), "box_cleaner")
-	game.open_shop()
-	assert_true(game.upgrading, "the shop shows the box's tree")
+	assert_true(game.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "box_primer"),
+		"the strip along the bottom offers the box's next steps")
 	var money: int = game.ledger.money
 	assert_true(game.buy_upgrade("box_primer"))
 	assert_eq(game.ledger.money, money - 40)
@@ -1493,8 +1493,7 @@ func test_a_hooks_tree_is_its_tools():
 	game.clean_kit.on_built(h, "sponge")
 	assert_true(game.pick_up(Grid.center(w)))
 	assert_eq(game.hand_key(), "sponge")
-	game.open_shop()
-	assert_true(game.upgrading)
+	assert_true(game.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "spill_kit"))
 	assert_true(game.buy_upgrade("spill_kit"))
 	assert_eq(h.kit_tool, "spill_kit")
 	assert_eq(game.hand_key(), "spill_kit")
