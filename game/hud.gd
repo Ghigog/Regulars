@@ -2361,7 +2361,7 @@ func _build_tip(p := 0) -> String:
 	if hand.is_empty():
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % game.ledger.day
-		return "%s walk      %s open a counter for stock      %s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
+		return "%s walk      %s open a piece (hold to move)      %s shop      %s menu      Flip the door card to open for day %d" % [_g("move", p), use, _g("shop", p), _g("menu", p), game.ledger.day]
 	if Treatments.is_laying_tool(hand.id):   # a floor treatment (PRD 9.5): laid free, paid each night
 		var k := Treatments.key_of(hand.id)
 		var off: bool = game.treat_off.has(k)

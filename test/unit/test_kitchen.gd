@@ -948,28 +948,19 @@ func _night_zero(theme: String) -> void:
 	game.choose_theme(theme)
 
 
-func test_night_zero_is_winnable_with_counters_a_fridge_and_boxes():
+func test_night_zero_starts_with_a_stove_a_fridge_and_the_starting_mains_boxes():
 	for theme in Pantry.THEMES:
 		_night_zero(theme)
 		assert_eq(game.phase, game.Phase.BUILD, theme)
 		assert_eq(game.ledger.money, 150)
-		assert_eq(game.night_hint(), game.NIGHT_HINTS[0])
 		var fm: Dictionary = game.fixed_main()
-		game.player.position = _at(3, 4)
-		assert_true(game.open_storage(Vector2i(4, 4)), "a pass counter's card")
-		game.storage_upgrades()
-		assert_true(game.buy_upgrade("stove"), theme + ": the pass counter made a stove")
-		assert_eq(game.stations[Vector2i(4, 4)].type, "stove")
-		assert_true(game.pick_up(_at(4, 5)), "a pass counter")
-		game.open_shop()
-		assert_true(game.buy_upgrade("fridge"), theme + ": the counter's tree reaches a fridge")
-		game.close_shop()
-		assert_true(game.place(Vector3i(4, 5, 0)))
+		assert_eq(game.stations[Vector2i(0, 3)].type, "stove", theme + ": a stove under the hood")
+		assert_eq(game.stations[Vector2i(0, 2)].base, "fridge", theme + ": a fridge in the corner")
 		for kind: String in [fm.grill, fm.bread]:
-			assert_true(game.pick_catalog(Pantry.box_id(kind)), kind)
-			var at := Vector3i(4, 5, 0) if Kitchen.is_chilled(kind) else Vector3i(4, 3, 0)
-			assert_true(game.place(at), theme + ": " + kind)
-		assert_eq(game.night_hint(), game.NIGHT_HINTS[1], "next, a menu")
+			assert_not_null(game.storage_of(kind), theme + ": " + kind + " is stocked")
+		assert_not_null(game.find_station("cups"), theme + ": a cup stack by the plates")
+		assert_eq(game.night_hint(), game.NIGHT_HINTS[1], "first, a menu")
+		assert_eq(game.open_block(), game.NIGHT_ZERO_BLOCK)
 		game.write_test_menu()
 		game.menu_changed()
 		assert_eq(game.night_hint(), game.NIGHT_HINTS[2])
@@ -1054,7 +1045,7 @@ func test_first_room_hangs_its_fixtures_as_pieces_in_both_themes():
 		assert_eq(game.highs.size(), 5)
 		assert_eq(game.highs[Vector2i(0, 3)].facing, 1, "faces off the left wall")
 		assert_eq(game.highs[Vector2i(3, 2)].facing, 0, "faces off the back wall")
-		assert_true(game.pick_up(_at(0, 4)))
+		assert_true(game.pick_up(_at(0, 4), game.player, true, "high"), "the hood over the starter's bread counter")
 		assert_eq(game.player.hand.id, "hood")
 		assert_eq(game.sell_block(), "", theme + ": sellable")
 		var money: int = game.ledger.money

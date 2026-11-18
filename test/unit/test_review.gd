@@ -228,3 +228,13 @@ func test_the_receipt_counts_perfect_plates():
 	var rec := l.end_day()
 	assert_eq(int(rec.perfect), 3)
 	assert_eq(int(rec.best_streak), 2)
+
+
+# ---------- Item 7: early days are a little longer ----------
+
+func test_the_first_days_are_a_little_longer_and_then_steady():
+	assert_gt(Town.day_length(1), Town.day_length(2))
+	assert_gt(Town.day_length(2), Town.day_length(3))
+	assert_eq(Town.day_length(3), Town.DAY_LENGTH)
+	assert_eq(Town.day_length(30), Town.DAY_LENGTH, "it never grows again")
+	assert_gt(Town.day_length(1), 55.0, "longer than the old first day")

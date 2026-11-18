@@ -332,6 +332,13 @@ func visit_chance(i: int) -> float:
 ## The day's arrival window, the same every day (review, item 1): later days are harder
 ## for the crowd, the bigger parties and the shorter patience, not easier for a longer day.
 const DAY_LENGTH := 75.0   # tunable: seconds the door lets people in
+const EARLY_EXTRA := 10.0  # tunable: the first days run this much longer each, for learning
+const EARLY_DAYS := 2      # tunable: days 1 and 2 (+20 s, +10 s), then DAY_LENGTH
+
+
+## How long day `day`'s door lets people in: a little longer on the first days.
+static func day_length(day: int) -> float:
+	return DAY_LENGTH + EARLY_EXTRA * maxi(0, EARLY_DAYS + 1 - day)
 
 
 ## How long a table waits, in seconds: less each day, down to a floor.

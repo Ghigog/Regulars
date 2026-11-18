@@ -130,8 +130,11 @@ var _room_lights: Array[OmniLight3D] = []
 var _openings := {}                    # Vector3i edge -> Scenery opening info
 var _opening_ok := {}                  # Vector3i edge -> whether it was last drawn usable
 var _frame := [WIDE_FOCUS, WIDE_SIZE, CLOSE_FOCUS, CLOSE_SIZE]   # the camera, fitted to the floor
-const NIGHT_ZERO_BLOCK := "Buy an ingredient, a tool, and write a menu."
-const NIGHT_HINTS: Array[String] = ["Open a counter with E: make it a stove or a fridge, and stock it with boxes.", "Write a menu.", "Flip the door card to open."]
+const NIGHT_ZERO_BLOCK := "Write a menu first: a main the kitchen can make (N, or the board by the door)."
+## Night zero starts with a stove, a fridge and the starting main's boxes (review, item 7),
+## so the first hint is the menu; the first is only seen if the starter kitchen is sold.
+const NIGHT_HINTS: Array[String] = ["The first main needs a stove and a fridge (both are a counter upgraded: E on a counter), each with its box.",
+	"Write a menu: N, or the board by the door.", "Flip the door card to open."]
 var menu_board: MenuBoard               # the chalkboard by the door: tonight's names
 const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "plates": "Plate stack", "cups": "Cup stack", "pass": "Pass counter"}
 ## What a kitchen cannot open without. Every piece can be sold, these too; while there is
@@ -2172,7 +2175,7 @@ func popup(text: String, at: Vector3, col: Color) -> void:
 
 ## Days are the same length; they get busier and less forgiving (Town).
 func day_length() -> float:
-	return Town.DAY_LENGTH
+	return Town.day_length(ledger.day)
 
 
 func table_patience() -> float:
@@ -2280,6 +2283,7 @@ func guest_at(screen: Vector2, within := 60.0) -> Guest:
 ## Night 0: the game opens with the door card on CLOSED and the room to set up.
 ## Nothing has been played yet, so there is no receipt; day 1 starts at the door.
 func _open_first_night() -> void:
+	_starter_kitchen()
 	phase = Phase.BUILD
 	door_open = false
 	_door_turn.rotation.y = PI
@@ -2287,6 +2291,24 @@ func _open_first_night() -> void:
 	hud.show_build()
 	hud.say("The night before day 1. Set up the kitchen, then flip the door card.")
 	autosave()
+
+
+## Night zero's starting goodies (review, item 7): the starting main's stove and fridge,
+## built already, its two boxes stocked, and a cup stack beside the plates. Only in a new
+## kitchen that has none of them yet.
+func _starter_kitchen() -> void:
+	if not ledger.history.is_empty() or find_station("stove") != null:
+		return
+	var fm := fixed_main()
+	if not stations.has(Vector2i(0, 2)):
+		stock_box(fm.grill, Vector2i(0, 2), false, 1)   # the corner fridge, the chilled kind in it
+	if not stations.has(Vector2i(0, 3)):
+		add_station("stove", Vector2i(0, 3), 1, 1)   # under the hood: a counter grown into a stove
+	if not stations.has(Vector2i(0, 4)):
+		stock_box(fm.bread, Vector2i(0, 4), false, 1)
+	if find_station("cups") == null and not stations.has(Vector2i(1, 2)):
+		add_station("cups", Vector2i(1, 2))
+	menu_changed()
 
 
 ## A saved game comes back on the night it was saved: the room to tend, the door closed.
