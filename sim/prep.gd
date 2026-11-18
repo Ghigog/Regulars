@@ -13,6 +13,30 @@ const GRILL_PERFECT := 7.5  # good until here, then it dries out (plain, falling
 const GRILL_BURN := 12.0    # spoiled
 
 
+## Perfect plates (review, item 6). A tray served at PERFECT_AT or better is perfect;
+## perfect trays in a row make a streak. Each step of the streak raises that guest's tip,
+## and from STREAK_REP_FROM on the town hears about the cooking.
+const PERFECT_AT := 0.95
+const STREAK_TIP := 0.1        # tunable: tip raised this much per perfect tray in a row
+const STREAK_TIP_MAX := 5      # tunable: up to this many steps (+50%)
+const STREAK_REP_FROM := 3     # tunable: the streak at which word gets round
+const STREAK_REP := 0.03       # tunable: affinity for the guest (friends hear 40%)
+
+
+static func is_perfect(tray_quality: float) -> bool:
+	return tray_quality > PERFECT_AT
+
+
+## The tip scale for a tray served `streak` perfect trays into a run (0 for none).
+static func streak_tip(streak: int) -> float:
+	return 1.0 + STREAK_TIP * clampi(streak, 0, STREAK_TIP_MAX)
+
+
+## The affinity a perfect tray `streak` into a run earns its guest.
+static func streak_rep(streak: int) -> float:
+	return STREAK_REP if streak >= STREAK_REP_FROM else 0.0
+
+
 static func quality_of(result: String) -> float:
 	return {"good": GOOD, "plain": PLAIN, "bad": BAD}.get(result, 0.0)
 

@@ -108,6 +108,7 @@ var guests: Array[Guest] = []
 var queue: Array[Guest] = []
 var seat_taken := {}             # Vector2i -> Guest
 var arrivals: Array[Dictionary] = []
+var perfect_streak := 0   # perfect trays served in a row today (review, item 6)
 var clock := 0.0
 var last_day := {}
 var catalog: Catalog
@@ -2209,6 +2210,7 @@ func start_day() -> void:
 	pay_staff()
 	menu_board.refresh(tonight_menu())
 	town.new_day()
+	perfect_streak = 0
 	var coming := town.roll_guests(ledger.day, (Town.FLYER_BOOST if flyers_out else 0.0) + critic.visit_boost(ledger.day))
 	coming = coming.filter(func(i: int) -> bool: return staff.may_visit(i, ledger.day))   # staff work; they eat out only on a day off
 	var critic_day := critic.visits_on(ledger.day)
@@ -5286,7 +5288,14 @@ func serve(g: Guest, t: Tray) -> void:
 	if g.mood.patience > 0.65:
 		g.mood.delight(0.15, "That was quick!")
 	var q := savour_for(g, t)
-	var perfect := t.quality() > 0.95
+	var perfect := Prep.is_perfect(t.quality())
+	perfect_streak = perfect_streak + 1 if perfect else 0
+	g.perfect_streak = perfect_streak
+	if perfect:
+		ledger.record_perfect(perfect_streak)
+		town.record_praise(g.idx, Prep.streak_rep(perfect_streak))
+		if perfect_streak >= 2:
+			popup("Perfect! x%d" % perfect_streak, g.position + Vector3(0, 2.5, 0), Color(Build.GOOD))
 	g.mood.think("Perfectly done" if perfect else ("Just right" if t.quality() >= Prep.PLAIN - 0.01 else "A bit off, this"))
 	g.bill_base = t.price()
 	tickets.erase(find_ticket(t.ticket))
@@ -5365,7 +5374,7 @@ func _pay_guest(g: Guest) -> void:
 		var letdown := town.paid_full_price(g.idx)
 		if letdown > 0.0:
 			g.mood.delight(-letdown, "Full price this time? Hm")
-	var tip := g.mood.tip_for(bill, town.tip_bonus(g.idx))
+	var tip := g.mood.tip_for(bill, town.tip_bonus(g.idx) * Prep.streak_tip(g.perfect_streak))
 	var was_sore: bool = g.info.sore
 	var was_regular := town.is_regular(g.idx)
 	ledger.record_sale(bill, tip)

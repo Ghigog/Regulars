@@ -182,12 +182,17 @@ static func rate(patience: float, quality: float, disgust: float, level: int, av
 	}
 
 
-## The mean of the four, rounded; at most WALKOUT_CAP after a walkout.
+## The mean of the four, rounded, with the food counted twice (review, item 6: good
+## prep is what a critic writes about); at most WALKOUT_CAP after a walkout.
+const FOOD_WEIGHT := 2
 static func stars(ratings: Dictionary, walked_out := false) -> int:
 	var sum := 0.0
+	var n := 0
 	for t in TOPICS:
-		sum += int(ratings[t])
-	var s := clampi(roundi(sum / TOPICS.size()), 1, 5)
+		var w := FOOD_WEIGHT if t == "quality" else 1
+		sum += int(ratings[t]) * w
+		n += w
+	var s := clampi(roundi(sum / n), 1, 5)
 	return mini(s, WALKOUT_CAP) if walked_out else s
 
 

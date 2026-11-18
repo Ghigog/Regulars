@@ -290,6 +290,16 @@ func left_unpaid(i: int) -> String:
 	return "%s will tell %s: left without paying, nobody came." % [people[i].name, friends]
 
 
+## Guest `i` had a perfect plate in a run of them (review, item 6): they think better of
+## the cooking, and their friends hear it.
+func record_praise(i: int, amount: float) -> void:
+	if amount <= 0.0:
+		return
+	_nudge(i, amount, {"quality": 1.0})
+	for f: int in people[i].friends:
+		_nudge(f, amount * FRIEND_SHARE, {"quality": 1.0})
+
+
 ## Staff member `i` was fired (PRD 10.4): their opinion drops by `drop`; without
 ## severance their friends hear it and drop by `friend_drop`. Returns the change.
 func record_fired(i: int, drop: float, friend_drop := 0.0) -> float:

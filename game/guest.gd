@@ -213,6 +213,7 @@ func want_icon() -> String:
 
 ## How long this guest eats, once served: longer when they are comfortable.
 var eat_time := EAT_TIME
+var perfect_streak := 0   # their tray's place in a run of perfect ones: raises their tip
 
 
 ## Happiness is fixed here, as the food arrives and they take the first taste: it sets

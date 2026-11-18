@@ -1932,6 +1932,8 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_row(box, "", "SALES:", "$%d" % rec.sales)
 	_row(box, "", "TIPS:", "$%d" % rec.tips)
 	_row(box, "", "WALKOUTS:", str(rec.walkouts))
+	if int(rec.get("perfect", 0)) > 0:   # review, item 6: good prep shows on the books
+		_row(box, "", "PERFECT PLATES:", "%d   (best run %d)" % [int(rec.perfect), int(rec.get("best_streak", 0))])
 	var unpaid_bills := int(rec.get("unpaid_bills", 0))
 	if unpaid_bills > 0:   # PRD 11: parties who left without paying, an open-purse stamp each
 		var ub := _row(box, "", "LEFT UNPAID:", str(unpaid_bills))

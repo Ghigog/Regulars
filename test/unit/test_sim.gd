@@ -1421,7 +1421,8 @@ func test_critic_ratings_at_their_thresholds():
 
 
 func test_stars_are_the_rounded_mean_and_a_walkout_caps_them():
-	assert_eq(Critic.stars({"speed": 5, "clean": 5, "quality": 4, "variety": 4}), 5, "4.5 rounds up")
+	assert_eq(Critic.stars({"speed": 5, "clean": 4, "quality": 5, "variety": 4}), 5, "4.6 (food twice) rounds up")
+	assert_eq(Critic.stars({"speed": 5, "clean": 5, "quality": 4, "variety": 4}), 4, "4.4: the food counts twice")
 	assert_eq(Critic.stars({"speed": 4, "clean": 4, "quality": 3, "variety": 4}), 4)
 	assert_eq(Critic.stars({"speed": 1, "clean": 2, "quality": 1, "variety": 1}), 1)
 	assert_eq(Critic.stars({"speed": 5, "clean": 5, "quality": 5, "variety": 5}, true), 2)

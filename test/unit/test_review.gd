@@ -193,3 +193,38 @@ func test_dear_prices_also_trim_the_bill_scale():
 	var before := m.comfort()
 	m.read_prices(2)
 	assert_lt(m.comfort(), before, "one score: prices count everywhere")
+
+
+# ---------- Item 6: good prep pays ----------
+
+func test_a_perfect_streak_raises_the_tip_and_word_gets_round():
+	assert_eq(Prep.streak_tip(0), 1.0)
+	assert_gt(Prep.streak_tip(3), Prep.streak_tip(1))
+	assert_eq(Prep.streak_tip(50), Prep.streak_tip(Prep.STREAK_TIP_MAX), "capped")
+	assert_eq(Prep.streak_rep(Prep.STREAK_REP_FROM - 1), 0.0)
+	assert_gt(Prep.streak_rep(Prep.STREAK_REP_FROM), 0.0)
+	var m := GuestMood.new()
+	m.joy = 0.8
+	m.patience = 0.8
+	m.taste(1.0)
+	assert_gt(m.tip_for(20, Prep.streak_tip(4)), m.tip_for(20), "a streak is real money")
+	var t := Town.new(4)
+	t.record_praise(0, Prep.streak_rep(4))
+	assert_gt(t.opinion(0, "quality"), 0.0, "filed under the cooking, for the critic to weigh")
+	assert_gt(float(t.people[t.people[0].friends[0]].affinity), 0.0, "friends hear it")
+
+
+func test_the_critic_weights_the_food():
+	var good_food := {"speed": 3, "clean": 3, "quality": 5, "variety": 2}
+	var good_clean := {"speed": 3, "clean": 5, "quality": 2, "variety": 3}
+	assert_gt(Critic.stars(good_food), Critic.stars(good_clean), "the same sum, the food counts more")
+
+
+func test_the_receipt_counts_perfect_plates():
+	var l := Ledger.new()
+	l.record_perfect(1)
+	l.record_perfect(2)
+	l.record_perfect(1)
+	var rec := l.end_day()
+	assert_eq(int(rec.perfect), 3)
+	assert_eq(int(rec.best_streak), 2)

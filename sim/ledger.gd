@@ -13,7 +13,7 @@ var history: Array[Dictionary] = []
 
 
 static func _blank() -> Dictionary:
-	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0, "unpaid_bills": 0}
+	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0, "unpaid_bills": 0, "perfect": 0, "best_streak": 0}
 
 
 func level() -> int:
@@ -45,6 +45,12 @@ func pay_staff(amount: int, unpaid := 0) -> void:
 	money -= amount
 	today.staff += amount
 	today.unpaid += unpaid
+
+
+## A perfect tray served, `streak` in a row (review, item 6).
+func record_perfect(streak: int) -> void:
+	today.perfect += 1
+	today.best_streak = maxi(int(today.best_streak), streak)
 
 
 ## Someone read the menu and found no main they would eat. Not a strike.
