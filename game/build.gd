@@ -973,7 +973,7 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 			_empty_cup(n)
 			cyl(n, Vector3(0, 0.012, 0), 0.046, 0.025, "#8a5a3a")   # a last drop in the bottom
 			box(n, Vector3(0.02, 0.2, 0), Vector3(0.014, 0.14, 0.014), PAPER).rotation.z = 0.35
-		"tool:mop", "tool:sponge_mop", "tool:flat_mop", "tool:wringer_mop", "tool:scrubber":
+		"tool:mop", "tool:sponge_mop", "tool:flat_mop", "tool:wringer_mop", "tool:scrubber", "tool:cleaner_mop", "tool:strong_mop":
 			# Held out at the side, head on the floor, the pole leaning out (PRD 9.4). Held
 			# items are tipped 25 degrees to the camera (Player.move); a pole stands back
 			# up so it reads at full length, leaning out a little. The scrubber is pushed.
@@ -1141,7 +1141,9 @@ static func mop_bucket(n: Node3D, node := "") -> void:
 		for z: float in [-0.16, 0.16]:
 			ball(n, Vector3(x, 0.04, z), 0.04, STEEL_DARK)
 	_add(n, lathe_mesh([[0.0, 0.0], [0.26, 0.0], [0.33, 0.42], [0.31, 0.44], [0.27, 0.06], [0.0, 0.06]], 4), Vector3(0, 0.06, 0), Color(BUCKET), 0.0).rotation.y = PI / 4
-	_add(n, lathe_mesh([[0.0, 0.0], [0.27, 0.0], [0.27, 0.02], [0.0, 0.02]], 4), Vector3(0, 0.38, 0), Color("#8fb7bd"), 0.0, R_GLOSS).rotation.y = PI / 4   # water
+	var liquid := str(Kitchen.NODES.get(node, {}).get("liquid", ""))   # a cleaner in the pail tints its water
+	var water: String = TREAT_COL.get(liquid, "#8fb7bd") if liquid != "" else "#8fb7bd"
+	_add(n, lathe_mesh([[0.0, 0.0], [0.27, 0.0], [0.27, 0.02], [0.0, 0.02]], 4), Vector3(0, 0.38, 0), Color(water), 0.0, R_GLOSS).rotation.y = PI / 4   # water
 	_add(n, bevel_mesh(Vector3(0.2, 0.18, 0.34), 0.03), Vector3(0.24, 0.5, 0), Color("#9aa3a6"), 0.0, R_WOOD)
 	box(n, Vector3(0.36, 0.62, 0), Vector3(0.05, 0.3, 0.05), STEEL_DARK).rotation.z = -0.5   # the wringer's handle
 	if node == "wringer_bucket":   # PRD 9.5: a big coral press on top, its long lever up

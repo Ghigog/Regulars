@@ -61,13 +61,13 @@ const ITEMS := {
 	# Cleaning (PRD 9.4): homes for the hand tools, and the robot sweeper's dock. The
 	# robot is the wringer bucket line's top in the PRD's tree; until those trees (9.5)
 	# its dock is sold here.
-	"mop_bucket": {"name": "Mop bucket", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,
+	"mop_bucket": {"name": "Mop bucket", "price": 35, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Holds the mop and rinses it. Mop floor dirt a level a press"},
 	"hook": {"name": "Wall hook", "price": 5, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Hangs on a wall. Holds one small cleaning tool"},
 	"sponge": {"name": "Sponge", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Comes on its own wall hook. Quick spot cleaning, dirty after two"},
-	"robot_dock": {"name": "Robot sweeper", "price": 300, "level": 1, "category": "Kitchen", "tiers": 1,
+	"robot_dock": {"name": "Robot sweeper", "price": 315, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Drifts to the nearest dirt and slowly cleans it, then docks. Anyone can trip on it"},
 	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3, "theme": "diner",
 		"joy": 0.2, "reach": 3, "blurb": "Cheers guests seated beside it, a little those who see it",
@@ -432,7 +432,7 @@ static func search(query := "", category := "", theme := "", level := 0, show_lo
 		var node := Kitchen.node_of(id)
 		if node != "" and (not Kitchen.is_root(node) or Kitchen.TOP_LINKS.has(node)):
 			continue   # reached only through its tree (PRD 8.3), or a counter's (a stove)
-		if Treatments.is_laying_tool(id) or (Treatments.is_box(id) and not Treatments.is_root(Treatments.key_of(id))):
+		if Treatments.is_laying_tool(id) or (Treatments.is_box(id) and (not Treatments.ON_SALE or not Treatments.is_root(Treatments.key_of(id)))):
 			continue   # a laying tool is listed by the game while its box is stored (PRD 9.5)
 		offered.append({"id": id, "tier": 1})
 		# The steps up a tree are bought on the piece itself, lifted (owner's review of

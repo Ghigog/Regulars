@@ -448,7 +448,7 @@ func _demo_mop_line() -> void:
 	arrivals.assign([{"time": 99999.0, "idx": 0}])   # keeps the day open, nobody comes
 	floor_dirt.drops = false
 	floor_dirt.sync_room()
-	var line: Array = [["mop_bucket", 2], ["sponge_mop", 3], ["flat_mop", 2], ["wringer_bucket", 0], ["scrubber", 0]]
+	var line: Array = [["mop_bucket", 2], ["sponge_mop", 3], ["flat_mop", 2], ["wringer_bucket", 0], ["cleaner_bucket", 0], ["strong_bucket", 0], ["scrubber", 0]]
 	var x := 4
 	for b: Array in line:
 		var c := Vector2i(x, 6)
@@ -2615,6 +2615,28 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		hud.show_build()
 		return true
 	var st: Station = ch.hand.node
+	if st.type == "hook" and Kitchen.fit_of(to) == "floor":   # the sponge grows into a mop bucket
+		if ch.hand.get("in_place", false):
+			ledger.refund(Upgrades.step_price(to))
+			sfx("fail")
+			hud.say("Lift the hook first: the bucket stands on the floor.")
+			return false
+		var bucket := Station.new()
+		add_child(bucket)
+		bucket.setup(to, st.cell, 1, 0)
+		bucket.visible = false
+		_bought_tonight(bucket, spent_tonight(st) + Upgrades.step_price(to))
+		clean_kit.upgrade_home(st, bucket, Kitchen.tool_of(to))
+		st.queue_free()
+		ch.hand.node = bucket
+		ch.hand.id = bucket.type
+		ch.hand.tier = 1
+		ch.hand.layer = ""
+		ch.hand.facing = 0
+		sfx("coin")
+		hud.say("The sponge is a mop bucket now: put it down on the floor.")
+		hud.show_build()
+		return true
 	_bought_tonight(st, Upgrades.step_price(to))   # an upgrade bought tonight comes back whole too
 	if ch.hand.get("in_place", false):   # the storage card: upgraded where it stands
 		if Kitchen.is_tall(to) and kitchen.get_piece(st.cell, "high") != "":
@@ -3939,7 +3961,11 @@ func _kit_action(ch: Player) -> String:
 		return clean_kit.floor_action(ch)
 	var st: Station = station_at(ch.target_cell())
 	var kit := clean_kit.station_use(st, true, ch) if st != null else ""
-	return kit if kit != "" else clean_kit.floor_action(ch)
+	if kit != "":
+		return kit
+	if not CleanKit.holding(ch) and (st != null or _piece_in_front(ch) != Vector3.INF):
+		return ""   # by hand, a piece in front comes first (picking it up, its night clean)
+	return clean_kit.floor_action(ch)
 
 
 ## The cleaning Use would do on this station at night, by its night name
@@ -7129,7 +7155,7 @@ func _process(delta: float) -> void:
 			_paint_held(p)
 			_tick_card_hold(ch, controls.holding(p, "use"), delta)
 		if phase in [Phase.SERVICE, Phase.BUILD] and shopper != ch and not preps.has(p):
-			clean_kit.hold_use(ch, controls.holding(p, "use"))   # held E keeps mopping
+			clean_kit.hold_use(ch, controls.holding(p, "use"), delta)   # held E keeps mopping, or scrubbing by hand
 		if phase == Phase.SERVICE and not (hud.bill_open() and hud.bill.chef == ch):
 			_tick_giving(ch, controls.holding(p, "use"), delta)   # held E hands a bill over (PRD 11)
 			_tick_deal(ch, controls.holding(p, "use"), delta)     # held E gives a deal (review, item 11)
@@ -7177,7 +7203,7 @@ func _update_cursor(ch: Player = null) -> void:
 		if action == "" and phase == Phase.BUILD and shopper != ch and ch.hand.is_empty():
 			action = clean_kit.station_use(st, true, ch)   # a tool's home at night (PRD 9.4)
 	if action == "" and (phase == Phase.SERVICE or (phase == Phase.BUILD and shopper != ch and ch.hand.is_empty())):
-		var fl := clean_kit.floor_action(ch)
+		var fl := clean_kit.floor_action(ch) if phase == Phase.SERVICE else _kit_action(ch)
 		if fl != "":   # mopping, or a tool to put down or pick up
 			ch.cursor.visible = false
 			var fc: Vector2i = clean_kit.floor_cell(ch)

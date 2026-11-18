@@ -429,6 +429,13 @@ Survive as many days as you can; three walkouts in one day ends the run.
     moved at night. The robot sweeper (a dock) drifts to the nearest dirt at 0.7 m/s and
     clears a level every 3 s. Rules in `sim/clean_tools.gd`, the scene in
     `game/clean_kit.gd`.
+  - *One cleaning tree (owner's review of night zero).* Night zero hangs a sponge on a
+    hook. Lifted, the sponge's strip offers its hook tools and the **mop bucket** ($20
+    step): the hook comes off the wall and a bucket with its mop is in hand. The bucket
+    branches into the mops below or a **liquid in its pail**: Floor cleaner (a whole cell
+    a press, dirty after 4) and then Strong cleaner (never dirty). The mop bucket is no
+    longer sold on its own. *Parked:* the tile-laid treatments below
+    (`Treatments.ON_SALE` is false), so no treatment box is sold.
   - *Trees (9.5).* Mop bucket: sponge-head mop (dirty after 6), flat mop (a whole cell a
     press, dirty after 8), floor scrubber (push it: clears every cell walked over, never
     dirty, slow to walk); or the wringer bucket (never dirty), then the robot's dock.

@@ -28,7 +28,7 @@ func test_child_keeps_its_parents_fit_except_tall_fridge():
 		if Kitchen.is_root(id):
 			continue
 		var same := Kitchen.fit_of(id) == Kitchen.fit_of(Kitchen.parent_of(id))
-		assert_true(same or id == "tall_fridge", id + " fits where its parent did")
+		assert_true(same or id in ["tall_fridge", "mop_bucket"], id + " fits where its parent did (the sponge's bucket stands on the floor)")
 
 
 func test_roots_are_the_shop_pieces():

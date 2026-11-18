@@ -38,6 +38,9 @@ const ITEMS := {
 }
 
 const BOX_PREFIX := "box_"
+## Parked (owner's review of night zero): cleaning liquids went into the mop bucket's
+## tree instead, so no treatment's box is sold. The one switch that puts them back.
+const ON_SALE := false
 const TOOL_PREFIX := "treat_"
 
 

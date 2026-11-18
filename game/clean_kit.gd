@@ -17,6 +17,7 @@ var lying := {}
 ## "t": seconds cleaning this level, "dir": Vector3}.
 var robots := {}
 var _wait := {}   # Player -> seconds before the next press of their tool
+var _scrub := {}  # Player -> seconds scrubbed by hand on the cell in front (held E, no tool)
 
 
 func setup(game_) -> void:
@@ -248,7 +249,10 @@ func floor_cell(ch: Player) -> Variant:
 	if holding(ch):
 		var c: Variant = clean_target(ch)
 		return c if c != null else drop_target(ch)
-	return lying_target(ch) if ch.held == "" else null
+	if ch.held != "":
+		return null
+	var l: Variant = lying_target(ch)
+	return l if l != null else (clean_target(ch) if can_scrub(ch) else null)
 
 
 ## What E does on the floor, by name: "Mop", "Wipe" ("... spreads it" with a dirty tool),
@@ -265,7 +269,19 @@ func floor_action(ch: Player) -> String:
 		return ""
 	if ch.held == "" and lying_target(ch) != null:
 		return "Pick up %s" % CleanTools.name_of(lying[lying_target(ch)].tool).to_lower()
+	if can_scrub(ch):
+		return "Scrubbing %d%%" % int(scrub_share(ch) * 100) if _scrub.has(ch) else "Hold to scrub"
 	return ""
+
+
+## Bare hands with dirt in reach, and not at the door: holding E scrubs it (slower than any tool).
+func can_scrub(ch: Player) -> bool:
+	return ch.held == "" and ch.hand.is_empty() and clean_target(ch) != null and game.door_action(ch) == ""
+
+
+## How far the scrub by hand on this chef's cell has got, 0 to 1 (0 when not scrubbing).
+func scrub_share(ch: Player) -> float:
+	return clampf(float(_scrub.get(ch, 0.0)) / CleanTools.HAND_TIME, 0.0, 1.0)
 
 
 ## E on the floor. Returns whether it did (or was waiting to do) something.
@@ -285,6 +301,11 @@ func floor_use(ch: Player) -> bool:
 		game.sfx("putdown")
 		return true
 	var c: Variant = lying_target(ch)
+	if c == null and can_scrub(ch):
+		if not _scrub.has(ch):
+			_scrub[ch] = 0.0   # starts the scrub; held E carries it on (hold_use)
+			ch.punch()
+		return true
 	if ch.held != "" or c == null:
 		return false
 	var l: Dictionary = lying[c]
@@ -324,10 +345,34 @@ func press(ch: Player) -> String:
 	return r.did
 
 
-## E held down: the tool presses again each time its wait runs out.
-func hold_use(ch: Player, down: bool) -> void:
+## E held down: the tool presses again each time its wait runs out. By hand, a scrub
+## started by E goes on while E is held and clears a level each HAND_TIME seconds;
+## letting go, or turning off the dirt, stops it.
+func hold_use(ch: Player, down: bool, delta := 0.0) -> void:
 	if down and holding(ch) and _wait.get(ch, 0.0) <= 0.0 and clean_target(ch) != null:
 		press(ch)
+	if not _scrub.has(ch):
+		return
+	if not down or not can_scrub(ch):
+		_scrub.erase(ch)
+		return
+	var before := float(_scrub[ch])
+	_scrub[ch] = before + delta
+	if int(before / 0.45) != int(_scrub[ch] / 0.45):
+		ch.punch()   # the scrubbing arm
+		var tc: Vector2i = clean_target(ch)
+		game.burst(Grid.center(tc) + Vector3(0, 0.15, 0), "bubbles", 0.18)
+	if float(_scrub[ch]) >= CleanTools.HAND_TIME:
+		var c: Vector2i = clean_target(ch)
+		if c != ch.cell():
+			ch.look_at_cell(c)
+		CleanTools.hand_scrub(game.floor_dirt.mess, c)
+		_scrub[ch] = 0.0
+		game.sfx("wash", 0.1, 1.0)
+		game.burst(Grid.center(c) + Vector3(0, 0.2, 0), "bubbles", 0.3)
+		game.floor_dirt.redraw()
+		if clean_target(ch) == null:
+			_scrub.erase(ch)
 
 
 ## A tool left on the floor: drawn lying there, and in the way.
@@ -496,3 +541,4 @@ func clear() -> void:
 		(robots[dock].node as Node3D).queue_free()
 	robots.clear()
 	_wait.clear()
+	_scrub.clear()
