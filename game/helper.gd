@@ -46,7 +46,7 @@ static func _apron(peg: Peg) -> void:
 
 ## A helper's own pace: their rating, slowed by the floor under them.
 func speed() -> float:
-	return HelperWork.walk_speed(rating) * game.floor_speed(position)
+	return HelperWork.walk_speed(rating) * game.seating.floor_speed(position)
 
 
 ## Slipping hurts their mood a little too (PRD 10, section 6).

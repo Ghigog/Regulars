@@ -127,8 +127,8 @@ func _why(tk: Dictionary) -> String:
 		if st.type in ["counter", "pass"] and st.item != "":
 			tops.append("%s:%s" % [str(st.cell), st.item if st.item != "dish" else "dish" + str(st.dish.ings) + "t" + str(st.dish.ticket)])
 	return "ticket %d (%s) stuck: %s; board %s; tops %s; cups %d plates %d" % [tk.id, str(tk.items.map(func(i: Dictionary) -> String: return i.name)),
-		_state_of(tk), str(tasks), str(tops), game.find_station("cups").count if game.find_station("cups") else -1,
-		game.find_station("plates").count]
+		_state_of(tk), str(tasks), str(tops), game.world.find_station("cups").count if game.world.find_station("cups") else -1,
+		game.world.find_station("plates").count]
 
 
 func _check(theme: String, seed_value: int, day := 1) -> Dictionary:
@@ -208,7 +208,7 @@ func test_the_crew_covers_every_duty_the_room_gives():
 		_start(theme, 1)
 		if is_failing():
 			return
-		var room: Dictionary = game.room_duties()
+		var room: Dictionary = game.desk.room_duties()
 		var offered := []
 		for k: String in room:
 			offered.append_array(room[k])
@@ -221,4 +221,4 @@ func test_the_crew_covers_every_duty_the_room_gives():
 		for d: String in ["mop", "sponge", "scraper", "spill_kit"]:
 			assert_true(offered.has(d), "%s: the cleaning trees give %s" % [theme, d])
 		assert_eq(game.floor_dirt.mess.treat.size(), game.treat_laid.size(), "%s: every laid cell treated today" % theme)
-		assert_eq(game.treat_boxed().size(), 3, "%s: cleaner, primer and finish boxed apart from food" % theme)
+		assert_eq(game.menu_stock.treat_boxed().size(), 3, "%s: cleaner, primer and finish boxed apart from food" % theme)

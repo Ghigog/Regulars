@@ -87,7 +87,7 @@ func tick(delta: float) -> void:
 		for h in helpers:
 			if h.steps.is_empty() and not h.resting and not game.floor_dirt.is_down(h):
 				free.append({"id": h.person, "cell": h.cell(), "idle": h.idle})
-		var got := board.assign(game.staff, free, game.ledger.day, game.clock, game.day_length())
+		var got := board.assign(game.staff, free, game.ledger.day, game.clock, game.day.day_length())
 		for h in helpers:
 			if got.has(h.person):
 				_begin(h, got[h.person])
@@ -97,7 +97,7 @@ func tick(delta: float) -> void:
 
 
 func _tick_helper(h: Helper, delta: float) -> void:
-	var at_work := JobBoard.at_work(game.staff, h.person, game.ledger.day, game.clock, game.day_length())
+	var at_work := JobBoard.at_work(game.staff, h.person, game.ledger.day, game.clock, game.day.day_length())
 	if not at_work and not h.resting and _on_the_heat(h):
 		pass   # what is on the heat is seen to before the break (PRD 10.7): it would burn
 	elif not at_work and not h.resting:
@@ -123,7 +123,7 @@ func _tick_helper(h: Helper, delta: float) -> void:
 func _on_the_heat(h: Helper) -> bool:
 	if h.steps.is_empty() or str(h.steps[0].do) != "cook" or not h.step_started or h.work_left < 0.0:
 		return false
-	var st: Station = game.station_at(h.steps[0].get("at", Vector2i(-999, -999)))
+	var st: Station = game.world.station_at(h.steps[0].get("at", Vector2i(-999, -999)))
 	return st != null and st.is_heat_tool()
 
 
@@ -136,7 +136,7 @@ func _begin(h: Helper, task: Dictionary) -> void:
 	var e: Dictionary = game.staff.employee(h.person)
 	var dest_duty := ""
 	if task.type == "fetch" and not str(task.get("job", "")) in ["", "none"]:
-		var st: Station = game.station_at(task.dest)
+		var st: Station = game.world.station_at(task.dest)
 		dest_duty = Staff.duty_of_tool(st.node) if st != null else ""
 	h.task = task
 	h.steps = HelperWork.steps(task, e.duties, dest_duty)
@@ -181,7 +181,7 @@ func _fail(h: Helper) -> void:
 ## Plates and cups that must be let go of go back on their stacks, food and all lost.
 func _back_to_stacks(h: Helper) -> void:
 	for d: Dish in h.dishes:
-		var stack: Station = game.find_station("cups" if d.vessel == Dish.CUP else "plates") if d.vessel != "" and not d.dirty else null
+		var stack: Station = game.world.find_station("cups" if d.vessel == Dish.CUP else "plates") if d.vessel != "" and not d.dirty else null
 		if stack != null:
 			stack.count += 1
 			stack.refresh()
@@ -242,8 +242,8 @@ func _run(h: Helper, delta: float) -> void:
 	if poll == "now":
 		h.work_left = minf(h.work_left, HelperWork.HEAT_REACT)
 	h.work_left -= delta
-	if s.do == "give" and game.station_at(s.at) != null:   # the hand-over bar, as a chef's (PRD 11)
-		h.show_giving(game.station_at(s.at), 1.0 - h.work_left / maxf(float(s.get("total", 1.0)), 0.01))
+	if s.do == "give" and game.world.station_at(s.at) != null:   # the hand-over bar, as a chef's (PRD 11)
+		h.show_giving(game.world.station_at(s.at), 1.0 - h.work_left / maxf(float(s.get("total", 1.0)), 0.01))
 	if h.work_left > 0.0 or poll == "wait":
 		return
 	var more: Variant = _finish(h, s)
@@ -279,7 +279,7 @@ func _start(h: Helper, s: Dictionary) -> bool:
 		"leave":
 			# Raw food for a cook goes on the press tool itself, where it is worked in
 			# place; else (a heat tool, or it is in use) on a worktop beside it.
-			var tool: Station = game.station_at(s.at)
+			var tool: Station = game.world.station_at(s.at)
 			if not (tool != null and _free_tool_top(tool, h)):
 				var c: Variant = _free_surface(s.get("at", h.cell()), h)
 				if c == null:
@@ -298,7 +298,7 @@ func _start(h: Helper, s: Dictionary) -> bool:
 				return false
 			s.at = c
 		"get_cup":
-			var tk: Dictionary = game.find_ticket(int(s.ticket))
+			var tk: Dictionary = game.serving.find_ticket(int(s.ticket))
 			if tk.is_empty() or h.held != "":
 				return false
 			var st: Station = _dish_needing(int(s.ticket), str(s.kind))
@@ -306,7 +306,7 @@ func _start(h: Helper, s: Dictionary) -> bool:
 			if st != null and st.dish.vessel == Dish.CUP:
 				step = {"do": "pick_dish", "at": st.cell}
 			else:
-				var stack: Station = game.find_station("cups")
+				var stack: Station = game.world.find_station("cups")
 				var line := -1
 				for li: int in _unplated(tk):
 					if (tk.order.lines[li].item.ingredients as Array).has(s.kind) and tk.order.lines[li].item.course == "drink":
@@ -365,17 +365,17 @@ func _start(h: Helper, s: Dictionary) -> bool:
 				return false
 			s.at = st.cell
 		"write":
-			var till: Station = game.till_station()
+			var till: Station = game.paying.till_station()
 			if till == null:
 				return false
 			s.at = till.cell
 		"give":
-			var table: Station = game.table_by_number(int(s.table))
-			if table == null or not game.ready_to_pay(table):
+			var table: Station = game.paying.table_by_number(int(s.table))
+			if table == null or not game.paying.ready_to_pay(table):
 				return false
 			s.at = _bill_place(table).cell
 	if STASH.has(str(s.do)) or s.get("mode", "") == "put" or s.do == "leave" or s.do == "set_out":
-		if s.has("at") and game.station_at(s.at) != null and s.do != "to_sink" and s.do != "bin":
+		if s.has("at") and game.world.station_at(s.at) != null and s.do != "to_sink" and s.do != "bin":
 			_claims[s.at] = h
 	var stand: Variant = _stand_for(h, s)
 	if stand == null:
@@ -397,7 +397,7 @@ func _stand_for(h: Helper, s: Dictionary) -> Variant:
 	if s.do == "to_door":
 		return at
 	var targets: Array[Vector2i] = [at]
-	var st: Station = game.station_at(at)
+	var st: Station = game.world.station_at(at)
 	if st != null and Station.is_table(st.type):
 		targets.append_array(st.seats)
 	var best: Variant = null
@@ -422,7 +422,7 @@ func _open(c: Vector2i) -> bool:
 func _work(h: Helper, s: Dictionary) -> float:
 	var e: Dictionary = game.staff.employee(h.person)
 	var sat := float(e.get("satisfaction", 0.5))
-	var st: Station = game.station_at(s.at) if s.has("at") else null
+	var st: Station = game.world.station_at(s.at) if s.has("at") else null
 	match str(s.do):
 		"take":
 			if h.held != "" or _box_with(s.at, s.kind, s.get("ready", false)) == "":
@@ -452,7 +452,7 @@ func _work(h: Helper, s: Dictionary) -> float:
 			_using[h] = st
 			return HelperWork.press_seconds(st.q(s.job), h.rating, sat)
 		"pour":
-			if st == null or game._cup_in_hand(h, s.kind) == null or st.prep_by >= 0 or not game.dispenser_drinks(st).has(s.kind):
+			if st == null or game.cooking._cup_in_hand(h, s.kind) == null or st.prep_by >= 0 or not game.menu_stock.dispenser_drinks(st).has(s.kind):
 				return -1.0
 			st.prep_by = HELPER_PREP
 			_using[h] = st
@@ -471,22 +471,22 @@ func _work(h: Helper, s: Dictionary) -> float:
 				return -1.0
 			return HelperWork.task_seconds("pick", h.rating, sat)
 		"serve":
-			if st == null or h.held != "dishes" or game._dish_guests(st, h.dishes).is_empty():
+			if st == null or h.held != "dishes" or game.serving._dish_guests(st, h.dishes).is_empty():
 				return -1.0
 			return HelperWork.task_seconds("serve", h.rating, sat)
 		"order":
-			if st == null or h.held != "" or game._guests_to_order(st).is_empty():
+			if st == null or h.held != "" or game.seating._guests_to_order(st).is_empty():
 				return -1.0
 			return HelperWork.task_seconds("order", h.rating, sat)
 		"write":
-			var table: Station = game.table_by_number(int(s.table))
-			if st == null or h.held != "" or table == null or not game.ready_to_pay(table) or game.slip_out(int(s.table)):
+			var table: Station = game.paying.table_by_number(int(s.table))
+			if st == null or h.held != "" or table == null or not game.paying.ready_to_pay(table) or game.paying.slip_out(int(s.table)):
 				return -1.0
 			h.punch()
 			return HelperWork.task_seconds("write", h.rating, sat)
 		"give":
-			var table: Station = game.table_by_number(int(s.table))
-			if st == null or h.held != "bill" or table == null or not game.ready_to_pay(table):
+			var table: Station = game.paying.table_by_number(int(s.table))
+			if st == null or h.held != "bill" or table == null or not game.paying.ready_to_pay(table):
 				return -1.0
 			return HelperWork.task_seconds("give", h.rating, sat)
 		"clear":
@@ -523,7 +523,7 @@ func _work(h: Helper, s: Dictionary) -> float:
 func _poll(h: Helper, s: Dictionary) -> String:
 	match str(s.do):
 		"cook":
-			var st: Station = game.station_at(s.at)
+			var st: Station = game.world.station_at(s.at)
 			var raw := str(s.get("hold", Tray.kind("raw", s.kind)))
 			if st == null:
 				return "fail"
@@ -540,18 +540,18 @@ func _poll(h: Helper, s: Dictionary) -> String:
 ## The work is done. Returns the steps to do next in its place ([] for none), or null
 ## when it went wrong in a way that ends the task.
 func _finish(h: Helper, s: Dictionary) -> Variant:
-	var st: Station = game.station_at(s.at) if s.has("at") else null
+	var st: Station = game.world.station_at(s.at) if s.has("at") else null
 	match str(s.do):
 		"take":
 			var box := _box_with(s.at, s.kind, s.get("ready", false))
 			if box == "":
 				return null
-			game._hold_from_box(h, box)
-			game.sfx("pickup")
+			game.cooking._hold_from_box(h, box)
+			game.audio.sfx("pickup")
 		"pick":
 			h.set_held(st.item, st.current_quality())
 			st.set_item("")
-			game.sfx("pickup")
+			game.audio.sfx("pickup")
 		"cook":
 			var job := str(s.job)
 			var q := st.q(job)
@@ -562,27 +562,27 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			h.set_held(Tray.kind("prep", s.kind), float(roll.quality))
 			PrepWidget.pop(st, Vector3(0, 2.0, 0), str(roll.result))
 			game.floor_dirt.prep_grease(job, str(roll.result), h.cell(), st)
-			game.sfx("pickup")
+			game.audio.sfx("pickup")
 		"pour":
 			var roll := JobBoard.roll_prep(game.staff, h.person, st.q("pour"))
 			_using.erase(h)
 			st.prep_by = -1
-			var cup: Dish = game._cup_in_hand(h, s.kind)
+			var cup: Dish = game.cooking._cup_in_hand(h, s.kind)
 			if cup == null:
 				return null
 			cup.add(Tray.kind("prep", s.kind), float(roll.quality))
 			h.show_held()
 			PrepWidget.pop(st, Vector3(0, 2.0, 0), str(roll.result))
-			game.sfx("pickup")
+			game.audio.sfx("pickup")
 		"deliver", "add":
 			_claims.erase(s.at)
 			if st.item == "dish" and st.dish != null and st.dish.refusal(h.held, game.menu.items) == "":
-				game._use_surface(st, false, h)   # "Add ..."
-				game.sfx("putdown")
+				game.cooking._use_surface(st, false, h)   # "Add ..."
+				game.audio.sfx("putdown")
 			elif st.item == "" and s.do == "deliver":
 				st.set_item(h.held, h.held_quality)
 				h.set_held("")
-				game.sfx("putdown")
+				game.audio.sfx("putdown")
 			else:
 				return null
 		"leave", "stash", "set_out":
@@ -593,7 +593,7 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 				var d: Dish = h.dishes.back()
 				h.drop_dish(d)
 				st.set_dish(d)
-				game.sfx("putdown")
+				game.audio.sfx("putdown")
 				if h.held == "dishes" and s.do == "stash":
 					return [{"do": "stash"}]   # one at a time
 			elif h.held == "tray":
@@ -601,7 +601,7 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			else:
 				st.set_item(h.held, h.held_quality)
 				h.set_held("")
-				game.sfx("putdown")
+				game.audio.sfx("putdown")
 		"take_plate":
 			st.count -= 1
 			st.refresh()
@@ -609,16 +609,16 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			d.ticket = int(s.get("ticket", -1))
 			d.line = int(s.get("line", -1))
 			h.take_dish(d)
-			game.sfx("pickup")
+			game.audio.sfx("pickup")
 		"pick_dish":
 			if st.item != "dish" or st.dish == null or not h.has_room():
 				return null   # someone else took it meanwhile
 			var d: Dish = st.dish
 			st.set_item("")
 			h.take_dish(d)
-			game.sfx("pickup")
+			game.audio.sfx("pickup")
 		"serve":
-			var fed: Array[Guest] = game._dish_guests(st, h.dishes)
+			var fed: Array[Guest] = game.serving._dish_guests(st, h.dishes)
 			if fed.is_empty():
 				return [{"do": "stash"}]
 			if not JobBoard.roll_task(game.staff, h.person).ok:
@@ -628,36 +628,36 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 					d.scrape()
 				h.show_held()
 				game.hud.refresh_tickets()
-				game.sfx("fail")
-				game.popup("Dropped it!", h.position + Vector3(0, 2.2, 0), Color(Build.WARN))
+				game.audio.sfx("fail")
+				game.audio.popup("Dropped it!", h.position + Vector3(0, 2.2, 0), Color(Build.WARN))
 				return [{"do": "stash"}]
-			game.serve_dishes(h, st)
+			game.serving.serve_dishes(h, st)
 			var skill := float(game.staff.employee(h.person).skills.service)
 			for g: Guest in fed:
 				g.mood.delight(HelperWork.serve_joy(skill))
 			if h.held == "dishes":
 				return [{"do": "stash"}]
 		"order":
-			game.take_orders(st)
+			game.serving.take_orders(st)
 			h.punch()
 		"write":   # always right
 			h.set_held("bill")
-			h.bill = game.right_bill(game.table_by_number(int(s.table)))
-			game.sfx("page")
+			h.bill = game.paying.right_bill(game.paying.table_by_number(int(s.table)))
+			game.audio.sfx("page")
 		"give":
 			h.punch()
-			if not game.give_bill(h, st):
+			if not game.paying.give_bill(h, st):
 				return null
 		"clear":
 			while st.dirty > 0 and h.has_room(true):
-				game.clear_one(st, h)
-			game.sfx("pickup")
+				game.cooking.clear_one(st, h)
+			game.audio.sfx("pickup")
 		"to_sink":
 			st.dirty += h.dishes.size()
 			st.dirty_cups += h.dishes.filter(func(d: Dish) -> bool: return d.vessel == Dish.CUP).size()
 			st.refresh()
 			h.set_held("")
-			game.sfx("putdown")
+			game.audio.sfx("putdown")
 		"bin":
 			st.count += 1
 			st.refresh()
@@ -673,14 +673,14 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			h.drop_dish(d)
 			st.count += 1
 			st.refresh()
-			game.sfx("putdown")
+			game.audio.sfx("putdown")
 			if h.held == "dishes":
 				return [{"do": "restack"}]
 		"wash":
 			if JobBoard.roll_task(game.staff, h.person).ok:
-				game.wash_one(st)
-				game.sfx("wash")
-				game.burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
+				game.cooking.wash_one(st)
+				game.audio.sfx("wash")
+				game.audio.burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
 			st.used()
 			if st.dirty > 0:
 				return [s.duplicate()]
@@ -688,10 +688,10 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			st.count = 0
 			st.refresh()
 			h.set_held("rubbish_bag")
-			game.sfx("pickup")
+			game.audio.sfx("pickup")
 		"to_door":
 			h.set_held("")
-			game.sfx("putdown")
+			game.audio.sfx("putdown")
 		"drop":
 			h.set_held("")
 		"wipe":
@@ -699,7 +699,7 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			if JobBoard.roll_task(game.staff, h.person).ok:
 				mess.clean(s.at, HelperWork.wipe_levels(float(game.staff.employee(h.person).skills.clean),
 					str(s.tool), mess.one_press(s.at)))
-			game.sfx("step", 0.2)
+			game.audio.sfx("step", 0.2)
 			if mess.level(s.at) > 0:
 				return [s.duplicate()]
 			if h.held.begins_with(CleanKit.PREFIX):
@@ -732,7 +732,7 @@ func _tagged(ticket: int) -> Array:
 	for st: Station in game.stations.values():
 		if st.item == "dish" and st.dish != null and st.dish.ticket == ticket:
 			out.append({"dish": st.dish, "st": st})
-	for hand: Player in game.hands():
+	for hand: Player in game.serving.hands():
 		for d: Dish in hand.dishes:
 			if d.ticket == ticket:
 				out.append({"dish": d, "st": null})
@@ -773,7 +773,7 @@ func _ticket_needs(tk: Dictionary) -> Array:
 
 ## The worktop holding a ticket's plate or cup that still needs `kind`, or null.
 func _dish_needing(ticket: int, kind: String) -> Station:
-	var tk: Dictionary = game.find_ticket(ticket)
+	var tk: Dictionary = game.serving.find_ticket(ticket)
 	if tk.is_empty() or kind == "":
 		return null
 	for e: Dictionary in _tagged(ticket):
@@ -788,7 +788,7 @@ func _dish_needing(ticket: int, kind: String) -> Station:
 ## Setting out a plate (or a cup) for each of a ticket's items that has none yet. null
 ## when there is nothing to set out or nothing to set it out with.
 func _plate_steps(h: Helper, ticket: int) -> Variant:
-	var tk: Dictionary = game.find_ticket(ticket)
+	var tk: Dictionary = game.serving.find_ticket(ticket)
 	if tk.is_empty() or h.held != "":
 		return null
 	var out := []
@@ -799,7 +799,7 @@ func _plate_steps(h: Helper, ticket: int) -> Variant:
 			break
 		var it: Dictionary = tk.order.lines[li].item
 		var type := "cups" if it.course == "drink" else "plates"
-		var stack: Station = game.find_station(type)
+		var stack: Station = game.world.find_station(type)
 		if stack == null or stack.count - int(left[type]) <= 0:
 			continue
 		left[type] = int(left[type]) + 1
@@ -812,7 +812,7 @@ func _plate_steps(h: Helper, ticket: int) -> Variant:
 ## A ticket's plates built from what is made: its plates and cups set out first where it
 ## has none, then each made thing it still needs picked up and added. null for nothing to do.
 func _assemble_steps(h: Helper, ticket: int) -> Variant:
-	var tk: Dictionary = game.find_ticket(ticket)
+	var tk: Dictionary = game.serving.find_ticket(ticket)
 	if tk.is_empty() or h.held != "":
 		return null
 	var out := []
@@ -905,7 +905,7 @@ func _wear(h: Helper, delta: float) -> void:
 func demo(which: String) -> void:
 	for c: Vector2i in [Vector2i(8, 6), Vector2i(9, 6)]:
 		if not game.stations.has(c):
-			game.add_station("desk", c)
+			game.world.add_station("desk", c)
 	var on_break := which == "helpers_break"
 	var slip := which == "helpers_slip"
 	var hires := [[2, "Grill cook", ["fetch", "grill", "assemble"], 0, 0.85, Vector2i(1, 4)],
@@ -921,13 +921,13 @@ func demo(which: String) -> void:
 		var helper := add_helper(row[0], row[5])
 		if slip and row[0] == 9:   # once the day is under way, as the guest slip demo does
 			game.get_tree().create_timer(1.0).timeout.connect(_demo_slip.bind(helper, Vector2i(6, 3)))
-	game.find_station("sink").dirty = 2
+	game.world.find_station("sink").dirty = 2
 	if not slip:   # in the slip demo the server is free to help
 		game.stations[Vector2i(8, 3)].dirty = 1
 		game.stations[Vector2i(8, 3)].refresh()
-	game.find_station("sink").refresh()
+	game.world.find_station("sink").refresh()
 	if on_break:
-		game.clock = Staff.break_starts(1, game.day_length())[0] + 0.2
+		game.clock = Staff.break_starts(1, game.day.day_length())[0] + 0.2
 		game.floor_dirt.mess.dirt[Vector2i(6, 3)] = 2
 	var t: float = game.clock
 	game.arrivals.assign([{"time": t + 0.5, "group": [0, 1]}, {"time": t + 2.0, "group": [4]}, {"time": t + 5.0, "group": [6, 7]}])
@@ -1021,10 +1021,10 @@ func _place_cups() -> void:
 			var c := Vector2i(x, z)
 			if game.stations.has(c) or not game.plan.has_floor(c):
 				continue
-			var st: Station = game.add_station("cups", c)
+			var st: Station = game.world.add_station("cups", c)
 			if _all_reachable():
 				return
-			game._unregister(st)
+			game.world._unregister(st)
 			st.queue_free()
 
 
@@ -1049,32 +1049,32 @@ func _all_reachable() -> bool:
 ## started again so everything is in force (guests, the treatments, the crew).
 func staff_only() -> void:
 	var theme: String = Scenery.theme_id if STAFF_ROOM.has(Scenery.theme_id) else "diner"
-	game.test_kitchen()
-	game.clear_walls()
+	game.menu_stock.test_kitchen()
+	game.menu_stock.clear_walls()
 	game.plan.fill(Rect2i(0, 0, Scenery.KITCHEN_W, Scenery.KITCHEN_Z), "tile")
-	game._sync_grid()
-	game._rebuild_room()
+	game.world._sync_grid()
+	game.world._rebuild_room()
 	var stove: Station = game.stations.get(Vector2i(0, 4))
 	if stove != null:
-		game._unregister(stove)
+		game.world._unregister(stove)
 		stove.queue_free()
 	for row: Array in STAFF_ROOM[theme]:
 		var c: Vector2i = row[0]
 		if not game.stations.has(c):
-			game.add_station("counter", c, 1, 0, row[2])
+			game.world.add_station("counter", c, 1, 0, row[2])
 		if row[1] != "":
-			game.add_station(row[1], c)
+			game.world.add_station(row[1], c)
 		for b: String in row[3]:
-			game._store_box(c, b)
+			game.placing._store_box(c, b)
 	for spot: Array in [["hood", Vector2i(0, 3)], ["extractor", Vector2i(1, 0)], ["hood", Vector2i(2, 0)],
 			["hood", Vector2i(3, 0)], ["cabinet", Vector2i(0, 5)]]:
 		if game.kitchen.can_hang(spot[1], spot[0]):
-			game.add_high(spot[0], spot[1])
+			game.world.add_high(spot[0], spot[1])
 	# Chemicals apart from food: the cleaner over the bin, primer and finish by the door.
-	game._store_box(Vector2i(0, 5), "box_cleaner")
-	game.add_station("counter", Vector2i(9, 6), 1, 0, "double_counter")
-	game._store_box(Vector2i(9, 6), "box_primer")
-	game._store_box(Vector2i(9, 6), "box_finish")
+	game.placing._store_box(Vector2i(0, 5), "box_cleaner")
+	game.world.add_station("counter", Vector2i(9, 6), 1, 0, "double_counter")
+	game.placing._store_box(Vector2i(9, 6), "box_primer")
+	game.placing._store_box(Vector2i(9, 6), "box_finish")
 	for k: String in STAFF_TREAT:
 		var r: Rect2i = STAFF_TREAT[k]
 		for x in range(r.position.x, r.end.x):
@@ -1082,16 +1082,16 @@ func staff_only() -> void:
 				if game.plan.has_floor(Vector2i(x, y)):
 					game.treat_laid[Vector2i(x, y)] = k
 	# The cleaning trees: a flat mop's bucket; a scourer, a grease scraper and a spill kit on hooks.
-	var bucket: Station = game.add_station("flat_mop", Vector2i(8, 6))
+	var bucket: Station = game.world.add_station("flat_mop", Vector2i(8, 6))
 	game.clean_kit.on_built(bucket, "flat_mop")
 	var hooks := 0
 	for c: Vector2i in game.kitchen.wall_cells:
 		if hooks < 3 and not game.highs.has(c) and game.kitchen.can_hang(c, "hook"):
-			game.clean_kit.keep(game.add_high("hook", c), ["scourer", "grease_scraper", "spill_kit"][hooks], 0)
+			game.clean_kit.keep(game.world.add_high("hook", c), ["scourer", "grease_scraper", "spill_kit"][hooks], 0)
 			hooks += 1
 	for c: Vector2i in [Vector2i(5, 6), Vector2i(7, 6)]:
 		if not game.stations.has(c):
-			game.add_station("desk", c)
+			game.world.add_station("desk", c)
 	_place_cups()
 	game.menu.items.clear()
 	for it: Array in STAFF_MENU[theme]:
@@ -1108,7 +1108,7 @@ func staff_only() -> void:
 		ch.visible = false
 		ch.position = Grid.center(game.LOT.position)
 	game.ledger.money = maxi(game.ledger.money, 2000)
-	game.start_day()
+	game.day.start_day()
 
 
 # ---------------------------------------------------------------- the room, for the board
@@ -1124,7 +1124,7 @@ func world() -> Dictionary:
 	var bins := []
 	var ready := []
 	var has_sink := false
-	var stack: Station = game.find_station("plates")
+	var stack: Station = game.world.find_station("plates")
 	for st: Station in game.stations.values():
 		var c: Vector2i = st.cell
 		var jobs := Kitchen.jobs_of(st.node) if Kitchen.has_node(st.node) else {}
@@ -1134,7 +1134,7 @@ func world() -> Dictionary:
 		if is_tool:
 			var row := {"id": c, "cell": c, "tool": st.node, "busy": st.item != "" or st.prep_by >= 0}
 			if jobs.has("pour"):
-				var drinks: Array[String] = game.dispenser_drinks(st)
+				var drinks: Array[String] = game.menu_stock.dispenser_drinks(st)
 				if not drinks.is_empty():
 					row.drinks = drinks
 			tools.append(row)
@@ -1153,7 +1153,7 @@ func world() -> Dictionary:
 			# of ice cream in a blender a milkshake (PRD 8.6).
 			var into: String = p.id
 			if is_tool and p.state in ["raw", "prep"]:
-				var pj: Array = game.press_job(st, p)
+				var pj: Array = game.cooking.press_job(st, p)
 				if str(pj[1]) != "":
 					into = str(pj[1])
 			if p.state == "raw" or into != p.id:
@@ -1168,7 +1168,7 @@ func world() -> Dictionary:
 				made.append(p.id)
 		if Station.is_table(st.type):
 			var tid := "%d,%d" % [c.x, c.y]
-			var waiting: Array = game._guests_to_order(st)
+			var waiting: Array = game.seating._guests_to_order(st)
 			if not waiting.is_empty():
 				tables.append({"id": tid, "cell": c, "state": "order", "wait": _wait_of(waiting[0])})
 			if st.dirty > 0:
@@ -1184,7 +1184,7 @@ func world() -> Dictionary:
 			ready.append(st)
 	if not has_sink:
 		tables = tables.filter(func(t: Dictionary) -> bool: return t.state != "clear")
-	for hand: Player in game.hands():
+	for hand: Player in game.serving.hands():
 		var p := Tray.parse(hand.held)
 		if p.is_empty():
 			continue
@@ -1237,11 +1237,11 @@ func world() -> Dictionary:
 			if mess.is_grease(c):
 				grease[c] = true
 	var bills := []   # PRD 11.4: tables ready to pay with no slip printed yet
-	for st: Station in game.dining_tables():
-		var n: int = game.table_number(st)
-		if game.ready_to_pay(st) and not game.slip_out(n):
+	for st: Station in game.paying.dining_tables():
+		var n: int = game.paying.table_number(st)
+		if game.paying.ready_to_pay(st) and not game.paying.slip_out(n):
 			var at: Station = _bill_place(st)
-			bills.append({"id": n, "cell": at.cell, "wait": game.clock - float(game.pay_since.get(st, game.clock))})
+			bills.append({"id": n, "cell": at.cell, "wait": game.clock - float(game.paying.pay_since.get(st, game.clock))})
 	return {"stations": tools, "storage": storage, "items": items, "tickets": tickets, "dishes": _carries(ready),
 		"leftovers": _leftovers(),
 		"bills": bills, "tables": tables, "dirt": dirt, "grease": grease, "fallen": fallen, "sinks": sinks, "bins": bins,
@@ -1262,7 +1262,7 @@ func _leftovers() -> Array:
 		if st.item != "dish" or st.dish == null or st.dish.ticket == -1 or _claims.has(st.cell):
 			continue
 		var d: Dish = st.dish
-		var tk: Dictionary = game.find_ticket(d.ticket)
+		var tk: Dictionary = game.serving.find_ticket(d.ticket)
 		if not tk.is_empty() and d.line >= 0 and d.line < tk.order.lines.size() and not tk.order._served(tk.order.lines[d.line]):
 			continue
 		d.ticket = -2   # orphaned: nobody's
@@ -1326,8 +1326,8 @@ func _carries(ready: Array) -> Array:
 
 ## Where a table's bill is handed over: the till if one of them went to pay there.
 func _bill_place(table: Station) -> Station:
-	var till: Station = game.till_station()
-	if till != null and game.party_at(table).any(func(g: Guest) -> bool: return g.state == "at_till" or g.state == "to_till"):
+	var till: Station = game.paying.till_station()
+	if till != null and game.paying.party_at(table).any(func(g: Guest) -> bool: return g.state == "at_till" or g.state == "to_till"):
 		return till
 	return table
 
@@ -1338,7 +1338,7 @@ static func _wait_of(g: Guest) -> float:
 
 ## Where plates for a ticket are built: the pass nearest the plate stack, else the stack.
 func _assembly_cell() -> Vector2i:
-	var stack: Station = game.find_station("plates")
+	var stack: Station = game.world.find_station("plates")
 	var from: Vector2i = stack.cell if stack != null else Vector2i.ZERO
 	var best := from
 	var best_d := INF
@@ -1409,7 +1409,7 @@ func _free_surface(near: Vector2i, h: Helper, pass_first := false, for_plate := 
 ## Whether the stacks hold a plate or cup for any of these lines of a ticket.
 func _plates_left(tk: Dictionary, lines: Array) -> bool:
 	for li: int in lines:
-		var stack: Station = game.find_station("cups" if tk.order.lines[li].item.course == "drink" else "plates")
+		var stack: Station = game.world.find_station("cups" if tk.order.lines[li].item.course == "drink" else "plates")
 		if stack != null and stack.count > 0:
 			return true
 	return false
@@ -1417,7 +1417,7 @@ func _plates_left(tk: Dictionary, lines: Array) -> bool:
 
 ## Whether a ticket has an item with no plate set out and the stack has one for it.
 func _plates_wanted() -> bool:
-	var stack: Station = game.find_station("plates")
+	var stack: Station = game.world.find_station("plates")
 	if stack == null or stack.count <= 0:
 		return false
 	for tk: Dictionary in game.tickets:

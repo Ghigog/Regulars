@@ -207,7 +207,7 @@ class Marks extends Control:
 		queue_redraw()
 
 	func _draw() -> void:
-		var t: Tray = game.tray_for_ticket(ticket)
+		var t: Tray = game.serving.tray_for_ticket(ticket)
 		for k in count:
 			var c := Vector2(7 + k * 15, 8)
 			var have := t != null and line < t.lines.size() and float(t.lines[line].have[k]) >= 0.0
@@ -682,7 +682,7 @@ class ModelView extends TextureRect:
 		var n := Node3D.new()
 		spin.add_child(n)
 		if bp.id == "screen":
-			game._wall_visual(n, 0.9 + 0.1 * int(bp.tier))
+			game.world._wall_visual(n, 0.9 + 0.1 * int(bp.tier))
 		elif Treatments.is_laying_tool(bp.id):   # a floor treatment (PRD 9.5): planks with its sheen
 			Scenery.tool_preview(n, "floor_planks")
 			for c: Vector2i in [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 0)]:
@@ -1104,7 +1104,7 @@ func show_guest(g: Guest) -> void:
 	name_row.add_theme_constant_override("separation", 6)
 	box.add_child(name_row)
 	_label(name_row, 24, g.info.name)
-	if game.critic.known and game.is_critic(g):   # only once a review has named them
+	if game.critic.known and game.day.is_critic(g):   # only once a review has named them
 		var mark := Icon.new("quill", 26, false)
 		mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		name_row.add_child(mark)
@@ -1147,7 +1147,7 @@ func _update_guest() -> void:
 		return
 	var m: GuestMood = _guest.mood
 	_guest_state.text = STATE_WORDS.get(_guest.state, "")
-	var paying: float = _guest.game.pay_wait(_guest)   # PRD 11: how long they have waited to pay
+	var paying: float = _guest.game.paying.pay_wait(_guest)   # PRD 11: how long they have waited to pay
 	if paying >= 0.0:
 		_guest_state.text = ("Waiting at the till, %ds" if _guest.state == "at_till" else "Waiting for the bill, %ds") % roundi(paying)
 	var hints := m.tolerance_hints()
@@ -1210,7 +1210,7 @@ func update_status() -> void:
 		_turn_day(want)
 	if not _turning:
 		clock.night = game.phase != P.SERVICE
-	clock.progress = game.day_progress()
+	clock.progress = game.day.day_progress()
 	_update_hints(l.day <= 1 and game.phase == P.SERVICE)   # the controls reminder is for the first day
 	if l.money != _shown_money:
 		if _shown_money >= 0 and l.money > _shown_money:
@@ -1259,7 +1259,7 @@ func _roll_clock(out: float) -> void:
 func _intro() -> void:
 	var tw := create_tween()
 	tw.tween_interval(0.6)
-	tw.tween_callback(game.sfx.bind("roll"))
+	tw.tween_callback(game.audio.sfx.bind("roll"))
 	tw.tween_method(_roll_clock, 0.0, 1.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
@@ -1268,30 +1268,30 @@ func _intro() -> void:
 func _turn_day(to: int) -> void:
 	_turning = true
 	var tw := create_tween()
-	tw.tween_callback(game.sfx.bind("roll"))
+	tw.tween_callback(game.audio.sfx.bind("roll"))
 	tw.tween_method(_roll_clock, 1.0, 0.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_callback(game.sfx.bind("lift"))
+	tw.tween_callback(game.audio.sfx.bind("lift"))
 	tw.tween_property(calendar, "lift", 15.0, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(game.sfx.bind("rattle"))
+	tw.tween_callback(game.audio.sfx.bind("rattle"))
 	for i in 5:
 		tw.tween_property(calendar, "rotation", 0.07 * (1.0 if i % 2 == 0 else -1.0) * (1.0 - i * 0.16), 0.065)
 	tw.tween_property(calendar, "rotation", 0.0, 0.06)
 	tw.tween_callback(func() -> void:
 		calendar.next_day = to
-		game.sfx("page"))
+		game.audio.sfx("page"))
 	tw.tween_property(calendar, "flip", 1.0, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_callback(func() -> void:
 		calendar.day = to
 		calendar.flip = 0.0)
 	tw.tween_property(calendar, "lift", 0.0, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_callback(func() -> void:
-		game.sfx("thump")
+		game.audio.sfx("thump")
 		calendar.scale = Vector2(1.06, 0.93)
 		dangle.spin += randf_range(1.5, 2.5) * (1.0 if randf() < 0.5 else -1.0))
 	tw.tween_property(calendar, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_callback(func() -> void:
 		clock.night = false
-		game.sfx("roll"))
+		game.audio.sfx("roll"))
 	tw.tween_method(_roll_clock, 0.0, 1.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_callback(func() -> void: _turning = false)
 
@@ -1308,7 +1308,7 @@ func _rip_tag() -> void:
 	if _tag_state != "hang":
 		return
 	_tag_state = "fly"
-	game.sfx("rip")
+	game.audio.sfx("rip")
 	money_tag.reparent(fly)
 	dangle.tied = false
 	money_tag.pivot_offset = money_tag.size * Vector2(0.5, 0.0)
@@ -1316,12 +1316,12 @@ func _rip_tag() -> void:
 	var r0 := money_tag.rotation
 	_tag_tween = money_tag.create_tween()
 	_tag_tween.tween_property(money_tag, "position:y", p0.y - 18.0, 0.12).set_ease(Tween.EASE_OUT)
-	_tag_tween.tween_callback(game.sfx.bind("flutter"))
+	_tag_tween.tween_callback(game.audio.sfx.bind("flutter"))
 	_tag_tween.tween_method(_flutter.bind(p0 - Vector2(0, 18), r0), 0.0, 1.0, 1.5)
 	_tag_tween.tween_callback(func() -> void:
 		_tag_state = "receipt"
 		money_tag.scale = Vector2.ONE
-		game.sfx("rustle"))
+		game.audio.sfx("rustle"))
 
 
 func _flutter(t: float, p0: Vector2, r0: float) -> void:
@@ -1355,11 +1355,11 @@ func _new_tag() -> void:
 		dangle.angle = 0.0
 		dangle.spin = 0.0
 		dangle.drop = 0.0
-		game.sfx("rustle"))
+		game.audio.sfx("rustle"))
 	_tag_tween.tween_property(dangle, "drop", 1.12, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_tag_tween.tween_callback(func() -> void:
 		dangle.spin = randf_range(2.5, 3.5) * (1.0 if randf() < 0.5 else -1.0)
-		game.sfx("rustle"))
+		game.audio.sfx("rustle"))
 	_tag_tween.tween_property(dangle, "drop", 1.0, 0.6).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
@@ -1372,7 +1372,7 @@ func _board_down() -> void:
 			stamps[i].queue_redraw()
 	board.position.y = -board.size.y - 80.0
 	var tw := board.create_tween()
-	tw.tween_callback(game.sfx.bind("rope"))
+	tw.tween_callback(game.audio.sfx.bind("rope"))
 	tw.tween_property(board, "position:y", BOARD_Y, 0.75).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_callback(func() -> void: board.spin += 1.4)
 
@@ -1386,7 +1386,7 @@ func _board_up(at_once := false) -> void:
 	tw.tween_interval(0.5)
 	tw.tween_callback(func() -> void:
 		board.spin -= 0.8
-		game.sfx("rope"))
+		game.audio.sfx("rope"))
 	tw.tween_property(board, "position:y", gone, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 
 
@@ -1402,7 +1402,7 @@ func _stamp(slot: Punch, delay: float) -> void:
 	tw.tween_interval(0.1)
 	tw.tween_property(st, "hover", 0.0, 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_callback(func() -> void:
-		game.sfx("stamp")
+		game.audio.sfx("stamp")
 		slot.stamp()
 		board.spin += randf_range(-1.0, 1.0)
 		st.scale = Vector2(1.08, 0.9))
@@ -1577,8 +1577,8 @@ func save_options() -> void:
 
 
 func apply_options() -> void:
-	game.set_volumes(float(options.sfx), float(options.music))
-	game.set_tilt_shift(bool(options.tilt_shift))
+	game.audio.set_volumes(float(options.sfx), float(options.music))
+	game.audio.set_tilt_shift(bool(options.tilt_shift))
 
 
 # ---------------------------------------------------------------- title screen
@@ -1757,7 +1757,7 @@ func _toggle_tilt_shift() -> void:
 func _options_pick(i: int) -> void:
 	i = clampi(i, 0, maxi(_options_rows.size() - 1, 0))
 	if i != _options_sel and _options_card != null:
-		game.sfx("tick")
+		game.audio.sfx("tick")
 	_options_sel = i
 	if _options_frame:
 		_options_frame.queue_redraw()
@@ -1774,7 +1774,7 @@ func _options_turn(dir: int) -> void:
 		var ids: Array = _options_tabs.keys()
 		var at := ids.find(_options_tab)
 		_show_options_tab(ids[posmod(at + dir, ids.size())])
-		game.sfx("tab")
+		game.audio.sfx("tab")
 	elif row is HBoxContainer:
 		var slider: HSlider = row.get_meta("slider")
 		slider.value = clampf(snappedf(slider.value + dir * 0.1, 0.05), 0.0, 1.0)
@@ -1861,7 +1861,7 @@ func _volume_row(title: String, key: String) -> HBoxContainer:
 		value.text = "%d%%" % roundi(v * 100)
 		apply_options()
 		if key == "sfx":
-			game.sfx("coin"))
+			game.audio.sfx("coin"))
 	return row
 
 
@@ -2015,7 +2015,7 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	gossip.custom_minimum_size = Vector2(380, 0)
 	_button(stack, "Town book" + _key_note("town"), show_town)
 	_button(stack, ("Set up for day %d" % game.ledger.day) + _key_note("confirm"),
-		func() -> void: game.confirm_receipt(game.controls.owner_of("keys") if game.controls else 0))
+		func() -> void: game.coop.confirm_receipt(game.controls.owner_of("keys") if game.controls else 0))
 	# Co-op: everyone confirms. A tag per player, ticked once they have.
 	_ready_row = HBoxContainer.new()
 	_ready_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -2128,10 +2128,10 @@ const STORAGE_TABS: Array[String] = ["Ingredients", "Upgrades"]
 
 ## The tabs of the tray now open: the shop's, or a piece's card's.
 func shop_tabs() -> Array[String]:
-	if not game.storing():
+	if not game.card.storing():
 		return SHOP_TABS
-	var tabs: Array[String] = ["Ingredients" if game.card_keeps_boxes() else "This piece"]
-	if game.storage_tree() != "":
+	var tabs: Array[String] = ["Ingredients" if game.card.card_keeps_boxes() else "This piece"]
+	if game.card.storage_tree() != "":
 		tabs.append("Upgrades")
 	return tabs
 const TRAY_DROP := 260.0   # how far below its place the shop tray waits
@@ -2215,11 +2215,11 @@ func set_search(text: String) -> void:
 
 
 func _set_category(cat: String) -> void:
-	if game.storing() and cat == "Upgrades":
-		game.storage_upgrades()
+	if game.card.storing() and cat == "Upgrades":
+		game.card.storage_upgrades()
 		return
 	if cat != _category and _shop:
-		game.sfx("tab", 0.08)
+		game.audio.sfx("tab", 0.08)
 	_category = cat
 	_search = ""   # a search looks through every category; picking one ends it
 	if _search_box:
@@ -2333,7 +2333,7 @@ func _hint_short(p: int) -> String:
 
 ## The receipt's and the door card's ready markers, from the game's ready list.
 func refresh_ready() -> void:
-	var states: Array[String] = game.ready_states()
+	var states: Array[String] = game.coop.ready_states()
 	var coop: bool = game.chefs.size() > 1
 	if _ready_row and is_instance_valid(_ready_row):
 		_fill_ready(_ready_row, states, 30)
@@ -2378,7 +2378,7 @@ func _hint_text(p := 0) -> String:
 
 
 func _shop_keys_text() -> String:
-	if game.storing():   # a piece's card: only E and Back (review, item 4)
+	if game.card.storing():   # a piece's card: only E and Back (review, item 4)
 		match _mode():
 			"pad":
 				return "A choose      D-pad browse      B back"
@@ -2419,7 +2419,7 @@ func _build_tip(p := 0) -> String:
 				return "%s      Hold A and walk to lay      X lift      %s      B done" % [what, flip]
 		return "%s      Hold E and walk, or drag, to lay      Right-drag lifts      %s      Esc done" % [what, flip]
 	if Catalog.is_build_tool(hand.id):
-		var floor: bool = game.floor_kind(hand.id) != ""
+		var floor: bool = game.placing.floor_kind(hand.id) != ""
 		var what := "%s, $%d each." % [Catalog.label(hand), int(hand.price)]
 		match m:
 			"touch":
@@ -2442,21 +2442,21 @@ func _build_tip(p := 0) -> String:
 		var what := "%s, $%d a night.      Put it in %s" % [Catalog.label(hand), Pantry.fee_of(b.id, b.ready), where]
 		var away := ("%s sell stops the fee" % ("Sell" if m == "touch" else _g("sell", p))) if hand.get("moving", false) else "%s drop" % ("Drop" if m == "touch" else _g("back", p))
 		return "%s      %s put in      %s" % [what, "Tap the counter" if m == "touch" else use, away]
-	if Kitchen.is_high_only(game.hand_node(hand)):   # PRD 8.5: it hangs on a wall, facing out
+	if Kitchen.is_high_only(game.world.hand_node(hand)):   # PRD 8.5: it hangs on a wall, facing out
 		var lead := "%s, $%d when it is hung." % [Catalog.label(hand), int(hand.price)]
 		var tail := "%s drop" % ("Drop" if m == "touch" else _g("back", p))
 		if hand.get("moving", false):
-			var why: String = game.sell_block(ch)
-			lead = "Carrying the %s." % game.piece_name(hand).to_lower()
-			tail = ("%s for $%d" % ["Sell" if m == "touch" else _g("sell", p) + " sell", game.sell_value(ch)]) if why == "" else why
+			var why: String = game.placing.sell_block(ch)
+			lead = "Carrying the %s." % game.placing.piece_name(hand).to_lower()
+			tail = ("%s for $%d" % ["Sell" if m == "touch" else _g("sell", p) + " sell", game.placing.sell_value(ch)]) if why == "" else why
 		return "%s      %s hang it on a wall, over anything      %s" % [lead, "Tap a cell by a wall to" if m == "touch" else use, tail]
 	if hand.get("moving", false):
-		var why: String = game.sell_block(ch)
-		var sell := ("%s for $%d" % ["Sell" if m == "touch" else _g("sell", p) + " sell", game.sell_value(ch)]) if why == "" else why
+		var why: String = game.placing.sell_block(ch)
+		var sell := ("%s for $%d" % ["Sell" if m == "touch" else _g("sell", p) + " sell", game.placing.sell_value(ch)]) if why == "" else why
 		if m == "touch":
-			return "Carrying the %s.      Tap the floor to put it down      Turn      %s      Drop puts it back" % [game.piece_name(hand).to_lower(), sell]
+			return "Carrying the %s.      Tap the floor to put it down      Turn      %s      Drop puts it back" % [game.placing.piece_name(hand).to_lower(), sell]
 		return "Carrying the %s.      %s put down      %s turn      %s      %s put back" % [
-			game.piece_name(hand).to_lower(), use, turn, sell, _g("back", p)]
+			game.placing.piece_name(hand).to_lower(), use, turn, sell, _g("back", p)]
 	if m == "touch":
 		return "%s, $%d when it is put down.      Tap the floor to put it down      Turn      Drop" % [Catalog.label(hand), int(hand.price)]
 	return "%s, $%d when it is put down.      %s put down      %s turn      %s drop" % [
@@ -2542,7 +2542,7 @@ func show_build() -> void:
 		_tip = _tip_rows[0].label
 		holder.modulate.a = 0.0
 		holder.create_tween().tween_property(holder, "modulate:a", 1.0, 0.3)
-		game.sfx("rustle")
+		game.audio.sfx("rustle")
 	build_bar.visible = _shop == null
 	# One row per chef, each worded for that player's device; tagged in co-op.
 	var n: int = game.chefs.size()
@@ -2554,7 +2554,7 @@ func show_build() -> void:
 		if p < n:
 			(d.tag as ChefTag).visible = n > 1
 			d.label.text = _build_tip(p) + _aim_note(p)
-	_dirty_label.text = game.dirty_note()
+	_dirty_label.text = game.room_edit.dirty_note()
 	_dirty_note.visible = _dirty_label.text != ""
 	_fill_strip()
 	menu_notes.refresh()
@@ -2570,10 +2570,10 @@ func _fill_strip() -> void:
 	var n: int = game.chefs.size()
 	for p in n:
 		var ch: Player = game.chefs[p]
-		var list: Array[Dictionary] = game.strip_choices(ch)
+		var list: Array[Dictionary] = game.upgrades.strip_choices(ch)
 		if list.is_empty():
 			continue
-		var chosen: Dictionary = game.strip_chosen(ch)
+		var chosen: Dictionary = game.upgrades.strip_chosen(ch)
 		var sheet := Sheet.new("paper", 16, 8)
 		sheet.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		_strip.add_child(sheet)
@@ -2585,7 +2585,7 @@ func _fill_strip() -> void:
 		box.add_child(head)
 		if n > 1:
 			head.add_child(ChefTag.new(p))
-		_label(head, 18, "Upgrades for the %s" % game.piece_name(ch.hand).to_lower()).modulate = Color(INK, 0.7)
+		_label(head, 18, "Upgrades for the %s" % game.placing.piece_name(ch.hand).to_lower()).modulate = Color(INK, 0.7)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		box.add_child(row)
@@ -2632,10 +2632,10 @@ func _strip_chip(ch: Player, i: int, c: Dictionary, on: bool) -> Control:
 	chip.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT) or (e is InputEventScreenTouch and e.pressed):
 			if ch.strip_pick == i:
-				game.strip_buy(ch)
+				game.upgrades.strip_buy(ch)
 			else:
 				ch.strip_pick = i
-				game.sfx("tab", 0.08)
+				game.audio.sfx("tab", 0.08)
 				show_build()
 			chip.accept_event())
 	return chip
@@ -2664,7 +2664,7 @@ func show_shop() -> void:
 		return
 	_search = ""
 	_category = shop_tabs()[0]
-	_shop_index = game.card_actions().size() if game.storing() and game.card_keeps_boxes() else 0   # the boxes first
+	_shop_index = game.card.card_actions().size() if game.card.storing() and game.card.card_keeps_boxes() else 0   # the boxes first
 	build_bar.visible = false
 	_shop = Control.new()
 	_shop.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2811,16 +2811,16 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 			"blurb": "More guests tomorrow",
 			"can": not game.flyers_out and l.money >= Town.FLYER_PRICE, "locked": false}
 	if bp.id == "night_cleaner":
-		var p: int = game.cleaner_price()
+		var p: int = game.room_edit.cleaner_price()
 		return {"name": "Night cleaner", "price": "Clean" if p <= 0 else "$%d" % p,
 			"blurb": "Clears every table, washes up, takes the bags out and mops the floor" if p > 0 else "Nothing to clean tonight",
 			"can": p > 0 and l.money >= p, "locked": false}
-	if game.storing():
+	if game.card.storing():
 		return _storage_info(bp)
 	var id: String = bp.id
 	var tier: int = bp.tier
 	var need := Catalog.bp_level(bp)
-	var locked: bool = bp.get("locked", false) or game.buy_level(id) < need
+	var locked: bool = bp.get("locked", false) or game.placing.buy_level(id) < need
 	var price := "$%d" % Catalog.bp_price(bp)
 	if Treatments.is_box(id):   # restocked each night for a flat fee, like food (review, item 8)
 		price = Treatments.fee_words(Treatments.key_of(id))
@@ -2831,7 +2831,7 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
 	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp), "locked": locked,
 		"price": "Level %d" % need if locked else price,
-		"can": not locked and game.catalog.can_buy(id, l.money, game.buy_level(id), tier) and l.money >= Catalog.bp_price(bp)}
+		"can": not locked and game.catalog.can_buy(id, l.money, game.placing.buy_level(id), tier) and l.money >= Catalog.bp_price(bp)}
 
 
 ## A box on the storage card: one stored here is taken out; one that may go in shows
@@ -2846,7 +2846,7 @@ func _storage_info(bp: Dictionary) -> Dictionary:
 		return {"name": Catalog.label(bp), "blurb": "Stored here. Take it out", "locked": false,
 			"price": "Take out", "can": true}
 	var why: String = game.kitchen.store_refusal(game.storing_cell, bp.id)
-	var fridge: int = game.fridge_offer(bp.id)
+	var fridge: int = game.card.fridge_offer(bp.id)
 	if fridge > 0:   # review, item 11: one press makes this counter the fridge it needs
 		return {"name": Catalog.label(bp), "blurb": "%s: E makes this counter one ($%d), with the box in" % [why, fridge],
 			"locked": false, "price": "Fridge $%d" % fridge, "can": game.ledger.money >= fridge}
@@ -2858,8 +2858,8 @@ func _storage_info(bp: Dictionary) -> Dictionary:
 ## An action card on a piece's card: Upgrades, Move, Turn, Sell, the till's Move, or the
 ## upgrade of a stored treatment box.
 func _card_act_info(bp: Dictionary) -> Dictionary:
-	var st: Station = game.card_station()
-	var what: String = game.piece_name({"id": st.type, "tier": st.tier}).to_lower() if st != null else "piece"
+	var st: Station = game.card.card_station()
+	var what: String = game.placing.piece_name({"id": st.type, "tier": st.tier}).to_lower() if st != null else "piece"
 	match str(bp.act):
 		"upgrades":
 			return {"name": "Upgrades", "blurb": "Its upgrade tree: upgrade the %s where it stands" % what,
@@ -2876,9 +2876,9 @@ func _card_act_info(bp: Dictionary) -> Dictionary:
 			return {"name": "Move the till", "blurb": "Lift the till off to put it on another counter",
 				"price": "Move", "can": true, "locked": false}
 		"sell":
-			var v: int = game.card_sell_value()
+			var v: int = game.card.card_sell_value()
 			if v < 0:
-				return {"name": "Sell", "blurb": game.card_sell_block(), "price": "Can't sell", "can": false, "locked": true}
+				return {"name": "Sell", "blurb": game.card.card_sell_block(), "price": "Can't sell", "can": false, "locked": true}
 			return {"name": "Sell", "blurb": "Half back; whatever was bought tonight comes back whole",
 				"price": "+$%d" % v, "can": true, "locked": false}
 	return {"name": "", "blurb": "", "price": "", "can": false, "locked": false}
@@ -2898,7 +2898,7 @@ func _refresh_catalog() -> void:
 		_cards.remove_child(c)
 		c.queue_free()
 	_drop_row()
-	_shop_items = game.shop_items(_search, "" if searching else _category)
+	_shop_items = game.session.shop_items(_search, "" if searching else _category)
 	for i in _shop_items.size():
 		var bp := _shop_items[i]
 		var info := _shop_info(bp)
@@ -2961,7 +2961,7 @@ func _card_pressed(i: int) -> void:
 	if i == _shop_index:
 		shop_buy()
 	else:
-		game.sfx("tick", 0.1)
+		game.audio.sfx("tick", 0.1)
 		_select(i, signi(i - _shop_index))
 
 
@@ -2996,7 +2996,7 @@ func shop_selected() -> Dictionary:
 func shop_move(d: int) -> void:
 	if _shop == null or _shop_items.is_empty():
 		return
-	game.sfx("tick", 0.1)
+	game.audio.sfx("tick", 0.1)
 	_select(wrapi(_shop_index + d, 0, _shop_items.size()), d)
 
 
@@ -3009,10 +3009,10 @@ func shop_category(d: int) -> void:
 ## Buys the piece in the middle. A refusal shakes it; flyers get a little hop.
 func shop_buy() -> void:
 	if _shop == null or _shop_items.is_empty():
-		game.sfx("fail")
+		game.audio.sfx("fail")
 		return
 	var item := _items[_shop_index]
-	if game.buy(_shop_items[_shop_index]):
+	if game.placing.buy(_shop_items[_shop_index]):
 		if _shop:   # still open: it was the flyers, and the row has been redrawn
 			item = _items[_shop_index]
 			var tw := item.create_tween()
@@ -3033,7 +3033,7 @@ func show_tree(key: String) -> void:
 	build_bar.visible = false
 	var p: int = maxi(game.chefs.find(game.shopper), 0)
 	var keys := "%s buy      %s choose      %s %s" % [_g("use", p), "D-pad" if _mode(p) == "pad" else "Arrows", _g("back", p),
-		"back to the card" if game.storing() else "close"]
+		"back to the card" if game.card.storing() else "close"]
 	if game.shopper != null and game.shopper.hand.get("node") is Station:   # the piece in hand turns
 		keys += "      %s turn" % _g("turn", p)
 	if _mode(p) == "touch":
@@ -3073,7 +3073,7 @@ func tree_buy() -> void:
 	if _tree:
 		_tree.buy()
 	else:
-		game.sfx("fail")
+		game.audio.sfx("fail")
 
 
 func toggle_town() -> void:
@@ -3155,5 +3155,5 @@ func show_closed(days: int, earned: int, best: Dictionary, is_record: bool) -> v
 	_centred(box, "TOTAL EARNED: $%d" % earned)
 	_ornament(box, "star")
 	_centred(box, "NEW BEST RUN!" if is_record else "BEST RUN: %d %s" % [best.days, "DAY" if best.days == 1 else "DAYS"])
-	_button(box, "Try again" + _key_note("confirm"), game.restart)
+	_button(box, "Try again" + _key_note("confirm"), game.day.restart)
 	_pop_in(menu)

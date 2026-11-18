@@ -277,7 +277,7 @@ func _game():
 	game.set_process(false)
 	game.best_path = "user://regulars_best_test.json"
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])   # keeps the day open
-	game.test_kitchen()
+	game.menu_stock.test_kitchen()
 	game.floor_dirt.mess.rng.seed = 7
 	game.step(0.01)   # the dirt takes the room's floors and furniture
 	return game
@@ -292,7 +292,7 @@ func test_the_room_floors_are_where_dirt_can_be_and_furniture_covers_cells():
 	var game = _game()
 	var m: FloorMess = game.floor_dirt.mess
 	assert_eq(m.floor_cells.size(), game.plan.floors.size())
-	var stove: Station = game.find_station("stove")
+	var stove: Station = game.world.find_station("stove")
 	assert_true(m.is_floor(stove.cell))
 	assert_true(m.is_covered(stove.cell), "furniture stands on it")
 	assert_false(m.is_covered(game.player.cell()))
@@ -314,7 +314,7 @@ func test_a_chef_walking_off_a_dirty_cell_tracks_a_level_and_leaves_footprints()
 
 func test_guests_track_dirt_too():
 	var game = _game()
-	var g: Guest = game.spawn_guest(0)
+	var g: Guest = game.seating.spawn_guest(0)
 	var from := Vector2i(6, 5)
 	g.position = Grid.center(from)
 	_dirty(game, from, 3)
@@ -332,14 +332,14 @@ func test_dirt_underfoot_slows_chefs_and_guests():
 	assert_almost_eq(game.player.speed(), Player.SPEED * 0.5, 0.001, "the whole cell: half speed")
 	var at := Vector2i(6, 5)
 	_dirty(game, at, 3)
-	assert_almost_eq(game.floor_speed(Grid.center(at)), 0.65, 0.001)
+	assert_almost_eq(game.seating.floor_speed(Grid.center(at)), 0.65, 0.001)
 
 
 func test_a_guest_walks_slower_over_dirt():
 	var walked := []
 	for lvl in [0, 4]:
 		var game = _game()
-		var g: Guest = game.spawn_guest(0)
+		var g: Guest = game.seating.spawn_guest(0)
 		var start := Vector2i(6, 5)
 		g.position = Grid.center(start)
 		g.cell = start
@@ -353,7 +353,7 @@ func test_a_guest_walks_slower_over_dirt():
 
 func test_a_bad_fry_always_drops_grease_beside_the_fryer():
 	var game = _game()
-	var fryer: Station = game.add_station("fryer", Vector2i(2, 5))
+	var fryer: Station = game.world.add_station("fryer", Vector2i(2, 5))
 	var chef: Vector2i = fryer.cell + Vector2i(1, 0)
 	var landed = game.floor_dirt.prep_grease("fry", "bad", chef, fryer)
 	assert_not_null(landed, "fry 0.5, doubled for a bad one")
@@ -365,7 +365,7 @@ func test_tool_mess_and_the_hood_come_from_the_kitchen():
 	var game = _game()
 	var stove: Station = game.stations[Vector2i(0, 3)]
 	assert_eq(game.floor_dirt.grease_factors(stove), {"mess": 1.0, "hood": "hood"}, "the start's hood hangs over it (PRD 8.5)")
-	game.clear_walls()
+	game.menu_stock.clear_walls()
 	assert_eq(game.floor_dirt.grease_factors(stove), {"mess": 1.0, "hood": ""})
 
 
@@ -374,18 +374,18 @@ func test_a_hood_cuts_a_stoves_grease():
 	var stove: Station = game.stations[Vector2i(0, 3)]
 	var before: int = game.floor_dirt.mess.total()
 	for i in 40:
-		game._prep_done(0, stove, "fry", "bad")   # certain without a hood (the test below)
+		game.prep_games._prep_done(0, stove, "fry", "bad")   # certain without a hood (the test below)
 	var hooded: int = game.floor_dirt.mess.total() - before
 	assert_lt(hooded, 30, "a hood drops grease about %d%% as often" % int(FloorMess.HOOD * 100))
 
 
 func test_a_finished_prep_rolls_grease_through_the_game():
 	var game = _game()
-	game.clear_walls()   # no hood over the stove
-	var stove: Station = game.find_station("stove")
+	game.menu_stock.clear_walls()   # no hood over the stove
+	var stove: Station = game.world.find_station("stove")
 	var before: int = game.floor_dirt.mess.total()
 	for i in 40:
-		game._prep_done(0, stove, "fry", "bad")   # a certain drop each time
+		game.prep_games._prep_done(0, stove, "fry", "bad")   # a certain drop each time
 	assert_eq(game.floor_dirt.mess.total(), before + 40)
 
 
@@ -399,7 +399,7 @@ func test_greasy_food_is_fried_or_meat():
 
 func test_guest_mess_lands_near_the_seat_and_never_under_furniture():
 	var game = _game()
-	var g: Guest = game.spawn_guest(0)
+	var g: Guest = game.seating.spawn_guest(0)
 	g.seat = Vector2i(6, 4)
 	var m: FloorMess = game.floor_dirt.mess
 	for i in 60:
@@ -411,7 +411,7 @@ func test_guest_mess_lands_near_the_seat_and_never_under_furniture():
 
 func test_an_annoyed_guest_counts_as_more_annoyed():
 	var game = _game()
-	var g: Guest = game.spawn_guest(0)
+	var g: Guest = game.seating.spawn_guest(0)
 	var calm := FloorDirt.annoyance(g)
 	g.mood.patience = 0.0
 	g.mood.disgust = 0.8
@@ -420,7 +420,7 @@ func test_an_annoyed_guest_counts_as_more_annoyed():
 
 func test_a_seated_guest_is_put_off_by_dirt_they_can_see():
 	var game = _game()
-	var g: Guest = game.spawn_guest(0)
+	var g: Guest = game.seating.spawn_guest(0)
 	g.cell = Vector2i(6, 4)
 	_dirty(game, Vector2i(8, 4), 2)   # a puddle: seen, no smell
 	assert_true(game.floor_dirt.disgust(g, 1.0, game.SIGHT_RANGE))
@@ -429,7 +429,7 @@ func test_a_seated_guest_is_put_off_by_dirt_they_can_see():
 
 func test_from_level_three_dirt_smells_even_out_of_sight():
 	var game = _game()
-	var g: Guest = game.spawn_guest(0)
+	var g: Guest = game.seating.spawn_guest(0)
 	g.cell = Vector2i(6, 4)
 	_dirty(game, Vector2i(7, 4), 2)
 	game.floor_dirt.disgust(g, 1.0, 0)   # sees nothing
@@ -441,7 +441,7 @@ func test_from_level_three_dirt_smells_even_out_of_sight():
 
 func test_the_critic_marks_cleanliness_down_for_a_filthy_floor():
 	var game = _game()
-	var g: Guest = game.spawn_guest(0)
+	var g: Guest = game.seating.spawn_guest(0)
 	g.cell = Vector2i(6, 4)
 	game.critic_guest = g
 	for c in [Vector2i(7, 4), Vector2i(8, 4), Vector2i(7, 5), Vector2i(8, 5)]:
@@ -471,7 +471,7 @@ func test_each_level_is_drawn_as_its_own_shape_and_cleared_when_clean():
 func test_dirt_stays_overnight():
 	var game = _game()
 	_dirty(game, Vector2i(6, 5), 3)
-	game._end_day()
+	game.day._end_day()
 	game.step(0.01)
 	assert_eq(game.floor_dirt.mess.level(Vector2i(6, 5)), 3, "no cleaning until the mop (9.4)")
 
@@ -488,7 +488,7 @@ func test_getting_up_times():
 
 
 func _guest_at(game, idx: int, c: Vector2i) -> Guest:
-	var g: Guest = game.spawn_guest(idx)
+	var g: Guest = game.seating.spawn_guest(idx)
 	g.position = Grid.center(c)
 	g.cell = c
 	g.path.clear()
@@ -585,7 +585,7 @@ func test_a_chef_helps_a_fallen_guest_up_with_e_in_a_second():
 	var fd: FloorDirt = game.floor_dirt
 	fd.slip(g, c)
 	assert_eq(fd.help_target(ch), g)
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(fd.helping(ch), g)
 	var at := ch.position
 	ch.move(Vector2(1, 0), 0.2)
@@ -678,7 +678,7 @@ func test_a_chef_slips_cannot_move_and_gets_up_alone_after_four_seconds():
 	var at := ch.position
 	ch.move(Vector2(1, 0), 0.2)
 	assert_eq(ch.position, at)
-	game.act(0, "use")   # nothing: they are on the floor
+	game.coop.act(0, "use")   # nothing: they are on the floor
 	for i in 39:
 		fd.tick_slips(0.1)
 	assert_true(fd.is_down(ch))
@@ -721,7 +721,7 @@ func test_a_fallen_guest_is_drawn_down_with_stars_and_a_help_bar():
 func test_the_end_of_the_day_gets_everyone_up():
 	var game = _game()
 	game.floor_dirt.slip(game.player, game.player.cell())
-	game._end_day()
+	game.day._end_day()
 	assert_false(game.floor_dirt.is_down(game.player))
 
 
@@ -831,7 +831,7 @@ func _stand(game, c: Vector2i, dir := Vector2i(0, 1)) -> Vector2i:
 
 
 func _bucket(game, c: Vector2i) -> Station:
-	var st: Station = game.add_station("mop_bucket", c)
+	var st: Station = game.world.add_station("mop_bucket", c)
 	game.clean_kit.on_built(st, "mop_bucket")
 	game.step(0.01)
 	return st
@@ -860,13 +860,13 @@ func test_e_takes_the_mop_from_its_bucket_and_puts_it_back_rinsed():
 	var b := _bucket(game, c + Vector2i(-1, 0))
 	assert_eq(b.kit_tool, "mop", "a bucket comes with its mop")
 	_stand(game, c, Vector2i(-1, 0))
-	assert_eq(game.use_station(b, true), "Take mop")
-	game.act(0, "use")
+	assert_eq(game.cooking.use_station(b, true), "Take mop")
+	game.coop.act(0, "use")
 	assert_eq(game.player.held, "tool:mop")
 	assert_eq(b.kit_tool, "")
 	game.player.set_held("tool:mop", CleanTools.cleanness("mop", 3))
-	assert_eq(game.use_station(b, true), "Put mop back")
-	game.act(0, "use")
+	assert_eq(game.cooking.use_station(b, true), "Put mop back")
+	game.coop.act(0, "use")
 	assert_eq(game.player.held, "")
 	assert_eq(b.kit_tool, "mop")
 	assert_eq(b.kit_used, 0, "the bucket rinses it")
@@ -876,7 +876,7 @@ func test_hands_are_full_while_holding_a_tool():
 	var game = _game()
 	CleanKit.hold(game.player, "mop", 0)
 	for st: Station in game.stations.values():
-		assert_eq(game.use_station(st, true), "", "nothing at the %s" % st.type)
+		assert_eq(game.cooking.use_station(st, true), "", "nothing at the %s" % st.type)
 
 
 func test_e_at_a_dirty_cell_in_front_clears_a_level_and_held_e_repeats():
@@ -886,9 +886,9 @@ func test_e_at_a_dirty_cell_in_front_clears_a_level_and_held_e_repeats():
 		game.floor_dirt.mess.add_dirt(front)
 	CleanKit.hold(game.player, "mop", 0)
 	assert_eq(game.clean_kit.floor_action(game.player), "Mop")
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(game.floor_dirt.mess.level(front), 2)
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(game.floor_dirt.mess.level(front), 2, "a press takes 0.6 s")
 	game.clean_kit.tick(0.61)
 	game.clean_kit.hold_use(game.player, true)
@@ -904,9 +904,9 @@ func test_held_e_with_bare_hands_scrubs_slower_than_a_tool():
 	var front := _stand(game, Vector2i(7, 2))
 	for i in 2:
 		game.floor_dirt.mess.add_dirt(front)
-	assert_null(game.station_at(game.player.target_cell()), "nothing stands in front")
+	assert_null(game.world.station_at(game.player.target_cell()), "nothing stands in front")
 	assert_eq(game.clean_kit.floor_action(game.player), "Hold to scrub")
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(game.floor_dirt.mess.level(front), 2, "a tap by hand does nothing yet")
 	game.clean_kit.hold_use(game.player, true, CleanTools.HAND_TIME * 0.6)
 	assert_eq(game.floor_dirt.mess.level(front), 2)
@@ -938,11 +938,11 @@ func test_a_dirty_mop_is_slow_until_rinsed_at_a_sink():
 	CleanKit.hold(game.player, "mop", 4)
 	assert_string_contains(game.clean_kit.floor_action(game.player), "slow")
 	var before: int = game.floor_dirt.mess.total()
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(game.floor_dirt.mess.total(), before - 1, "it still mops")
-	var sink: Station = game.find_station("sink")
-	assert_eq(game.use_station(sink, true), "Rinse mop")
-	game.use_station(sink)
+	var sink: Station = game.world.find_station("sink")
+	assert_eq(game.cooking.use_station(sink, true), "Rinse mop")
+	game.cooking.use_station(sink)
 	assert_eq(CleanKit.held_used(game.player), 0)
 	assert_eq(game.player.held, "tool:mop", "still in hand, clean")
 
@@ -955,7 +955,7 @@ func test_dirt_straight_ahead_beats_putting_the_mop_back():
 	var front := _stand(game, c)
 	game.floor_dirt.mess.add_dirt(front)
 	CleanKit.hold(game.player, "mop", 0)
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(game.floor_dirt.mess.level(front), 0)
 	assert_eq(game.player.held, "tool:mop")
 
@@ -964,17 +964,17 @@ func test_a_sponge_hangs_on_its_hook():
 	var game = _game()
 	var w := _wall_cell(game)
 	assert_ne(w, Vector2i(-99, -99), "the test needs a free wall cell")
-	var h: Station = game.add_high("hook", w)
+	var h: Station = game.world.add_high("hook", w)
 	game.clean_kit.on_built(h, "sponge")
 	assert_eq(h.kit_tool, "sponge")
 	assert_eq(game.clean_kit.home_at(w), h)
-	assert_eq(game.use_station(h, true), "Take sponge")
-	game.use_station(h)
+	assert_eq(game.cooking.use_station(h, true), "Take sponge")
+	game.cooking.use_station(h)
 	assert_eq(game.player.held, "tool:sponge")
 	CleanKit.hold(game.player, "mop", 0)
-	assert_eq(game.use_station(h, true), "", "a mop does not hang on a hook")
+	assert_eq(game.cooking.use_station(h, true), "", "a mop does not hang on a hook")
 	CleanKit.hold(game.player, "sponge", 2)
-	game.use_station(h)
+	game.cooking.use_station(h)
 	assert_eq(h.kit_tool, "sponge")
 	assert_eq(h.kit_used, 2, "a hook does not rinse")
 
@@ -982,15 +982,15 @@ func test_a_sponge_hangs_on_its_hook():
 func test_a_closet_holds_a_mop_or_a_sponge():
 	var game = _game()
 	var w := _wall_cell(game)
-	var low: Station = game.add_station("shelf", w)
-	var high: Station = game.add_high("shelf", w)
+	var low: Station = game.world.add_station("shelf", w)
+	var high: Station = game.world.add_high("shelf", w)
 	assert_true(game.kitchen.is_closet(w))
 	assert_eq(game.clean_kit.home_at(w), high)
 	CleanKit.hold(game.player, "mop", 1)
-	assert_eq(game.use_station(low, true), "Put mop back")
-	game.use_station(low)
+	assert_eq(game.cooking.use_station(low, true), "Put mop back")
+	game.cooking.use_station(low)
 	assert_eq(high.kit_tool, "mop")
-	assert_eq(game.use_station(low, true), "Take mop")
+	assert_eq(game.cooking.use_station(low, true), "Take mop")
 
 
 func test_a_tool_put_down_elsewhere_lies_in_the_way():
@@ -998,13 +998,13 @@ func test_a_tool_put_down_elsewhere_lies_in_the_way():
 	var front := _stand(game, Vector2i(7, 2))
 	CleanKit.hold(game.player, "sponge", 1)
 	assert_eq(game.clean_kit.floor_action(game.player), "Put sponge down")
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(game.player.held, "")
 	assert_true(game.clean_kit.lying.has(front))
 	game.step(0.01)
-	assert_almost_eq(game.floor_speed(Grid.center(front)), FloorMess.speed_of(2), 0.001, "in the way")
+	assert_almost_eq(game.seating.floor_speed(Grid.center(front)), FloorMess.speed_of(2), 0.001, "in the way")
 	assert_eq(game.clean_kit.floor_action(game.player), "Pick up sponge")
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(game.player.held, "tool:sponge")
 	assert_eq(CleanKit.held_used(game.player), 1, "as dirty as it was")
 	assert_false(game.clean_kit.lying.has(front))
@@ -1017,29 +1017,29 @@ func test_at_night_moving_furniture_uncovers_dirt_to_mop():
 	game.floor_dirt.mess.add_dirt(under)
 	game.arrivals.clear()
 	game.step(0.1)
-	game.open_build()
+	game.session.open_build()
 	game.step(0.01)
 	_stand(game, under + Vector2i(0, -1))
 	CleanKit.hold(game.player, "mop", 0)
 	assert_false(game.floor_dirt.mess.can_clean(under), "covered while the table stands there")
-	game.build_interact()
+	game.room_edit.build_interact()
 	assert_eq(game.floor_dirt.mess.level(under), 1)
 	assert_true(game.player.hand.is_empty(), "hands full: the table is not picked up with a mop in them")
-	assert_false(game.pick_up(Grid.center(under)))
+	assert_false(game.placing.pick_up(Grid.center(under)))
 	game.player.set_held("")
-	assert_true(game.pick_up(Grid.center(under)))
+	assert_true(game.placing.pick_up(Grid.center(under)))
 	game.step(0.01)
 	assert_true(game.floor_dirt.mess.can_clean(under))
 	game.player.hand = {}   # the table set aside for the test
 	CleanKit.hold(game.player, "mop", 0)
-	assert_eq(game._kit_action(game.player), "Mop")
-	game.build_interact()
+	assert_eq(game.room_edit._kit_action(game.player), "Mop")
+	game.room_edit.build_interact()
 	assert_eq(game.floor_dirt.mess.level(under), 0)
 
 
 func test_the_robot_drifts_to_dirt_cleans_it_slowly_and_docks():
 	var game = _game()
-	var dock: Station = game.add_station("robot_dock", Vector2i(7, 2))
+	var dock: Station = game.world.add_station("robot_dock", Vector2i(7, 2))
 	var dirt := Vector2i(7, 4)
 	game.floor_dirt.mess.add_dirt(dirt)
 	game.floor_dirt.mess.add_dirt(dirt)
@@ -1062,12 +1062,12 @@ func test_the_robot_drifts_to_dirt_cleans_it_slowly_and_docks():
 
 func test_the_robot_goes_home_at_the_end_of_the_day():
 	var game = _game()
-	var dock: Station = game.add_station("robot_dock", Vector2i(7, 2))
+	var dock: Station = game.world.add_station("robot_dock", Vector2i(7, 2))
 	game.floor_dirt.mess.add_dirt(Vector2i(7, 5))
 	for i in 30:
 		game.step(0.05)
 	assert_false(game.clean_kit.is_docked(dock))
-	game._end_day()
+	game.day._end_day()
 	assert_true(game.clean_kit.is_docked(dock))
 
 
@@ -1075,19 +1075,19 @@ func test_bought_at_night_a_sponge_hangs_on_its_own_hook_and_a_bucket_holds_a_mo
 	var game = _game()
 	game.arrivals.clear()
 	game.step(0.1)
-	game.open_build()
+	game.session.open_build()
 	game.ledger.money = 200
 	var w := _wall_cell(game)
-	assert_true(game.pick_catalog("sponge"))
-	assert_true(game.can_place(Vector3i(w.x, w.y, 0)), "a sponge goes on a wall")
-	assert_true(game.place(Vector3i(w.x, w.y, 0)))
+	assert_true(game.placing.pick_catalog("sponge"))
+	assert_true(game.placing.can_place(Vector3i(w.x, w.y, 0)), "a sponge goes on a wall")
+	assert_true(game.placing.place(Vector3i(w.x, w.y, 0)))
 	var h: Station = game.highs[w]
 	assert_eq(h.type, "hook")
 	assert_eq(h.kit_tool, "sponge")
-	game.cancel_hand()
+	game.placing.cancel_hand()
 	var spot := Vector2i(7, 2)
-	assert_true(game.pick_catalog("mop_bucket"))
-	assert_true(game.place(Vector3i(spot.x, spot.y, 0)))
+	assert_true(game.placing.pick_catalog("mop_bucket"))
+	assert_true(game.placing.place(Vector3i(spot.x, spot.y, 0)))
 	assert_eq((game.stations[spot] as Station).kit_tool, "mop")
 	assert_eq(game.ledger.money, 200 - 15 - 35)
 
@@ -1356,69 +1356,69 @@ func test_chemicals_and_food_never_share_a_cell_and_chemicals_stay_out_of_fridge
 func _night(game) -> void:
 	game.arrivals.clear()
 	game.step(0.1)
-	game.open_build()
+	game.session.open_build()
 	game.ledger.money = 1000
 
 
 ## A bare counter at a free cell for a box; its cell.
 func _shelf_for(game, c := Vector2i(7, 2)) -> Vector2i:
-	game.add_station("counter", c)
+	game.world.add_station("counter", c)
 	return c
 
 
 func test_a_treatment_box_is_stored_away_from_food_and_stocks_no_food():
 	var game = _game()
 	_night(game)
-	var food: Vector2i = game.storage_of(game.fixed_main().bread).cell
-	assert_true(game.pick_catalog("box_cleaner"))
-	assert_false(game.can_place(Vector3i(food.x, food.y, 0)), "not in with the bread")
+	var food: Vector2i = game.menu_stock.storage_of(game.world.fixed_main().bread).cell
+	assert_true(game.placing.pick_catalog("box_cleaner"))
+	assert_false(game.placing.can_place(Vector3i(food.x, food.y, 0)), "not in with the bread")
 	game.player.demo_hover = Grid.center(food)
-	assert_eq(game.build_action(), "No chemicals with food")
+	assert_eq(game.room_edit.build_action(), "No chemicals with food")
 	var c := _shelf_for(game)
-	var before: int = game.kitchen_stock().size()
-	assert_true(game.place(Vector3i(c.x, c.y, 0)))
+	var before: int = game.menu_stock.kitchen_stock().size()
+	assert_true(game.placing.place(Vector3i(c.x, c.y, 0)))
 	assert_true(game.kitchen.stock(c).has("box_cleaner"))
-	assert_eq(game.kitchen_stock().size(), before, "chemicals stock no food")
-	assert_eq(game.treat_boxed(), {"cleaner": true})
+	assert_eq(game.menu_stock.kitchen_stock().size(), before, "chemicals stock no food")
+	assert_eq(game.menu_stock.treat_boxed(), {"cleaner": true})
 	game.player.demo_hover = Vector3.INF
 	_stand(game, c + Vector2i(0, 1), Vector2i(0, -1))
-	assert_eq(game.use_station(game.stations[c], true), "", "nothing to take out of a box of chemicals")
+	assert_eq(game.cooking.use_station(game.stations[c], true), "", "nothing to take out of a box of chemicals")
 
 
 func test_laid_at_night_a_treatment_is_paid_at_the_door_each_night_while_on():
 	var game = _game()
 	_night(game)
-	var base: int = game.night_cost()
-	assert_false(game.shop_items("", "Build").any(func(bp: Dictionary) -> bool: return bp.id == "treat_cleaner"),
+	var base: int = game.menu_stock.night_cost()
+	assert_false(game.session.shop_items("", "Build").any(func(bp: Dictionary) -> bool: return bp.id == "treat_cleaner"),
 		"no box stored: nothing to lay")
 	game.kitchen.store(_shelf_for(game), "box_cleaner")
-	assert_true(game.shop_items("", "Build").any(func(bp: Dictionary) -> bool: return bp.id == "treat_cleaner"))
-	assert_true(game.pick_catalog("treat_cleaner"))
+	assert_true(game.session.shop_items("", "Build").any(func(bp: Dictionary) -> bool: return bp.id == "treat_cleaner"))
+	assert_true(game.placing.pick_catalog("treat_cleaner"))
 	var money: int = game.ledger.money
-	assert_eq(game.finish_drag(Grid.center(Vector2i(4, 2)), Grid.center(Vector2i(5, 3)), false), 4)
+	assert_eq(game.room_edit.finish_drag(Grid.center(Vector2i(4, 2)), Grid.center(Vector2i(5, 3)), false), 4)
 	assert_eq(game.ledger.money, money, "laying is free")
 	assert_eq(game.treat_laid.size(), 4)
 	var fee := Treatments.fee_of("cleaner")
-	assert_eq(game.night_cost(), base + fee, "the stocked box's flat fee: the tiles add nothing")
-	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner box, 4 tiles" and l.fee == fee))
+	assert_eq(game.menu_stock.night_cost(), base + fee, "the stocked box's flat fee: the tiles add nothing")
+	assert_true(game.menu_stock.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner box, 4 tiles" and l.fee == fee))
 	assert_eq(game.floor_dirt.sheen_cells().size(), 4, "a sheen where it is laid")
-	game.rotate_hand()
+	game.placing.rotate_hand()
 	assert_true(game.treat_off.has("cleaner"), "turning the tool switches it off")
-	assert_eq(game.night_cost(), base, "switched off: the box is not restocked")
-	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner box, 4 tiles, off" and l.fee == 0))
-	game.rotate_hand()
-	assert_eq(game.night_cost(), base + fee)
-	assert_eq(game.finish_drag(Grid.center(Vector2i(5, 3)), Grid.center(Vector2i(5, 3)), true), 1, "a right-drag lifts it")
-	assert_eq(game.night_cost(), base + fee, "fewer tiles, the same fee")
-	game.cancel_hand()
+	assert_eq(game.menu_stock.night_cost(), base, "switched off: the box is not restocked")
+	assert_true(game.menu_stock.stock_lines().any(func(l: Dictionary) -> bool: return l.name == "Floor cleaner box, 4 tiles, off" and l.fee == 0))
+	game.placing.rotate_hand()
+	assert_eq(game.menu_stock.night_cost(), base + fee)
+	assert_eq(game.room_edit.finish_drag(Grid.center(Vector2i(5, 3)), Grid.center(Vector2i(5, 3)), true), 1, "a right-drag lifts it")
+	assert_eq(game.menu_stock.night_cost(), base + fee, "fewer tiles, the same fee")
+	game.placing.cancel_hand()
 	money = game.ledger.money
-	game.start_day()
+	game.day.start_day()
 	assert_eq(game.ledger.money, money - base - fee)
 	assert_eq(game.floor_dirt.mess.treat.size(), 3, "laid for the day")
 	game.floor_dirt.mess.add_dirt(Vector2i(4, 2))
 	game.floor_dirt.mess.add_dirt(Vector2i(4, 2))
 	assert_true(game.floor_dirt.mess.one_press(Vector2i(4, 2)))
-	game._end_day()
+	game.day._end_day()
 	assert_eq(game.floor_dirt.mess.treat.size(), 0, "it lasts one day of service")
 	assert_eq(game.treat_laid.size(), 3, "and is re-laid tomorrow")
 
@@ -1426,25 +1426,25 @@ func test_laid_at_night_a_treatment_is_paid_at_the_door_each_night_while_on():
 func test_without_its_box_a_treatment_is_not_relaid():
 	var game = _game()
 	_night(game)
-	var base: int = game.night_cost()
+	var base: int = game.menu_stock.night_cost()
 	var c := _shelf_for(game)
 	game.kitchen.store(c, "box_finish")
 	game.treat_laid = {Vector2i(4, 2): "finish", Vector2i(4, 3): "finish"}
-	assert_eq(game.night_cost(), base + Treatments.fee_of("finish"), "the finish box's flat fee")
+	assert_eq(game.menu_stock.night_cost(), base + Treatments.fee_of("finish"), "the finish box's flat fee")
 	game.kitchen.unstore(c, "box_finish")
-	assert_eq(game.night_cost(), base)
-	assert_true(game.stock_lines().any(func(l: Dictionary) -> bool: return l.name.ends_with("no box")))
-	game.start_day()
+	assert_eq(game.menu_stock.night_cost(), base)
+	assert_true(game.menu_stock.stock_lines().any(func(l: Dictionary) -> bool: return l.name.ends_with("no box")))
+	game.day.start_day()
 	assert_true(game.floor_dirt.mess.treat.is_empty())
 
 
 func test_a_finish_in_force_cheers_guests_like_a_fine_floor():
 	var game = _game()
 	var seat := Vector2i(4, 2)
-	var before: float = game.decor_bonus(seat).joy
+	var before: float = game.decor.decor_bonus(seat).joy
 	game.floor_dirt.mess.treat = {seat: "high_gloss"}
-	assert_gt(game.decor_bonus(seat).joy, before)
-	assert_eq(game.decor_bonus(seat).best, "treat_high_gloss")
+	assert_gt(game.decor.decor_bonus(seat).joy, before)
+	assert_eq(game.decor.decor_bonus(seat).best, "treat_high_gloss")
 
 
 func test_a_box_picked_up_climbs_its_tree_and_the_laid_cells_follow():
@@ -1453,18 +1453,18 @@ func test_a_box_picked_up_climbs_its_tree_and_the_laid_cells_follow():
 	var c := _shelf_for(game)
 	game.kitchen.store(c, "box_cleaner")
 	game.treat_laid = {Vector2i(4, 2): "cleaner"}
-	assert_true(game.pick_up(Grid.center(c)))
+	assert_true(game.placing.pick_up(Grid.center(c)))
 	assert_eq(game.player.hand.id, "box_cleaner")
-	assert_eq(game.hand_key(), "box_cleaner")
-	assert_true(game.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "box_primer"),
+	assert_eq(game.upgrades.hand_key(), "box_cleaner")
+	assert_true(game.upgrades.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "box_primer"),
 		"the strip along the bottom offers the box's next steps")
 	var money: int = game.ledger.money
-	assert_true(game.buy_upgrade("box_primer"))
+	assert_true(game.upgrades.buy_upgrade("box_primer"))
 	assert_eq(game.ledger.money, money - 40)
 	assert_eq(game.player.hand.id, "box_primer")
 	assert_eq(game.treat_laid[Vector2i(4, 2)], "primer")
-	game.close_shop()
-	assert_true(game.place(Vector3i(c.x, c.y, 0)))
+	game.session.close_shop()
+	assert_true(game.placing.place(Vector3i(c.x, c.y, 0)))
 	assert_true(game.kitchen.stock(c).has("box_primer"))
 
 
@@ -1473,17 +1473,17 @@ func test_a_mop_bucket_climbs_to_a_flat_mop_and_its_mop_comes_too():
 	_night(game)
 	var c := Vector2i(7, 2)
 	var b := _bucket(game, c)
-	assert_true(game.pick_up(Grid.center(c)))
-	game.open_shop()
-	assert_true(game.buy_upgrade("sponge_mop"))
-	assert_true(game.buy_upgrade("flat_mop"))
+	assert_true(game.placing.pick_up(Grid.center(c)))
+	game.session.open_shop()
+	assert_true(game.upgrades.buy_upgrade("sponge_mop"))
+	assert_true(game.upgrades.buy_upgrade("flat_mop"))
 	var up: Station = game.player.hand.node
 	assert_eq(up.node, "flat_mop")
 	assert_eq(up.type, "mop_bucket", "still a bucket in the room")
 	assert_eq(up.kit_tool, "flat_mop")
 	assert_false(is_instance_valid(b) and not b.is_queued_for_deletion())
-	game.close_shop()
-	assert_true(game.place(Vector3i(c.x, c.y, 0)))
+	game.session.close_shop()
+	assert_true(game.placing.place(Vector3i(c.x, c.y, 0)))
 	assert_eq((game.stations[c] as Station).kit_tool, "flat_mop")
 
 
@@ -1495,9 +1495,9 @@ func test_with_its_mop_out_the_bucket_upgrade_swaps_the_mop_in_hand():
 	game.clean_kit.keep(b, "", 0)
 	var holder: Player = game.add_chef(Vector2i(4, 4))   # chef 2 has the mop out
 	CleanKit.hold(holder, "mop", 3)
-	assert_true(game.pick_up(Grid.center(c)))
-	game.open_shop()
-	assert_true(game.buy_upgrade("wringer_bucket"))
+	assert_true(game.placing.pick_up(Grid.center(c)))
+	game.session.open_shop()
+	assert_true(game.upgrades.buy_upgrade("wringer_bucket"))
 	assert_eq(CleanKit.held_tool(holder), "wringer_mop")
 
 
@@ -1506,16 +1506,16 @@ func test_the_wringer_bucket_grows_into_the_robot_sweepers_dock():
 	_night(game)
 	var c := Vector2i(7, 2)
 	_bucket(game, c)
-	assert_true(game.pick_up(Grid.center(c)))
-	game.open_shop()
-	assert_true(game.buy_upgrade("wringer_bucket"))
+	assert_true(game.placing.pick_up(Grid.center(c)))
+	game.session.open_shop()
+	assert_true(game.upgrades.buy_upgrade("wringer_bucket"))
 	assert_eq((game.player.hand.node as Station).kit_tool, "wringer_mop")
-	assert_true(game.buy_upgrade("robot_dock"))
+	assert_true(game.upgrades.buy_upgrade("robot_dock"))
 	var dock: Station = game.player.hand.node
 	assert_eq(dock.type, "robot_dock")
 	assert_eq(dock.kit_tool, "")
-	game.close_shop()
-	assert_true(game.place(Vector3i(c.x, c.y, 0)))
+	game.session.close_shop()
+	assert_true(game.placing.place(Vector3i(c.x, c.y, 0)))
 	game.step(0.01)
 	assert_true(game.clean_kit.robots.has(game.stations[c]), "its robot is out")
 
@@ -1524,33 +1524,33 @@ func test_a_hooks_tree_is_its_tools():
 	var game = _game()
 	_night(game)
 	var w := _wall_cell(game)
-	var h: Station = game.add_high("hook", w)
+	var h: Station = game.world.add_high("hook", w)
 	game.clean_kit.on_built(h, "sponge")
-	assert_true(game.pick_up(Grid.center(w)))
-	assert_eq(game.hand_key(), "sponge")
-	assert_true(game.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "spill_kit"))
-	assert_true(game.buy_upgrade("spill_kit"))
+	assert_true(game.placing.pick_up(Grid.center(w)))
+	assert_eq(game.upgrades.hand_key(), "sponge")
+	assert_true(game.upgrades.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "spill_kit"))
+	assert_true(game.upgrades.buy_upgrade("spill_kit"))
 	assert_eq(h.kit_tool, "spill_kit")
-	assert_eq(game.hand_key(), "spill_kit")
-	game.close_shop()
-	assert_true(game.place(Vector3i(w.x, w.y, 0)))
+	assert_eq(game.upgrades.hand_key(), "spill_kit")
+	game.session.close_shop()
+	assert_true(game.placing.place(Vector3i(w.x, w.y, 0)))
 	assert_eq((game.highs[w] as Station).kit_tool, "spill_kit")
 
 
 func test_a_hood_upgraded_to_an_extractor_cuts_more_grease():
 	var game = _game()
 	_night(game)
-	game.clear_walls()
+	game.menu_stock.clear_walls()
 	var w := _wall_cell(game)
-	game.add_high("hood", w)
-	assert_true(game.pick_up(Grid.center(w)))
-	game.open_shop()
-	assert_true(game.buy_upgrade("extractor"))
-	game.close_shop()
-	assert_true(game.place(Vector3i(w.x, w.y, 0)))
+	game.world.add_high("hood", w)
+	assert_true(game.placing.pick_up(Grid.center(w)))
+	game.session.open_shop()
+	assert_true(game.upgrades.buy_upgrade("extractor"))
+	game.session.close_shop()
+	assert_true(game.placing.place(Vector3i(w.x, w.y, 0)))
 	assert_eq(game.kitchen.hood_at(w), "extractor")
 	assert_eq((game.highs[w] as Station).type, "hood", "it draws as a hood")
-	game.start_day()
+	game.day.start_day()
 	assert_true(game.floor_dirt.mess.extractor)
 
 
@@ -1589,23 +1589,23 @@ func test_the_sponge_grows_into_a_mop_bucket_and_then_a_cleaner_in_its_pail():
 	_night(game)
 	game.ledger.money = 500
 	var w := _wall_cell(game)
-	var h: Station = game.add_high("hook", w)
+	var h: Station = game.world.add_high("hook", w)
 	game.clean_kit.on_built(h, "sponge")
-	assert_true(game.pick_up(Grid.center(w)))
-	assert_true(game.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "mop_bucket"),
+	assert_true(game.placing.pick_up(Grid.center(w)))
+	assert_true(game.upgrades.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "mop_bucket"),
 		"the sponge's strip offers the mop bucket")
-	assert_true(game.buy_upgrade("mop_bucket"))
+	assert_true(game.upgrades.buy_upgrade("mop_bucket"))
 	assert_eq(game.ledger.money, 500 - Upgrades.step_price("mop_bucket"))
 	var b: Station = game.player.hand.node
 	assert_eq(b.type, "mop_bucket", "off the wall: a bucket in hand")
 	assert_eq(b.kit_tool, "mop", "with its mop")
-	var keys: Array = game.strip_choices().map(func(c: Dictionary) -> String: return str(c.get("key", "")))
+	var keys: Array = game.upgrades.strip_choices().map(func(c: Dictionary) -> String: return str(c.get("key", "")))
 	assert_has(keys, "sponge_mop", "better mops")
 	assert_has(keys, "cleaner_bucket", "or a liquid in the pail")
-	assert_true(game.buy_upgrade("cleaner_bucket"))
+	assert_true(game.upgrades.buy_upgrade("cleaner_bucket"))
 	assert_eq((game.player.hand.node as Station).kit_tool, "cleaner_mop")
 	assert_eq(int(CleanTools.TOOLS.cleaner_mop.levels), FloorMess.MAX_LEVEL, "a whole cell a press")
 	var spot := Vector2i(7, 2)
-	assert_true(game.place(Vector3i(spot.x, spot.y, 0)))
+	assert_true(game.placing.place(Vector3i(spot.x, spot.y, 0)))
 	assert_eq((game.stations[spot] as Station).kit_tool, "cleaner_mop")
 	assert_false(game.highs.has(w), "the hook is gone")

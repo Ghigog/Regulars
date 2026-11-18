@@ -28,7 +28,7 @@ func test_no_save_is_empty():
 func test_capture_round_trips_through_the_file():
 	game.ledger.money = 321
 	game.ledger.day = 4
-	game.autosave()
+	game.session.autosave()
 	var d := SaveGame.read(SAVE_TEST_PATH)
 	assert_false(d.is_empty())
 	assert_eq(int(d.ledger.money), 321)
@@ -39,7 +39,7 @@ func test_capture_round_trips_through_the_file():
 
 func test_restore_rebuilds_the_room():
 	game.ledger.money = 77
-	game.add_station("table", Vector2i(7, 4), 1, 0)
+	game.world.add_station("table", Vector2i(7, 4), 1, 0)
 	var data := SaveGame.capture(game)
 	var other = load("res://game/main.tscn").instantiate()
 	other._resume_data = data
@@ -50,13 +50,13 @@ func test_restore_rebuilds_the_room():
 	assert_eq(other.stations.size(), game.stations.size())
 	assert_eq(other.highs.size(), game.highs.size())
 	assert_eq(other.phase, other.Phase.BUILD)
-	assert_ne(other.till_cell(), other.NO_CELL)
+	assert_ne(other.paying.till_cell(), other.NO_CELL)
 
 
 func test_closing_down_deletes_the_save():
-	game.autosave()
+	game.session.autosave()
 	assert_true(SaveGame.exists(SAVE_TEST_PATH))
-	game._close_down()
+	game.day._close_down()
 	assert_false(SaveGame.exists(SAVE_TEST_PATH))
 
 
@@ -64,9 +64,9 @@ func test_pause_menu_opens_and_resumes():
 	game.hud.toggle_pause()
 	assert_true(game.hud.pause_open())
 	assert_true(get_tree().paused)
-	game.act(0, "down")
+	game.coop.act(0, "down")
 	assert_eq(game.hud.pause.sel, 1)
-	game.act(0, "back")
+	game.coop.act(0, "back")
 	assert_false(game.hud.pause_open())
 	assert_false(get_tree().paused)
 

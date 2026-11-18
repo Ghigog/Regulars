@@ -12,7 +12,7 @@ func before_each():
 	game.best_path = "user://regulars_best_test.json"
 	game.theme_path = "user://regulars_theme_test.cfg"
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])   # keeps the day open
-	game.test_kitchen()
+	game.menu_stock.test_kitchen()
 	for p in game.town.people:   # middling tolerances and no floor dirt (PRDs 9, 10): not what these test
 		p.tolerance = {"food": 3, "service": 3, "clean": 3}
 	game.floor_dirt.drops = false
@@ -30,7 +30,7 @@ func _to_summary() -> void:
 
 func _to_build() -> void:
 	_to_summary()
-	game.open_build()
+	game.session.open_build()
 
 
 func _pad(button: int, pressed: bool, device := 0) -> void:
@@ -47,7 +47,7 @@ func _tap_pad(button: int, device := 0) -> void:
 
 
 func _two() -> Player:
-	assert_eq(game.join("pad:1"), 1, "pad 1 joins as player two")
+	assert_eq(game.coop.join("pad:1"), 1, "pad 1 joins as player two")
 	return game.chefs[1]
 
 
@@ -62,8 +62,8 @@ func test_a_join_adds_a_second_chef_who_acts_for_themselves():
 	one.position = Grid.center(Vector2i(3, 4))
 	two.position = Grid.center(Vector2i(1, 2))
 	two.look(Vector2i(-1, 0))   # at the patty crate
-	game.act(1, "use")
-	assert_eq(two.held, Tray.kind("raw", game.fixed_main().grill), "chef 2 took a patty")
+	game.coop.act(1, "use")
+	assert_eq(two.held, Tray.kind("raw", game.world.fixed_main().grill), "chef 2 took a patty")
 	assert_eq(one.held, "", "chef 1's hands are untouched")
 	assert_eq(one.position, Grid.center(Vector2i(3, 4)), "and chef 1 did not move")
 
@@ -91,13 +91,13 @@ func test_the_first_use_at_a_station_wins():
 		ch.position = Grid.center(Vector2i(1, 2))
 		ch.look(Vector2i(-1, 0))
 	var stove: Station = game.stations[Vector2i(0, 3)]
-	one.set_held(Tray.kind("raw", game.fixed_main().grill))
-	two.set_held(Tray.kind("raw", game.fixed_main().grill))
+	one.set_held(Tray.kind("raw", game.world.fixed_main().grill))
+	two.set_held(Tray.kind("raw", game.world.fixed_main().grill))
 	for ch: Player in [one, two]:
 		ch.position = Grid.center(Vector2i(1, 3))
-	assert_ne(game.use_station(stove, false, one), "", "chef 1 puts a patty on")
-	assert_eq(game.use_station(stove, true, two).begins_with("Grill"), false, "chef 2 cannot put a second one on")
-	assert_eq(game.use_station(stove, true, two), "Chef 1 has it", "and is told who won")
+	assert_ne(game.cooking.use_station(stove, false, one), "", "chef 1 puts a patty on")
+	assert_eq(game.cooking.use_station(stove, true, two).begins_with("Grill"), false, "chef 2 cannot put a second one on")
+	assert_eq(game.cooking.use_station(stove, true, two), "Chef 1 has it", "and is told who won")
 
 
 # ---------------------------------------------------------------- building together
@@ -107,28 +107,28 @@ func test_two_build_hands_are_independent():
 	var one: Player = game.player
 	var two := _two()
 	game.ledger.money = 500
-	assert_true(game.pick_catalog("plant", 1, one))
-	assert_true(game.pick_catalog("plant", 1, two))
+	assert_true(game.placing.pick_catalog("plant", 1, one))
+	assert_true(game.placing.pick_catalog("plant", 1, two))
 	assert_eq(one.hand.id, "plant")
 	assert_eq(two.hand.id, "plant", "each chef holds their own piece")
 	assert_ne(one.hand, two.hand.merged({"x": 1}), "two dictionaries, not one")
-	game.rotate_hand(two)
+	game.placing.rotate_hand(two)
 	assert_eq(int(two.hand.facing), 1)
 	assert_eq(int(one.hand.facing), 0, "turning one hand leaves the other")
 	var spot := Vector3i(2, 4, 0)
-	assert_true(game.can_place(spot, one))
-	assert_true(game.place(spot, one), "the first to press Use gets the spot")
-	assert_false(game.can_place(spot, two), "the other's ghost shows the cross")
-	game.cancel_hand(one)
-	assert_true(game.pick_up(Grid.center(Vector2i(6, 1)), one), "chef 1 lifts a table")
-	assert_false(game.pick_up(Grid.center(Vector2i(6, 1)), two), "chef 2 cannot take the piece chef 1 is moving")
+	assert_true(game.placing.can_place(spot, one))
+	assert_true(game.placing.place(spot, one), "the first to press Use gets the spot")
+	assert_false(game.placing.can_place(spot, two), "the other's ghost shows the cross")
+	game.placing.cancel_hand(one)
+	assert_true(game.placing.pick_up(Grid.center(Vector2i(6, 1)), one), "chef 1 lifts a table")
+	assert_false(game.placing.pick_up(Grid.center(Vector2i(6, 1)), two), "chef 2 cannot take the piece chef 1 is moving")
 
 
 func test_a_piece_cannot_shut_the_other_chef_in():
 	_to_build()
 	var two := _two()
 	two.position = Grid.center(Vector2i(7, 3))
-	var reach: Array[Vector2i] = game._reach()
+	var reach: Array[Vector2i] = game.placing._reach()
 	assert_true(reach.has(Vector2i(7, 3)), "every chef must still get about")
 
 
@@ -137,12 +137,12 @@ func test_the_shop_is_shared_and_whoever_opened_it_buys():
 	var one: Player = game.player
 	var two := _two()
 	game.ledger.money = 500
-	game.act(1, "shop")
+	game.coop.act(1, "shop")
 	assert_eq(game.shopper, two, "player two opened the shop")
-	game.act(0, "shop")
+	game.coop.act(0, "shop")
 	assert_eq(game.shopper, two, "player one's Shop does nothing while it is open")
-	game.act(0, "turn")   # player one keeps building: no shop browsing
-	assert_true(game.buy({"id": "plant", "tier": 1}))
+	game.coop.act(0, "turn")   # player one keeps building: no shop browsing
+	assert_true(game.placing.buy({"id": "plant", "tier": 1}))
 	assert_eq(two.hand.get("id", ""), "plant", "the buyer holds what was bought")
 	assert_true(one.hand.is_empty())
 	assert_false(game.shopping)
@@ -154,19 +154,19 @@ func test_the_receipt_needs_every_player():
 	_two()
 	_to_summary()
 	assert_eq(game.phase, game.Phase.SUMMARY)
-	game.act(0, "confirm")
+	game.coop.act(0, "confirm")
 	assert_eq(game.phase, game.Phase.SUMMARY, "one confirm is not enough with two")
-	assert_eq(game.ready_states(), ["ready", "waiting"] as Array[String])
-	game.act(0, "back")
-	assert_eq(game.ready_states(), ["waiting", "waiting"] as Array[String], "Back takes it back")
-	game.act(1, "confirm")
-	game.act(0, "confirm")
+	assert_eq(game.coop.ready_states(), ["ready", "waiting"] as Array[String])
+	game.coop.act(0, "back")
+	assert_eq(game.coop.ready_states(), ["waiting", "waiting"] as Array[String], "Back takes it back")
+	game.coop.act(1, "confirm")
+	game.coop.act(0, "confirm")
 	assert_eq(game.phase, game.Phase.BUILD, "both confirmed")
 
 
 func test_the_receipt_takes_one_confirm_with_one_chef():
 	_to_summary()
-	game.act(0, "confirm")
+	game.coop.act(0, "confirm")
 	assert_eq(game.phase, game.Phase.BUILD)
 
 
@@ -176,21 +176,21 @@ func test_the_door_card_needs_both_chefs():
 	var two := _two()
 	for ch: Player in [one, two]:
 		ch.position = game.DOORWAY + Vector3(-0.6, 0, 0)
-	assert_eq(game.door_action(one), "Open up")
-	game.use_door(one)
+	assert_eq(game.day.door_action(one), "Open up")
+	game.day.use_door(one)
 	assert_eq(game.phase, game.Phase.BUILD, "half turned")
-	assert_eq(game.ready_states(), ["ready", "waiting"] as Array[String])
-	game.use_door(one)
-	assert_eq(game.ready_states(), ["waiting", "waiting"] as Array[String], "using it again cancels")
-	game.use_door(two)
-	game.use_door(one)
+	assert_eq(game.coop.ready_states(), ["ready", "waiting"] as Array[String])
+	game.day.use_door(one)
+	assert_eq(game.coop.ready_states(), ["waiting", "waiting"] as Array[String], "using it again cancels")
+	game.day.use_door(two)
+	game.day.use_door(one)
 	assert_eq(game.phase, game.Phase.SERVICE, "the second chef opens")
 
 
 func test_the_door_card_takes_one_use_with_one_chef():
 	_to_build()
 	game.player.position = game.DOORWAY + Vector3(-0.6, 0, 0)
-	game.use_door()
+	game.day.use_door()
 	assert_eq(game.phase, game.Phase.SERVICE)
 
 
@@ -198,13 +198,13 @@ func test_closing_early_needs_both_chefs():
 	var one: Player = game.player
 	var two := _two()
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
-	game.clock = game.day_length() * 0.8
+	game.clock = game.day.day_length() * 0.8
 	for ch: Player in [one, two]:
 		ch.position = game.DOORWAY + Vector3(-0.6, 0, 0)
-	assert_eq(game.door_action(two), "Close early")
-	game.use_door(two)
+	assert_eq(game.day.door_action(two), "Close early")
+	game.day.use_door(two)
 	assert_true(game.door_open, "one is not enough")
-	game.use_door(one)
+	game.day.use_door(one)
 	assert_false(game.door_open, "both agreed")
 
 
@@ -213,9 +213,9 @@ func test_closing_early_needs_both_chefs():
 func test_a_chef_who_leaves_returns_a_moved_piece():
 	_to_build()
 	var two := _two()
-	assert_true(game.pick_up(Grid.center(Vector2i(6, 1)), two))
+	assert_true(game.placing.pick_up(Grid.center(Vector2i(6, 1)), two))
 	assert_false(game.stations.has(Vector2i(6, 1)))
-	assert_true(game.leave(1))
+	assert_true(game.coop.leave(1))
 	assert_eq(game.chefs.size(), 1)
 	assert_true(game.stations.has(Vector2i(6, 1)), "the table went back")
 
@@ -224,17 +224,17 @@ func test_a_new_piece_in_hand_costs_nothing_when_its_chef_leaves():
 	_to_build()
 	var two := _two()
 	var money: int = game.ledger.money
-	assert_true(game.pick_catalog("plant", 1, two))
-	game.leave(1)
+	assert_true(game.placing.pick_catalog("plant", 1, two))
+	game.coop.leave(1)
 	assert_eq(game.ledger.money, money, "nothing was paid, so nothing is owed")
 
 
 func test_food_lands_on_a_free_counter_when_its_chef_leaves():
 	var two := _two()
-	var patty := Tray.kind("raw", game.fixed_main().grill)
+	var patty := Tray.kind("raw", game.world.fixed_main().grill)
 	two.set_held(patty)
 	two.position = Grid.center(Vector2i(5, 3))
-	game.leave(1)
+	game.coop.leave(1)
 	var found := false
 	for st: Station in game.stations.values():
 		found = found or (st.type in ["counter", "pass"] and st.item == patty)
@@ -243,7 +243,7 @@ func test_food_lands_on_a_free_counter_when_its_chef_leaves():
 
 func test_when_player_one_leaves_the_other_becomes_player_one():
 	var two := _two()
-	game.leave(0)
+	game.coop.leave(0)
 	assert_eq(game.chefs.size(), 1)
 	assert_eq(game.player, two)
 	assert_eq(two.trim, 0, "dressed as player one")
@@ -251,7 +251,7 @@ func test_when_player_one_leaves_the_other_becomes_player_one():
 
 
 func test_the_last_chef_never_leaves():
-	assert_false(game.leave(0))
+	assert_false(game.coop.leave(0))
 	assert_eq(game.chefs.size(), 1)
 
 

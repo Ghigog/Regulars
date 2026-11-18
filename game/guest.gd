@@ -128,7 +128,7 @@ func _advance(delta: float) -> bool:
 		_stand()
 		return true
 	var dir := (target - position).normalized()
-	var other: Guest = game.guest_in_way(self, dir)
+	var other: Guest = game.seating.guest_in_way(self, dir)
 	var move := dir
 	if other != null:
 		_waited += delta
@@ -145,7 +145,7 @@ func _advance(delta: float) -> bool:
 		_waited = 0.0
 	_face(dir, delta)
 	var was := position
-	var speed: float = SPEED * game.floor_speed(position)   # slowed by dirt underfoot
+	var speed: float = SPEED * game.seating.floor_speed(position)   # slowed by dirt underfoot
 	if other != null:
 		position += move * speed * delta
 	else:
@@ -183,11 +183,11 @@ func seated_waiting() -> bool:
 
 func _sit() -> void:
 	state = "ordering"
-	game.sfx("sit")
+	game.audio.sfx("sit")
 	mood.patience = minf(1.0, mood.patience + 0.3)
 	_body.create_tween().tween_property(_body, "position:y", SEAT_HEIGHT, 0.2) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	game.on_seated(self)
+	game.seating.on_seated(self)
 
 
 ## The chef has written down what they want. Now they wait for the food, or,
@@ -334,73 +334,73 @@ func tick(delta: float) -> void:
 			_advance(delta)
 			mood.wait(delta, QUEUE_PATIENCE)
 			if mood.walked_out():
-				game.walk_out(self)
+				game.paying.walk_out(self)
 		"to_seat":
 			if _advance(delta):
 				_sit()
 		"ordering", "waiting":
 			_face(Grid.center(table.cell) - position, delta)
-			mood.wait(delta, game.table_patience() * (game.ORDER_PATIENCE_SCALE if state == "ordering" else 1.0))
-			game.apply_surroundings(self, delta)
+			mood.wait(delta, game.day.table_patience() * (game.ORDER_PATIENCE_SCALE if state == "ordering" else 1.0))
+			game.seating.apply_surroundings(self, delta)
 			if mood.walked_out():
-				game.walk_out(self)
+				game.paying.walk_out(self)
 		"eating":
 			timer -= delta
 			# Lean in for a bite, and the burger shrinks as it is eaten.
 			_body.rotation.x = maxf(0.0, sin(_age * 7.0)) * 0.22
 			if timer < eat_time * 0.55 and _meal_kind == "tray":
 				_set_meal("tray_bitten", mood.savour)
-			game.apply_surroundings(self, delta)
+			game.seating.apply_surroundings(self, delta)
 			if timer <= 0.0:
-				game.finish_meal(self)
+				game.serving.finish_meal(self)
 		"chatting":   # the meal is done: a moment's chat (alone, they just sit back)
 			_face(Grid.center(table.cell) - position, delta)
 			timer -= delta
-			game.apply_surroundings(self, delta)
+			game.seating.apply_surroundings(self, delta)
 			if timer <= 0.0:
 				state = "to_pay"
 		"to_pay", "at_till":   # ready to pay: the party's patience runs once the table is ready
 			if state == "to_pay":
 				_face(Grid.center(table.cell) - position, delta)
-				game.apply_surroundings(self, delta)
+				game.seating.apply_surroundings(self, delta)
 			else:
 				_advance(delta)
-				_face(Grid.center(game.till_cell()) - position, delta)
-			if game.ready_to_pay(table):
-				mood.wait_to_pay(delta, game.table_patience())
+				_face(Grid.center(game.paying.till_cell()) - position, delta)
+			if game.paying.ready_to_pay(table):
+				mood.wait_to_pay(delta, game.day.table_patience())
 				if mood.skipped_bill:
-					game.leave_unpaid(table)
+					game.paying.leave_unpaid(table)
 		"to_till":
 			if _advance(delta):
 				state = "at_till"
-			if game.ready_to_pay(table):
-				mood.wait_to_pay(delta, game.table_patience())
+			if game.paying.ready_to_pay(table):
+				mood.wait_to_pay(delta, game.day.table_patience())
 				if mood.skipped_bill:
-					game.leave_unpaid(table)
+					game.paying.leave_unpaid(table)
 		"company":   # nothing to eat: they sit with friends and go when the friends go
 			_face(Grid.center(table.cell) - position, delta)
 			var staying := party.any(func(m) -> bool:
 				return is_instance_valid(m) and m != self and m.state != "leaving" and m.state != "company")
 			if not staying:
-				game.leave_with_friends(self)
+				game.paying.leave_with_friends(self)
 		"browse":
 			if _advance(delta):
 				_face(Vector3(-1, 0, 0), delta)   # towards the window and the menu
 				if timer == BROWSE_TIME:
-					game.read_board(self)
+					game.seating.read_board(self)
 				timer -= delta
 				if timer <= 0.0:
-					game.leave_with_friends(self)
+					game.paying.leave_with_friends(self)
 		"leaving":
 			if _advance(delta):
-				game.remove_guest(self)
+				game.paying.remove_guest(self)
 				return
 	_refresh(delta)
 
 
 func _refresh(delta: float) -> void:
 	var p := mood.patience
-	_bar.visible = state == "queue" or seated_waiting() or state == "to_seat" or (paying() and game.ready_to_pay(table))
+	_bar.visible = state == "queue" or seated_waiting() or state == "to_seat" or (paying() and game.paying.ready_to_pay(table))
 	_fill.scale.x = maxf(p, 0.001)
 	_fill.position.x = (p - 1.0) * BAR_WIDTH / 2.0
 	var shade := snappedf(p, 0.1)  # few distinct colours, so materials stay cached

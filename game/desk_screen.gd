@@ -137,10 +137,10 @@ func _header() -> void:
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(gap)
-	var used := _label(top, 22, "Desks used: %d of %d" % [game.staff.seats_used(), game.desk_count()])
+	var used := _label(top, 22, "Desks used: %d of %d" % [game.staff.seats_used(), game.desk.desk_count()])
 	used.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if _draft.is_empty():
-		var done: Button = hud._button(top, "Done", game.close_desk)
+		var done: Button = hud._button(top, "Done", game.desk.close_desk)
 		done.size_flags_horizontal = Control.SIZE_SHRINK_END
 		done.custom_minimum_size = Vector2(140, 0)
 		_target(done, "done")
@@ -150,7 +150,7 @@ func _header() -> void:
 ## The posts up, the staff hired, and Write a post.
 func _posts() -> void:
 	var staff: Staff = game.staff
-	var room: Dictionary = game.room_duties()
+	var room: Dictionary = game.desk.room_duties()
 	var ids := staff.posts.keys()
 	ids.sort()
 	var list := VBoxContainer.new()
@@ -191,7 +191,7 @@ func _posts() -> void:
 	foot.add_theme_constant_override("separation", 14)
 	_content.add_child(foot)
 	var write := _paper_button(foot, "write", _write, "Write a job post", 24)
-	if not staff.can_post(game.desk_count()):
+	if not staff.can_post(game.desk.desk_count()):
 		write.disabled = true
 		write.modulate.a = 0.5
 		var why := _label(foot, 20, "Every desk is taken: one desk for each post and each hire.")
@@ -244,7 +244,7 @@ func _post_page() -> void:
 	cols.add_theme_constant_override("separation", 24)
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_content.add_child(cols)
-	var room: Dictionary = game.room_duties()
+	var room: Dictionary = game.desk.room_duties()
 	for k in Staff.KINDS:
 		var col := VBoxContainer.new()
 		col.custom_minimum_size = Vector2(330, 0)
@@ -375,7 +375,7 @@ func _pick_by(by: int) -> void:
 		return
 	_pick = clampi(_pick + by, 0, n - 1)
 	_offer = -1
-	game.sfx("tick")
+	game.audio.sfx("tick")
 	render()
 
 
@@ -514,7 +514,7 @@ func move(dir: Vector2) -> void:
 		_sel_key = _targets[best].get_meta("key")
 		if _scroll != null and _scroll.is_ancestor_of(_targets[best]):
 			_scroll.ensure_control_visible(_targets[best])
-		game.sfx("tick")
+		game.audio.sfx("tick")
 
 
 func press() -> void:
@@ -539,7 +539,7 @@ func back() -> void:
 	elif not _draft.is_empty():
 		_cancel_post()
 	else:
-		game.close_desk()
+		game.desk.close_desk()
 
 
 func selected() -> String:
@@ -599,7 +599,7 @@ func _set_tab(t: String) -> void:
 	_person = -1
 	_raise_offer = -1
 	_firing = false
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
@@ -610,7 +610,7 @@ func hire_top() -> void:
 		return
 	var cv: Dictionary = _cv()
 	var who: String = game.town.people[cv.person].name
-	if game.desk_hire(int(cv.id)):
+	if game.desk.desk_hire(int(cv.id)):
 		note = "%s is hired, at $%d a day." % [who, int(cv.ask)]
 	_offer = -1
 	render()
@@ -621,7 +621,7 @@ func dismiss_top() -> void:
 	var staff: Staff = game.staff
 	if staff.cvs.is_empty():
 		return
-	game.desk_dismiss(int(_cv().id))
+	game.desk.desk_dismiss(int(_cv().id))
 	note = ""
 	_offer = -1
 	render()
@@ -635,14 +635,14 @@ func _start_haggle() -> void:
 	var last := int(_cv().haggle.last)
 	_offer = clampi(last if last > 0 else int(round(ask * 0.85)), 1, maxi(1, ask - 1))
 	_sel_key = "offer"
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
 func _nudge_offer(by: int) -> void:
 	var ask := int(_cv().ask)
 	_offer = clampi(_offer + by, 1, maxi(1, ask - 1))
-	game.sfx("tick")
+	game.audio.sfx("tick")
 	render()
 
 
@@ -663,7 +663,7 @@ func make_offer(figure: int) -> String:
 		return ""
 	var cv: Dictionary = _cv()
 	var who: String = game.town.people[cv.person].name
-	var r: String = game.desk_haggle(int(cv.id), figure)
+	var r: String = game.desk.desk_haggle(int(cv.id), figure)
 	match r:
 		"accept":
 			note = "%s takes $%d a day. Hired." % [who, figure]
@@ -682,16 +682,16 @@ func make_offer(figure: int) -> String:
 
 
 func _take_down(id: int) -> void:
-	game.desk_take_down(id)
+	game.desk.desk_take_down(id)
 	render()
 
 
 func _write() -> void:
-	if not game.staff.can_post(game.desk_count()):
+	if not game.staff.can_post(game.desk.desk_count()):
 		return
 	_draft = {"name": "", "duties": [], "breaks": 1, "days_off": 1}
 	_sel_key = "name"
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
@@ -702,14 +702,14 @@ func _toggle_duty(d: String) -> void:
 	else:
 		duties.append(d)
 	_sel_key = "duty:" + d
-	game.sfx("tick")
+	game.audio.sfx("tick")
 	render()
 
 
 func _set_field(field: String, n: int) -> void:
 	_draft[field] = n
 	_sel_key = "%s:%d" % [field, n]
-	game.sfx("tick")
+	game.audio.sfx("tick")
 	render()
 
 
@@ -724,7 +724,7 @@ func _put_up() -> void:
 	if (_draft.duties as Array).is_empty():
 		return
 	var title: String = _draft.name if str(_draft.name) != "" else DEFAULT_NAME
-	if game.desk_post(title, _draft.duties, int(_draft.breaks), int(_draft.days_off)) >= 0:
+	if game.desk.desk_post(title, _draft.duties, int(_draft.breaks), int(_draft.days_off)) >= 0:
 		_draft = {}
 		tab = "posts"
 		_sel_key = "write"
@@ -735,7 +735,7 @@ func _start_name() -> void:
 	_naming = "grid" if hud._mode() == "pad" else "type"
 	_name_text = _draft.name
 	_sel_key = "L:0"
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
@@ -749,13 +749,13 @@ func _focus_line() -> void:
 func _type_letter(c: String) -> void:
 	if _name_text.length() < Staff.MAX_POST_NAME:
 		_name_text += c if _name_text.length() == 0 or _name_text.ends_with(" ") else c.to_lower()
-		game.sfx("tick")
+		game.audio.sfx("tick")
 		render()
 
 
 func _rub_out() -> void:
 	_name_text = _name_text.substr(0, maxi(0, _name_text.length() - 1))
-	game.sfx("tick")
+	game.audio.sfx("tick")
 	render()
 
 
@@ -831,7 +831,7 @@ func _person_row(row: HBoxContainer, person: int, face_px: int) -> void:
 	var post := _label(head, 18, "%s,  $%d a day" % [e.post_name, int(e.wage)])
 	post.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	post.modulate.a = 0.8
-	_duty_line(info, e.duties, game.room_duties())
+	_duty_line(info, e.duties, game.desk.room_duties())
 	var rest := _label(info, 16, "%s a day,  %s a week" % [_count_word(int(e.breaks), "break"),
 		_count_word(int(e.days_off), "day off", "days off")])
 	rest.modulate.a = 0.7
@@ -895,7 +895,7 @@ func _manage() -> void:
 		cols.add_theme_constant_override("separation", 24)
 		cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		_content.add_child(cols)
-		var room: Dictionary = game.room_duties()
+		var room: Dictionary = game.desk.room_duties()
 		for k in Staff.KINDS:
 			var col := VBoxContainer.new()
 			col.custom_minimum_size = Vector2(330, 0)
@@ -928,7 +928,7 @@ func _manage() -> void:
 	_content.add_child(foot)
 	if _firing:
 		var sev := _paper_button(foot, "fire_pay", _fire.bind(true), "Fire, paying $%d severance" % int(e.wage), 20)
-		if not game.can_pay_severance(_person):
+		if not game.desk.can_pay_severance(_person):
 			sev.disabled = true
 			sev.modulate.a = 0.5
 		_paper_button(foot, "fire_harsh", _fire.bind(false), "Fire with nothing (friends hear)", 20)
@@ -1005,7 +1005,7 @@ func open_person(person: int) -> void:
 	_firing = false
 	note = ""
 	_sel_key = "staff_back"
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
@@ -1025,10 +1025,10 @@ func _toggle_staff_duty(d: String) -> void:
 	var who: String = game.town.people[_person].name
 	_sel_key = "duty:" + d
 	if (e.duties as Array).has(d):
-		game.desk_remove_duty(_person, d)
+		game.desk.desk_remove_duty(_person, d)
 		note = "%s is glad to be off %s." % [who, Staff.duty_word(d).to_lower()]
 	else:
-		var r: Dictionary = game.desk_add_duty(_person, d)
+		var r: Dictionary = game.desk.desk_add_duty(_person, d)
 		if r.ok:
 			note = "%s takes on %s." % [who, Staff.duty_word(d).to_lower()]
 		else:
@@ -1044,7 +1044,7 @@ func answer_raise(choice: String, offer := 0) -> String:
 	var person := _person
 	var who: String = game.town.people[person].name
 	var duty: String = Staff.duty_word(str(game.staff.employee(person).pending.get("duty", ""))).to_lower()
-	var r: String = game.desk_answer_raise(person, choice, offer)
+	var r: String = game.desk.desk_answer_raise(person, choice, offer)
 	match r:
 		"added":
 			note = "%s takes on %s, at $%d a day." % [who, duty, int(game.staff.employee(person).wage)]
@@ -1068,14 +1068,14 @@ func _start_raise_haggle() -> void:
 	var p: Dictionary = game.staff.employee(_person).pending
 	_raise_offer = maxi(0, int(p.raise) - 1)
 	_sel_key = "raise_offer"
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
 func _nudge_raise(by: int) -> void:
 	var p: Dictionary = game.staff.employee(_person).pending
 	_raise_offer = clampi(_raise_offer + by, 0, maxi(0, int(p.raise) - 1))
-	game.sfx("tick")
+	game.audio.sfx("tick")
 	render()
 
 
@@ -1086,14 +1086,14 @@ func _stop_raise_haggle() -> void:
 
 
 func _more_break() -> void:
-	if game.desk_add_break(_person):
+	if game.desk.desk_add_break(_person):
 		note = "%s has a break more a day." % game.town.people[_person].name
 	_sel_key = "break"
 	render()
 
 
 func _more_day_off() -> void:
-	if game.desk_add_day_off(_person):
+	if game.desk.desk_add_day_off(_person):
 		note = "%s has a day off more a week, picked next week." % game.town.people[_person].name
 	_sel_key = "day_off"
 	render()
@@ -1102,13 +1102,13 @@ func _more_day_off() -> void:
 func _set_firing(on: bool) -> void:
 	_firing = on
 	_sel_key = "keep" if on else "fire"
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
 func _fire(severance: bool) -> void:
 	var who: String = game.town.people[_person].name
-	if game.desk_fire(_person, severance):
+	if game.desk.desk_fire(_person, severance):
 		note = "%s is let go%s." % [who, " with a day's wage" if severance else ", and their friends will hear of it"]
 		_person = -1
 		_firing = false

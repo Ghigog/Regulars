@@ -99,7 +99,7 @@ func _list() -> void:
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(gap)
 	top.add_child(Hud.Icon.new("coins", 34, false))
-	var cost: int = game.night_cost()
+	var cost: int = game.menu_stock.night_cost()
 	var stock := _label(top, 24, "Tomorrow's stock: $%d   (you have $%d)" % [cost, game.ledger.money])
 	stock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if cost > game.ledger.money:
@@ -116,7 +116,7 @@ func _list() -> void:
 		_label(col, 30, Menu.COURSE_NAMES[course])
 		var items: Array[Dictionary] = game.menu.in_course(course)
 		for it in items:
-			var why: String = game.item_off_reason(it)
+			var why: String = game.menu_stock.item_off_reason(it)
 			var b := _paper_button(col, "item:%d" % it.id, _open.bind(it))
 			var box := VBoxContainer.new()
 			box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -153,13 +153,13 @@ func _list() -> void:
 	chips.add_theme_constant_override("v_separation", 8)
 	srow.add_child(chips)
 	# Read only: a kind is stocked by putting its box in a slot, and stopped by selling it (PRD 8.4).
-	var lines: Array[Dictionary] = game.stock_lines()
+	var lines: Array[Dictionary] = game.menu_stock.stock_lines()
 	for l in lines:
 		_label(chips, 20, "%s  $%d" % [l.name, int(l.fee)])
 	if lines.is_empty():
 		var none := _label(chips, 20, "No boxes yet: E on a counter at night to stock one.")
 		none.modulate.a = 0.6
-	var done: Button = hud._button(srow, "Done", game.close_menu)
+	var done: Button = hud._button(srow, "Done", game.menu_stock.close_menu)
 	done.size_flags_horizontal = Control.SIZE_SHRINK_END
 	done.custom_minimum_size = Vector2(150, 0)
 	_target(done, "done")
@@ -196,7 +196,7 @@ func _page() -> void:
 	else:
 		_label(price, 30, "$%d" % Menu.price_of(it))
 		price.add_child(_coins(it.price_level, 24))
-	var why: String = game.item_off_reason(it) if not it.ingredients.is_empty() else ""
+	var why: String = game.menu_stock.item_off_reason(it) if not it.ingredients.is_empty() else ""
 	if why != "":
 		var off := _label(left, 20, "Off tonight: " + why)
 		off.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -396,7 +396,7 @@ func action(a: String, echo := false) -> void:
 	elif a == "back":
 		back()
 	elif a == "menu" and _naming == "":
-		game.close_menu()
+		game.menu_stock.close_menu()
 
 
 ## Moves the highlight to the nearest button that way.
@@ -418,7 +418,7 @@ func move(dir: Vector2) -> void:
 	if best >= 0:
 		_sel = best
 		_sel_key = _targets[best].get_meta("key")
-		game.sfx("tick")
+		game.audio.sfx("tick")
 
 
 func press() -> void:
@@ -435,7 +435,7 @@ func back() -> void:
 	elif not _edit.is_empty():
 		_close_page()
 	else:
-		game.close_menu()
+		game.menu_stock.close_menu()
 
 
 ## The highlighted button's key ("item:3", "add:main", "lvl:dear"), for tests.
@@ -457,7 +457,7 @@ func select(key: String) -> bool:
 ## The ingredients the kitchen has a station for, stocked or not, in pantry order.
 func kitchen_ingredients() -> Array[String]:
 	var have := {}
-	for s: Dictionary in game.kitchen_stock():
+	for s: Dictionary in game.menu_stock.kitchen_stock():
 		have[s.ingredient] = true
 	var out: Array[String] = []
 	for id: String in Pantry.ITEMS:
@@ -471,7 +471,7 @@ func _open(it: Dictionary) -> void:
 	_named = it.name != Menu.default_name(it.ingredients)
 	_naming = ""
 	_sel_key = "done"
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
@@ -481,7 +481,7 @@ func _new(course: String) -> void:
 	_named = false
 	_naming = ""
 	_sel_key = ""
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 	for ing in kitchen_ingredients():
 		if select("add:" + ing):
@@ -493,7 +493,7 @@ func _close_page() -> void:
 	_edit = {}
 	_naming = ""
 	_sel_key = was
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
@@ -522,16 +522,16 @@ func _put_in(ing: String) -> void:
 	var ings: Array = _edit.ingredients.duplicate()
 	ings.append(ing)
 	if Menu.refusal(_edit.course, ings) != "":
-		game.sfx("fail")
+		game.audio.sfx("fail")
 		return
-	game.sfx("pickup")
+	game.audio.sfx("pickup")
 	_set_ingredients(ings)
 
 
 func _take_out(k: int) -> void:
 	var ings: Array = _edit.ingredients.duplicate()
 	ings.remove_at(k)
-	game.sfx("putdown")
+	game.audio.sfx("putdown")
 	_set_ingredients(ings)
 	if not select("out:%d" % mini(k, ings.size() - 1)):
 		select("done")
@@ -546,7 +546,7 @@ func _shift(k: int, by: int) -> void:
 	var tmp = ings[k]
 	ings[k] = ings[j]
 	ings[j] = tmp
-	game.sfx("tick")
+	game.audio.sfx("tick")
 	_set_ingredients(ings)
 	if not select("%s:%d" % ["up" if by > 0 else "down", j]):
 		select("out:%d" % j)
@@ -554,13 +554,13 @@ func _shift(k: int, by: int) -> void:
 
 func _set_level(lvl: String) -> void:
 	_edit.price_level = lvl
-	game.sfx("coin")
+	game.audio.sfx("coin")
 	_changed()
 
 
 func _toggle_off() -> void:
 	_edit.off = not _edit.off
-	game.sfx("flip")
+	game.audio.sfx("flip")
 	_changed()
 
 
@@ -570,7 +570,7 @@ func _delete() -> void:
 	var course: String = _edit.course
 	_edit = {}
 	_sel_key = "add:" + course
-	game.sfx("rip")
+	game.audio.sfx("rip")
 	_changed()
 
 
@@ -578,7 +578,7 @@ func _start_name() -> void:
 	_naming = "grid" if hud._mode() == "pad" else "type"
 	_name_text = _edit.name
 	_sel_key = "L:0"
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
@@ -592,13 +592,13 @@ func _focus_line() -> void:
 func _type_letter(ch: String) -> void:
 	if _name_text.length() < Menu.MAX_NAME:
 		_name_text += ch if _name_text.length() == 0 or _name_text.ends_with(" ") else ch.to_lower()
-		game.sfx("tick")
+		game.audio.sfx("tick")
 		render()
 
 
 func _rub_out() -> void:
 	_name_text = _name_text.substr(0, maxi(0, _name_text.length() - 1))
-	game.sfx("tick")
+	game.audio.sfx("tick")
 	render()
 
 
@@ -621,11 +621,11 @@ func set_name_text(text: String) -> void:
 		game.menu.rename(int(_edit.id), clean)
 	else:
 		_edit.name = clean
-	game.menu_changed()
+	game.menu_stock.menu_changed()
 
 
 func _changed() -> void:
-	game.menu_changed()
+	game.menu_stock.menu_changed()
 	render()
 
 
@@ -798,17 +798,17 @@ class BuildNotes extends HBoxContainer:
 	func _clicked(e: InputEvent) -> void:
 		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 			open = not open
-			game.sfx("rustle")
+			game.audio.sfx("rustle")
 			refresh()
 			accept_event()
 
 	func refresh() -> void:
-		var hint: String = game.night_hint()
+		var hint: String = game.menu_stock.night_hint()
 		_hint.visible = hint != ""
 		_hint_label.text = hint
 		for c in _box.get_children():
 			c.free()   # nothing in the note is mid-signal: the click lands on the note itself
-		var cost: int = game.night_cost()
+		var cost: int = game.menu_stock.night_cost()
 		var short: bool = cost > game.ledger.money
 		var head := HBoxContainer.new()
 		head.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -821,7 +821,7 @@ class BuildNotes extends HBoxContainer:
 		more.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		more.modulate.a = 0.55
 		if open:
-			var lines: Array[Dictionary] = game.stock_lines()
+			var lines: Array[Dictionary] = game.menu_stock.stock_lines()
 			for l in lines:
 				var row := HBoxContainer.new()
 				row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -831,7 +831,7 @@ class BuildNotes extends HBoxContainer:
 				hud._label(row, 18, "$%d" % int(l.fee))
 			if lines.is_empty():
 				hud._label(_box, 18, "Nothing stocked yet").modulate.a = 0.6
-		var wages: int = game.staff_wages()
+		var wages: int = game.desk.staff_wages()
 		if wages > 0:   # STAFF: tonight's wages, paid with the stock as the door opens (PRD 10.4)
 			var srow := HBoxContainer.new()
 			srow.mouse_filter = Control.MOUSE_FILTER_IGNORE

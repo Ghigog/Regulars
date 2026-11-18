@@ -185,12 +185,12 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 			if not dry_run:
 				hold(ch, tool, 0)
 				_done(ch, st, "wash")
-				game.burst(st.position + Vector3(0, 1.0, 0), "bubbles", 0.4)
+				game.audio.burst(st.position + Vector3(0, 1.0, 0), "bubbles", 0.4)
 			return "Rinse %s" % nm
 		return ""
 	if ch.held != "" or home == null or home.kit_tool == "":
 		return ""
-	if home != st and not game.kitchen.is_closet(st.cell) and game._use_station(st, true, ch) != "":
+	if home != st and not game.kitchen.is_closet(st.cell) and game.cooking._use_station(st, true, ch) != "":
 		return ""   # a hook over a working piece: the piece comes first
 	var what := CleanTools.name_of(home.kit_tool).to_lower()
 	if not dry_run:
@@ -205,7 +205,7 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 func _done(ch: Player, st: Station, sound: String) -> void:
 	ch.punch()
 	st.used()
-	game.sfx(sound)
+	game.audio.sfx(sound)
 
 
 # ---------------------------------------------------------------- E at the floor
@@ -276,7 +276,7 @@ func floor_action(ch: Player) -> String:
 
 ## Bare hands with dirt in reach, and not at the door: holding E scrubs it (slower than any tool).
 func can_scrub(ch: Player) -> bool:
-	return ch.held == "" and ch.hand.is_empty() and clean_target(ch) != null and game.door_action(ch) == ""
+	return ch.held == "" and ch.hand.is_empty() and clean_target(ch) != null and game.day.door_action(ch) == ""
 
 
 ## How far the scrub by hand on this chef's cell has got, 0 to 1 (0 when not scrubbing).
@@ -298,7 +298,7 @@ func floor_use(ch: Player) -> bool:
 		put_down(tool, held_used(ch), at)
 		ch.set_held("")
 		ch.punch()
-		game.sfx("putdown")
+		game.audio.sfx("putdown")
 		return true
 	var c: Variant = lying_target(ch)
 	if c == null and can_scrub(ch):
@@ -312,7 +312,7 @@ func floor_use(ch: Player) -> bool:
 	pick_up_lying(c)
 	hold(ch, l.tool, l.used)
 	ch.punch()
-	game.sfx("pickup")
+	game.audio.sfx("pickup")
 	return true
 
 
@@ -332,12 +332,12 @@ func press(ch: Player) -> String:
 	_wait[ch] = CleanTools.press_time(tool, held_used(ch))
 	var at := Grid.center(c) + Vector3(0, 0.2, 0)
 	if r.did == "clean":
-		game.sfx("wash", 0.1, 1.2)
-		game.burst(at, "bubbles", 0.3)
+		game.audio.sfx("wash", 0.1, 1.2)
+		game.audio.burst(at, "bubbles", 0.3)
 		if CleanTools.is_dirty(tool, r.used) and not CleanTools.is_dirty(tool, used_before):
 			game.hud.say("The %s is dirty: it works slower until it is rinsed at the bucket or a sink." % CleanTools.name_of(tool).to_lower())
 	elif r.did == "refused":   # the scraper on guest mess, a spill kit on a small spill (PRD 9.5)
-		game.sfx("fail")
+		game.audio.sfx("fail")
 		game.hud.say(r.why)
 	if CleanTools.used_up(tool, r.used) and r.did == "clean":
 		game.hud.say("The spill kit is used up for today.")
@@ -361,15 +361,15 @@ func hold_use(ch: Player, down: bool, delta := 0.0) -> void:
 	if int(before / 0.45) != int(_scrub[ch] / 0.45):
 		ch.punch()   # the scrubbing arm
 		var tc: Vector2i = clean_target(ch)
-		game.burst(Grid.center(tc) + Vector3(0, 0.15, 0), "bubbles", 0.18)
+		game.audio.burst(Grid.center(tc) + Vector3(0, 0.15, 0), "bubbles", 0.18)
 	if float(_scrub[ch]) >= CleanTools.HAND_TIME:
 		var c: Vector2i = clean_target(ch)
 		if c != ch.cell():
 			ch.look_at_cell(c)
 		CleanTools.hand_scrub(game.floor_dirt.mess, c)
 		_scrub[ch] = 0.0
-		game.sfx("wash", 0.1, 1.0)
-		game.burst(Grid.center(c) + Vector3(0, 0.2, 0), "bubbles", 0.3)
+		game.audio.sfx("wash", 0.1, 1.0)
+		game.audio.burst(Grid.center(c) + Vector3(0, 0.2, 0), "bubbles", 0.3)
 		game.floor_dirt.redraw()
 		if clean_target(ch) == null:
 			_scrub.erase(ch)
@@ -524,7 +524,7 @@ func _push(_delta: float) -> void:
 		if m.level(c) > 0 and m.can_clean(c):
 			m.clean(c, int(CleanTools.TOOLS[tool].levels))
 			_wait[ch] = CleanTools.press_time(tool)
-			game.burst(Grid.center(c) + Vector3(0, 0.2, 0), "bubbles", 0.3)
+			game.audio.burst(Grid.center(c) + Vector3(0, 0.2, 0), "bubbles", 0.3)
 			game.floor_dirt.redraw()
 
 

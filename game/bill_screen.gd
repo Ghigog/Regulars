@@ -46,7 +46,7 @@ func setup(game_, hud_, chef_: Player) -> void:
 	_frame.draw.connect(_draw_frame)
 	add_child(_frame)
 	# The first table nobody has a slip for yet is picked to start with.
-	for t: Dictionary in game.bill_tables():
+	for t: Dictionary in game.paying.bill_tables():
 		if not t.printed:
 			bill.table = int(t.number)
 			break
@@ -73,7 +73,7 @@ func render() -> void:
 	_content.add_child(tables)
 	_label(tables, 22, "For")
 	var any := false
-	for t: Dictionary in game.bill_tables():
+	for t: Dictionary in game.paying.bill_tables():
 		any = true
 		var words := "Table %d  ·  %d" % [t.number, t.size]
 		if t.till:
@@ -90,7 +90,7 @@ func render() -> void:
 	cols.add_theme_constant_override("separation", 22)
 	_content.add_child(cols)
 	var tonight := {}
-	for it: Dictionary in game.tonight_menu():
+	for it: Dictionary in game.menu_stock.tonight_menu():
 		tonight[int(it.id)] = true
 	for course in Menu.COURSES:
 		var col := VBoxContainer.new()
@@ -174,7 +174,7 @@ func action(a: String, echo := false) -> void:
 	elif a == "sell":
 		take_one()
 	elif a == "back":
-		game.close_bill()
+		game.paying.close_bill()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -208,7 +208,7 @@ func move(dir: Vector2) -> void:
 	if best >= 0:
 		_sel = best
 		_sel_key = _targets[best].get_meta("key")
-		game.sfx("tick")
+		game.audio.sfx("tick")
 
 
 func press() -> void:
@@ -239,20 +239,20 @@ func select(key: String) -> bool:
 
 func _pick_table(number: int) -> void:
 	bill.table = number
-	game.sfx("page")
+	game.audio.sfx("page")
 	render()
 
 
 func _add(id: int, n: int) -> void:
 	var before := bill.count(id)
 	bill.add(id, n)
-	game.sfx("tick" if bill.count(id) != before else "fail")
+	game.audio.sfx("tick" if bill.count(id) != before else "fail")
 	_sel_key = "item:%d" % id
 	render()
 
 
 func _print() -> void:
-	game.print_bill(chef, bill)
+	game.paying.print_bill(chef, bill)
 
 
 # ---------------------------------------------------------------- pieces

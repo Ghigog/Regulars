@@ -108,7 +108,7 @@ func _process(_delta: float) -> void:
 func pick(i: int) -> void:
 	i = clampi(i, 0, buttons.size() - 1)
 	if i != sel:
-		hud.game.sfx("tick")
+		hud.game.audio.sfx("tick")
 	sel = i
 	_frame.queue_redraw()
 
@@ -148,4 +148,4 @@ func press_id(id: String) -> void:
 		"no":
 			show_main()
 		"yes":
-			hud.game.quit_to_title()
+			hud.game.session.quit_to_title()

@@ -178,8 +178,8 @@ func slip(who: Node3D, cell: Vector2i) -> void:
 		return
 	down[who] = {"cell": cell, "t": 0.0, "helper": null, "help": 0.0, "mark": _down_mark(who)}
 	who.fall()
-	game.sfx("slide", 0.08)
-	game.sfx("thump", 0.08)
+	game.audio.sfx("slide", 0.08)
+	game.audio.sfx("thump", 0.08)
 	if who is Guest:
 		var g: Guest = who
 		g.mood.patience = maxf(0.0, g.mood.patience - FloorMess.SLIP_PATIENCE)
@@ -225,7 +225,7 @@ func help_up(ch: Player) -> bool:
 		return false
 	_start_help(who, ch, FloorMess.help_time(true) * CleanTools.help_factor(CleanKit.held_tool(ch)))   # a spill kit is faster (PRD 9.5)
 	ch.look_at_cell(down[who].cell)
-	game.sfx("lift", 0.08)
+	game.audio.sfx("lift", 0.08)
 	return true
 
 
@@ -400,7 +400,7 @@ func sheen_cells() -> Dictionary:
 		for c: Vector2i in mess.treat:
 			out[c] = [mess.treat[c], true]
 		return out
-	var on: Dictionary = game.treat_active()
+	var on: Dictionary = game.menu_stock.treat_active()
 	for c: Vector2i in game.treat_laid:
 		if game.plan.has_floor(c):
 			out[c] = [game.treat_laid[c], on.has(c)]

@@ -229,7 +229,7 @@ func tick(delta: float) -> void:
 
 
 func speed() -> float:
-	return SPEED * boost_speed * game.floor_speed(position) * CleanKit.walk_factor(self)   # a scrubber is slow (PRD 9.5)
+	return SPEED * boost_speed * game.seating.floor_speed(position) * CleanKit.walk_factor(self)   # a scrubber is slow (PRD 9.5)
 
 
 ## A quick squash and stretch whenever the chef does something.
@@ -296,7 +296,7 @@ func target_cell() -> Vector2i:
 	for dx in range(-2, 3):
 		for dy in range(-2, 3):
 			var n := here + Vector2i(dx, dy)
-			var st: Station = game.station_at(n)   # a piece hung over bare floor too (PRD 8.5)
+			var st: Station = game.world.station_at(n)   # a piece hung over bare floor too (PRD 8.5)
 			if st == null:
 				continue
 			if absi(dx) + absi(dy) == 1 and not game.grid.edge_open(here, n):
@@ -307,7 +307,7 @@ func target_cell() -> Vector2i:
 			for s in st.seats:
 				if game.seat_taken.has(s):
 					dist = minf(dist, (Grid.center(s) - position).length())
-			var action: String = game.prompt_for(st, self)
+			var action: String = game.cooking.prompt_for(st, self)
 			if dist > REACH or action == "":
 				continue
 			var score := -dist + (2.0 if aiming else 0.4) * to.normalized().dot(aim)   # aimed: the one looked at wins
@@ -448,7 +448,7 @@ func move(input: Vector2, delta: float, hold := false) -> void:
 	var before := floori(_stride / PI)
 	_stride += delta * 13.0 * pace
 	if floori(_stride / PI) != before and pace > 0.3:
-		game.sfx("step", 0.15)
+		game.audio.sfx("step", 0.15)
 	_body.position.y = absf(sin(_stride)) * 0.07 * pace
 	# Lean into a run, and tip whatever is carried so its top faces the camera.
 	_body.rotation.x = lerpf(_body.rotation.x, 0.3 * pace, 1.0 - exp(-10.0 * delta))

@@ -15,7 +15,7 @@ func before_each():
 	game.arrivals.clear()
 	game.step(0.1)
 	game.step(0.1)
-	game.open_build()
+	game.session.open_build()
 
 
 func test_holding_aim_turns_without_walking():
@@ -39,14 +39,14 @@ func test_an_aimed_diagonal_piece_is_picked_up():
 	ch.position = Grid.center(Vector2i(5, 3))
 	ch.move(Vector2(-1, 0), 0.1, true)       # A: the cell up-left on screen is (4, 4)
 	assert_eq(ch.facing, Vector2i(-1, 1))
-	assert_eq(game.build_action(), "Pick up")
+	assert_eq(game.room_edit.build_action(), "Pick up")
 	var counter: Station = game.stations[Vector2i(4, 4)]
-	game.build_interact()
+	game.room_edit.build_interact()
 	assert_eq(game.player.hand.get("node"), counter, "the diagonal counter is lifted")
 
 
 func test_aim_is_a_held_action_not_a_press():
-	game.act(0, "aim")
+	game.coop.act(0, "aim")
 	assert_true(game.player.hand.is_empty())
 	game.controls.players[0].hold("pad:0", "trigger4", "aim", true)
 	assert_true(game.controls.aiming(0))

@@ -171,7 +171,7 @@ func select(k: String) -> void:
 func _why(k: String) -> String:
 	match state_of(k):
 		"held":
-			return "This one" if game.storing() else "In hand"
+			return "This one" if game.card.storing() else "In hand"
 		"later":
 			return "Buy the %s first" % Upgrades.name_of(Upgrades.parent(k))
 	if game.ledger.level() < Upgrades.level(k):
@@ -217,14 +217,14 @@ func move(action: String) -> void:
 			best_d = score
 			best = k
 	if best != "":
-		game.sfx("tick", 0.1)
+		game.audio.sfx("tick", 0.1)
 		select(best)
 
 
 ## Buys the chosen node: the held piece becomes it, and the tree is drawn from there.
 ## A refusal shakes the card.
 func buy() -> bool:
-	if state_of(selected) == "next" and game.buy_upgrade(selected):
+	if state_of(selected) == "next" and game.upgrades.buy_upgrade(selected):
 		if Upgrades.is_link(selected):
 			return true   # a stove stood on the counter: the card has shut
 		set_root(selected)
@@ -233,7 +233,7 @@ func buy() -> bool:
 		card.scale = Vector2.ONE * 1.12
 		card.create_tween().tween_property(card, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		return true
-	game.sfx("fail")
+	game.audio.sfx("fail")
 	var c: Control = cards[selected]
 	var x := c.position.x
 	var no := c.create_tween()
@@ -247,7 +247,7 @@ func card_pressed(k: String) -> void:
 	if k == selected:
 		buy()
 	else:
-		game.sfx("tick", 0.1)
+		game.audio.sfx("tick", 0.1)
 		select(k)
 
 
@@ -469,7 +469,7 @@ class Card extends Control:
 	func _price() -> String:
 		match screen.state_of(key):
 			"held":
-				return "This one" if screen.game.storing() else "In hand"
+				return "This one" if screen.game.card.storing() else "In hand"
 		if screen.game.ledger.level() < Upgrades.level(key):
 			return "Level %d" % Upgrades.level(key)
 		return "+$%d" % Upgrades.step_price(key)

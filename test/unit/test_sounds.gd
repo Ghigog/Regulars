@@ -43,8 +43,8 @@ func test_a_patty_sounds_its_doneness():
 
 
 func test_loops_fade_in_and_out():
-	game._fade_loops({"sizzle_raw": true}, 0.1)
+	game.prep_games._fade_loops({"sizzle_raw": true}, 0.1)
 	assert_true(game._sfx.sizzle_raw.playing)
 	for i in 30:
-		game._fade_loops({}, 0.1)
+		game.prep_games._fade_loops({}, 0.1)
 	assert_false(game._sfx.sizzle_raw.playing, "faded out and stopped")

@@ -134,13 +134,13 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 	g.town.rng.state = int(d.town.rng)
 	_put(g.plan, ["floors", "built", "openings", "finishes"], d.plan)
 	for e: Vector3i in d.screens:
-		var n: Node3D = g.add_wall(Vector2i(e.x, e.y), e.z, 0.9 + 0.1 * int(d.screens[e]))
+		var n: Node3D = g.world.add_wall(Vector2i(e.x, e.y), e.z, 0.9 + 0.1 * int(d.screens[e]))
 		n.set_meta("tier", int(d.screens[e]))
 		g.wall_nodes[e] = n
-	g._sync_grid()
-	g._rebuild_room()
+	g.world._sync_grid()
+	g.world._rebuild_room()
 	for a: Vector2i in d.rugs:
-		g.add_rug(a, int(d.rugs[a]))
+		g.placing.add_rug(a, int(d.rugs[a]))
 	# Floor pieces first, then what hangs above them.
 	var ordered: Array = (d.pieces as Array).filter(func(p: Dictionary) -> bool: return not p.high)
 	ordered.append_array((d.pieces as Array).filter(func(p: Dictionary) -> bool: return p.high))
@@ -148,12 +148,12 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 		_place(g, p)
 	for p: Dictionary in ordered:
 		if p.till:
-			var host: Station = g._till_host(p.cell)
+			var host: Station = g.paying._till_host(p.cell)
 			if host != null:
 				Build.register(host)
 	for c: Vector2i in d.stock:
 		g.kitchen.give_stock(c, (d.stock[c] as Dictionary).duplicate(true))
-		g._show_boxes(c)
+		g.world._show_boxes(c)
 	g.treat_laid = d.treat_laid.duplicate(true)
 	g.treat_off = d.treat_off.duplicate(true)
 	g.flyers_out = bool(d.flyers_out)
@@ -164,9 +164,9 @@ static func _place(g: Node3D, p: Dictionary) -> void:
 	if p.type == "trays":
 		p.type = "plates"   # saved before the plate stack was the tray stack
 	if p.high:
-		st = g.add_high(p.node if p.node != "" else p.type, p.cell)
+		st = g.world.add_high(p.node if p.node != "" else p.type, p.cell)
 	else:
-		st = g.add_station(p.type, p.cell, int(p.tier), int(p.facing), str(p.base), bool(p.pass_look), str(p.node))
+		st = g.world.add_station(p.type, p.cell, int(p.tier), int(p.facing), str(p.base), bool(p.pass_look), str(p.node))
 	st.stacked = bool(p.stacked)
 	st.count = int(p.count)
 	st.dirty = int(p.dirty)

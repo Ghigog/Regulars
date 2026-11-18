@@ -105,7 +105,7 @@ func show_themes() -> void:
 	themes_open = true
 	var head := hud._label(_box, 26, "Which restaurant?")
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var last: String = hud.game.remembered_theme()
+	var last: String = hud.game.session.remembered_theme()
 	sel = 0
 	for id: String in Scenery.THEMES:
 		var t: Dictionary = Scenery.THEMES[id]
@@ -154,7 +154,7 @@ func _process(_delta: float) -> void:
 func pick(i: int) -> void:
 	i = clampi(i, 0, buttons.size() - 1)
 	if i != sel:
-		hud.game.sfx("tick")
+		hud.game.audio.sfx("tick")
 	sel = i
 	_frame.queue_redraw()
 
@@ -177,7 +177,7 @@ func key(k: int, echo := false) -> bool:
 	return true
 
 
-## One action from any player's device (see Controls and game.act): up and down
+## One action from any player's device (see Controls and game.coop.act): up and down
 ## pick a button, use or confirm presses it.
 func action(a: String, echo := false) -> bool:
 	match a:
@@ -201,18 +201,18 @@ func action(a: String, echo := false) -> bool:
 func press_id(id: String) -> void:
 	match id:
 		"continue":
-			hud.game.continue_game()
+			hud.game.session.continue_game()
 		"play":
-			hud.game.play()
+			hud.game.session.play()
 		"settings":
 			hud.toggle_options()
 		"quit":
-			hud.game.quit_game()
+			hud.game.session.quit_game()
 		"back":
 			show_main()
 		_:
 			if id.begins_with("theme:"):
-				hud.game.choose_theme(id.trim_prefix("theme:"))
+				hud.game.session.choose_theme(id.trim_prefix("theme:"))
 
 
 ## A little picture of a theme's room: the back wall with its cutaway stripe over
