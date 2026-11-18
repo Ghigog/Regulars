@@ -515,10 +515,32 @@ func test_tools_lose_their_catalog_tiers_and_later_nodes_leave_the_shop():
 	for id: String in ["stove", "fryer", "pot", "board", "slicer"]:
 		assert_eq(int(Catalog.ITEMS[id].tiers), 1, id)
 	var ids := Catalog.search("", "Kitchen", "diner").map(func(bp: Dictionary) -> String: return bp.id)
-	assert_has(ids, "stove")
 	assert_has(ids, "board")
-	for id: String in ["fryer", "pot", "slicer"]:
-		assert_does_not_have(ids, id, id + " is reached through the stove or board")
+	for id: String in ["stove", "fryer", "pot", "slicer"]:
+		assert_does_not_have(ids, id, id + " is reached through the counter, stove or board")
+
+
+func test_a_stove_grows_from_a_bare_counter_for_its_whole_price():
+	assert_true(Upgrades.children("counter").has("stove"), "a branch of the counter's tree")
+	assert_eq(Upgrades.parent("stove"), "counter")
+	assert_eq(Kitchen.parent_of("stove"), "", "still a root piece in the room: it lifts off its counter")
+	assert_eq(Upgrades.step_price("stove"), Kitchen.price_of("stove"), "the counter stays, so the stove is paid in full")
+	assert_eq(Upgrades.step_price("range"), Kitchen.price_of("range") - Kitchen.price_of("stove"))
+	assert_true(Upgrades.can_buy("counter", "stove", 999, 1))
+	assert_false(Upgrades.can_buy("double_counter", "stove", 999, 1))
+	assert_true(Upgrades.layout("counter").has("fryer"), "the counter's tree shows the way to the fryer")
+
+
+func test_a_full_fridge_says_it_is_full_not_that_it_needs_a_fridge():
+	var k := Kitchen.new()
+	var c := Vector2i(1, 1)
+	k.set_cell(c, "counter")
+	assert_true(k.store(c, "box_bun"))
+	k.set_cell(c, "fridge")   # upgraded where it stands: the bun stays in its one slot
+	assert_eq(k.store_refusal(c, "box_patty"), "The fridge is full. Take a box out first")
+	k.set_cell(c, "counter")
+	k.unstore(c, "box_bun")
+	assert_eq(k.store_refusal(c, "box_patty"), "Needs a fridge")
 
 
 func test_quality_is_the_minigames_difficulty():

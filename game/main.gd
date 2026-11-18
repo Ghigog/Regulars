@@ -174,6 +174,10 @@ var _drag: Dictionary:            # chef 1's mouse drag, for tests and demos
 	set(v): player.drag = v
 var _door_turn: Node3D
 var best_path := "user://regulars_best.json"
+var fav_path := "user://regulars_favourites.cfg"   # starred tree nodes: kept across runs
+## Upgrade-tree nodes the player starred: the shop's Favourites tab sells each already
+## upgraded, at the whole price of the way there.
+var favourites: Array[String] = []
 var player: Player               # chef 1; `chefs` holds every chef, by player index
 const MAX_CHEFS := 2             # trims exist for four; two are shipped and tested (PRD 4)
 var ready_chefs: Array[Player] = []   # co-op: who has confirmed the receipt, or used the door card
@@ -203,6 +207,7 @@ var _shot_time := 0.0
 
 
 func _ready() -> void:
+	load_favourites()
 	var seed_value := int(Time.get_unix_time_from_system())
 	grid = Grid.new(W + 2 - LOT.position.x, LOT.size.y, LOT.position)   # columns W and W + 1 are the pavement outside
 	town = Town.new(seed_value)
@@ -1903,6 +1908,8 @@ static func hand_node(h: Dictionary) -> String:
 		return st.base if st.type == "counter" and st.base != "" else st.node
 	if h.get("id", "") == "sponge":
 		return "hook"   # sold hanging on its own hook (PRD 9.4)
+	if h.get("up", "") != "":
+		return h.up   # a favourite, built already upgraded
 	if h.get("base", "") != "":
 		return h.base   # a counter sold as a fridge
 	return Kitchen.node_of(str(h.get("id", "")))
@@ -2412,6 +2419,8 @@ func shop_items(query := "", category := "") -> Array[Dictionary]:
 		found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:   # what fits first
 			return _storage_rank(a) < _storage_rank(b))
 		return found
+	if category == "Favourites":
+		return favourite_items(query)
 	if category != "Extras":
 		found = Catalog.search(query, category, Scenery.theme_id, ledger.level())
 		for bp in Catalog.search(query, category, Scenery.theme_id):   # a missing essential, at any level
@@ -2486,6 +2495,69 @@ func close_shop() -> void:
 		pick_up(Grid.center(Vector2i(carried.from.x, carried.from.y)), ch, true, str(carried.layer))
 
 
+# ---------------------------------------------------------------- favourites
+
+func load_favourites() -> void:
+	favourites.clear()
+	var cfg := ConfigFile.new()
+	if cfg.load(fav_path) == OK:
+		for k in cfg.get_value("shop", "favourites", []):
+			if Catalog.can_favourite(str(k)) and not favourites.has(str(k)):
+				favourites.append(str(k))
+
+
+func is_favourite(key: String) -> bool:
+	return favourites.has(key)
+
+
+## Stars or unstars a tree node. Returns whether it is a favourite now.
+func toggle_favourite(key: String) -> bool:
+	if not Catalog.can_favourite(key):
+		sfx("fail")
+		hud.say("Cleaning tools can't be favourites.")
+		return false
+	if favourites.has(key):
+		favourites.erase(key)
+	else:
+		favourites.append(key)
+	var cfg := ConfigFile.new()
+	cfg.set_value("shop", "favourites", favourites.duplicate())
+	cfg.save(fav_path)
+	sfx("tick", 0.1)
+	return favourites.has(key)
+
+
+## The Favourites tab: each starred node this run's theme sells, at the level reached.
+func favourite_items(query := "") -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var words := query.strip_edges().to_lower().split(" ", false)
+	for k: String in favourites:
+		var bp := Catalog.fav_blueprint(k)
+		if not Catalog.sold_in(bp.id, Scenery.theme_id) or Catalog.bp_level(bp) > ledger.level():
+			continue
+		var text := ("%s favourite %s" % [Catalog.label(bp), Catalog.bp_blurb(bp)]).to_lower()
+		var hit := true
+		for w in words:
+			hit = hit and text.contains(w)
+		if hit:
+			out.append(bp)
+	return out
+
+
+## Picks a favourite to place, already upgraded. Nothing is paid until it is placed.
+func pick_favourite(bp: Dictionary, ch: Player = null) -> bool:
+	ch = _me(ch)
+	if ledger.money < Catalog.bp_price(bp) or Catalog.bp_level(bp) > ledger.level() \
+			or not pick_catalog(bp.id, int(bp.tier), ch, bp.get("base", "")):
+		return false
+	ch.hand.price = Catalog.bp_price(bp)
+	if bp.get("up", "") != "":
+		ch.hand.up = bp.up
+		if bp.get("counter", false):
+			ch.hand.counter = true
+	return true
+
+
 ## The upgrade-tree key of the piece a chef has picked up: its kitchen node, its tier
 ## in a tiered piece's short tree, or "" (nothing picked up, or a piece with no tree).
 func hand_key(ch: Player = null) -> String:
@@ -2505,10 +2577,27 @@ func hand_key(ch: Player = null) -> String:
 func buy_upgrade(to: String, ch: Player = null) -> bool:
 	ch = shopper if ch == null and shopper != null else _me(ch)
 	var from := hand_key(ch)
+	var link := Upgrades.is_link(to)   # a stove grown on a counter where it stands
+	if link and not (ch.hand.get("in_place", false) and ch.hand.node is Station and (ch.hand.node as Station).item == ""):
+		sfx("fail")
+		hud.say("Put the counter down first, then upgrade it where it stands.")
+		return false
 	if phase != Phase.BUILD or from == "" or not Upgrades.can_buy(from, to, ledger.money, ledger.level()) \
 			or not ledger.spend(Upgrades.step_price(to)):
 		sfx("fail")
 		return false
+	if link:
+		var under: Station = ch.hand.node
+		var cell := under.cell
+		var facing := under.facing
+		close_shop()   # the counter settles; the card and its tree shut
+		var top := add_station(to, cell, 1, facing)
+		_bought_tonight(top, Upgrades.step_price(to))
+		burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
+		hud.say("A %s on the counter. Pick it up with E to upgrade it further." % Upgrades.name_of(to).to_lower())
+		menu_changed()
+		sfx("coin")
+		return true
 	if Upgrades.is_treatment(to):   # a box: it is the new treatment's now (PRD 9.5)
 		ch.hand.id = to
 		_swap_treatment(Treatments.key_of(from), Treatments.key_of(to))
@@ -2766,7 +2855,7 @@ func buy(bp: Dictionary) -> bool:
 	if bp.id == FLYERS.id:
 		if buy_flyers():
 			return true
-	elif pick_catalog(bp.id, int(bp.tier), shopper, bp.get("base", "")):
+	elif pick_favourite(bp, shopper) if bp.has("fav") else pick_catalog(bp.id, int(bp.tier), shopper, bp.get("base", "")):
 		sfx("pickup")
 		close_shop()
 		return true
@@ -3207,6 +3296,9 @@ func can_place(spot: Vector3i, ch: Player = null) -> bool:
 			return layer == "high"
 	elif Kitchen.is_tall(hn) and kitchen.get_piece(cell, "high") != "":
 		return false   # a tall piece fills both wall layers
+	if ch.hand.get("counter", false):   # a favourite from a stove's line comes on its own counter
+		return not stations.has(cell) and kitchen.layer_for(cell, "counter") == "base" \
+			and grid.can_place_block(cell, Station.seats_for("counter", cell, int(ch.hand.facing)), LOT, DOOR, reach, touch)
 	if stations.has(cell) or Kitchen.is_top(ch.hand.id):
 		return _stacks_on(cell, ch.hand)   # a tool needs a counter under it
 	return grid.can_place_block(cell, Station.seats_for(ch.hand.id, cell, int(ch.hand.facing)), LOT, DOOR, reach, touch)
@@ -3257,11 +3349,11 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		_bought_tonight(_bare_counter(cell), paid)
 		_stack_counter(cell)
 	elif layer_for(cell, hand_node(ch.hand)) == "high":
-		var hung := add_high(hand_node(ch.hand) if ch.hand.id == "sponge" else ch.hand.id, cell)
+		var hung := add_high(hand_node(ch.hand) if ch.hand.id == "sponge" else str(ch.hand.get("up", ch.hand.id)), cell)
 		_bought_tonight(hung, paid)
 		clean_kit.on_built(hung, ch.hand.id)
 	else:
-		var st := add_station(ch.hand.id, cell, int(ch.hand.tier), int(ch.hand.facing), ch.hand.get("base", ""))
+		var st := add_station(str(ch.hand.get("up", ch.hand.id)), cell, int(ch.hand.tier), int(ch.hand.facing), ch.hand.get("base", ""))
 		_bought_tonight(st, paid)
 		clean_kit.on_built(st, ch.hand.id)
 	burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
@@ -3598,7 +3690,7 @@ func build_interact(ch: Player = null) -> void:
 func _update_ghost(ch: Player = null) -> void:
 	ch = _me(ch)
 	_update_tool_ghost(ch)
-	var key := "%s:%s:%s" % [ch.hand.get("id", ""), ch.hand.get("tier", 0), hand_key(ch)] if phase == Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) and not ch.hand.get("in_place", false) else ""
+	var key := "%s:%s:%s:%s" % [ch.hand.get("id", ""), ch.hand.get("tier", 0), hand_key(ch), ch.hand.get("up", "")] if phase == Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) and not ch.hand.get("in_place", false) else ""
 	# A wall-layer piece (PRD 8.5) shows the layer it would take where it points.
 	var hn := hand_node(ch.hand) if key != "" else ""
 	var layer := ""
@@ -3630,7 +3722,7 @@ func _update_ghost(ch: Player = null) -> void:
 				var hs: Station = ch.hand.node
 				Build.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" else "", false, hs.node)
 			else:
-				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier), ch.hand.get("base", ""))
+				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier), "counter" if ch.hand.get("counter", false) else ch.hand.get("base", ""), false, str(ch.hand.get("up", "")))
 			if layer != "" and wall_facing.has(cell):
 				_layer_band(ch.ghost, layer, 0 if layer == "high" else int(wall_facing[cell]) - int(ch.hand.facing), hn == "hook")
 	var p := hover
@@ -6676,6 +6768,7 @@ func shop_action(action: String) -> bool:
 			"shop" when storing(): storage_ingredients()
 			"back", "shop": close_shop()
 			"use", "confirm": hud.tree_buy()
+			"sell": hud.tree_favourite()   # X: star the chosen node for the Favourites tab
 			"turn" when shopper.hand.get("node") is Station:   # turn it round to see its back
 				rotate_hand(shopper)
 			_: return false
