@@ -157,7 +157,7 @@ func _game() -> void:
 	game.best_path = "user://regulars_best_test.json"
 	game.theme_path = "user://regulars_theme_test.cfg"
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
-	game.test_kitchen()
+	game.menu_stock.test_kitchen()
 	for p in game.town.people:
 		p.likes = []
 		p.dislikes = []
@@ -171,9 +171,9 @@ func _night(desks := 1) -> void:
 	game.arrivals.clear()
 	for i in 20:
 		game.step(0.1)
-	game.open_build()
+	game.session.open_build()
 	for i in desks:
-		game.add_station("desk", Vector2i(8 + i, 6))
+		game.world.add_station("desk", Vector2i(8 + i, 6))
 	game.player.position = Grid.center(Vector2i(7, 6))
 	game.player.look(Vector2i(1, 0))
 
@@ -184,7 +184,7 @@ func _applicants() -> Array[Dictionary]:
 		p.affinity = 0.5
 	var fresh: Array[Dictionary] = []
 	for tries in 10:
-		fresh = game.roll_applicants()
+		fresh = game.desk.roll_applicants()
 		if not fresh.is_empty():
 			break
 	return fresh
@@ -192,44 +192,44 @@ func _applicants() -> Array[Dictionary]:
 
 func test_either_chef_opens_the_desk_at_night_only():
 	_night()
-	assert_eq(game.build_action(), "Use desk")
-	game.build_interact()
+	assert_eq(game.room_edit.build_action(), "Use desk")
+	game.room_edit.build_interact()
 	assert_true(game.hud.desk_open())
 	assert_true(game.hud.card_open())
-	game.close_desk()
+	game.desk.close_desk()
 	assert_false(game.hud.desk_open())
-	game.start_day()
-	assert_false(game.open_desk(), "not during service")
+	game.day.start_day()
+	assert_false(game.desk.open_desk(), "not during service")
 
 
 func test_no_desk_no_desk_screen():
 	_night(0)
-	assert_false(game.open_desk())
+	assert_false(game.desk.open_desk())
 
 
 func test_post_duties_come_from_the_room():
 	_night()
-	var room: Dictionary = game.room_duties()
+	var room: Dictionary = game.desk.room_duties()
 	assert_true((room.food as Array).has("grill"), "the test kitchen has stoves")
 	assert_true((room.food as Array).has("fryer"), "a stove stands in for frying (PRD 8.3)")
 	assert_false((room.food as Array).has("board"), "nothing in the room chops")
 	assert_true((room.clean as Array).has("wash_up"))
-	game.add_station("counter", Vector2i(1, 6))
-	game.add_station("board", Vector2i(1, 6))
-	assert_true((game.room_duties().food as Array).has("board"))
+	game.world.add_station("counter", Vector2i(1, 6))
+	game.world.add_station("board", Vector2i(1, 6))
+	assert_true((game.desk.room_duties().food as Array).has("board"))
 
 
 func test_posts_plus_hires_are_capped_by_desks():
 	_night(1)
-	assert_eq(game.desk_post("Grill cook", ["grill"], 1, 0), 1)
-	assert_eq(game.desk_post("Server", ["take_orders"], 0, 0), -1, "one desk, one opening")
-	game.add_station("desk", Vector2i(9, 5))
-	assert_ne(game.desk_post("Server", ["take_orders"], 0, 0), -1)
+	assert_eq(game.desk.desk_post("Grill cook", ["grill"], 1, 0), 1)
+	assert_eq(game.desk.desk_post("Server", ["take_orders"], 0, 0), -1, "one desk, one opening")
+	game.world.add_station("desk", Vector2i(9, 5))
+	assert_ne(game.desk.desk_post("Server", ["take_orders"], 0, 0), -1)
 
 
 func test_writing_a_post_on_the_desk_screen():
 	_night()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	assert_eq(desk.tab, "posts", "an empty pile opens on the posts")
 	assert_true(desk.select("write"))
@@ -257,7 +257,7 @@ func test_writing_a_post_on_the_desk_screen():
 
 func test_a_post_with_no_duties_cannot_go_up():
 	_night()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	desk.draft_post("Nobody", [])
 	desk.put_up()
@@ -266,22 +266,22 @@ func test_a_post_with_no_duties_cannot_go_up():
 
 func test_applicants_line_up_outside_and_their_cvs_go_in_the_pile():
 	_night()
-	game.desk_post("Grill cook", ["grill", "fetch"], 1, 1)
+	game.desk.desk_post("Grill cook", ["grill", "fetch"], 1, 1)
 	var fresh := _applicants()
 	assert_false(fresh.is_empty())
 	assert_eq(game.applicants.size(), fresh.size())
 	for cv in fresh:
 		var rig: Node3D = game.applicants[cv.person]
 		assert_gt(rig.position.x, float(game.W), "outside, on the pavement")
-	assert_not_null(game.find_station("desk").get_node_or_null("pile"), "the pile on the desk")
-	game.start_day()
+	assert_not_null(game.world.find_station("desk").get_node_or_null("pile"), "the pile on the desk")
+	game.day.start_day()
 	assert_true(game.applicants.is_empty(), "the line goes home for the day")
 	assert_eq(game.staff.cvs.size(), fresh.size(), "unread CVs stay in the pile")
 
 
 func test_applicants_come_at_the_start_of_the_build_phase():
 	_game()
-	game.add_station("desk", Vector2i(8, 6))
+	game.world.add_station("desk", Vector2i(8, 6))
 	game.staff.add_post("Grill cook", ["grill"], 0, 0, 1)
 	for p in game.town.people:
 		p.affinity = 1.0
@@ -289,20 +289,20 @@ func test_applicants_come_at_the_start_of_the_build_phase():
 	for i in 20:
 		game.step(0.1)
 	assert_true(game.staff.cvs.is_empty(), "not on the receipt")
-	game.open_build()
+	game.session.open_build()
 	assert_false(game.staff.cvs.is_empty())
 
 
 func test_swipe_right_hires_at_the_ask():
 	_night()
-	game.desk_post("Grill cook", ["grill"], 1, 1)
+	game.desk.desk_post("Grill cook", ["grill"], 1, 1)
 	_applicants()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	assert_eq(desk.tab, "cvs", "a pile opens on the CVs")
 	var cv: Dictionary = game.staff.cvs[0]
 	desk.drag_to(DeskScreen.SWIPE + 20)
-	desk.hire_top()
+	desk.posting.hire_top()
 	var e: Dictionary = game.staff.employee(cv.person)
 	assert_false(e.is_empty())
 	assert_eq(e.wage, cv.ask)
@@ -314,12 +314,12 @@ func test_swipe_right_hires_at_the_ask():
 
 func test_swipe_left_dismisses_and_a_mouse_drag_swipes():
 	_night()
-	game.desk_post("Grill cook", ["grill"], 1, 1)
+	game.desk.desk_post("Grill cook", ["grill"], 1, 1)
 	var fresh := _applicants()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	var first: Dictionary = game.staff.cvs[0]
-	desk.dismiss_top()
+	desk.posting.dismiss_top()
 	assert_true(game.staff.cv(first.id).is_empty())
 	assert_false(game.applicants.has(first.person))
 	assert_true(game.staff.employees.is_empty())
@@ -339,38 +339,38 @@ func test_swipe_left_dismisses_and_a_mouse_drag_swipes():
 
 func test_hire_and_dismiss_buttons_from_keys_or_pad():
 	_night()
-	game.desk_post("Grill cook", ["grill"], 1, 1)
+	game.desk.desk_post("Grill cook", ["grill"], 1, 1)
 	_applicants()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	assert_eq(desk.selected(), "hire")
-	game.act(0, "use")
+	game.coop.act(0, "use")
 	assert_eq(game.staff.employees.size(), 1)
 
 
 func test_haggling_at_hire():
 	_night()
-	game.desk_post("Grill cook", ["grill"], 1, 1)
+	game.desk.desk_post("Grill cook", ["grill"], 1, 1)
 	_applicants()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	var cv: Dictionary = game.staff.cvs[0]
 	desk.start_haggle()
 	assert_eq(desk.selected(), "offer")
-	assert_eq(desk.make_offer(int(cv.ask)), "accept", "the full ask is always taken")
+	assert_eq(desk.posting.make_offer(int(cv.ask)), "accept", "the full ask is always taken")
 	assert_eq(game.staff.employee(cv.person).wage, cv.ask)
 
 
 func test_a_haggle_far_below_the_ask_is_refused_then_decided():
 	_night()
-	game.desk_post("Grill cook", ["grill"], 1, 1)
+	game.desk.desk_post("Grill cook", ["grill"], 1, 1)
 	_applicants()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	var cv: Dictionary = game.staff.cvs[0]
 	desk.start_haggle()
-	assert_eq(desk.make_offer(1), "refuse", "a coin a day: never")
-	var r := desk.make_offer(1)
+	assert_eq(desk.posting.make_offer(1), "refuse", "a coin a day: never")
+	var r := desk.posting.make_offer(1)
 	assert_true(r in ["take_last", "walk"], "after two refusals they decide")
 	if r == "walk":
 		assert_true(game.staff.cv(cv.id).is_empty())
@@ -381,32 +381,32 @@ func test_a_haggle_far_below_the_ask_is_refused_then_decided():
 
 func test_taking_a_post_down_clears_its_cvs_and_line():
 	_night()
-	var id: int = game.desk_post("Grill cook", ["grill"], 1, 1)
+	var id: int = game.desk.desk_post("Grill cook", ["grill"], 1, 1)
 	_applicants()
-	game.desk_take_down(id)
+	game.desk.desk_take_down(id)
 	assert_true(game.staff.posts.is_empty())
 	assert_true(game.staff.cvs.is_empty())
 	assert_true(game.applicants.is_empty())
-	assert_null(game.find_station("desk").get_node_or_null("pile"))
+	assert_null(game.world.find_station("desk").get_node_or_null("pile"))
 
 
 func test_a_desk_in_use_cannot_be_sold():
 	_night(1)
-	game.desk_post("Grill cook", ["grill"], 1, 1)
-	assert_true(game.pick_up(Grid.center(Vector2i(8, 6))))
-	assert_ne(game.sell_block(), "", "the post needs its desk")
-	assert_false(game.sell_hand())
+	game.desk.desk_post("Grill cook", ["grill"], 1, 1)
+	assert_true(game.placing.pick_up(Grid.center(Vector2i(8, 6))))
+	assert_ne(game.placing.sell_block(), "", "the post needs its desk")
+	assert_false(game.placing.sell_hand())
 
 
 func test_staff_do_not_come_as_guests():
 	_night()
-	game.desk_post("Grill cook", ["grill"], 1, 1)
+	game.desk.desk_post("Grill cook", ["grill"], 1, 1)
 	_applicants()
 	var person := int(game.staff.cvs[0].person)
-	game.desk_hire(int(game.staff.cvs[0].id))
+	game.desk.desk_hire(int(game.staff.cvs[0].id))
 	for p in game.town.people:
 		p.affinity = 1.0
-	game.start_day()
+	game.day.start_day()
 	for a in game.arrivals:
 		if a.has("group"):
 			assert_false((a.group as Array).has(person), "they work here now")
@@ -426,23 +426,23 @@ func _hire_one(person := 3, duties := ["grill", "fetch"], breaks := 1, days_off 
 func test_the_staff_tab_lists_each_hire_with_manage():
 	_night(2)
 	var p := _hire_one()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	assert_eq(desk.tab, "staff", "an empty pile with staff opens on the staff")
 	assert_true(desk.select("manage:%d" % p))
 	desk.press()
-	assert_eq(desk.managing(), p)
+	assert_eq(desk.staff_ui.managing(), p)
 	desk.back()
-	assert_eq(desk.managing(), -1)
+	assert_eq(desk.staff_ui.managing(), -1)
 	assert_eq(desk.selected(), "manage:%d" % p)
 
 
 func test_ticking_a_duty_offers_it_and_unticking_takes_it_off():
 	_night()
 	var p := _hire_one()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	var e: Dictionary = game.staff.employee(p)
 	e.satisfaction = 1.0
 	game.staff.rng.seed = 1
@@ -461,7 +461,7 @@ func _refused(p: int) -> Dictionary:
 	var e: Dictionary = game.staff.employee(p)
 	e.satisfaction = 0.0
 	for tries in 20:
-		if not game.desk_add_duty(p, "wash_up").ok:
+		if not game.desk.desk_add_duty(p, "wash_up").ok:
 			break
 		game.staff.remove_duty(p, "wash_up")
 		e.satisfaction = 0.0
@@ -471,12 +471,12 @@ func _refused(p: int) -> Dictionary:
 func test_a_refused_duty_names_a_raise_to_approve():
 	_night()
 	var p := _hire_one()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	var e := _refused(p)
 	assert_false((e.pending as Dictionary).is_empty())
-	desk.render()
+	desk.pages.render()
 	assert_true(desk.select("approve"))
 	var wage := int(e.wage) + int(e.pending.raise)
 	desk.press()
@@ -487,41 +487,41 @@ func test_a_refused_duty_names_a_raise_to_approve():
 func test_a_raise_can_be_withdrawn_or_denied():
 	_night()
 	var p := _hire_one()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	var e := _refused(p)
 	var wage := int(e.wage)
-	assert_eq(desk.answer_raise("withdraw"), "withdrawn")
+	assert_eq(desk.staff_ui.answer_raise("withdraw"), "withdrawn")
 	assert_eq(int(e.wage), wage)
 	assert_false((e.duties as Array).has("wash_up"))
 	_refused(p)
-	assert_eq(desk.answer_raise("deny"), "quit")
+	assert_eq(desk.staff_ui.answer_raise("deny"), "quit")
 	assert_true(game.staff.employee(p).is_empty(), "denied, they quit")
-	assert_eq(desk.managing(), -1)
+	assert_eq(desk.staff_ui.managing(), -1)
 
 
 func test_a_raise_haggled_is_refused_then_decided():
 	_night()
 	var p := _hire_one()
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	var e := _refused(p)
-	desk.start_raise_haggle(0)
+	desk.staff_ui.start_raise_haggle(0)
 	assert_eq(desk.selected(), "raise_offer")
-	var r := desk.answer_raise("haggle", 0)
+	var r := desk.staff_ui.answer_raise("haggle", 0)
 	if r == "refuse":
-		r = desk.answer_raise("haggle", 0)
+		r = desk.staff_ui.answer_raise("haggle", 0)
 	assert_true(r in ["added", "quit"], "after two refusals they take it or go")
 
 
 func test_breaks_and_days_off_are_added_at_the_desk():
 	_night()
 	var p := _hire_one(3, ["grill"], 0, 0)
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	assert_true(desk.select("break"))
 	desk.press()
 	assert_true(desk.select("day_off"))
@@ -538,9 +538,9 @@ func test_firing_with_severance_pays_a_day_and_without_friends_hear():
 		x.affinity = 0.5
 	game.ledger.money = 100
 	var wage := int(game.staff.employee(a).wage)
-	game.open_desk()
+	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(a)
+	desk.staff_ui.open_person(a)
 	assert_true(desk.select("fire"))
 	desk.press()
 	assert_true(desk.select("fire_pay"))
@@ -548,7 +548,7 @@ func test_firing_with_severance_pays_a_day_and_without_friends_hear():
 	assert_true(game.staff.employee(a).is_empty())
 	assert_eq(game.ledger.money, 100 - wage)
 	assert_almost_eq(float(game.town.people[a].affinity), 0.5 - Staff.FIRE_DROP, 0.0001)
-	assert_true(game.desk_fire(b, false))
+	assert_true(game.desk.desk_fire(b, false))
 	assert_eq(game.ledger.money, 100 - wage, "nothing paid")
 	assert_almost_eq(float(game.town.people[b].affinity), 0.5 - Staff.FIRE_DROP_HARSH, 0.0001)
 	for f: int in game.town.people[b].friends:
@@ -560,7 +560,7 @@ func test_severance_needs_the_money():
 	_night()
 	var p := _hire_one()
 	game.ledger.money = 0
-	assert_false(game.desk_fire(p, true))
+	assert_false(game.desk.desk_fire(p, true))
 	assert_false(game.staff.employee(p).is_empty())
 
 
@@ -569,8 +569,8 @@ func test_wages_are_paid_as_the_door_opens_on_the_receipt():
 	var p := _hire_one()
 	var wage := int(game.staff.employee(p).wage)
 	game.ledger.money = 500
-	assert_eq(game.staff_wages(), wage)
-	game.start_day()
+	assert_eq(game.desk.staff_wages(), wage)
+	game.day.start_day()
 	assert_eq(game.ledger.today.staff, wage)
 	game.arrivals.clear()
 	for i in 20:
@@ -585,9 +585,9 @@ func test_an_unpaid_wage_is_a_hit_not_a_debt():
 	_night()
 	var p := _hire_one()
 	var e: Dictionary = game.staff.employee(p)
-	game.ledger.money = game.night_cost()   # the stock, and nothing for wages
+	game.ledger.money = game.menu_stock.night_cost()   # the stock, and nothing for wages
 	var sat: float = e.satisfaction
-	game.start_day()
+	game.day.start_day()
 	assert_eq(game.ledger.today.staff, 0)
 	assert_eq(game.ledger.today.unpaid, 1)
 	assert_lt(float(e.satisfaction), sat - Staff.UNPAID_HIT + 0.05)
@@ -600,8 +600,8 @@ func test_staff_quit_after_nights_at_the_bottom():
 	e.satisfaction = 0.0
 	e.bottom_nights = Staff.QUIT_NIGHTS - 1
 	e.wage = 999   # far more than there is: unpaid, and at the bottom
-	game.ledger.money = game.night_cost()
-	game.start_day()
+	game.ledger.money = game.menu_stock.night_cost()
+	game.day.start_day()
 	assert_true(game.staff.employee(p).is_empty(), "they quit")
 
 
@@ -612,7 +612,7 @@ func test_days_off_are_picked_as_a_week_starts():
 	for i in 20:
 		game.step(0.1)
 	game.ledger.day = 6
-	game.open_build()
+	game.session.open_build()
 	assert_true(game.staff.picked_week(3, 6))
 	var off: Array = game.staff.week_boxes(3, 6).filter(func(b: Dictionary) -> bool: return b.off)
 	assert_eq(off.size(), 2)
@@ -738,7 +738,7 @@ func _helper(person: int, duties: Array, at := Vector2i(5, 4), breaks := 0) -> H
 
 
 func _seated(idx := 0) -> Guest:
-	var g: Guest = game.spawn_guest(idx)
+	var g: Guest = game.seating.spawn_guest(idx)
 	_run(12.0)
 	return g
 
@@ -754,7 +754,7 @@ func test_staff_walk_in_as_the_door_opens_and_go_home_as_the_day_ends():
 	var h: Helper = game.crew.helpers[0]
 	assert_eq(h.person, 3)
 	assert_eq(h.cell(), game.DOOR, "in through the front door")
-	assert_true(game.hands().has(h))
+	assert_true(game.serving.hands().has(h))
 	game.arrivals.clear()
 	_run(0.5)
 	assert_true(game.crew.helpers.is_empty(), "the day ended and they went home")
@@ -792,20 +792,20 @@ func test_a_helper_with_no_assemble_duty_leaves_the_cooking_for_others():
 	_order_by_chef(g)
 	_helper(3, ["fetch", "grill"])
 	_run(30.0)
-	var made: Array = game.stations.values().filter(func(st: Station) -> bool: return st.item == "prep:" + game.fixed_main().grill)
+	var made: Array = game.stations.values().filter(func(st: Station) -> bool: return st.item == "prep:" + game.world.fixed_main().grill)
 	assert_eq(made.size(), 1, "the patty is grilled and put down for someone to plate")
-	assert_eq(game.crew._tagged(int(game.tickets[0].id)), [], "nobody set out a plate")
+	assert_eq(game.crew.task_end._tagged(int(game.tickets[0].id)), [], "nobody set out a plate")
 
 
 func _order_by_chef(g: Guest) -> void:
-	game.use_station(g.table)
+	game.cooking.use_station(g.table)
 	assert_eq(game.tickets.size(), 1)
 
 
 func test_a_washer_washes_up_into_the_plate_stack():
 	_game()
-	var sink: Station = game.find_station("sink")
-	var stack: Station = game.find_station("plates")
+	var sink: Station = game.world.find_station("sink")
+	var stack: Station = game.world.find_station("plates")
 	sink.dirty = 2
 	var before := stack.count
 	_helper(3, ["wash_up"], Vector2i(3, 3))
@@ -816,7 +816,7 @@ func test_a_washer_washes_up_into_the_plate_stack():
 
 func test_a_full_bin_is_emptied_and_the_bag_goes_out_the_front():
 	_game()
-	var bin: Station = game.find_station("bin")
+	var bin: Station = game.world.find_station("bin")
 	bin.count = Crew.BIN_FULL
 	var h := _helper(3, ["empty_bin"], Vector2i(1, 5))
 	var carried := false
@@ -831,7 +831,7 @@ func test_a_full_bin_is_emptied_and_the_bag_goes_out_the_front():
 func test_a_table_is_cleared_into_the_sink():
 	_game()
 	var table: Station = game.stations[Vector2i(6, 5)]
-	var sink: Station = game.find_station("sink")
+	var sink: Station = game.world.find_station("sink")
 	table.dirty = 1
 	_helper(3, ["clear_tables"])
 	_run(15.0)
@@ -866,7 +866,7 @@ func test_on_a_break_they_take_nothing_and_chat_with_another_on_a_break():
 	var b := _helper(4, ["take_orders"], Vector2i(8, 5), 1)
 	game.staff.employee(3).satisfaction = 0.9
 	game.staff.employee(4).satisfaction = 0.3
-	game.clock = Staff.break_starts(1, game.day_length())[0] + 0.1
+	game.clock = Staff.break_starts(1, game.day.day_length())[0] + 0.1
 	_run(3.0)
 	assert_true(a.resting and b.resting)
 	assert_eq(game.tickets.size(), 0, "nobody takes the order on a break")
@@ -904,7 +904,7 @@ func test_enough_training_changes_a_tolerance_for_good():
 	_game()
 	var h := _helper(3, ["wash_up"], Vector2i(3, 3))
 	game.staff.employee(3).skills.clean = 3.49
-	var sink: Station = game.find_station("sink")
+	var sink: Station = game.world.find_station("sink")
 	sink.dirty = 1
 	_run(6.0)
 	assert_eq(sink.dirty, 0)
@@ -921,8 +921,8 @@ func test_the_desk_is_in_the_shop_now():
 func test_a_server_with_take_payment_brings_the_bill_and_the_table_pays():
 	_game()
 	var g := _seated()
-	game.take_orders(g.table)
-	game.serve(g, game.full_tray_for(g))
+	game.serving.take_orders(g.table)
+	game.serving.serve(g, game.serving.full_tray_for(g))
 	var h := _helper(3, ["take_payment"])
 	var paid := false
 	for i in 400:

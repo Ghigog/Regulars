@@ -4,7 +4,7 @@ extends RefCounted
 ## last (so the hints can name its buttons), the stick they steer with, and the
 ## actions they are holding down. `Controls` fills one of these per player from
 ## the devices seated to that player; the game asks it for movement and held
-## actions and receives presses as `game.act(index, action)`.
+## actions and receives presses as `game.coop.act(index, action)`.
 ##
 ## A source is one device: "keys" (the keyboard and the mouse), "pad:<id>" (one
 ## controller, by Godot device id) or "touch" (the screen).

@@ -1,0 +1,216 @@
+extends "res://test/helpers/game_case.gd"
+
+
+func test_a_guest_who_finishes_eating_chats_then_waits_to_pay():
+	var g := _ordered_guest()
+	game.serving.serve(g, game.serving.full_tray_for(g))
+	_run(g.eat_time + 0.5)
+	assert_eq(g.state, "chatting")
+	assert_eq(g.table.dirty, 1, "the plate is left as they finish eating")
+	_run(Guest.CHAT_TIME)
+	assert_eq(g.state, "to_pay")
+	assert_true(game.paying.ready_to_pay(g.table))
+	assert_eq(int(game.ledger.today.sales), 0, "no money until the bill is handed over")
+	assert_true(game.paying.pay_wait(g) >= 0.0)
+
+
+
+func test_a_ready_table_calls_a_chef_in_sight_but_not_behind_a_wall():
+	var g := _ready_to_pay()
+	game.player.position = Grid.center(Vector2i(8, 6))
+	_run(1.0)
+	assert_true(game.grid.has_los(g.table.cell, game.player.cell()))
+	assert_true(g.calling, "a hand up with the bill bubble")
+	_walls_round(g.table.cell)
+	_run(1.0)
+	assert_false(g.calling, "nobody can see them")
+
+
+
+func test_after_a_while_one_guest_walks_to_the_till_and_the_rest_stay():
+	var pair: Array[Guest] = game.seating.spawn_group([0, 1])
+	_run(14.0)
+	game.cooking.use_station(pair[0].table)
+	for g in pair:
+		game.serving.serve(g, game.serving.full_tray_for(g))
+	_run(pair[0].eat_time + pair[1].eat_time + Guest.CHAT_TIME)
+	assert_true(game.paying.ready_to_pay(pair[0].table))
+	_run(game.paying.TILL_AFTER + 0.5)
+	var going := pair.filter(func(g: Guest) -> bool: return g.state == "to_till" or g.state == "at_till")
+	assert_eq(going.size(), 1, "one of them goes to pay")
+	var stayed := pair.filter(func(g: Guest) -> bool: return g.state == "to_pay")
+	assert_eq(stayed.size(), 1, "the other stays seated")
+	_run(6.0)
+	assert_eq(going[0].state, "at_till")
+	assert_eq(Grid.to_cell(going[0].position), game.paying.till_front(), "queued in front of the pass")
+
+
+
+func test_an_exact_bill_pays_as_before_and_a_wrong_one_is_refused():
+	var g := _ready_to_pay()
+	var n: int = game.paying.table_number(g.table)
+	var wrong := Bill.new(n, {int(g.order.main.id): 2})
+	game.player.set_held("bill")
+	game.player.bill = wrong
+	var joy := g.mood.joy
+	assert_false(game.paying.give_bill(game.player, g.table))
+	assert_eq(game.player.held, "", "the slip is thrown away")
+	assert_almost_eq(g.mood.joy, joy - GuestMood.WRONG_BILL_JOY, 0.0001)
+	assert_eq(g.mood.latest_thought(), "We never had the %s" % str(g.order.main.name).to_lower())
+	assert_eq(g.state, "to_pay", "still waiting")
+	assert_eq(int(game.ledger.today.sales), 0)
+	# The right one, written at the till.
+	var slip := Bill.new(n)
+	slip.add(int(g.order.main.id))
+	game.paying.print_bill(game.player, slip)
+	assert_eq(game.player.held, "bill")
+	assert_true(game.paying.slip_out(n))
+	var bill := g.mood.bill_for(g.bill_base)
+	var tip := maxi(0, g.mood.tip_for(bill, game.town.tip_bonus(g.idx)) + g.mood.pay_for(g.bill_base) - bill)
+	assert_true(game.paying.give_bill(game.player, g.table))
+	assert_eq(int(game.ledger.today.sales), bill, "the amount on the slip, never anything else")
+	assert_eq(int(game.ledger.today.tips), tip, "the mood's extras with the tip")
+	assert_eq(g.state, "leaving")
+
+
+
+func test_holding_e_at_the_table_hands_the_bill_over():
+	var g := _ready_to_pay()
+	var stand := g.table.cell + Vector2i(0, 1) if not game.grid.is_blocked(g.table.cell + Vector2i(0, 1)) else g.table.cell + Vector2i(-1, 0)
+	game.player.position = Grid.center(stand)
+	game.player.look_at_cell(g.table.cell)
+	game.player.set_held("bill")
+	game.player.bill = game.paying.right_bill(g.table)
+	assert_eq(game.cooking.prompt_for(g.table), "Hold to give the bill")
+	game.paying._tick_giving(game.player, true, game.paying.HAND_TIME / 2.0)
+	assert_eq(game.player.held, "bill", "half way")
+	game.paying._tick_giving(game.player, false, 0.1)
+	assert_eq(game.player.give_t, 0.0, "letting go starts again")
+	for i in 12:
+		game.paying._tick_giving(game.player, true, 0.1)
+	assert_eq(game.player.held, "")
+	assert_eq(g.state, "leaving")
+
+
+
+func test_a_table_can_be_cleared_while_its_party_waits_to_pay():
+	var g := _ready_to_pay()
+	assert_eq(game.cooking.use_station(g.table), "Clear plates")
+	assert_eq(g.table.dirty, 0)
+	assert_true(game.seat_taken.has(g.seat), "the seat is still theirs")
+	game.player.set_held("")
+	game.paying.pay_bill(g.table)
+	assert_false(game.seat_taken.has(g.seat), "free once they go")
+
+
+
+func test_the_till_writes_a_bill_for_a_table_waiting_to_pay():
+	var g := _ready_to_pay()
+	var till: Station = game.paying.till_station()
+	assert_eq(game.cooking.prompt_for(till), "Write the bill")
+	game.cooking.use_station(till)
+	assert_true(game.hud.bill_open())
+	assert_eq(game.hud.bill.bill.table, game.paying.table_number(g.table), "the waiting table is picked")
+	game.hud.bill.select("item:%d" % int(g.order.main.id))
+	game.hud.bill.action("use")
+	game.hud.bill.action("use")
+	game.hud.bill.action("sell")
+	assert_eq(game.hud.bill.bill.count(int(g.order.main.id)), 1)
+	game.hud.bill._print()
+	assert_false(game.hud.bill_open())
+	assert_eq(game.player.held, "bill")
+	assert_eq(Bill.check(game.player.bill, game.paying.right_bill(g.table)), "ok")
+
+
+
+func test_a_party_left_too_long_leaves_without_paying_and_no_strike():
+	var g := _ready_to_pay()
+	g.mood.patience = 0.001
+	_run(0.5)
+	assert_eq(g.state, "leaving")
+	assert_true(g.mood.skipped_bill)
+	assert_eq(int(game.ledger.today.unpaid_bills), 1)
+	assert_eq(int(game.ledger.today.sales), 0)
+	assert_eq(game.ledger.strikes(), 0, "not a walkout")
+
+
+
+func test_the_night_cleaner_clears_everything_in_one_press():
+	_to_build()
+	var table: Station = game.stations[Vector2i(8, 3)]
+	table.dirty = 2
+	table.dirty_cups = 1
+	game.world.find_station("bin").count = 3
+	game.floor_dirt.mess.add_dirt(Vector2i(7, 4))
+	game.ledger.money = 100
+	var price: int = game.room_edit.cleaner_price()
+	assert_gt(price, 0)
+	assert_true(game.room_edit.dirty_note().contains("night cleaner"), "the dirty note offers it")
+	game.session.open_shop()
+	var plates: int = game.world.find_station("plates").count
+	assert_true(game.placing.buy(game.CLEANER))
+	assert_eq(game.ledger.money, 100 - price)
+	assert_eq(table.dirty, 0)
+	assert_eq(game.world.find_station("bin").count, 0)
+	assert_eq(game.floor_dirt.mess.total(), 0)
+	assert_eq(game.world.find_station("plates").count, plates + 1, "the plates go back on their stack")
+	assert_eq(game.room_edit.dirty_note(), "")
+	assert_eq(game.room_edit.cleaner_price(), 0)
+	assert_false(game.placing.buy(game.CLEANER), "nothing left to clean")
+	game.session.close_shop()
+
+
+
+func test_one_press_makes_a_counter_the_fridge_a_box_needs():
+	_to_build()
+	game.ledger.money = 200
+	var c := _plain_counter()
+	assert_true(game.card.open_storage(c))
+	var price: int = game.card.fridge_offer("box_patty")
+	assert_eq(price, Upgrades.step_price("fridge"))
+	assert_true(game.placing.buy({"id": "box_patty", "tier": 1}))
+	assert_eq(game.stations[c].base, "fridge", "the counter is a fridge now")
+	assert_true(game.kitchen.stock(c).has("box_patty"), "with the box in")
+	assert_eq(game.ledger.money, 200 - price)
+	assert_true(game.card.storing(), "the card stays open")
+	game.session.close_shop()
+	assert_true(game.card.open_storage(_plain_counter()))
+	assert_string_contains(game.hud.shop_ui._storage_info({"id": "box_bun", "tier": 1}).blurb, "Unlimited tonight", "a box says it never runs out")
+	game.session.close_shop()
+
+
+
+func test_the_door_refusing_for_money_offers_remedies():
+	_to_build()
+	game.ledger.money = 0
+	var why: String = game.menu_stock.open_block()
+	assert_string_contains(why, "Tomorrow's stock costs")
+	assert_string_contains(why, "dearest box")
+	assert_string_contains(why, "sell something")
+
+
+
+func test_one_wash_clears_the_whole_sink_onto_each_stack():
+	_to_build()
+	var sink: Station = game.world.find_station("sink")
+	sink.dirty = 3
+	sink.dirty_cups = 1
+	var plates: int = game.world.find_station("plates").count
+	game.cooking.wash_one(sink)   # the old one-at-a-time, for the count below
+	sink.dirty = 3
+	sink.dirty_cups = 1
+	plates = game.world.find_station("plates").count
+	game.player.position = sink.position + Vector3(0, 0, 1)
+	game.player.look(Vector2i(0, -1))
+	game.cooking.use_station(sink, false)
+	assert_eq(sink.dirty, 0, "one press washes it all")
+	assert_eq(game.world.find_station("plates").count, plates + 2)
+
+
+
+func test_the_receipt_names_a_side_nobody_ordered():
+	game.menu.add("side", [game.world.fixed_main().bread], "Plain Roll")
+	game.ledger.today.served = 1
+	var nudges: Array[String] = game.menu_stock.unordered_nudges()
+	assert_eq(nudges.size(), 1)
+	assert_string_contains(nudges[0], "Plain Roll: no orders.")

@@ -175,7 +175,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   orders with full hands). Taking an order comes before half price and the free meal at
   the same table. An order is data on the guest (`Guest.order`: `{main, side, drink,
   ticket}`, each an item or empty), chosen at the door by `Menu.group_order` (or by
-  `order_for` in `game/main.gd` for a guest who came in another way), and serving
+  `order_for` in `game/main/serving.gd` for a guest who came in another way), and serving
   matches each plate against its ticket. `REGULARS_DEMO=order`.
 - **What guests order.** Each townsperson has hidden tastes: liked and disliked
   ingredient tags. A guest orders a main with nothing they dislike, plus a side and a
@@ -267,7 +267,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     sold like a fern. It lies flat, so anyone walks over it and a table can stand on
     it; picking up on a cell takes what stands there first, then the rug. Floor under a
     rug cannot be lifted. The first room starts with one under the middle table.
-  - *Decor* (`sim/decor.gd`, `cheer_with_decor` in `game/main.gd`) works like
+  - *Decor* (`sim/decor.gd`, `cheer_with_decor` in `game/main/decor.gd`) works like
     RollerCoaster Tycoon scenery: a flat joy bonus when a guest sits down, not joy per
     second. Each piece's "joy" in `Catalog.ITEMS` is scaled by how close it is to the
     seat: on it (the floor or rug under the seat) 100%, beside it (within a cell) 50%,
@@ -350,7 +350,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   back; a piece still carried when the day opens goes back too. Sell (button or X)
   refunds half the catalog price, except same-night returns: whatever was paid for a
   piece since the last day ended (buying it, or an upgrade step) comes back in full if
-  it is sold before the door opens (`spent_tonight` in `game/main.gd`). Every piece can be moved and
+  it is sold before the door opens (`spent_tonight` in `game/main/placing.gd`). Every piece can be moved and
   sold, the start's fixtures and the last of anything included.
   Player-built partitions move and sell the same way; the entrance wall does not.
 - **Upgrade trees (PRD 8.3).** Nothing is upgraded in the shop. At night, pick a piece
@@ -463,7 +463,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
 - **Staff (PRD 10).** Townspeople hired to work in the restaurant. Rules in
   `sim/staff.gd` (posts, CVs, wages, satisfaction, the week), `sim/jobs.gd` (`JobBoard`,
   the task board) and `sim/helper_work.gd` (how a helper does each task); the room side
-  is `game/crew.gd` and `game/helper.gd`, the screen `game/desk_screen.gd`. All numbers
+  is `game/crew.gd` (with `game/crew/`) and `game/helper.gd`, the screen `game/desk_screen.gd` (with `game/desk/`). All numbers
   are named constants, all tunable.
   - *Tolerances (10.1).* Everyone has a tolerance for food, service and clean, 1 to 5
     (two dice averaged, so middling is common; low means they care). It scales the
@@ -874,7 +874,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   palette) and the 27 images in `docs/art/`. Toy diorama: legless peg-people with floating
   mitten hands, bevelled painted-wood props, soft warm shadows, paper-and-wood interface.
 - **The game now follows it.** The first art pass is done, all of it built in code:
-  1. Palette roles, plum-warm soft shadows and 3 cm bevels on every box (`game/build.gd`).
+  1. Palette roles, plum-warm soft shadows and 3 cm bevels on every box (`game/build.gd` and `game/build/`).
   2. Peg-people: one shared body, the eight faces, mitten hands with poses, and the kit
      (5 skins, 8 hair shapes, 6 hats, glasses, beard, 10 outfit colours, 4 patterns). All
      fourteen townsfolk have a look; the chef has the toque and player trim (`game/peg.gd`).
@@ -909,7 +909,7 @@ Not built yet, except where marked; this is the agreed direction for future sess
 
 - **Order-taking is a step.** *Built (section 1)*, now with the menu. The chef walks to
   the table to take the order before cooking. For the menu below, `order_for(guest)` in
-  `game/main.gd` is the one place that picks a dish from the player's menu; the guest
+  `game/main/serving.gd` is the one place that picks a dish from the player's menu; the guest
   stores it (`Guest.order`), the bubble draws its icon and serving checks the dish in
   hand against it. A guest whose order is a dish not yet cooked just keeps waiting.
 - **Recipes, ingredients and a menu the player designs.** Every dish is data: a recipe

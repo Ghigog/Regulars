@@ -372,7 +372,7 @@ static func dress_opening(info: Dictionary, ok: bool) -> void:
 			hinge.rotation.y = -0.9
 			n.add_child(hinge)
 			_rb(hinge, Vector3(0.4, 0.98, 0.03), Vector3(0.8, 1.9, 0.06), leaf, 0.02)
-			_rb(hinge, Vector3(0.4, 1.35, 0.065), Vector3(0.5, 0.6, 0.02), Build._tint(leaf, 0.07), 0.01)
+			_rb(hinge, Vector3(0.4, 1.35, 0.065), Vector3(0.5, 0.6, 0.02), BuildStations._tint(leaf, 0.07), 0.01)
 			Build.ball(hinge, Vector3(0.7, 0.95, 0.09), 0.04, BRASS if ok else grey)
 		else:   # cafe doors on low posts
 			for sx: float in [-0.5, 0.5]:

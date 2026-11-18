@@ -7,18 +7,18 @@ extends CanvasLayer
 ## what they hold down. A press becomes an action ("use", "back", "turn",
 ## "sell", "shop", "town", "options", "confirm", "search", "mute" and the
 ## browse directions "up", "down", "left", "right") and goes to the game as
-## `game.act(player, action)`, so all three devices share one set of rules.
+## `game.coop.act(player, action)`, so all three devices share one set of rules.
 ## Movement is read with move(player).
 ##
 ## Every device nobody has been seated to is player one's, and whichever of
 ## them was used last is their `mode`: player one can pick up a pad or reach for
 ## the screen at any moment. Co-op (PRD 4): Start on another pad (Enter on the
 ## keyboard while player one is on a pad) seats it to the next player
-## (`game.join`); holding Start a second, or unplugging, leaves (`game.leave`).
+## (`game.coop.join`); holding Start a second, or unplugging, leaves (`game.coop.leave`).
 ##
 ## Keys: WASD or arrows walk (and browse), E/Space use, Enter confirm, Esc back,
 ## R turn, C sell, Tab shop, Z and X choose a lifted piece's upgrade and Space buys it
-## (Space is "use" everywhere else: `game.act` turns "buy" back into "use"), T town, O options, F search, M mute, N the menu screen
+## (Space is "use" everywhere else: `game.coop.act` turns "buy" back into "use"), T town, O options, F search, M mute, N the menu screen
 ## (R on an ingredient station at night switches its stock). Shift held: the chef stands
 ## still and WASD only turns them, to aim (diagonals too at night).
 ## Controller: left stick or d-pad walk (the d-pad also browses), A use (confirm
@@ -226,7 +226,7 @@ func press(source: String, action: String, pressed := true, control = null, echo
 	if control != null and not echo:
 		action = who.hold(source, control, action, pressed)
 	if pressed and action != "":
-		game.act(who.index, action, echo)
+		game.coop.act(who.index, action, echo)
 
 
 ## A device's stick moved (screen space, x right, y up).
@@ -261,7 +261,7 @@ func _input(event: InputEvent) -> void:
 		_emulated_mouse(event)
 	elif event is InputEventKey:
 		if event.pressed and not event.echo and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER] and joins("keys"):
-			game.join("keys")
+			game.coop.join("keys")
 			get_viewport().set_input_as_handled()
 			return
 		_use("keys")
@@ -303,7 +303,7 @@ func _pad_button(e: InputEventJoypadButton) -> void:
 func _start_button(source: String, pressed: bool) -> void:
 	if pressed:
 		if joins(source):
-			if game.join(source) >= 0:
+			if game.coop.join(source) >= 0:
 				_start_held[source] = -1.0   # its release does nothing
 				return
 		_use(source)
@@ -324,7 +324,7 @@ func _on_joy_connection(device: int, connected: bool) -> void:
 	for q: PlayerInput in players:
 		q.let_go(source)
 	if game.chefs.size() > 1:
-		game.leave(p)
+		game.coop.leave(p)
 
 
 func _pad_axis(e: InputEventJoypadMotion) -> void:
@@ -358,7 +358,7 @@ func _process(delta: float) -> void:
 		_start_held[source] += delta
 		if _start_held[source] >= LEAVE_HOLD and game.chefs.size() > 1:
 			_start_held[source] = -1.0
-			game.leave(owner_of(source))
+			game.coop.leave(owner_of(source))
 	if _touch_who().mode == "touch":
 		_view.queue_redraw()
 
@@ -371,7 +371,7 @@ func _browse(who: PlayerInput, delta: float) -> void:
 		who.erase = false
 	var dir := Vector2i.ZERO
 	var s := who._sticks.get(who.source, Vector2.ZERO) as Vector2
-	if ((game.shopping and game.shopper == _chef_of(who.index)) or _options() or game.hud.title_open()) and s.length() > 0.6:
+	if ((game.shopping and game.shopper == _chef_of(who.index)) or _options() or game.hud.options_ui.title_open()) and s.length() > 0.6:
 		dir = Vector2i(signi(roundi(s.x)), 0) if absf(s.x) > absf(s.y) else Vector2i(0, -signi(roundi(s.y)))
 	if dir != who.browse_dir:
 		who.browse_dir = dir
@@ -380,7 +380,7 @@ func _browse(who: PlayerInput, delta: float) -> void:
 		who.browse_wait -= delta
 		if who.browse_wait <= 0.0:
 			who.browse_wait = 0.28
-			game.act(who.index, "right" if dir.x > 0 else "left" if dir.x < 0 else "down" if dir.y > 0 else "up")
+			game.coop.act(who.index, "right" if dir.x > 0 else "left" if dir.x < 0 else "down" if dir.y > 0 else "up")
 
 
 # ---------------------------------------------------------------- touch
@@ -390,7 +390,7 @@ func _browse(who: PlayerInput, delta: float) -> void:
 func buttons() -> Array:
 	var r := _view.get_rect()
 	var out: Array = []
-	if game.hud.title_open():   # the title's own buttons are tapped
+	if game.hud.options_ui.title_open():   # the title's own buttons are tapped
 		return out
 	var x := r.size.x - 92.0
 	var y := r.size.y - 112.0
@@ -453,7 +453,7 @@ func _stick_home() -> Vector2:
 
 
 func _options() -> bool:
-	return game.hud != null and (game.hud.options_open() or game.hud.pause_open())
+	return game.hud != null and (game.hud.options_ui.options_open() or game.hud.options_ui.pause_open())
 
 
 func _stick_shown() -> bool:
