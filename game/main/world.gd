@@ -121,7 +121,7 @@ func _build_layout() -> void:
 	# each able to take a tool (PRD 8).
 	for z in range(2, 6):
 		add_station("counter", Vector2i(4, z), 1, 0, "counter", true)
-	Build.register(game.stations[Vector2i(4, 2)])  # the till: its own piece, standing on the pass
+	BuildStations.register(game.stations[Vector2i(4, 2)])  # the till: its own piece, standing on the pass
 	game.placing.add_rug(Vector2i(8, 3))   # under the middle table, as in sheet 1
 
 

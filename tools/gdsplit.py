@@ -229,6 +229,8 @@ def main():
             return f'{back}.{name}'
         return f'{back}.{owner_var[to]}.{name}'
 
+    func_names = {it.name for it in items if it.kind == 'func'}
+
     def rewrite(it):
         text = it.text
         loc = locals_of(text)
@@ -245,7 +247,10 @@ def main():
             elif name == 'self':
                 if it.owner != 'main' and it.kind != 'class':
                     new = back
-            elif name in loc:
+            elif name in loc and not (text[b:].lstrip(' \t')[:1] == '(' and members.get(name, ('', ''))[0] != ''
+                                      and name in func_names):
+                # a local of this name; a call `name(...)` still means the method (GDScript
+                # calls a local Callable with .call())
                 if name in members and members[name][0] != it.owner:
                     problems.append(f'{it.name}: local {name} shadows a member')
             elif name in members:
@@ -330,6 +335,13 @@ def main():
                     report.setdefault(f'{m.group(1)}.{m.group(2)}', set()).add(f.name)
             if t2 != t:
                 files[f] = t2
+    # the class's own explicit `Class.x` in its own and the new files
+    cpat = re.compile(r'\b' + re.escape(plan['class']) + r'\.(' + '|'.join(map(re.escape, moved_names)) + r')\b')
+    for f in [src] + [root / p['file'] for p in plan['parts']]:
+        mine = 'main' if f == src else next(p['var'] for p in plan['parts'] if root / p['file'] == f)
+        files[f] = cpat.sub(lambda m: m.group(0) if moved_names[m.group(1)] == mine and members[m.group(1)][1] == 'static'
+                            and False else (f'{owner_cls[moved_names[m.group(1)]]}.{m.group(1)}'
+                            if members[m.group(1)][1] == 'static' else m.group(0)), files[f])
     for k in sorted(report):
         print('stray?', k, sorted(report[k]))
     for pr in sorted(set(problems)):

@@ -100,7 +100,7 @@ func set_held(kind: String, quality := 1.0, dishes_: Array = [], tray_ := false)
 		_held_node = null
 	_body.pose = "carry" if kind != "" else "idle"
 	if kind != "":
-		_held_node = Build.carried(dishes, on_tray) if kind in ["dishes", "dirty_dishes", "tray"] else Build.item(kind, quality)
+		_held_node = BuildFood.carried(dishes, on_tray) if kind in ["dishes", "dirty_dishes", "tray"] else BuildFood.item(kind, quality)
 		_held_node.position = Vector3(0, 0.42, 0.34)
 		_body.add_child(_held_node)
 		_held_size = 0.4

@@ -20,8 +20,8 @@ func _open_first_night() -> void:
 	game.door_open = false
 	game._door_turn.rotation.y = PI
 	game.audio.play_music("night")
-	game.hud.show_build()
-	game.hud.say("The night before day 1. Set up the kitchen, then flip the door card.")
+	game.hud.hints_ui.show_build()
+	game.hud.day_ui.say("The night before day 1. Set up the kitchen, then flip the door card.")
 	autosave()
 
 
@@ -57,8 +57,8 @@ func _open_night() -> void:
 	game._door_turn.rotation.y = PI
 	game.audio.play_music("night")
 	game.desk.roll_applicants()
-	game.hud.show_build()
-	game.hud.say("Welcome back. Day %d is tomorrow: set up the kitchen, then flip the door card." % game.ledger.day)
+	game.hud.hints_ui.show_build()
+	game.hud.day_ui.say("Welcome back. Day %d is tomorrow: set up the kitchen, then flip the door card." % game.ledger.day)
 
 
 ## Writes the saved game. Skipped when the game runs headless on the real save's path
@@ -100,7 +100,7 @@ func open_title() -> void:
 	game.door_open = false
 	game._door_turn.rotation.y = PI
 	game.audio.play_music("title")
-	game.hud.show_title()
+	game.hud.options_ui.show_title()
 
 
 ## Play on the title screen: the theme card, unless REGULARS_THEME already chose.
@@ -109,10 +109,10 @@ func play() -> void:
 		return
 	if theme_forced():
 		Game._theme_picked = true
-		game.hud.hide_title()
+		game.hud.options_ui.hide_title()
 		_open_first_night()
 		return
-	game.hud.title.show_themes()
+	game.hud.options_ui.title.show_themes()
 
 
 ## REGULARS_THEME is set: a developer's switch that skips the theme card.
@@ -146,7 +146,7 @@ func choose_theme(id: String) -> void:
 		Game._kept_seats = game.controls.seats.duplicate()
 		game.get_tree().call_deferred("reload_current_scene")
 		return
-	game.hud.hide_title()
+	game.hud.options_ui.hide_title()
 	_open_first_night()
 
 
@@ -164,11 +164,11 @@ func open_build() -> void:
 		return
 	game.phase = Game.Phase.BUILD
 	game.ready_chefs.clear()
-	game.hud.hide_card()
+	game.hud.receipt_ui.hide_card()
 	if Staff.week_day(game.ledger.day) == 0:   # a new week: everyone picks their days off (PRD 10.4)
 		game.staff.start_week(game.ledger.day)
 	game.desk.roll_applicants()
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 	autosave()   # the night's start: where Continue picks up
 
 
@@ -227,19 +227,19 @@ func open_shop(ch: Player = null) -> void:
 		return
 	if game.shopping:   # one shop for everyone: the other player's Shop does nothing
 		if game.shopper != ch:
-			game.hud.say("Chef %d is shopping." % (game.chefs.find(game.shopper) + 1))
+			game.hud.day_ui.say("Chef %d is shopping." % (game.chefs.find(game.shopper) + 1))
 		return
 	if Cleaning.carrying_mess(ch.held):
 		game.audio.sfx("fail")
-		game.hud.say(Cleaning.HANDS_FULL)
+		game.hud.day_ui.say(Cleaning.HANDS_FULL)
 		return
 	if ch.hand.get("moving", false):   # a piece in hand: its upgrades are on the strip
 		game.audio.sfx("fail")
-		game.hud.say("Put the %s down to shop. Its upgrades are along the bottom." % GamePlacing.piece_name(ch.hand).to_lower())
+		game.hud.day_ui.say("Put the %s down to shop. Its upgrades are along the bottom." % GamePlacing.piece_name(ch.hand).to_lower())
 		return
 	game.shopper = ch
 	game.audio.sfx("slide")
-	game.hud.show_shop()
+	game.hud.shop_ui.show_shop()
 
 
 func close_shop() -> void:
@@ -256,8 +256,8 @@ func close_shop() -> void:
 	game.audio.sfx("slide", 0.0, 0.8)
 	if game.upgrading:
 		game.upgrading = false
-		game.hud.hide_tree()
+		game.hud.screens_ui.hide_tree()
 	else:
-		game.hud.hide_shop()
+		game.hud.shop_ui.hide_shop()
 	if not carried.is_empty():   # Tab or Esc: the piece stays in hand to carry elsewhere
 		game.placing.pick_up(Grid.center(Vector2i(carried.from.x, carried.from.y)), ch, true, str(carried.layer))

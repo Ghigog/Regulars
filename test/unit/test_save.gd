@@ -61,30 +61,30 @@ func test_closing_down_deletes_the_save():
 
 
 func test_pause_menu_opens_and_resumes():
-	game.hud.toggle_pause()
-	assert_true(game.hud.pause_open())
+	game.hud.options_ui.toggle_pause()
+	assert_true(game.hud.options_ui.pause_open())
 	assert_true(get_tree().paused)
 	game.coop.act(0, "down")
-	assert_eq(game.hud.pause.sel, 1)
+	assert_eq(game.hud.options_ui.pause.sel, 1)
 	game.coop.act(0, "back")
-	assert_false(game.hud.pause_open())
+	assert_false(game.hud.options_ui.pause_open())
 	assert_false(get_tree().paused)
 
 
 func test_pause_options_returns_to_pause():
-	game.hud.toggle_pause()
-	game.hud.pause.press_id("options")
-	assert_true(game.hud.options_open())
-	game.hud.toggle_options()
-	assert_true(game.hud.pause_open())
+	game.hud.options_ui.toggle_pause()
+	game.hud.options_ui.pause.press_id("options")
+	assert_true(game.hud.options_ui.options_open())
+	game.hud.options_ui.toggle_options()
+	assert_true(game.hud.options_ui.pause_open())
 	assert_true(get_tree().paused)
-	game.hud.toggle_pause()
+	game.hud.options_ui.toggle_pause()
 
 
 func test_quit_asks_first():
-	game.hud.toggle_pause()
-	game.hud.pause.press_id("quit")
-	assert_true(game.hud.pause.confirming)
-	game.hud.pause.press_id("no")
-	assert_false(game.hud.pause.confirming)
-	game.hud.toggle_pause()
+	game.hud.options_ui.toggle_pause()
+	game.hud.options_ui.pause.press_id("quit")
+	assert_true(game.hud.options_ui.pause.confirming)
+	game.hud.options_ui.pause.press_id("no")
+	assert_false(game.hud.options_ui.pause.confirming)
+	game.hud.options_ui.toggle_pause()

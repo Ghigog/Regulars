@@ -53,7 +53,7 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 
 func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	ch = game._me(ch)
-	Build.menu = game.menu.items
+	BuildFood.menu = game.menu.items
 	var held := ch.held
 	var q := ch.held_quality
 	var held_ing := Tray.parse(held)
@@ -325,7 +325,7 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			elif held == "dishes" and not to_order.is_empty():
 				why = "Take order first"
 				if not dry_run:
-					game.hud.say("%s hasn't ordered yet. Free your hands and take the order." % to_order[0].info.name)
+					game.hud.day_ui.say("%s hasn't ordered yet. Free your hands and take the order." % to_order[0].info.name)
 					game.audio.sfx("fail")
 					return why
 			elif held == "dishes" and g != null:
@@ -362,7 +362,7 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 	var why: String = r[1]
 	if act == "" and why != "":
 		if not dry_run:
-			game.hud.say(why + ".")
+			game.hud.day_ui.say(why + ".")
 			game.audio.sfx("fail")
 		return why
 	if act != "" and not dry_run:

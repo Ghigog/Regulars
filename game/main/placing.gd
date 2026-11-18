@@ -23,7 +23,7 @@ func buy(bp: Dictionary) -> bool:
 		if game.room_edit.hire_cleaner():
 			return true
 	elif bp.get("locked", false):
-		game.hud.say("The %s needs level %d." % [Catalog.label(bp), Catalog.bp_level(bp)])
+		game.hud.day_ui.say("The %s needs level %d." % [Catalog.label(bp), Catalog.bp_level(bp)])
 	elif game.upgrades.pick_tree(bp, game.shopper) if bp.has("tree") else pick_catalog(bp.id, int(bp.tier), game.shopper, bp.get("base", "")):
 		game.audio.sfx("pickup")
 		game.session.close_shop()
@@ -41,14 +41,14 @@ func pick_catalog(id: String, tier := 1, ch: Player = null, base := "") -> bool:
 			or game.ledger.money < Catalog.bp_price(bp) or not Catalog.sold_in(id, Scenery.theme_id):
 		return false
 	if id == "till" and game.paying.till_station() != null:
-		game.hud.say("One till is enough. Pick it up with E to move it.")
+		game.hud.day_ui.say("One till is enough. Pick it up with E to move it.")
 		return false
 	if ch.hand.get("moving", false):
 		cancel_hand(ch)
 	ch.hand = {"id": id, "tier": tier, "price": Catalog.bp_price(bp), "facing": 0}
 	if base != "":
 		ch.hand.base = base
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 	return true
 
 
@@ -60,7 +60,7 @@ func cancel_hand(ch: Player = null) -> void:
 		_put_down(ch.hand, ch.hand.from, int(ch.hand.from_facing))
 	ch.hand = {}
 	if game.phase == Game.Phase.BUILD:
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 
 
 ## The level the shop sells a piece at: any, while the kitchen has none of an essential.
@@ -99,11 +99,11 @@ func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool
 		ch.hand = {"id": "till", "tier": 1, "price": 0, "facing": 0, "moving": true, "node": till,
 			"from": Vector3i(c.x, c.y, 0), "from_facing": 0}
 		game.audio.sfx("pickup")
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return true
 	if game.stations.has(c) and game.room_edit.needs_cleaning(game.stations[c]):
 		game.audio.sfx("fail")   # a messy piece is not moved or sold until it is clean
-		game.hud.say(Cleaning.CLEAN_FIRST)
+		game.hud.day_ui.say(Cleaning.CLEAN_FIRST)
 		return false
 	if game.stations.has(c) or game.highs.has(c):
 		var st: Station = game.stations.get(c)
@@ -165,7 +165,7 @@ func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool
 	else:
 		return false
 	game.audio.sfx("pickup")
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 	return true
 
 
@@ -223,7 +223,7 @@ func _restock(h: Dictionary, cell: Vector2i) -> void:
 	game.world._show_boxes(cell)
 	game.menu_stock.menu_changed()
 	if not left.is_empty():
-		game.hud.say("No room here for %s: left out." % ", ".join(left))
+		game.hud.day_ui.say("No room here for %s: left out." % ", ".join(left))
 
 
 ## Puts a box of stock in a cell's storage: that kind is stocked from tonight (PRD 8.4).
@@ -250,7 +250,7 @@ func rotate_hand(ch: Player = null) -> void:
 		var k := Treatments.key_of(ch.hand.id)
 		game.menu_stock.switch_treatment(k, game.treat_off.has(k))
 		game.audio.sfx("pickup")
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return
 	if not ch.hand.is_empty() and not on_edge(ch.hand.id) and not Catalog.is_build_tool(ch.hand.id) \
 			and not Kitchen.is_high_only(GameWorld.hand_node(ch.hand)):   # a hung piece faces off its wall
@@ -311,7 +311,7 @@ func sell_hand(ch: Player = null) -> bool:
 		ch.hand = {}
 		game.audio.sfx("coin")
 		game.menu_stock.menu_changed()
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return true
 	var n: Node3D = ch.hand.node
 	if n is Station and (n as Station).lamp:
@@ -323,7 +323,7 @@ func sell_hand(ch: Player = null) -> bool:
 	if had_boxes:
 		game.menu_stock.menu_changed()
 	game.audio.sfx("coin")
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 	return true
 
 
@@ -494,7 +494,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		_put_down(ch.hand, spot, int(ch.hand.facing))
 		ch.hand = {}
 		game.audio.sfx("putdown")
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return true
 	if not game.ledger.spend(int(ch.hand.price)):
 		return false
@@ -502,7 +502,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		_store_box(cell, ch.hand.id)
 		ch.hand = {}   # one box a kind: hands are free again
 		game.audio.sfx("putdown")
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return true
 	var paid := int(ch.hand.price)
 	if ch.hand.id == "screen":
@@ -514,7 +514,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		add_rug(cell, int(ch.hand.facing))
 		_bought_tonight(rug_at(cell), paid)
 	elif ch.hand.id == "till":
-		Build.register(game.paying._till_host(cell))
+		BuildStations.register(game.paying._till_host(cell))
 		_bought_tonight(game.stations[cell].get_node("till"), paid)
 	elif Kitchen.is_counter(ch.hand.id) and ch.hand.get("base", "") == "" and game.world._bare_counter(cell) != null:
 		_bought_tonight(game.world._bare_counter(cell), paid)
@@ -538,4 +538,4 @@ func _after_building(ch: Player = null) -> void:
 	ch = game._me(ch)
 	if ch.hand.get("id", "") == "till" or not game.catalog.can_buy(ch.hand.id, game.ledger.money, buy_level(ch.hand.id), int(ch.hand.tier)) or game.ledger.money < int(ch.hand.price):
 		ch.hand = {}
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()

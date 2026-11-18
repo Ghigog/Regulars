@@ -41,7 +41,7 @@ func setup(hud_: Hud) -> void:
 	var logo := Logo.new()
 	logo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(logo)
-	var card := Hud.Sheet.new("paper", 30, 22)
+	var card := HudWidgets.Sheet.new("paper", 30, 22)
 	card.custom_minimum_size = Vector2(360, 0)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(card)
@@ -55,7 +55,7 @@ func setup(hud_: Hud) -> void:
 		if hud._mode() != "touch" and sel < _rows.size():
 			var r := _rows[sel].get_global_rect().grow_individual(14, 6, 10, 6)
 			r.position -= _frame.get_global_rect().position
-			Hud.pick_frame(_frame, r))
+			HudOptions.pick_frame(_frame, r))
 	add_child(_frame)
 	show_main()
 
@@ -70,7 +70,7 @@ func _clear() -> void:
 
 
 func _add_button(parent: Container, text: String, id: String, row: Control = null) -> Button:
-	var b := hud._button(parent, text, press_id.bind(id))
+	var b := hud.receipt_ui._button(parent, text, press_id.bind(id))
 	b.add_theme_font_size_override("font_size", 24)
 	var i := buttons.size()
 	b.mouse_entered.connect(func() -> void: pick(i))
@@ -205,7 +205,7 @@ func press_id(id: String) -> void:
 		"play":
 			hud.game.session.play()
 		"settings":
-			hud.toggle_options()
+			hud.options_ui.toggle_options()
 		"quit":
 			hud.game.session.quit_game()
 		"back":
@@ -229,8 +229,8 @@ class Swatch extends Control:
 	func _draw() -> void:
 		var t: Dictionary = Scenery.THEMES[theme_id]
 		var r := Rect2(Vector2.ZERO, size)
-		Hud.box(self, Rect2(r.position + Vector2(0, 4), r.size), Hud.SHADOW, 10)
-		Hud.box(self, r, Color(t.backdrop), 10, 3, Hud.INK)
+		HudWidgets.box(self, Rect2(r.position + Vector2(0, 4), r.size), Hud.SHADOW, 10)
+		HudWidgets.box(self, r, Color(t.backdrop), 10, 3, Hud.INK)
 		var inner := r.grow(-6)
 		var wall_h := inner.size.y * 0.42
 		draw_rect(Rect2(inner.position, Vector2(inner.size.x, wall_h)), Color(t.wall))
@@ -250,7 +250,7 @@ class Swatch extends Control:
 			draw_rect(Rect2(inner.position.x + split, floor_y + i * ph, inner.size.x - split, ph), Color(planks[i % planks.size()]))
 		# A window on the back wall, so the swatch reads as a room.
 		var win := Rect2(inner.position + Vector2(inner.size.x * 0.6, 5), Vector2(inner.size.x * 0.28, wall_h * 0.5))
-		Hud.box(self, win, Color("#bfe3ef"), 3, 2, Hud.INK)
+		HudWidgets.box(self, win, Color("#bfe3ef"), 3, 2, Hud.INK)
 		draw_rect(r.grow(-6), Hud.INK, false, 2.0)
 
 
@@ -270,7 +270,7 @@ class Logo extends Control:
 	func _init() -> void:
 		custom_minimum_size = Vector2(W, H)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var burger := Hud.Icon.new("burger", 76, false)
+		var burger := HudWidgets.Icon.new("burger", 76, false)
 		burger.position = Vector2(W / 2 - 38, H - 92)
 		add_child(burger)
 
@@ -296,9 +296,9 @@ class Logo extends Control:
 		draw_arc(c, r - 12, 0, TAU, 64, Color(Hud.CREAM, 0.55), 3.0, true)
 		# The slab: wood rim under a teal face, both ink-edged.
 		var slab := Rect2(18, 136, W - 36, 150)
-		Hud.box(self, Rect2(slab.position + Vector2(0, 16), slab.size), Hud.SHADOW, 34)
-		Hud.box(self, Rect2(slab.position + Vector2(0, 10), slab.size), Hud.WOOD, 34, 4, ink)
-		Hud.box(self, slab, TEAL, 34, 4, ink)
+		HudWidgets.box(self, Rect2(slab.position + Vector2(0, 16), slab.size), Hud.SHADOW, 34)
+		HudWidgets.box(self, Rect2(slab.position + Vector2(0, 10), slab.size), Hud.WOOD, 34, 4, ink)
+		HudWidgets.box(self, slab, TEAL, 34, 4, ink)
 		# The letters, each bobbing a little, gold and orange in turn.
 		var font: Font = Hud.lettering()
 		var word := "REGULARS"
@@ -353,7 +353,7 @@ class Logo extends Control:
 				draw_circle(p + b, 15, ink)
 			for b in [Vector2(-12, -r - 16), Vector2(12, -r - 16), Vector2(0, -r - 24)]:
 				draw_circle(p + b, 12, Hud.CREAM)
-			Hud.box(self, Rect2(p + Vector2(-18, -r - 8), Vector2(36, 15)), Hud.CREAM, 3, 3, ink)
+			HudWidgets.box(self, Rect2(p + Vector2(-18, -r - 8), Vector2(36, 15)), Hud.CREAM, 3, 3, ink)
 		elif look == "cap":
 			var dome := PackedVector2Array()
 			for i in 17:
@@ -363,4 +363,4 @@ class Logo extends Control:
 			for i in 17:
 				dome.append(p + Vector2(0, -4) + Vector2.from_angle(PI + PI * i / 16.0) * r)
 			draw_colored_polygon(dome, Color("#d9503f"))
-			Hud.box(self, Rect2(p + Vector2(-r - 4, -9), Vector2(2 * r + 20, 9)), Color("#b8402f"), 4, 3, ink)
+			HudWidgets.box(self, Rect2(p + Vector2(-r - 4, -9), Vector2(2 * r + 20, 9)), Color("#b8402f"), 4, 3, ink)

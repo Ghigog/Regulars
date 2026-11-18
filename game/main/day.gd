@@ -41,7 +41,7 @@ func start_day() -> void:
 	game.hud.close_menu()
 	game.desk.close_desk()
 	game.desk._clear_applicants()
-	game.hud.hide_card()
+	game.hud.receipt_ui.hide_card()
 	game.hud.hide_build()
 	game.ledger.pay_stock(game.menu_stock.night_cost())   # the door checked it can be paid (tests may skip the door)
 	game.floor_dirt.mess.treat = game.menu_stock.treat_active()   # tonight's laying lasts the day (PRD 9.5)
@@ -71,8 +71,8 @@ func start_day() -> void:
 		_book_critic(game.critic.arrival_time(day_length()))
 	game.crew.start_day()   # staff at work today walk in as the door opens (PRD 10.6)
 	game.audio.play_music("day")
-	game.hud.show_banner("Day %d" % game.ledger.day)
-	game.hud.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
+	game.hud.day_ui.show_banner("Day %d" % game.ledger.day)
+	game.hud.day_ui.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
 	game.audio.sfx("day")
 
 
@@ -193,8 +193,8 @@ func use_door(ch: Player = null) -> bool:
 			var why := game.menu_stock.open_block()
 			if why != "":
 				game.audio.sfx("fail")
-				game.hud.say(why)
-				game.hud.show_build()
+				game.hud.day_ui.say(why)
+				game.hud.hints_ui.show_build()
 				return false
 			if game.coop._agree_at_door(ch):
 				start_day()
@@ -219,7 +219,7 @@ func close_early() -> void:
 		game.critic.postpone(game.ledger.day)   # they come tomorrow instead
 	game.arrivals.clear()
 	set_door(false)
-	game.hud.say("Closed. Guests already here can stay.")
+	game.hud.day_ui.say("Closed. Guests already here can stay.")
 
 
 func _end_day() -> void:
@@ -248,7 +248,7 @@ func _end_day() -> void:
 		game.last_day["rep_change"] = float(game.last_day.get("rep_change", 0.0)) + game.ledger.reputation - before
 		game.last_day["reputation"] = game.ledger.reputation
 		game.ledger.today.rep_change = 0.0   # counted on tonight's receipt
-	game.hud.show_summary(game.last_day)
+	game.hud.receipt_ui.show_summary(game.last_day)
 	game.audio.sfx("coin")
 
 
@@ -266,7 +266,7 @@ func _close_down() -> void:
 		var f := FileAccess.open(game.best_path, FileAccess.WRITE)
 		if f:
 			f.store_string(JSON.stringify({"days": days, "earned": earned}))
-	game.hud.show_closed(days, earned, best, is_record)
+	game.hud.screens_ui.show_closed(days, earned, best, is_record)
 	game.audio.sfx("fail")
 
 

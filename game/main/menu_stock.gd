@@ -242,7 +242,7 @@ func stations_of(type: String) -> Array[Station]:
 func menu_changed() -> void:
 	game.menu_board.refresh(tonight_menu())
 	if game.phase == Game.Phase.BUILD and not game.shopping:
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 
 
 ## Why the door card will not flip to open, or "" if it will.
@@ -312,7 +312,7 @@ func open_menu(ch: Player = null) -> bool:
 	ch = game._me(ch)
 	if game.phase != Game.Phase.BUILD:
 		if game.phase == Game.Phase.SERVICE:
-			game.hud.say("The menu can't change during service.")
+			game.hud.day_ui.say("The menu can't change during service.")
 			game.audio.sfx("fail")
 		return false
 	if Cleaning.carrying_mess(ch.held) or game.hud.card_open():

@@ -38,7 +38,7 @@ func take_orders(table: Station) -> void:
 			game.tickets.append({"id": o.ticket, "guest": g, "items": items, "order": order})
 		g.take_order(o)
 		g.mood.patience = minf(1.0, g.mood.patience + Game.ORDER_RELIEF)
-	game.hud.refresh_tickets()
+	game.hud.day_ui.refresh_tickets()
 	game.audio.sfx("order_take")
 
 
@@ -139,7 +139,7 @@ func serve_dishes(ch: Player, table: Station) -> int:
 		else:
 			g.show_served(t)
 			game.audio.sfx("plate_food")
-	game.hud.refresh_tickets()
+	game.hud.day_ui.refresh_tickets()
 	return n
 
 
@@ -165,7 +165,7 @@ func turn_tap(st: Station) -> bool:
 	if st == null or game.menu_stock.dispenser_drinks(st).size() < 2:
 		return false
 	st.tap = (st.tap + 1) % game.menu_stock.dispenser_drinks(st).size()
-	game.hud.say("Turned to %s." % Pantry.name_of(game.menu_stock.dispenser_drinks(st)[st.tap]).to_lower())
+	game.hud.day_ui.say("Turned to %s." % Pantry.name_of(game.menu_stock.dispenser_drinks(st)[st.tap]).to_lower())
 	game.audio.sfx("page")
 	return true
 
@@ -184,7 +184,7 @@ func tear_ticket(g: Guest) -> void:
 	if t != null and t.served_count() > 0 and g.state in ["waiting", "ordering"] and g.table != null:
 		_leave_dirty(g.table, t)
 		g.clear_meal()
-	game.hud.refresh_tickets()
+	game.hud.day_ui.refresh_tickets()
 
 
 ## Leaves a guest's served plates and cups on the table, dirty.
@@ -226,7 +226,7 @@ func serve(g: Guest, t: Tray) -> void:
 	g.bill_base = t.price()
 	game.tickets.erase(find_ticket(t.ticket))
 	t.ticket = -1
-	game.hud.refresh_tickets()
+	game.hud.day_ui.refresh_tickets()
 	g.liked_meal = Menu.liked_count(t.ingredients(), g.info.likes) > 0
 	if g.liked_meal:
 		g.mood.think(Menu.LIKED_THOUGHT)
@@ -286,7 +286,7 @@ func offer_discount(g: Guest) -> void:
 	if not g.mood.offer_discount():
 		return
 	game.town.record_kindness(g.idx, "half")
-	game.hud.say("Half price for %s. Word gets around." % g.info.name)
+	game.hud.day_ui.say("Half price for %s. Word gets around." % g.info.name)
 	game.audio.burst(g.position + Vector3(0, 1.5, 0), "stars", 0.3)
 	g._heart_time = 1.5
 	game.audio.sfx("coin")
@@ -298,7 +298,7 @@ func offer_comp(g: Guest) -> void:
 	if not g.mood.offer_comp():
 		return
 	game.town.record_kindness(g.idx, "comp")
-	game.hud.say("%s eats free tonight. Their friends will hear of it." % g.info.name)
+	game.hud.day_ui.say("%s eats free tonight. Their friends will hear of it." % g.info.name)
 	game.audio.burst(g.position + Vector3(0, 1.5, 0), "stars")
 	g._heart_time = 2.5
 	game.audio.sfx("perfect")
@@ -348,7 +348,7 @@ func _pay_guest(g: Guest) -> void:
 	if news != "":
 		talk = news
 	if talk != "":
-		game.hud.say(talk)
+		game.hud.day_ui.say(talk)
 	game.day._critic_leaves(g, false)
 	game.audio.popup("+$%d" % (bill + tip), g.position + Vector3(0, 1.9, 0), Color(Build.TRIM))
 	Fx.coin(game, g.position + Vector3(0, 1.5, 0))

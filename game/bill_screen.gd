@@ -34,7 +34,7 @@ func setup(game_, hud_, chef_: Player) -> void:
 	var mid := CenterContainer.new()
 	mid.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(mid)
-	_card = Hud.Sheet.new("paper", 34, 26)
+	_card = HudWidgets.Sheet.new("paper", 34, 26)
 	_card.custom_minimum_size = Vector2(900, 0)
 	mid.add_child(_card)
 	_content = VBoxContainer.new()
@@ -51,7 +51,7 @@ func setup(game_, hud_, chef_: Player) -> void:
 			bill.table = int(t.number)
 			break
 	render()
-	hud._pop_in(_card)
+	hud.receipt_ui._pop_in(_card)
 
 
 func _process(_delta: float) -> void:
@@ -67,7 +67,7 @@ func render() -> void:
 	top.add_theme_constant_override("separation", 14)
 	_content.add_child(top)
 	_ribbon(top, "THE BILL")
-	top.add_child(Hud.Icon.new("bill", 40, false))
+	top.add_child(HudWidgets.Icon.new("bill", 40, false))
 	var tables := HBoxContainer.new()
 	tables.add_theme_constant_override("separation", 10)
 	_content.add_child(tables)
@@ -159,7 +159,7 @@ func _draw_frame() -> void:
 		return
 	var r := t.get_global_rect().grow_individual(12, 5, 8, 5)
 	r.position -= _frame.get_global_rect().position
-	Hud.pick_frame(_frame, r)
+	HudOptions.pick_frame(_frame, r)
 
 
 # ---------------------------------------------------------------- input
@@ -262,7 +262,7 @@ func _label(parent: Node, px: int, text := "") -> Label:
 
 
 func _ribbon(parent: Container, text: String) -> void:
-	var ribbon := Hud.Sheet.new("ribbon", 30, 6)
+	var ribbon := HudWidgets.Sheet.new("ribbon", 30, 6)
 	ribbon.tint = Hud.CORAL
 	ribbon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	parent.add_child(ribbon)

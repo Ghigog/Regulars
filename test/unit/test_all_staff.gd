@@ -38,7 +38,7 @@ func _start(theme: String, seed_value: int, day := 1) -> void:
 	game.flyers_out = day > 1   # a busy day: a long line at the door
 	assert_not_null(game.crew, "the game loaded")
 	if game.crew != null:
-		game.crew.staff_only()
+		game.crew.crew_demos.staff_only()
 
 
 ## Runs the day out. Returns what went wrong: stuck tickets, tables nobody served.
@@ -111,10 +111,10 @@ func _chores() -> Dictionary:
 ## Any change is progress.
 func _state_of(tk: Dictionary) -> String:
 	var parts := []
-	for e: Dictionary in game.crew._tagged(int(tk.id)):
+	for e: Dictionary in game.crew.task_end._tagged(int(tk.id)):
 		var d: Dish = e.dish
 		parts.append("%d:%s@%s" % [d.line, str(d.ings), str(e.st.cell) if e.st != null else "hand"])
-	return "%s needs %s served %d" % [str(parts), str(game.crew._ticket_needs(tk)), tk.order.served_count()]
+	return "%s needs %s served %d" % [str(parts), str(game.crew.task_end._ticket_needs(tk)), tk.order.served_count()]
 
 
 func _why(tk: Dictionary) -> String:
@@ -135,7 +135,7 @@ func _check(theme: String, seed_value: int, day := 1) -> Dictionary:
 	_start(theme, seed_value, day)
 	if is_failing():
 		return {}
-	assert_eq(game.crew.helpers.size(), Crew.STAFF_CREW.size(), "the whole crew came in")
+	assert_eq(game.crew.helpers.size(), CrewDemos.STAFF_CREW.size(), "the whole crew came in")
 	var r := _run_day()
 	var tag := "%s seed %d day %d" % [theme, seed_value, day]
 	for line: String in r.stuck:
@@ -168,7 +168,7 @@ func test_helpers_run_a_whole_seaside_day_with_no_chef():
 
 
 func _every_kind_ordered(theme: String, seen: Dictionary) -> void:
-	for it: Array in Crew.STAFF_MENU[theme]:
+	for it: Array in CrewDemos.STAFF_MENU[theme]:
 		for k: String in it[1]:
 			assert_true(seen.has(k), "%s: %s was ordered and made on some day" % [theme, k])
 
@@ -213,7 +213,7 @@ func test_the_crew_covers_every_duty_the_room_gives():
 		for k: String in room:
 			offered.append_array(room[k])
 		var held := []
-		for row: Array in Crew.STAFF_CREW:
+		for row: Array in CrewDemos.STAFF_CREW:
 			held.append_array(row[2])
 			assert_eq(Staff.missing_duties(row[2], room), [] as Array[String], "%s: %s has every tool" % [theme, row[1]])
 		for d: String in offered:

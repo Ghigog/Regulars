@@ -49,7 +49,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 	var link := Upgrades.is_link(to)   # a stove grown on a counter
 	if link and not (ch.hand.node is Station and (ch.hand.node as Station).item == ""):
 		game.audio.sfx("fail")
-		game.hud.say("Clear the counter first, then grow it into a %s." % Upgrades.name_of(to).to_lower())
+		game.hud.day_ui.say("Clear the counter first, then grow it into a %s." % Upgrades.name_of(to).to_lower())
 		return false
 	if game.phase != Game.Phase.BUILD or from == "" or not Upgrades.can_buy(from, to, game.ledger.money, game.ledger.level()) \
 			or not game.ledger.spend(Upgrades.step_price(to)):
@@ -68,7 +68,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		ch.hand.tier = 1
 		game.menu_stock.menu_changed()
 		game.audio.sfx("coin")
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return true
 	if link:
 		var under: Station = ch.hand.node
@@ -78,7 +78,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		var top := game.world.add_station(to, cell, 1, facing)
 		game.placing._bought_tonight(top, Upgrades.step_price(to))
 		game.audio.burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
-		game.hud.say("The counter is a %s now. Open it with E to upgrade it further." % Upgrades.name_of(to).to_lower())
+		game.hud.day_ui.say("The counter is a %s now. Open it with E to upgrade it further." % Upgrades.name_of(to).to_lower())
 		game.menu_stock.menu_changed()
 		game.audio.sfx("coin")
 		return true
@@ -91,14 +91,14 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		ch.hand.id = to
 		_swap_treatment(Treatments.key_of(from), Treatments.key_of(to))
 		game.audio.sfx("coin")
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return true
 	var st: Station = ch.hand.node
 	if st.type == "hook" and Kitchen.fit_of(to) == "floor":   # the sponge grows into a mop bucket
 		if ch.hand.get("in_place", false):
 			game.ledger.refund(Upgrades.step_price(to))
 			game.audio.sfx("fail")
-			game.hud.say("Lift the hook first: the bucket stands on the floor.")
+			game.hud.day_ui.say("Lift the hook first: the bucket stands on the floor.")
 			return false
 		var bucket := Station.new()
 		game.add_child(bucket)
@@ -113,8 +113,8 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		ch.hand.layer = ""
 		ch.hand.facing = 0
 		game.audio.sfx("coin")
-		game.hud.say("The sponge is a mop bucket now: put it down on the floor.")
-		game.hud.show_build()
+		game.hud.day_ui.say("The sponge is a mop bucket now: put it down on the floor.")
+		game.hud.hints_ui.show_build()
 		return true
 	game.placing._bought_tonight(st, Upgrades.step_price(to))   # an upgrade bought tonight comes back whole too
 	if ch.hand.get("in_place", false):   # the storage card: upgraded where it stands
@@ -122,7 +122,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 			game.ledger.refund(Upgrades.step_price(to))
 			st.set_meta("fresh", game.placing.spent_tonight(st) - Upgrades.step_price(to))
 			game.audio.sfx("fail")
-			game.hud.say("A tall fridge needs the wall above clear. Take down what hangs there first.")
+			game.hud.day_ui.say("A tall fridge needs the wall above clear. Take down what hangs there first.")
 			return false
 		if Upgrades.is_tiered(to):   # a table or fern a tier up where it stands
 			st.tier = Upgrades.tier_of(to)
@@ -152,7 +152,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 	if st.type == "hook" and Kitchen.tool_of(to) != "":   # the hook's tool is swapped
 		game.clean_kit.upgrade_tool(st, Kitchen.tool_of(to))
 		game.audio.sfx("coin")
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return true
 	if Upgrades.is_tiered(to):
 		st.tier = Upgrades.tier_of(to)
@@ -172,7 +172,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		ch.hand.node = up
 		ch.hand.id = up.type
 	game.audio.sfx("coin")
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 	return true
 
 
@@ -251,7 +251,7 @@ func strip_move(d: int, ch: Player = null) -> bool:
 		return false
 	ch.strip_pick = posmod(ch.strip_pick + d, n)
 	game.audio.sfx("tab", 0.08)
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 	return true
 
 
@@ -266,16 +266,16 @@ func strip_buy(ch: Player = null) -> bool:
 		(ch.hand.stock as Array).erase(c.id)
 		game.menu_stock.menu_changed()
 		game.audio.sfx("putdown")
-		game.hud.say("%s taken out: it is not stocked any more." % Catalog.label({"id": c.id, "tier": 1}))
-		game.hud.show_build()
+		game.hud.day_ui.say("%s taken out: it is not stocked any more." % Catalog.label({"id": c.id, "tier": 1}))
+		game.hud.hints_ui.show_build()
 		return true
 	var price := Upgrades.step_price(c.key)
 	if game.ledger.money < price:
 		game.audio.sfx("fail")
-		game.hud.say("The %s costs $%d." % [Upgrades.name_of(c.key).to_lower(), price])
+		game.hud.day_ui.say("The %s costs $%d." % [Upgrades.name_of(c.key).to_lower(), price])
 		return false
 	if not buy_upgrade(c.key, ch):
 		return false
 	ch.strip_pick = 0
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 	return true

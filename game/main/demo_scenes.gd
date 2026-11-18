@@ -35,7 +35,7 @@ func _demo_build(demo: String) -> void:
 		if demo == "build_find":
 			game.hud.set_search("o")
 		for i in 3:
-			game.get_tree().create_timer(0.3 + 0.25 * i).timeout.connect(game.hud.shop_move.bind(1))
+			game.get_tree().create_timer(0.3 + 0.25 * i).timeout.connect(game.hud.shop_ui.shop_move.bind(1))
 	elif demo == "build_move":  # a table picked up and turned, ready to sell or put down
 		game.placing.pick_up(Vector3(8.5, 0, 3.5))
 		game.placing.rotate_hand()
@@ -73,7 +73,7 @@ func _demo_build(demo: String) -> void:
 		if demo == "build_dining_shop":
 			game.session.open_shop()
 			game.hud._set_category("Dining")
-			game.get_tree().create_timer(0.3).timeout.connect(game.hud.shop_move.bind(1))
+			game.get_tree().create_timer(0.3).timeout.connect(game.hud.shop_ui.shop_move.bind(1))
 	elif demo == "build_finish":   # parquet and marble, striped and rose paper, paint, and the rug moved
 		game.ledger.money = 2000
 		game.ledger.xp = 500
@@ -138,7 +138,7 @@ func _demo_menu(demo: String) -> void:
 		game.hud.menu_notes.open = true
 		game.player.position = Grid.center(Vector2i(1, 5))
 		game.player.look(Vector2i(0, 1))
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 		return
 	game.menu_stock.open_menu()
 	if demo == "menu_name":
@@ -221,7 +221,7 @@ func _demo_pay(demo: String) -> void:
 			_demo_paying_party([0, 1], game.stations[Vector2i(8, 3)])
 			game.player.position = Grid.center(Vector2i(1, 4))
 			game.player.look(Vector2i(1, 0))
-			game.crew.demo_hire(5, "Server", ["take_orders", "take_payment", "carry_trays", "clear_tables"], Vector2i(5, 5))
+			game.crew.crew_demos.demo_hire(5, "Server", ["take_orders", "take_payment", "carry_trays", "clear_tables"], Vector2i(5, 5))
 
 
 ## Demos (PRD 11): a party sat straight down at `table`, served and done eating.
@@ -292,7 +292,7 @@ func _demo_ticket(full: bool) -> void:
 		game.player.position = Grid.center(Vector2i(3, 3))
 		game.player.look(Vector2i(1, 0))
 		game.player.take_dish(Dish.make(Dish.PLATE))   # "Plate it"
-	game.hud.refresh_tickets()
+	game.hud.day_ui.refresh_tickets()
 
 
 ## The chef at (1, 4) facing a tool at (2, 4) (and a second at (2, 5) where the

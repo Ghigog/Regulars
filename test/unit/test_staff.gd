@@ -302,7 +302,7 @@ func test_swipe_right_hires_at_the_ask():
 	assert_eq(desk.tab, "cvs", "a pile opens on the CVs")
 	var cv: Dictionary = game.staff.cvs[0]
 	desk.drag_to(DeskScreen.SWIPE + 20)
-	desk.hire_top()
+	desk.posting.hire_top()
 	var e: Dictionary = game.staff.employee(cv.person)
 	assert_false(e.is_empty())
 	assert_eq(e.wage, cv.ask)
@@ -319,7 +319,7 @@ func test_swipe_left_dismisses_and_a_mouse_drag_swipes():
 	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
 	var first: Dictionary = game.staff.cvs[0]
-	desk.dismiss_top()
+	desk.posting.dismiss_top()
 	assert_true(game.staff.cv(first.id).is_empty())
 	assert_false(game.applicants.has(first.person))
 	assert_true(game.staff.employees.is_empty())
@@ -357,7 +357,7 @@ func test_haggling_at_hire():
 	var cv: Dictionary = game.staff.cvs[0]
 	desk.start_haggle()
 	assert_eq(desk.selected(), "offer")
-	assert_eq(desk.make_offer(int(cv.ask)), "accept", "the full ask is always taken")
+	assert_eq(desk.posting.make_offer(int(cv.ask)), "accept", "the full ask is always taken")
 	assert_eq(game.staff.employee(cv.person).wage, cv.ask)
 
 
@@ -369,8 +369,8 @@ func test_a_haggle_far_below_the_ask_is_refused_then_decided():
 	var desk: DeskScreen = game.hud.desk
 	var cv: Dictionary = game.staff.cvs[0]
 	desk.start_haggle()
-	assert_eq(desk.make_offer(1), "refuse", "a coin a day: never")
-	var r := desk.make_offer(1)
+	assert_eq(desk.posting.make_offer(1), "refuse", "a coin a day: never")
+	var r := desk.posting.make_offer(1)
 	assert_true(r in ["take_last", "walk"], "after two refusals they decide")
 	if r == "walk":
 		assert_true(game.staff.cv(cv.id).is_empty())
@@ -431,9 +431,9 @@ func test_the_staff_tab_lists_each_hire_with_manage():
 	assert_eq(desk.tab, "staff", "an empty pile with staff opens on the staff")
 	assert_true(desk.select("manage:%d" % p))
 	desk.press()
-	assert_eq(desk.managing(), p)
+	assert_eq(desk.staff_ui.managing(), p)
 	desk.back()
-	assert_eq(desk.managing(), -1)
+	assert_eq(desk.staff_ui.managing(), -1)
 	assert_eq(desk.selected(), "manage:%d" % p)
 
 
@@ -442,7 +442,7 @@ func test_ticking_a_duty_offers_it_and_unticking_takes_it_off():
 	var p := _hire_one()
 	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	var e: Dictionary = game.staff.employee(p)
 	e.satisfaction = 1.0
 	game.staff.rng.seed = 1
@@ -473,10 +473,10 @@ func test_a_refused_duty_names_a_raise_to_approve():
 	var p := _hire_one()
 	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	var e := _refused(p)
 	assert_false((e.pending as Dictionary).is_empty())
-	desk.render()
+	desk.pages.render()
 	assert_true(desk.select("approve"))
 	var wage := int(e.wage) + int(e.pending.raise)
 	desk.press()
@@ -489,16 +489,16 @@ func test_a_raise_can_be_withdrawn_or_denied():
 	var p := _hire_one()
 	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	var e := _refused(p)
 	var wage := int(e.wage)
-	assert_eq(desk.answer_raise("withdraw"), "withdrawn")
+	assert_eq(desk.staff_ui.answer_raise("withdraw"), "withdrawn")
 	assert_eq(int(e.wage), wage)
 	assert_false((e.duties as Array).has("wash_up"))
 	_refused(p)
-	assert_eq(desk.answer_raise("deny"), "quit")
+	assert_eq(desk.staff_ui.answer_raise("deny"), "quit")
 	assert_true(game.staff.employee(p).is_empty(), "denied, they quit")
-	assert_eq(desk.managing(), -1)
+	assert_eq(desk.staff_ui.managing(), -1)
 
 
 func test_a_raise_haggled_is_refused_then_decided():
@@ -506,13 +506,13 @@ func test_a_raise_haggled_is_refused_then_decided():
 	var p := _hire_one()
 	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	var e := _refused(p)
-	desk.start_raise_haggle(0)
+	desk.staff_ui.start_raise_haggle(0)
 	assert_eq(desk.selected(), "raise_offer")
-	var r := desk.answer_raise("haggle", 0)
+	var r := desk.staff_ui.answer_raise("haggle", 0)
 	if r == "refuse":
-		r = desk.answer_raise("haggle", 0)
+		r = desk.staff_ui.answer_raise("haggle", 0)
 	assert_true(r in ["added", "quit"], "after two refusals they take it or go")
 
 
@@ -521,7 +521,7 @@ func test_breaks_and_days_off_are_added_at_the_desk():
 	var p := _hire_one(3, ["grill"], 0, 0)
 	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(p)
+	desk.staff_ui.open_person(p)
 	assert_true(desk.select("break"))
 	desk.press()
 	assert_true(desk.select("day_off"))
@@ -540,7 +540,7 @@ func test_firing_with_severance_pays_a_day_and_without_friends_hear():
 	var wage := int(game.staff.employee(a).wage)
 	game.desk.open_desk()
 	var desk: DeskScreen = game.hud.desk
-	desk.open_person(a)
+	desk.staff_ui.open_person(a)
 	assert_true(desk.select("fire"))
 	desk.press()
 	assert_true(desk.select("fire_pay"))
@@ -794,7 +794,7 @@ func test_a_helper_with_no_assemble_duty_leaves_the_cooking_for_others():
 	_run(30.0)
 	var made: Array = game.stations.values().filter(func(st: Station) -> bool: return st.item == "prep:" + game.world.fixed_main().grill)
 	assert_eq(made.size(), 1, "the patty is grilled and put down for someone to plate")
-	assert_eq(game.crew._tagged(int(game.tickets[0].id)), [], "nobody set out a plate")
+	assert_eq(game.crew.task_end._tagged(int(game.tickets[0].id)), [], "nobody set out a plate")
 
 
 func _order_by_chef(g: Guest) -> void:

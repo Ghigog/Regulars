@@ -51,7 +51,7 @@ func _init(game_, hud_, key: String, keys_text: String) -> void:
 	margin.add_theme_constant_override("margin_bottom", 14)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(margin)
-	var wood := Hud.Sheet.new("wood", 10, 10)
+	var wood := HudWidgets.Sheet.new("wood", 10, 10)
 	wood.mouse_filter = Control.MOUSE_FILTER_STOP
 	wood.size_flags_vertical = Control.SIZE_SHRINK_END
 	wood.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -420,7 +420,7 @@ class Card extends Control:
 			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 				screen.card_pressed(key))
 		var later: bool = screen.state_of(key) == "later"
-		var view := Hud.ModelView.new(112, false)
+		var view := HudWidgets.ModelView.new(112, false)
 		view.position = Vector2((CARD.x - 112) / 2.0, 2)
 		var locked: bool = screen.game.ledger.level() < Upgrades.level(key)
 		view.modulate = Color(0.12, 0.2, 0.36, 0.7) if locked else Color(1, 1, 1, 0.6 if later else 1.0)
@@ -478,7 +478,7 @@ class Card extends Control:
 	## count; a tiered piece as a heart with a pip a tier.
 	func _fill_jobs(row: HBoxContainer) -> void:
 		if Upgrades.is_tiered(key):
-			row.add_child(Hud.Icon.new("heart", 34))
+			row.add_child(HudWidgets.Icon.new("heart", 34))
 			for i in Upgrades.tier_of(key):
 				row.add_child(Pip.new(Kitchen.BASE + Kitchen.EFFICIENT_STEP if i > 0 else Kitchen.BASE))
 			return
@@ -486,12 +486,12 @@ class Card extends Control:
 		var order: Array = jobs.keys()
 		order.sort_custom(func(a: String, b: String) -> bool: return jobs[a] > jobs[b])
 		for job: String in order:
-			var ic := Hud.Icon.new("job_" + job, 34)
+			var ic := HudWidgets.Icon.new("job_" + job, 34)
 			ic.tooltip_text = "%s %.2f" % [job, jobs[job]]
 			row.add_child(ic)
 			row.add_child(Pip.new(float(jobs[job]), Kitchen.is_auto(key)))
 		if Kitchen.slots_of(key) > 0:
-			row.add_child(Hud.Icon.new("job_chill" if Kitchen.chills(key) else "job_store", 34))
+			row.add_child(HudWidgets.Icon.new("job_chill" if Kitchen.chills(key) else "job_store", 34))
 			var n: Label = screen._text(row, 16, "x%d" % Kitchen.slots_of(key), LINE)
 			n.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		if Upgrades.is_treatment(key):   # a floor treatment's box (PRD 9.5): what laying it costs

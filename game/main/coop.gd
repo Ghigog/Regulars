@@ -28,11 +28,11 @@ func join(source: String) -> int:
 	game.audio.burst(ch.position + Vector3(0, 1.0, 0), "stars", 0.5)
 	game.audio.door_bell()
 	ch.punch()
-	game.hud.say("Chef %d joined." % (p + 1))
+	game.hud.day_ui.say("Chef %d joined." % (p + 1))
 	game.hud.coop_hint_time = 25.0
-	game.hud.refresh_input()
+	game.hud.hints_ui.refresh_input()
 	if game.phase == Game.Phase.BUILD:
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 	_refresh_ready()
 	return p
 
@@ -72,12 +72,12 @@ func leave(p: int) -> bool:
 		if n:
 			n.queue_free()
 	game._recolour_cursors()
-	game.hud.trim_prompts(game.chefs.size())
+	game.hud.day_ui.trim_prompts(game.chefs.size())
 	_walk_out(ch)
-	game.hud.say("Chef %d left." % (p + 1))
-	game.hud.refresh_input()
+	game.hud.day_ui.say("Chef %d left." % (p + 1))
+	game.hud.hints_ui.refresh_input()
 	if game.phase == Game.Phase.BUILD:
-		game.hud.show_build()
+		game.hud.hints_ui.show_build()
 	_refresh_ready()
 	if game.phase == Game.Phase.SUMMARY and game.ready_chefs.size() >= game.chefs.size() and not game.ready_chefs.is_empty():
 		game.session.open_build()
@@ -101,7 +101,7 @@ func set_down(ch: Player) -> void:
 			best.set_item(ch.held, ch.held_quality)
 		game.audio.sfx("putdown")
 	ch.set_held("")
-	game.hud.refresh_tickets()
+	game.hud.day_ui.refresh_tickets()
 
 
 ## A chef who left walks out of the door and down the street, then is gone.
@@ -156,10 +156,10 @@ func _agree_at_door(ch: Player) -> bool:
 		game.ready_chefs.append(ch)
 	if game.ready_chefs.size() >= game.chefs.size():
 		game.ready_chefs.clear()   # the card turns all the way (set_door), not part way
-		game.hud.refresh_ready()
+		game.hud.hints_ui.refresh_ready()
 		return true
 	game.audio.sfx("flip")
-	game.hud.say("Chef %d is ready. Everyone uses the door card to %s." % [game.chefs.find(ch) + 1, "open" if game.phase == Game.Phase.BUILD else "close"]
+	game.hud.day_ui.say("Chef %d is ready. Everyone uses the door card to %s." % [game.chefs.find(ch) + 1, "open" if game.phase == Game.Phase.BUILD else "close"]
 		if game.ready_chefs.has(ch) else "Chef %d is not ready." % (game.chefs.find(ch) + 1))
 	_refresh_ready()
 	return false
@@ -181,7 +181,7 @@ func _refresh_ready() -> void:
 		var share := float(game.ready_chefs.size()) / maxf(game.chefs.size(), 1)
 		game._door_turn.create_tween().tween_property(game._door_turn, "rotation:y", lerpf(shut, PI - shut, share * 0.5), 0.35) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	game.hud.refresh_ready()
+	game.hud.hints_ui.refresh_ready()
 
 
 ## Player p pressed an action, on whatever device is theirs (see Controls).
@@ -197,17 +197,17 @@ func act(p: int, action: String, echo := false) -> void:
 			action = "turn"   # LB and RB turn the piece when there is nothing to choose
 		else:
 			return
-	if game.hud.options_open():
-		game.hud.options_action(action, echo)
+	if game.hud.options_ui.options_open():
+		game.hud.options_ui.options_action(action, echo)
 		return
-	if game.hud.pause_open():
-		game.hud.pause.action(action, echo)
+	if game.hud.options_ui.pause_open():
+		game.hud.options_ui.pause.action(action, echo)
 		return
-	if game.hud.title_open():
+	if game.hud.options_ui.title_open():
 		if action == "options":
-			game.hud.toggle_options()
+			game.hud.options_ui.toggle_options()
 		else:
-			game.hud.title.action(action, echo)
+			game.hud.options_ui.title.action(action, echo)
 		return
 	if game.hud.desk_open():
 		game.hud.desk.action(action, echo)
@@ -221,7 +221,7 @@ func act(p: int, action: String, echo := false) -> void:
 	if echo:
 		return
 	if action == "options":
-		game.hud.toggle_pause()
+		game.hud.options_ui.toggle_pause()
 		return
 	if action == "mute":
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
@@ -240,7 +240,7 @@ func act(p: int, action: String, echo := false) -> void:
 				ch.set_held("")   # the slip is thrown away (PRD 11)
 				game.audio.sfx("putdown")
 			elif action == "back" and ch.held == "" and game.inspected == null:
-				game.hud.toggle_pause()
+				game.hud.options_ui.toggle_pause()
 			elif action == "turn":
 				game.serving.turn_tap(game.stations.get(ch.target_cell()))
 			elif action == "menu":
@@ -265,7 +265,7 @@ func act(p: int, action: String, echo := false) -> void:
 			elif action == "back":
 				unconfirm_receipt(p)
 			elif action == "town":
-				game.hud.toggle_town()
+				game.hud.screens_ui.toggle_town()
 		Game.Phase.CLOSED:
 			if action == "confirm":
 				game.day.restart()
@@ -283,7 +283,7 @@ func _build_act(action: String, ch: Player = null) -> void:
 			game.room_edit.build_interact(ch)
 		"back":
 			if ch.hand.is_empty():
-				game.hud.toggle_pause()
+				game.hud.options_ui.toggle_pause()
 			else:
 				game.placing.cancel_hand(ch)
 		"turn":

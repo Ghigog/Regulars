@@ -25,7 +25,7 @@ func setup(hud_: Hud) -> void:
 	mid.set_anchors_preset(Control.PRESET_FULL_RECT)
 	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(mid)
-	var card := Hud.Sheet.new("paper", 30, 24)
+	var card := HudWidgets.Sheet.new("paper", 30, 24)
 	card.custom_minimum_size = Vector2(380, 0)
 	mid.add_child(card)
 	_box = VBoxContainer.new()
@@ -38,10 +38,10 @@ func setup(hud_: Hud) -> void:
 		if hud._mode() != "touch" and sel < buttons.size():
 			var r := buttons[sel].get_global_rect().grow_individual(14, 6, 10, 6)
 			r.position -= _frame.get_global_rect().position
-			Hud.pick_frame(_frame, r))
+			HudOptions.pick_frame(_frame, r))
 	add_child(_frame)
 	show_main()
-	hud._pop_in(card)
+	hud.receipt_ui._pop_in(card)
 
 
 func _clear() -> void:
@@ -52,7 +52,7 @@ func _clear() -> void:
 
 
 func _add_button(text: String, id: String) -> void:
-	var b := hud._button(_box, text, press_id.bind(id))
+	var b := hud.receipt_ui._button(_box, text, press_id.bind(id))
 	b.add_theme_font_size_override("font_size", 24)
 	var i := buttons.size()
 	b.mouse_entered.connect(func() -> void: pick(i))
@@ -62,7 +62,7 @@ func _add_button(text: String, id: String) -> void:
 func show_main() -> void:
 	_clear()
 	confirming = false
-	hud._ribbon(_box, "PAUSED", Hud.CORAL)
+	hud.receipt_ui._ribbon(_box, "PAUSED", Hud.CORAL)
 	_add_button("Resume", "resume")
 	_add_button("Options", "options")
 	_add_button("Quit to title", "quit")
@@ -131,7 +131,7 @@ func action(a: String, echo := false) -> bool:
 			if confirming:
 				show_main()
 			else:
-				hud.toggle_pause()
+				hud.options_ui.toggle_pause()
 		_:
 			return false
 	return true
@@ -140,9 +140,9 @@ func action(a: String, echo := false) -> bool:
 func press_id(id: String) -> void:
 	match id:
 		"resume":
-			hud.toggle_pause()
+			hud.options_ui.toggle_pause()
 		"options":
-			hud.toggle_options()
+			hud.options_ui.toggle_options()
 		"quit":
 			show_confirm()
 		"no":

@@ -97,7 +97,7 @@ func read_board(g: Guest) -> void:
 	game.ledger.record_found_nothing()
 	var talk := game.town.gossip_line(g.idx, game.town.record_found_nothing(g.idx), "there was nothing on the menu for them")
 	if g == g.party[0] and talk != "":
-		game.hud.say(talk)
+		game.hud.day_ui.say(talk)
 
 
 ## Where the guest `i`th in line stands: a single file up the pavement along the

@@ -277,7 +277,7 @@ func leave_unpaid(table: Station) -> void:
 		g.mood.think("Nobody came with the bill")
 		game.day._critic_leaves(g, false)
 		talk = game.town.left_unpaid(g.idx)
-	game.hud.say(talk if p.size() == 1 else "Table %d left without paying. Nobody came." % table_number(table))
+	game.hud.day_ui.say(talk if p.size() == 1 else "Table %d left without paying. Nobody came." % table_number(table))
 	game.audio.sfx("fail")
 	_party_leaves(table)
 
@@ -335,7 +335,7 @@ func give_bill(ch: Player, at: Station) -> bool:
 		g.mood.refuse_bill(line)
 	var who := payers(table)
 	if not who.is_empty():
-		game.hud.say("%s: \"%s.\"" % [who[0].info.name, line])
+		game.hud.day_ui.say("%s: \"%s.\"" % [who[0].info.name, line])
 		Fx.play(who[0], "anger", Vector3(0, 1.75, 0), 0.3)
 	game.audio.sfx("fail")
 	return false
@@ -405,7 +405,7 @@ func walk_out(g: Guest) -> void:
 		var mark := Fx.play(m, "anger", Vector3(0, 1.75, 0), 0.3, true)
 		mark.fps = 6.0
 		_leave(m)
-	game.hud.say(("%s walked out! " % " and ".join(names)) + (talk if going.size() == 1 else ""))
+	game.hud.day_ui.say(("%s walked out! " % " and ".join(names)) + (talk if going.size() == 1 else ""))
 	game.audio.sfx("fail")
 	game.audio.shake()
 

@@ -132,7 +132,7 @@ func roll_applicants() -> Array[Dictionary]:
 		rig.rotation.y = PI / 2   # facing the door
 		game.applicants[person] = rig
 	if not fresh.is_empty():
-		game.hud.say("%s outside: %s in the pile at the desk." % [
+		game.hud.day_ui.say("%s outside: %s in the pile at the desk." % [
 			"An applicant is" if fresh.size() == 1 else "%d applicants are" % fresh.size(),
 			"a CV" if fresh.size() == 1 else "their CVs"])
 	_refresh_desks()
@@ -177,7 +177,7 @@ func pay_staff() -> Dictionary:
 	for p: int in night.quit:
 		words.append("%s quit" % game.town.people[p].name)
 	if not words.is_empty():
-		game.hud.say(". ".join(words) + ".")
+		game.hud.day_ui.say(". ".join(words) + ".")
 	return night
 
 

@@ -111,7 +111,7 @@ func remove_at(spot: Vector3i, ch: Player = null) -> bool:
 ## After the plan changes: redraw the room and say so.
 func _plan_changed() -> void:
 	game.world._rebuild_room()
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 
 
 ## The spots a mouse drag covers, from where it started to `to`: a rectangle of
@@ -313,7 +313,7 @@ func build_interact(ch: Player = null) -> void:
 		action = "Put down"   # hung or stood, place() decides
 	if action in Cleaning.NIGHT_ACTIONS.values():
 		game.cooking.use_station(game.world.station_at(ch.target_cell()), false, ch)
-		game.hud.show_build()   # the dirty note counts down
+		game.hud.hints_ui.show_build()   # the dirty note counts down
 		return
 	match action:
 		"Put down":
@@ -328,7 +328,7 @@ func build_interact(ch: Player = null) -> void:
 			game.desk.open_desk(ch)
 		"Open up", "Take out rubbish":
 			game.day.use_door(ch)
-			game.hud.show_build()
+			game.hud.hints_ui.show_build()
 
 
 ## The piece in hand is held over the spot in front of the chef; a cross marks
@@ -360,15 +360,15 @@ func _update_ghost(ch: Player = null) -> void:
 			elif ch.hand.id == "rug":
 				Scenery.rug(ch.ghost)
 			elif ch.hand.id == "till":
-				Build.register(ch.ghost)
+				BuildStations.register(ch.ghost)
 			elif layer == "high":
 				var closet := hn.ends_with("shelf") and game.kitchen.is_closet_with(cell, hn)
-				Build.wall_piece(ch.ghost, hn, closet)
+				BuildStations.wall_piece(ch.ghost, hn, closet)
 			elif ch.hand.get("node") is Station:
 				var hs: Station = ch.hand.node
-				Build.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" or Kitchen.grows_from_counter(hs.node) else "", false, hs.node)
+				BuildStations.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" or Kitchen.grows_from_counter(hs.node) else "", false, hs.node)
 			else:
-				Build.station(ch.ghost, ch.hand.id, int(ch.hand.tier), "counter" if ch.hand.get("counter", false) else ch.hand.get("base", ""), false, str(ch.hand.get("up", "")))
+				BuildStations.station(ch.ghost, ch.hand.id, int(ch.hand.tier), "counter" if ch.hand.get("counter", false) else ch.hand.get("base", ""), false, str(ch.hand.get("up", "")))
 			if layer != "" and game.wall_facing.has(cell):
 				_layer_band(ch.ghost, layer, 0 if layer == "high" else int(game.wall_facing[cell]) - int(ch.hand.facing), hn == "hook")
 	var p := hover
@@ -402,11 +402,11 @@ func _layer_band(ghost: Node3D, layer: String, turn: int, small := false) -> voi
 	var band := Node3D.new()
 	band.rotation.y = turn * PI / 2
 	ghost.add_child(band)
-	var y0 := Build.HIGH_Y0 if layer == "high" else 0.0
-	var y1 := 0.92 if layer == "base" else Build.HIGH_Y1
+	var y0 := BuildStations.HIGH_Y0 if layer == "high" else 0.0
+	var y1 := 0.92 if layer == "base" else BuildStations.HIGH_Y1
 	if small:   # a hook is a small thing low in the band: frame it, not the whole layer
-		y0 = Build.HIGH_Y0 - 0.2
-		y1 = Build.HIGH_Y0 + 0.5
+		y0 = BuildStations.HIGH_Y0 - 0.2
+		y1 = BuildStations.HIGH_Y0 + 0.5
 	y0 -= 0.24   # a margin round the piece, so the band still shows as a frame behind it
 	y1 += 0.24
 	var plate := Build.box(band, Vector3(0, y0, -0.495), Vector3(1.0, y1 - y0, 0.01), Build.GOOD)
@@ -481,7 +481,7 @@ func hire_cleaner() -> bool:
 	var price := cleaner_price()
 	if game.phase != Game.Phase.BUILD or price <= 0 or not game.ledger.spend(price):
 		if price <= 0:
-			game.hud.say("Nothing to clean tonight.")
+			game.hud.day_ui.say("Nothing to clean tonight.")
 		return false
 	for st: Station in game.stations.values():
 		if Station.is_table(st.type) or st.type == "sink":
@@ -495,8 +495,8 @@ func hire_cleaner() -> bool:
 		m.clean(c, FloorMess.MAX_LEVEL)
 	game.floor_dirt.redraw()
 	game.audio.sfx("wash")
-	game.hud.say("The cleaner came: everything is clean for tomorrow.")
-	game.hud.show_build()
+	game.hud.day_ui.say("The cleaner came: everything is clean for tomorrow.")
+	game.hud.hints_ui.show_build()
 	return true
 
 
@@ -505,5 +505,5 @@ func buy_flyers() -> bool:
 		return false
 	game.flyers_out = true
 	game.audio.sfx("coin")
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 	return true

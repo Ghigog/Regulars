@@ -52,7 +52,7 @@ func open_card(ch: Player = null, at := Vector3.INF) -> bool:
 		return game.placing.pick_up(p, ch, true)   # a partition or a rug: nothing to show, so it is just picked up
 	if game.stations.has(c) and game.room_edit.needs_cleaning(game.stations[c]) and layer != "high":
 		game.audio.sfx("fail")
-		game.hud.say(Cleaning.CLEAN_FIRST)
+		game.hud.day_ui.say(Cleaning.CLEAN_FIRST)
 		return false
 	return _open_card_at(c, layer, ch)
 
@@ -66,7 +66,7 @@ func _open_card_at(c: Vector2i, layer: String, ch: Player) -> bool:
 	game._card_hold.erase(ch)
 	ch.set_meta("low_next", c if layer == "high" else Game.NO_CELL)   # a wall piece's card shut: next E, what is under it
 	game.audio.sfx("slide")
-	game.hud.show_shop()
+	game.hud.shop_ui.show_shop()
 	return true
 
 
@@ -163,10 +163,10 @@ func card_act(act: String, bp := {}) -> bool:
 		"box_tree":
 			ch.hand = {"id": bp.box, "tier": 1, "price": 0, "facing": 0, "moving": true, "in_place": true,
 				"from": Vector3i(c.x, c.y, 0), "from_facing": 0}
-			game.hud.hide_shop()
+			game.hud.shop_ui.hide_shop()
 			game.upgrading = true
 			game.audio.sfx("tab", 0.08)
-			game.hud.show_tree(bp.box)
+			game.hud.screens_ui.show_tree(bp.box)
 			return true
 		"move":
 			game.session.close_shop()
@@ -177,7 +177,7 @@ func card_act(act: String, bp := {}) -> bool:
 		"sell":
 			var why := card_sell_block()
 			if why != "":
-				game.hud.say(why + ".")
+				game.hud.day_ui.say(why + ".")
 				game.audio.sfx("fail")
 				return false
 			game.session.close_shop()
@@ -209,7 +209,7 @@ func _card_turn(ch: Player, c: Vector2i, layer: String) -> bool:
 		game.placing._put_down(h, spot, int(h.facing))
 	else:
 		game.audio.sfx("fail")
-		game.hud.say("It will not fit that way round here.")
+		game.hud.day_ui.say("It will not fit that way round here.")
 		game.placing._put_down(ch.hand, spot, from_facing)
 	ch.hand = {}
 	return true
@@ -238,10 +238,10 @@ func storage_upgrades() -> void:
 	var st := card_station()
 	ch.hand = {"id": st.type, "tier": st.tier, "price": 0, "facing": st.facing, "moving": true,
 		"node": st, "in_place": true, "layer": game.card_layer, "from": Vector3i(st.cell.x, st.cell.y, 0), "from_facing": st.facing}
-	game.hud.hide_shop()
+	game.hud.shop_ui.hide_shop()
 	game.upgrading = true
 	game.audio.sfx("tab", 0.08)
-	game.hud.show_tree(key)
+	game.hud.screens_ui.show_tree(key)
 
 
 ## Back from the tree to the card.
@@ -250,9 +250,9 @@ func storage_ingredients() -> void:
 		return
 	game.shopper.hand = {}
 	game.upgrading = false
-	game.hud.hide_tree()
+	game.hud.screens_ui.hide_tree()
 	game.audio.sfx("tab", 0.08)
-	game.hud.show_shop()
+	game.hud.shop_ui.show_shop()
 
 
 ## Held E after it opened a card (review, item 4): once held HOLD_MOVE, the card shuts
@@ -379,5 +379,5 @@ func _storage_buy(bp: Dictionary) -> bool:
 		st.used()   # a fridge or cabinet swings its door open
 	game.menu_stock.menu_changed()
 	game.audio.sfx("putdown")
-	game.hud._refresh_catalog()
+	game.hud.shop_ui._refresh_catalog()
 	return true

@@ -271,7 +271,7 @@ func _ready() -> void:
 		if p < chefs.size():
 			chefs[p].aim_mouse = false
 			chefs[p].drag = {}
-		hud.refresh_input())
+		hud.hints_ui.refresh_input())
 	if OS.get_environment("REGULARS_INPUT") != "":   # dev switch for screenshots: touch or pad
 		controls.set_mode(OS.get_environment("REGULARS_INPUT"))
 	_restore_seats()
@@ -294,7 +294,7 @@ func _ready() -> void:
 		session.open_title()
 	elif demo == "picker" or (first_night and demo == "" and not _theme_picked and not GameSession.theme_forced()):
 		session.open_title()   # starting over: the theme card again, the title skipped
-		hud.title.show_themes()
+		hud.options_ui.title.show_themes()
 	elif first_night and (demo == "" or demo == "night0"):   # night0: the empty kitchen and the first hint
 		session._open_first_night()
 	else:
@@ -409,11 +409,11 @@ func step(delta: float) -> void:
 # ---------------------------------------------------------------- input & frame
 
 func _process(delta: float) -> void:
-	Build.menu = menu.items   # loose stacks draw in the order of the item they are heading for
+	BuildFood.menu = menu.items   # loose stacks draw in the order of the item they are heading for
 	for p in chefs.size():
 		var ch := chefs[p]
 		var input := Vector2.ZERO
-		if hud.options_open():
+		if hud.options_ui.options_open():
 			pass   # paused anyway; the arrows belong to the options screen
 		elif phase == Phase.SERVICE or (phase == Phase.BUILD and shopper != ch and not hud.card_open() \
 				and not (hud.typing() and controls.owner_of("keys") == p)):
@@ -444,7 +444,7 @@ func _process(delta: float) -> void:
 		decor._update_range(ch)
 	audio._update_daylight()
 	hud.update_status()
-	hud.place_door_ready(cam.unproject_position(DOORWAY + Vector3(0.3, 1.3, 0)))   # just under the card
+	hud.hints_ui.place_door_ready(cam.unproject_position(DOORWAY + Vector3(0.3, 1.3, 0)))   # just under the card
 	if _shot_path != "":
 		_shot_time += delta
 		if _shot_time > float(OS.get_environment("REGULARS_SHOT_AT")):
@@ -464,12 +464,12 @@ func _update_cursor(ch: Player = null) -> void:
 	if (hud.bill_open() and hud.bill.chef == ch) or ch.give_t > 0.0 or ch.demo_giving >= 0.0:
 		# Writing a bill, or handing one over (PRD 11): the slip or the fill bar, no prompt.
 		ch.cursor.visible = false
-		hud.show_prompt(Vector2.ZERO, "", chefs.find(ch))
+		hud.day_ui.show_prompt(Vector2.ZERO, "", chefs.find(ch))
 		return
 	var fallen: Node3D = floor_dirt.help_target(ch) if phase == Phase.SERVICE else null
 	if fallen != null:   # someone down beside the chef: helping them up comes first (PRD 9.3)
 		ch.cursor.visible = false
-		hud.show_prompt(cam.unproject_position(fallen.position + Vector3(0, 1.9, 0)), "Help up", chefs.find(ch))
+		hud.day_ui.show_prompt(cam.unproject_position(fallen.position + Vector3(0, 1.9, 0)), "Help up", chefs.find(ch))
 		return
 	var st: Station = null if clean_kit.floor_first(ch) else world.station_at(ch.target_cell())
 	var action := ""
@@ -482,12 +482,12 @@ func _update_cursor(ch: Player = null) -> void:
 		if fl != "":   # mopping, or a tool to put down or pick up
 			ch.cursor.visible = false
 			var fc: Vector2i = clean_kit.floor_cell(ch)
-			hud.show_prompt(cam.unproject_position(Grid.center(fc) + Vector3(0, 1.3, 0)), fl, chefs.find(ch))
+			hud.day_ui.show_prompt(cam.unproject_position(Grid.center(fc) + Vector3(0, 1.3, 0)), fl, chefs.find(ch))
 			return
 	var messy := _messy_at_mouse(ch)
 	if messy != null and messy != st:   # the mouse cannot clean: that is the chef's job
 		ch.cursor.visible = false
-		hud.show_prompt(cam.unproject_position(messy.position + Vector3(0, 1.6, 0)), Cleaning.WALK_OVER, chefs.find(ch))
+		hud.day_ui.show_prompt(cam.unproject_position(messy.position + Vector3(0, 1.6, 0)), Cleaning.WALK_OVER, chefs.find(ch))
 		return
 	ch.cursor.visible = action != ""
 	var at := Vector2.ZERO
@@ -511,7 +511,7 @@ func _update_cursor(ch: Player = null) -> void:
 		elif action == "Use desk":
 			p = desk.desk_in_front(ch).position + Vector3(0, 1.9, 0)
 		at = cam.unproject_position(p)
-	hud.show_prompt(at, action, chefs.find(ch))
+	hud.day_ui.show_prompt(at, action, chefs.find(ch))
 
 
 ## The messy piece under the mouse at night, when the mouse is aiming with empty hands.
@@ -527,23 +527,23 @@ func _messy_at_mouse(ch: Player = null) -> Station:
 func shop_action(action: String) -> bool:
 	if upgrading:
 		match action:
-			"left", "right", "up", "down": hud.tree_move(action)
+			"left", "right", "up", "down": hud.screens_ui.tree_move(action)
 			"back" when card.storing(): card.storage_ingredients()
 			"shop" when card.storing(): card.storage_ingredients()
 			"back", "shop": session.close_shop()
-			"use", "confirm": hud.tree_buy()
+			"use", "confirm": hud.screens_ui.tree_buy()
 			"turn" when shopper.hand.get("node") is Station:   # turn it round to see its back
 				placing.rotate_hand(shopper)
 			_: return false
 		return true
 	match action:
-		"left": hud.shop_move(-1)
-		"right": hud.shop_move(1)
-		"up": hud.shop_category(-1)
-		"down": hud.shop_category(1)
+		"left": hud.shop_ui.shop_move(-1)
+		"right": hud.shop_ui.shop_move(1)
+		"up": hud.shop_ui.shop_category(-1)
+		"down": hud.shop_ui.shop_category(1)
 		"shop" when card.storing() and card.storage_tree() != "": card.storage_upgrades()
 		"back", "shop": session.close_shop()
-		"use", "confirm": hud.shop_buy()
+		"use", "confirm": hud.shop_ui.shop_buy()
 		"search": hud.focus_search()
 		_: return false
 	return true

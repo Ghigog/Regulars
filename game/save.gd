@@ -150,7 +150,7 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 		if p.till:
 			var host: Station = g.paying._till_host(p.cell)
 			if host != null:
-				Build.register(host)
+				BuildStations.register(host)
 	for c: Vector2i in d.stock:
 		g.kitchen.give_stock(c, (d.stock[c] as Dictionary).duplicate(true))
 		g.world._show_boxes(c)

@@ -162,9 +162,9 @@ func _draw() -> void:
 		_vis.remove_child(c)
 		c.queue_free()
 	if high:
-		Build.wall_piece(_vis, node, closet)
+		BuildStations.wall_piece(_vis, node, closet)
 	else:
-		Build.station(_vis, type, tier, base, pass_look, node)
+		BuildStations.station(_vis, type, tier, base, pass_look, node)
 
 
 ## Hangs this piece in the high layer, or stands it low, and redraws it (PRD 8.5).
@@ -182,13 +182,13 @@ func _show_item(kind: String) -> void:
 		_item_node = null
 	_shown_look = ""
 	if kind == "dish" and dish != null:
-		_item_node = Build.dish(dish, Build.menu_items())
+		_item_node = BuildFood.dish(dish, BuildFood.menu_items())
 		_item_node.position = Vector3(0, 0.9, 0)
 		add_child(_item_node)
 	elif kind != "":
 		var on_heat := is_heat_tool() and mode() == "stove"
-		_shown_look = _look(cook) if on_heat else Build.look_for(kind, quality)
-		_item_node = Build.item(kind, quality, _shown_look)
+		_shown_look = _look(cook) if on_heat else BuildFood.look_for(kind, quality)
+		_item_node = BuildFood.item(kind, quality, _shown_look)
 		match mode():
 			"stove":
 				_item_node.position = Vector3(Build.PAN.x, 0.93, Build.PAN.z)
@@ -527,16 +527,16 @@ func refresh() -> void:
 	_stack = Node3D.new()
 	add_child(_stack)
 	if type in ["plates", "cups", "tray_stack"]:
-		Build.stack_load(_stack, type, count)
+		BuildFood.stack_load(_stack, type, count)
 	elif is_table(type):
 		for i in dirty:
-			var d := Build.item("dirty_cup" if i >= dirty - dirty_cups else "dirty_plate")
+			var d := BuildFood.item("dirty_cup" if i >= dirty - dirty_cups else "dirty_plate")
 			d.position = Vector3(-0.25 + (i % 2) * 0.5, 0.74, 0.3 - ((i / 2) % 2) * 0.6) + Vector3(0, (i / 4) * 0.03, 0)
 			_stack.add_child(d)
 	elif type == "sink":
-		Build.sink_load(_stack, dirty, messy())
+		BuildStations.sink_load(_stack, dirty, messy())
 	elif type == "bin":
-		Build.bin_load(_stack, count, BIN_HOLDS)
+		BuildStations.bin_load(_stack, count, BIN_HOLDS)
 		if overflowing() and not _fx.has("wisps"):
 			_fx.wisps = Fx.play(self, "wisps", Vector3(0, 1.25, 0), 0.32, true)
 			_fx.wisps.fps = 3.0
@@ -567,12 +567,12 @@ func set_boxes(b: Array, y := 1.6) -> void:
 			cr.position = Vector3(-0.43 + gap * (i + 0.5), CRATE_Y, -0.2)
 			cr.scale = Vector3.ONE * minf(CRATE_SCALE, gap * 0.95)
 			_crates.add_child(cr)
-			Build.station(cr, str(boxes[i]), 1)
+			BuildStations.station(cr, str(boxes[i]), 1)
 		return
 	_tags = Node3D.new()
 	_tags.name = "box_tags"
 	add_child(_tags)
-	Build.box_tags(_tags, boxes, y)
+	BuildClean.box_tags(_tags, boxes, y)
 
 
 const CRATE_Y := 0.9        # an open counter's worktop

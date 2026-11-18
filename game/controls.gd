@@ -371,7 +371,7 @@ func _browse(who: PlayerInput, delta: float) -> void:
 		who.erase = false
 	var dir := Vector2i.ZERO
 	var s := who._sticks.get(who.source, Vector2.ZERO) as Vector2
-	if ((game.shopping and game.shopper == _chef_of(who.index)) or _options() or game.hud.title_open()) and s.length() > 0.6:
+	if ((game.shopping and game.shopper == _chef_of(who.index)) or _options() or game.hud.options_ui.title_open()) and s.length() > 0.6:
 		dir = Vector2i(signi(roundi(s.x)), 0) if absf(s.x) > absf(s.y) else Vector2i(0, -signi(roundi(s.y)))
 	if dir != who.browse_dir:
 		who.browse_dir = dir
@@ -390,7 +390,7 @@ func _browse(who: PlayerInput, delta: float) -> void:
 func buttons() -> Array:
 	var r := _view.get_rect()
 	var out: Array = []
-	if game.hud.title_open():   # the title's own buttons are tapped
+	if game.hud.options_ui.title_open():   # the title's own buttons are tapped
 		return out
 	var x := r.size.x - 92.0
 	var y := r.size.y - 112.0
@@ -453,7 +453,7 @@ func _stick_home() -> Vector2:
 
 
 func _options() -> bool:
-	return game.hud != null and (game.hud.options_open() or game.hud.pause_open())
+	return game.hud != null and (game.hud.options_ui.options_open() or game.hud.options_ui.pause_open())
 
 
 func _stick_shown() -> bool:

@@ -261,13 +261,13 @@ func test_start_on_an_unseated_pad_joins_and_on_a_seated_one_opens_options():
 	_tap_pad(JOY_BUTTON_A, 0)   # player one picks up pad 0
 	_tap_pad(JOY_BUTTON_START, 1)
 	assert_eq(game.chefs.size(), 2, "pad 1 joined")
-	assert_false(game.hud.options_open(), "joining does not open the options")
+	assert_false(game.hud.options_ui.options_open(), "joining does not open the options")
 	_tap_pad(JOY_BUTTON_START, 1)
-	assert_true(game.hud.pause_open(), "Start on a seated pad opens the pause menu")
-	game.hud.toggle_pause()
+	assert_true(game.hud.options_ui.pause_open(), "Start on a seated pad opens the pause menu")
+	game.hud.options_ui.toggle_pause()
 	_tap_pad(JOY_BUTTON_START, 0)
-	assert_true(game.hud.pause_open(), "and on player one's pad")
-	game.hud.toggle_pause()
+	assert_true(game.hud.options_ui.pause_open(), "and on player one's pad")
+	game.hud.options_ui.toggle_pause()
 
 
 func test_holding_start_leaves():
@@ -280,7 +280,7 @@ func test_holding_start_leaves():
 	game.controls._process(0.6)
 	assert_eq(game.chefs.size(), 1, "held a second: chef 2 left")
 	_pad(JOY_BUTTON_START, false, 1)
-	assert_false(game.hud.options_open(), "and the release opens nothing")
+	assert_false(game.hud.options_ui.options_open(), "and the release opens nothing")
 
 
 func test_enter_on_the_keyboard_joins_when_player_one_is_on_a_pad():
@@ -303,14 +303,14 @@ func test_no_join_before_any_device_is_used():
 
 
 func test_each_players_hint_line_uses_their_own_device():
-	assert_string_contains(game.hud._hint_text(0), "WASD")
+	assert_string_contains(game.hud.hints_ui._hint_text(0), "WASD")
 	_two()
 	assert_eq(game.controls.input_of(1).mode, "pad")
-	assert_string_contains(game.hud._hint_text(0), "WASD", "player one is on the keyboard")
-	assert_string_contains(game.hud._hint_text(1), "Stick", "player two is on a pad")
-	game.hud.show_prompt(Vector2(300, 300), "Cook", 1)
+	assert_string_contains(game.hud.hints_ui._hint_text(0), "WASD", "player one is on the keyboard")
+	assert_string_contains(game.hud.hints_ui._hint_text(1), "Stick", "player two is on a pad")
+	game.hud.day_ui.show_prompt(Vector2(300, 300), "Cook", 1)
 	assert_eq(game.hud._prompts[1].key_label.text, "A", "chef 2's bubble shows the pad's button")
 	assert_true(game.hud._prompts[1].tag.visible, "and their numbered tag")
 	_to_build()
-	assert_string_contains(game.hud._build_tip(1), "A pick up a piece")
-	assert_string_contains(game.hud._build_tip(0), "E pick up a piece")
+	assert_string_contains(game.hud.hints_ui._build_tip(1), "A pick up a piece")
+	assert_string_contains(game.hud.hints_ui._build_tip(0), "E pick up a piece")

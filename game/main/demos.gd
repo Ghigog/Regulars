@@ -88,7 +88,7 @@ func _demo_mop(demo: String) -> void:
 				game.player.look(Vector2i(0, 1))
 				game.clean_kit.keep(bucket, "", 0)
 				CleanKit.hold(game.player, "mop", 1)
-				game.hud.show_build())
+				game.hud.hints_ui.show_build())
 
 
 ## PRD 9.6: the mop bucket's tree in a row along the front, each with its own mop (plain,
@@ -142,14 +142,14 @@ func _apply_demo(demo: String) -> void:
 		game.player.take_dish(Dish.make(Dish.PLATE))
 		for a in game.arrivals:
 			a.time = 1.0
-	elif demo in ["helpers", "helpers_break", "helpers_slip"]:   # PRD 10.6/10.8: staff at work; see Crew.demo
-		game.crew.demo(demo)
+	elif demo in ["helpers", "helpers_break", "helpers_slip"]:   # PRD 10.6/10.8: staff at work; see Crew.crew_demos.demo
+		game.crew.crew_demos.demo(demo)
 	elif demo.begins_with("pay_"):   # PRD 11: paying the bill; see _demo_pay
 		game.demo_scenes._demo_pay(demo)
-	elif demo == "staff_only":   # PRD 10.7: a busy day run by helpers alone; see Crew.staff_only
+	elif demo == "staff_only":   # PRD 10.7: a busy day run by helpers alone; see Crew.crew_demos.staff_only
 		game.ledger.day = 8
 		game.flyers_out = true
-		game.crew.staff_only()
+		game.crew.crew_demos.staff_only()
 	elif demo == "dirt":  # every level of floor dirt, footprints, guests slowed tracking it in; shoot at about 7
 		game.floor_dirt.sync_room()
 		var m := game.floor_dirt.mess
@@ -293,12 +293,12 @@ func _apply_demo(demo: String) -> void:
 					game.day.inspect(g)
 					return)
 	elif demo == "pause":  # the pause menu over the room
-		game.hud.toggle_pause()
+		game.hud.options_ui.toggle_pause()
 		game.get_tree().paused = false   # so the screenshot timer still runs
 	elif demo == "options" or demo == "options_gfx":  # the options screen, on either tab
-		game.hud._options_tab = "graphics" if demo == "options_gfx" else "audio"
-		game.hud.toggle_options()
-		game.hud.options_action("down")   # the highlight on the first slider (keys and pad)
+		game.hud.options_ui._options_tab = "graphics" if demo == "options_gfx" else "audio"
+		game.hud.options_ui.toggle_options()
+		game.hud.options_ui.options_action("down")   # the highlight on the first slider (keys and pad)
 		game.get_tree().paused = false   # so the screenshot timer still runs
 	elif demo in ["menu", "menu_name", "restock"]:  # the menu screen; naming an item; the restock note open
 		game.ledger.record_sale(Game.DEMO_BILL, 5)
@@ -325,7 +325,7 @@ func _apply_demo(demo: String) -> void:
 					game.town.record_walkout(i, 1)
 				if i % 2 == 0:
 					game.town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
-			game.get_tree().create_timer(1.5).timeout.connect(game.hud.show_town)
+			game.get_tree().create_timer(1.5).timeout.connect(game.hud.screens_ui.show_town)
 	elif demo.begins_with("coop"):  # PRD 4: coop (service), coop_build (two ghosts at night), coop_ready (the receipt, one ready)
 		var two := game.chefs[game.coop.join("pad:1")]
 		game.hud.coop_hint_time = 9999.0
@@ -410,7 +410,7 @@ func _apply_demo(demo: String) -> void:
 			game.session.open_build()
 			game.player.position = Grid.center(Vector2i(6, 4))
 			game.player.look(Vector2i(0, 1))   # at the table by the door: "Clear table"
-			game.hud.show_build())
+			game.hud.hints_ui.show_build())
 		game.get_tree().create_timer(5.0).timeout.connect(func() -> void:
 			game.room_edit.build_interact()              # a plate in hand, carried to the sink
 			game.player.position = Grid.center(Vector2i(3, 3))
@@ -477,7 +477,7 @@ func _demo_critic(demo: String) -> void:
 	game.ledger.end_day()
 	if demo == "critic_town":
 		game.arrivals.clear()
-		game.get_tree().create_timer(1.5).timeout.connect(game.hud.show_town)
+		game.get_tree().create_timer(1.5).timeout.connect(game.hud.screens_ui.show_town)
 		return
 	game.arrivals.assign([{"time": 0.2, "group": [game.critic.critic_idx]}])
 	game.get_tree().create_timer(9.0).timeout.connect(func() -> void:
@@ -543,7 +543,7 @@ func _demo_storage(demo: String) -> void:
 			game.card.storage_ingredients()
 			game.card.card_act("turn")   # turned on its card, the door toward the camera
 		else:
-			game.get_tree().create_timer(0.3).timeout.connect(game.hud.shop_move.bind(1))
+			game.get_tree().create_timer(0.3).timeout.connect(game.hud.shop_ui.shop_move.bind(1))
 		return
 	var sea := Scenery.seaside()
 	for step: Array in [["counter", 2, 5], ["counter", 2, 5]]:
@@ -588,7 +588,7 @@ func _demo_wall(demo: String) -> void:
 	if demo == "wall_build":
 		game.placing.pick_catalog("cabinet")
 		game._demo_hover = Vector3(2.5, 0, 2.5)
-	game.hud.show_build()
+	game.hud.hints_ui.show_build()
 
 
 ## The upgrade trees (PRD 8.3): a piece picked up at night and the shop opened.
@@ -630,10 +630,10 @@ func _demo_tree(demo: String) -> void:
 	game.session.open_shop()
 	if demo == "tree_stove":
 		for i in 3:
-			game.get_tree().create_timer(0.4 + 0.3 * i).timeout.connect(game.hud.tree_move.bind("down"))
+			game.get_tree().create_timer(0.4 + 0.3 * i).timeout.connect(game.hud.screens_ui.tree_move.bind("down"))
 	if demo == "tree_cut":   # PRD 8.6: the whole cutting tree, scrolled down to the bread knife's line
 		for i in 2:
-			game.get_tree().create_timer(0.4 + 0.2 * i).timeout.connect(game.hud.tree_move.bind("down"))
+			game.get_tree().create_timer(0.4 + 0.2 * i).timeout.connect(game.hud.screens_ui.tree_move.bind("down"))
 
 
 ## The floor treatment and cleaning tree demos (PRD 9.5). "treat": at night, a strip of
@@ -752,19 +752,19 @@ func _demo_desk(demo: String) -> void:
 			game.hud.menu_notes.open = true
 			game.player.position = Grid.center(Vector2i(1, 5))
 			game.player.look(Vector2i(0, 1))
-			game.hud.show_build()
+			game.hud.hints_ui.show_build()
 			return
 		game.desk.open_desk()
 		game.hud.desk.show_tab("staff")
 		if demo == "desk_raise":
 			var person: int = game.staff.employees.keys()[0]
-			game.hud.desk.open_person(person)
+			game.hud.desk.staff_ui.open_person(person)
 			var e: Dictionary = game.staff.employee(person)
 			e.pending = {"duty": "wash_up", "raise": 3, "haggle": game.staff._new_haggle(int(e.wage) + 3)}
-			game.hud.desk.render()
+			game.hud.desk.pages.render()
 		elif demo == "desk_fire":   # PRD 10.8: the fed-up washer opened, both fire buttons out
-			game.hud.desk.open_person(game.staff.employees.keys()[2])
-			game.hud.desk._set_firing(true)
+			game.hud.desk.staff_ui.open_person(game.staff.employees.keys()[2])
+			game.hud.desk.staff_ui._set_firing(true)
 		return
 	game.staff.add_post("Grill cook", ["grill", "fetch", "assemble"], 1, 1, game.desk.desk_count())
 	for p in game.town.people:
@@ -785,7 +785,7 @@ func _demo_desk(demo: String) -> void:
 		game.hud.desk.show_tab("cvs")
 		game.hud.desk.start_haggle()
 		game.staff.rng.seed = 3
-		game.hud.desk.make_offer(maxi(1, int(game.staff.cvs[0].ask) / 2))
+		game.hud.desk.posting.make_offer(maxi(1, int(game.staff.cvs[0].ask) / 2))
 
 
 ## Three hires for the staff demos: a happy grill cook, a so-so server and a fed-up
