@@ -2,7 +2,7 @@
 
 The sound counterpart to `docs/STYLE_GUIDE.md`. In the game now: three real tracks in
 `assets/music` (Daytime, Nighttime, Closed), switched by phase with a cross-fade (`MUSIC`
-and `play_music` in `game/main.gd`), and synthesised effects from `tools/make_sfx.py`.
+and `play_music` in `game/main/audio.gd`), and synthesised effects from `tools/make_sfx.py`.
 `Intro.mp3` loops on the title screen.
 
 ## The idea

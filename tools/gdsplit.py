@@ -1,12 +1,32 @@
 """Split a large GDScript class into parts, rewriting references so they still resolve.
 
-Used once to break game/main.gd into game/main/*.gd (see CLAUDE.md, "Layout"). Kept for
-the next split: it moves whole top-level items (funcs, vars, consts with their doc
-comments) by cut points, prefixes references to members left behind (`game.x` for
-instance members, `Game.X` for constants and statics), rewrites the class's own calls
-to moved members (`part.x`) and, in other files, `<receiver>.x` to `<receiver>.part.x`.
+Used to break game/main.gd, hud.gd, build.gd, crew.gd and desk_screen.gd into the folders
+beside them (see CLAUDE.md, "Finding and changing code"). It moves whole top-level items
+(funcs, vars, consts, inner classes, with the comments above them) by cut points, then:
+- inside a part, prefixes what stayed behind: `<backref>.x` for instance members,
+  `Class.X` for constants, statics and inner classes, `<backref>.<part>.x` for another part;
+- in the class itself, `x` becomes `<part>.x` (or `PartClass.x` when static);
+- in other files, `<receiver>.x` becomes `<receiver>.<part>.x` (or `PartClass.x`).
+It prints PROBLEM lines (clashes, locals shadowing members) and "stray?" lines (`a.x` where
+`a` is not a known receiver) to review by hand. Check the result by running the tests.
 
     python3 tools/gdsplit.py plan.json [--dry]
+
+plan.json:
+    root        the project directory
+    file        the script to split, relative to root
+    class       its class_name
+    backref     the name a part uses for its owner ("game"); omit for "game"
+    inherited   a file of the owner's inherited member names (tools/godot_members.gd)
+    header      text put first in the split file if missing ("class_name Game\n")
+    anchor      the member after which the `var part := PartClass.new(self)` lines go
+    keep        names that stay in the class whatever the cuts say
+    parts       [{var, class, file, short, doc: [lines], static: bool}] (static: no instance)
+    cuts        [[first item name, part var or "main"], ...] in file order
+    other_globs files to rewrite references in
+    receivers   names that hold the class in other files ("game", "Hud");
+    file_receivers  {path: [extra receivers]} for one file only
+    list        true: only print the items with their owners
 """
 import json, re, sys, pathlib
 
