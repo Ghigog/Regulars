@@ -25,7 +25,7 @@ extends CanvasLayer
 ## on the receipt and the end screen), B back, X sell, Y shop (town on the
 ## receipt; buys the chosen upgrade while a piece is lifted), LB/RB choose a lifted
 ## piece's upgrade (turn otherwise), the right stick's click turns, either trigger held aims, Start options, Back the menu screen.
-## Touch: a joystick bottom left, a column of round buttons on the right (Aim, beside
+## Touch: a joystick bottom left, round buttons on the right, drawn by HudButtons (Aim, beside
 ## Use, is held while the joystick turns the chef); taps on
 ## the room still pick guests and place pieces, as a mouse click would.
 
@@ -385,45 +385,18 @@ func _browse(who: PlayerInput, delta: float) -> void:
 
 # ---------------------------------------------------------------- touch
 
-## The round buttons down the right-hand side, bottom first, for what can be
-## done right now: [id, label, centre, radius].
+## The discs on screen now, for what can be done: [id, label, centre, radius]. HudButtons
+## draws and lays them out; touches are tested against them here.
 func buttons() -> Array:
-	var r := _view.get_rect()
-	var out: Array = []
-	if game.hud.options_ui.title_open():   # the title's own buttons are tapped
-		return out
-	var x := r.size.x - 92.0
-	var y := r.size.y - 112.0
-	var hand := _hand_of(owner_of("touch"))
-	var build: bool = game.phase == game.Phase.BUILD
-	if _options() or game.hud.card_open():   # the card's own buttons are big enough to tap
-		pass
-	elif game.phase == game.Phase.SERVICE or (build and not _touch_shops()):
-		var word: String = game.hud.last_action if game.hud.last_action != "" else "Use"
-		out.append(["use", word, Vector2(x, y), USE_R])
-		out.append(["aim", "Aim", Vector2(x - USE_R - BTN_R - 18.0, y + USE_R - BTN_R), BTN_R])   # held: stand and turn
-		y -= USE_R + BTN_R + 16.0
-	if build and not _touch_shops() and not game.hud.card_open():
-		if not hand.is_empty():
-			out.append(["back", "Done" if Catalog.is_build_tool(hand.id) else "Drop", Vector2(x, y), BTN_R])
-			y -= BTN_R * 2 + 14.0
-			if Catalog.is_build_tool(hand.id):
-				out.append(["sell", "Erase" if not _touch_who().erase else "Erasing", Vector2(x, y), BTN_R])
-				y -= BTN_R * 2 + 14.0
-			else:
-				out.append(["turn", "Turn", Vector2(x, y), BTN_R])
-				y -= BTN_R * 2 + 14.0
-				if hand.get("moving", false):
-					out.append(["sell", "Sell", Vector2(x, y), BTN_R])
-					y -= BTN_R * 2 + 14.0
-		out.append(["shop", "Shop", Vector2(x, y), BTN_R])
-		y -= BTN_R * 2 + 14.0
-		if hand.is_empty():
-			out.append(["menu", "Dishes", Vector2(x, y), BTN_R])
-			y -= BTN_R * 2 + 14.0
-	elif build and _touch_shops():
-		out.append(["back", "Close", Vector2(x, 70.0), BTN_R])
-	out.append(["options", "Menu", Vector2(r.size.x - 60.0, 196.0), 30.0])
+	return game.hud.buttons_ui.specs().map(func(s: Dictionary) -> Array: return [s.id, s.label, s.centre, s.r])
+
+
+## The ids of the buttons a finger is holding down.
+func held_ids() -> Array:
+	var out := []
+	for f in _fingers.values():
+		if f is Array:
+			out.append(f[0])
 	return out
 
 
@@ -483,11 +456,11 @@ func _touch_event(e: InputEvent) -> void:
 			if what == "stick":
 				_stick_at = _stick_home()
 				steer("touch", _stick_vec(e.position))
-			elif what == "sell" and not _hand_of(owner_of("touch")).is_empty() and Catalog.is_build_tool(_hand_of(owner_of("touch")).id):
-				_touch_who().erase = not _touch_who().erase
-			else:
+			elif what in HudButtons.HOLD:
 				_fingers[e.index] = [what]
 				press("touch", what, true, "finger%d" % e.index)
+			else:
+				game.hud.buttons_ui.activate(what)   # taps press once, as their key does
 			get_viewport().set_input_as_handled()
 		elif _fingers.has(e.index):
 			var held = _fingers[e.index]
@@ -535,25 +508,3 @@ func _draw_touch() -> void:
 		_view.draw_circle(knob + Vector2(0, 4), KNOB_R, Color(ink, 0.25))
 		_view.draw_circle(knob, KNOB_R, Color(Hud.CORAL))
 		_view.draw_arc(knob, KNOB_R, 0, TAU, 32, ink, 3.0, true)
-	var font: Font = Hud.lettering()
-	var held := {}
-	for f in _fingers.values():
-		if f is Array:
-			held[f[0]] = true
-	for b: Array in buttons():
-		var c: Vector2 = b[2]
-		var r: float = b[3]
-		var down: bool = held.has(b[0]) or (b[0] == "sell" and _touch_who().erase)
-		var face := Color(Hud.CORAL) if b[0] == "use" else cream
-		if down:
-			face = face.darkened(0.15)
-		_view.draw_circle(c + Vector2(0, 5), r, Color(ink, 0.3))
-		_view.draw_circle(c + (Vector2(0, 3) if down else Vector2.ZERO), r, face)
-		_view.draw_arc(c + (Vector2(0, 3) if down else Vector2.ZERO), r, 0, TAU, 40, ink, 3.0, true)
-		var size := 22 if r >= USE_R else (17 if r >= BTN_R else 13)
-		var text: String = str(b[1]).to_upper()
-		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, size).x
-		if w > r * 1.8:
-			size = int(size * r * 1.8 / w)
-			w = font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, size).x
-		_view.draw_string(font, c + Vector2(-w / 2, size * 0.35 + (3 if down else 0)), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, cream if b[0] == "use" else ink)
