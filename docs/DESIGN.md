@@ -93,7 +93,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   combines on a worktop: a bun put on a cooked patty makes a loose burger, in any order,
   but only into something the menu makes ("Nothing on the menu has patty with fries",
   "One bun is enough", "Patty needs grilling first"). A plate from the plate stack then
-  takes it up ("Plate it"), or food goes onto a plate already put down. A drink station
+  takes it up ("Plate it"), and a loose stack already in hand is plated at the stack too (no extra hand slot), or food goes onto a plate already put down. A drink station
   fills the cup in hand (a cup from the cup stack; "Bring a cup"); a two-tap station
   turns with empty hands or Turn. The hands hold two plates or cups; a tray from the
   tray stack (bought, optional) holds four. At a table, every dish in hand that a
