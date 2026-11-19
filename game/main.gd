@@ -461,6 +461,7 @@ func _update_camera(delta: float) -> void:
 
 func _update_cursor(ch: Player = null) -> void:
 	ch = _me(ch)
+	hud.day_ui.update_walk_keys(chefs.find(ch), cam.unproject_position(ch.position + Vector3(0, 2.3, 0)))
 	if (hud.bill_open() and hud.bill.chef == ch) or ch.give_t > 0.0 or ch.demo_giving >= 0.0:
 		# Writing a bill, or handing one over (PRD 11): the slip or the fill bar, no prompt.
 		ch.cursor.visible = false

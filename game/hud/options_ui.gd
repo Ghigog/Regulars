@@ -12,7 +12,9 @@ func _init(hud_: Hud) -> void:
 # ---------------------------------------------------------------- options
 
 const OPTIONS_FILE := "user://regulars_options.cfg"
-var options := {"sfx": 0.8, "music": 0.8, "tilt_shift": true}
+static var options_path := OPTIONS_FILE   # tests point this at a temporary file
+## walk_learned / stick_learned: the walk keycaps over the chef are retired for good (PRD: teach in place).
+var options := {"sfx": 0.8, "music": 0.8, "tilt_shift": true, "walk_learned": false, "stick_learned": false}
 var _options_card: Control
 var _options_body: VBoxContainer
 var _options_tab := "audio"
@@ -27,7 +29,7 @@ var _options_sel := 0
 
 func load_options() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(OPTIONS_FILE) != OK:
+	if cfg.load(options_path) != OK:
 		return
 	for key: String in options:
 		options[key] = cfg.get_value("options", key, options[key])
@@ -37,7 +39,7 @@ func save_options() -> void:
 	var cfg := ConfigFile.new()
 	for key: String in options:
 		cfg.set_value("options", key, options[key])
-	cfg.save(OPTIONS_FILE)
+	cfg.save(options_path)
 
 
 func apply_options() -> void:
