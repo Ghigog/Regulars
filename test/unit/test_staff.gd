@@ -437,6 +437,40 @@ func test_the_staff_tab_lists_each_hire_with_manage():
 	assert_eq(desk.selected(), "manage:%d" % p)
 
 
+func _texts(node: Node) -> Array[String]:
+	var out: Array[String] = []
+	if node is Label:
+		out.append((node as Label).text)
+	for c in node.get_children():
+		out.append_array(_texts(c))
+	return out
+
+
+func test_the_staff_tab_shows_total_wages_big_and_no_footer_text():
+	_night(2)
+	var a := _hire_one(3)
+	var b := _hire_one(4)
+	game.staff.employees[a].wage = 27
+	game.staff.employees[b].wage = 20
+	game.desk.open_desk()
+	var desk: DeskScreen = game.hud.desk
+	var wages := desk._content.find_child("Wages", true, false) as Label
+	assert_not_null(wages)
+	assert_eq(wages.text, "$47")
+	for t in _texts(desk._content):
+		assert_false("Wages tonight" in t)
+		assert_false("Arrows choose" in t)
+	game.staff.employees[a].wage = 30
+	desk.pages.render()
+	assert_eq((desk._content.find_child("Wages", true, false) as Label).text, "$50")
+
+
+func test_no_wages_figure_without_hires():
+	_night()
+	game.desk.open_desk()
+	assert_null(game.hud.desk._content.find_child("Wages", true, false))
+
+
 func test_ticking_a_duty_offers_it_and_unticking_takes_it_off():
 	_night()
 	var p := _hire_one()
