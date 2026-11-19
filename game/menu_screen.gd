@@ -772,6 +772,7 @@ class BuildNotes extends HBoxContainer:
 	var _hint_label: Label
 	var _restock: HudWidgets.Sheet
 	var _box: VBoxContainer
+	var cost_tag: Label
 
 	func _init(game_, hud_) -> void:
 		game = game_
@@ -810,16 +811,21 @@ class BuildNotes extends HBoxContainer:
 			c.free()   # nothing in the note is mid-signal: the click lands on the note itself
 		var cost: int = game.menu_stock.night_cost()
 		var short: bool = cost > game.ledger.money
-		var head := HBoxContainer.new()
+		var head := Control.new()   # the basket, with the cost taped over its lower corner
 		head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		head.add_theme_constant_override("separation", 8)
+		head.custom_minimum_size = Vector2(92, 56)
+		head.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		_box.add_child(head)
-		head.add_child(HudWidgets.Icon.new("coins", 26, false))
-		var t: Label = hud._label(head, 21, "Tomorrow's stock: $%d" % cost)
-		t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		var more: Label = hud._label(head, 16, "less" if open else "more")
-		more.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		more.modulate.a = 0.55
+		var basket := HudWidgets.Icon.new("basket", 52, false)
+		basket.position = Vector2(0, 0)
+		head.add_child(basket)
+		cost_tag = hud._label(head, 22, "\u2212$%d" % cost)
+		cost_tag.name = "CostTag"
+		cost_tag.position = Vector2(34, 22)
+		cost_tag.add_theme_color_override("font_color", Hud.CORAL if short else Hud.INK)
+		cost_tag.add_theme_color_override("font_outline_color", Hud.PAPER)
+		cost_tag.add_theme_constant_override("outline_size", 6)
+		tooltip_text = "Tomorrow's stock"
 		if open:
 			var lines: Array[Dictionary] = game.menu_stock.stock_lines()
 			for l in lines:
