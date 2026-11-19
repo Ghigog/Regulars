@@ -89,18 +89,27 @@ static func _counter(n: Node3D, body: String, top: String, doors := true, kick :
 			Build.box(n, Vector3(sx * 0.08, 0.5, 0.48), Vector3(0.035, 0.12, 0.03), "#d9a441", 0.0, Build.R_WOOD)
 
 
+## Turns a till `facing` quarter turns from its resting look, keeping it centred
+## on the worktop: its offset from the middle turns with it. Kept as meta "facing".
+static func face_till(till: Node3D, facing: int) -> void:
+	facing = posmod(facing, 4)
+	till.set_meta("facing", facing)
+	till.rotation.y = PI / 2 + facing * PI / 2
+	till.position = Vector3(0, 0.9, -0.08).rotated(Vector3.UP, facing * PI / 2)
+
+
 ## A proper cash register (sheet 1, sheet 8): a cream body on a coral cash drawer
 ## with a brass pull, a sloped deck of chunky keys with a big coral total key, a
 ## dark display pod with a warm amber window and a coral price flag popped up on
 ## top, a receipt curling out of the back and a brass crank on the camera side.
+## `facing` is its quarter turns (see `face_till`).
 ## Reads at 20 px as cream block, dark band, coral drawer.
-static func register(n: Node3D) -> void:
+static func register(n: Node3D, facing := 0) -> void:
 	var cream := Color("#efe6d4")
 	var till := Node3D.new()
 	till.name = "till"
-	till.position = Vector3(0, 0.9, -0.08)
-	till.rotation.y = PI / 2
 	n.add_child(till)
+	face_till(till, facing)
 	# Cash drawer: a cream plinth with a coral front, a brass pull and a coin slot.
 	Build._add(till, Build.bevel_mesh(Vector3(0.62, 0.15, 0.56), 0.04), Vector3(0, 0.075, 0), cream, 0.0)
 	Build._add(till, Build.bevel_mesh(Vector3(0.54, 0.11, 0.03), 0.015), Vector3(0, 0.075, 0.28), Color(Build.CORAL), 0.0)
