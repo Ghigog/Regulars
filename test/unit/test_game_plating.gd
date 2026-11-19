@@ -41,6 +41,9 @@ func test_the_plated_burger_is_served():
 	var g := _ordered_guest()
 	_hold_loose_burger()
 	_use("plates")
+	game.cooking.use_station(_the_pass())
+	assert_eq(game.cooking.prompt_for(_the_pass()), "Pick up")
+	game.cooking.use_station(_the_pass())
 	assert_ne(game.cooking.use_station(g.table), "Put it on a plate first")
 	assert_ne(g.state, "waiting")
 
@@ -53,3 +56,67 @@ func test_a_refused_stack_falls_through():
 	var plates: Station = game.world.find_station("plates")
 	assert_ne(game.cooking.prompt_for(plates), "Plate it")
 	assert_eq(d.vessel, "")
+
+
+func test_a_plate_in_hand_goes_under_a_loose_burger_on_the_pass():
+	_ordered_guest()
+	game.player.set_held("prep:patty", 1.0)
+	game.cooking.use_station(_the_pass())
+	game.player.set_held("prep:bun", 1.0)
+	game.cooking.use_station(_the_pass())
+	game.player.set_held("")
+	_use("plates")
+	assert_eq(game.cooking.prompt_for(_the_pass()), "Plate it")
+	assert_eq(game.cooking.use_station(_the_pass()), "Plate it")
+	assert_eq(game.player.dishes.size(), 0)
+	assert_eq(_the_pass().item, "dish")
+	assert_eq(_the_pass().dish.vessel, Dish.PLATE)
+	assert_true(_the_pass().dish.is_ready(game.menu.items))
+	assert_eq(game.cooking.prompt_for(_the_pass()), "Pick up")
+
+
+func test_a_plate_goes_under_a_single_prepped_item():
+	game.player.set_held("prep:bun", 1.0)
+	game.cooking.use_station(_the_pass())
+	_use("plates")
+	assert_eq(game.cooking.use_station(_the_pass()), "Plate it")
+	assert_eq(game.player.dishes.size(), 0)
+	assert_eq(_the_pass().dish.vessel, Dish.PLATE)
+	assert_eq(_the_pass().dish.ings.size(), 1)
+
+
+func test_an_empty_cup_goes_under_a_loose_drink():
+	game.world.add_station("fountain", Vector2i(2, 5))
+	game.menu.add("drink", ["soda"], "Soda")
+	var cup := Dish.make(Dish.CUP)
+	var st := _the_pass()
+	var drink := Dish.new()
+	drink.add("prep:soda", 1.0)
+	st.set_dish(drink)
+	game.player.take_dish(cup)
+	assert_eq(game.cooking.use_station(st), "Pour into cup")
+	assert_eq(game.player.dishes.size(), 0)
+	assert_eq(st.dish, cup)
+	assert_false(cup.is_empty())
+
+
+func test_a_second_plate_stays_in_hand():
+	game.player.set_held("prep:bun", 1.0)
+	game.cooking.use_station(_the_pass())
+	var first := Dish.make(Dish.PLATE)
+	var second := Dish.make(Dish.PLATE)
+	game.player.take_dish(first)
+	game.player.take_dish(second)
+	game.cooking.use_station(_the_pass())
+	assert_eq(_the_pass().dish, second, "the plate last taken goes down")
+	assert_eq(game.player.dishes, [first] as Array[Dish])
+
+
+func test_a_refused_stack_keeps_the_plate_in_hand():
+	game.player.set_held("prep:patty", 1.0)
+	game.cooking.use_station(_the_pass())
+	game.player.take_dish(Dish.make(Dish.CUP))
+	assert_eq(game.cooking.prompt_for(_the_pass()), "Only drinks go in a cup")
+	game.cooking.use_station(_the_pass())
+	assert_eq(game.player.dishes.size(), 1)
+	assert_eq(_the_pass().item, "prep:patty")

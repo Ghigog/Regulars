@@ -17,9 +17,11 @@ func test_a_bun_on_a_cooked_patty_is_plated():
 	assert_eq(game.player.held, "dishes")
 	assert_eq(game.cooking.use_station(_the_pass(), true), "Plate it")
 	game.cooking.use_station(_the_pass())
-	assert_eq(_the_pass().item, "", "the burger is on the plate in hand")
+	assert_eq(game.player.dishes.size(), 0, "the plate went down under the burger")
+	assert_eq(_the_pass().dish.vessel, Dish.PLATE)
+	assert_true(_the_pass().dish.is_ready(game.menu.items))
+	assert_eq(game.cooking.use_station(_the_pass()), "Pick up")
 	assert_eq(game.player.dishes.size(), 1)
-	assert_true(game.player.dishes[0].is_ready(game.menu.items))
 	assert_eq(game.world.find_station("plates").count, Station.PLATES - 1)
 
 
