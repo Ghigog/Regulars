@@ -125,13 +125,14 @@ func flood(from: Vector2i) -> Dictionary:
 	return seen
 
 
-## True when everyone can still get about: each `must_reach` cell can be walked to
-## from the door, and each `must_touch` cell (furniture) has a side someone can stand at.
-func layout_ok(door: Vector2i, must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
+## The cells someone is cut off from: each `must_reach` cell the door's flood misses, and each
+## `must_touch` cell (furniture) with no open side that flood reaches.
+func cut_off(door: Vector2i, must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> Array[Vector2i]:
 	var seen := flood(door)
+	var out: Array[Vector2i] = []
 	for c in must_reach:
 		if not seen.has(c):
-			return false
+			out.append(c)
 	for c in must_touch:
 		var open := false
 		for d in DIRS:
@@ -139,32 +140,69 @@ func layout_ok(door: Vector2i, must_reach: Array[Vector2i], must_touch: Array[Ve
 				open = true
 				break
 		if not open:
-			return false
-	return true
+			out.append(c)
+	return out
+
+
+## True when everyone can still get about: nobody is cut off (see `cut_off`).
+func layout_ok(door: Vector2i, must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
+	return cut_off(door, must_reach, must_touch).is_empty()
+
+
+## True when `after` lists a cell that `before` did not: the change made the room worse.
+static func _adds_cut_off(before: Array[Vector2i], after: Array[Vector2i]) -> bool:
+	for c in after:
+		if not before.has(c):
+			return true
+	return false
+
+
+## Why furniture cannot go on `c` (with `seats` beside it): "" when it fits, "off_lot" (outside
+## the area or on bare ground), "taken" (blocked or reserved), "shut_in" (it would cut off
+## someone the door reaches now; a room that is already broken does not count against the spot).
+func block_refusal(c: Vector2i, seats: Array[Vector2i], area: Rect2i, door: Vector2i,
+		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> String:
+	var cells: Array[Vector2i] = [c]
+	cells.append_array(seats)
+	for s in cells:
+		if not area.has_point(s) or outside.has(s):
+			return "off_lot"
+	for s in cells:
+		if blocked.has(s) or reserved.has(s):
+			return "taken"
+	var reach := must_reach + seats
+	var touch := must_touch + ([c] as Array[Vector2i])
+	var before := cut_off(door, reach, touch)
+	blocked[c] = true
+	var after := cut_off(door, reach, touch)
+	blocked.erase(c)
+	return "shut_in" if _adds_cut_off(before, after) else ""
 
 
 ## Can furniture go on `c` (with `seats` beside it) inside `area` without cutting anyone off?
 func can_place_block(c: Vector2i, seats: Array[Vector2i], area: Rect2i, door: Vector2i,
 		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
-	if not area.has_point(c) or blocked.has(c) or reserved.has(c) or outside.has(c):
-		return false
-	for s in seats:
-		if not area.has_point(s) or blocked.has(s) or reserved.has(s) or outside.has(s):
-			return false
-	blocked[c] = true
-	var ok := layout_ok(door, must_reach + seats, must_touch + ([c] as Array[Vector2i]))
-	blocked.erase(c)
-	return ok
+	return block_refusal(c, seats, area, door, must_reach, must_touch) == ""
+
+
+## Why a wall cannot go on this edge (x, y, axis); it must lie between two cells of `area`.
+## "" when it fits, else "off_lot", "taken" (a wall is already there) or "shut_in".
+func wall_refusal(edge: Vector3i, area: Rect2i, door: Vector2i,
+		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> String:
+	var a := Vector2i(edge.x, edge.y)
+	var b := a + (Vector2i(0, -1) if edge.z == 0 else Vector2i(-1, 0))
+	if not area.has_point(a) or not area.has_point(b) or outside.has(a) or outside.has(b):
+		return "off_lot"
+	if walls.has(edge):
+		return "taken"
+	var before := cut_off(door, must_reach, must_touch)
+	walls[edge] = true
+	var after := cut_off(door, must_reach, must_touch)
+	walls.erase(edge)
+	return "shut_in" if _adds_cut_off(before, after) else ""
 
 
 ## Can a wall go on this edge (x, y, axis)? It must lie between two cells of `area`.
 func can_place_wall(edge: Vector3i, area: Rect2i, door: Vector2i,
 		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
-	var a := Vector2i(edge.x, edge.y)
-	var b := a + (Vector2i(0, -1) if edge.z == 0 else Vector2i(-1, 0))
-	if walls.has(edge) or not area.has_point(a) or not area.has_point(b) or outside.has(a) or outside.has(b):
-		return false
-	walls[edge] = true
-	var ok := layout_ok(door, must_reach, must_touch)
-	walls.erase(edge)
-	return ok
+	return wall_refusal(edge, area, door, must_reach, must_touch) == ""
