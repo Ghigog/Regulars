@@ -178,19 +178,6 @@ func _stamp(slot: HudWidgets.Punch, delay: float) -> void:
 	tw.tween_callback(st.queue_free)
 
 
-## One row of the build slip: a player's tag and their words.
-func _add_tip_row(rows: Node) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rows.add_child(row)
-	var tag := HudWidgets.ChefTag.new(hud._tip_rows.size(), 26)
-	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	tag.visible = false
-	row.add_child(tag)
-	hud._tip_rows.append({"row": row, "tag": tag, "label": hud._label(row, 20 if hud._tip_rows.is_empty() else 18)})
-
-
 ## One chef's prompt bubble: their number tag (shown in co-op), a keycap and a word.
 func _make_prompt() -> Dictionary:
 	var sheet := HudWidgets.Sheet.new("tab").pad(10, 8, 16, 12)

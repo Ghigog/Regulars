@@ -328,8 +328,7 @@ func _apply_demo(demo: String) -> void:
 			game.get_tree().create_timer(1.5).timeout.connect(game.hud.screens_ui.show_town)
 	elif demo.begins_with("coop"):  # PRD 4: coop (service), coop_build (two ghosts at night), coop_ready (the receipt, one ready)
 		var two := game.chefs[game.coop.join("pad:1")]
-		game.hud.coop_hint_time = 9999.0
-		if demo == "coop":   # two chefs, two bubbles, two hint lines; shoot at about 8
+		if demo == "coop":   # two chefs, two bubbles; shoot at about 8
 			game.world.find_station("stove").set_item("raw:" + GameWorld.fixed_main().grill)
 			game.world.find_station("stove").cook = -8.2
 			game.player.position = Grid.center(Vector2i(1, 2))

@@ -60,6 +60,19 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+**Controls taught in place (epic "Replace the bottom controls bar")**
+- The bottom controls bar is gone: no build slip of key words at night, no corner key line
+  by day (one chef or co-op). What stays at the bottom: the night cleaning note, the restock
+  note, the lifted piece's strip, the co-op ready marks and the shop's own key line.
+- Icon buttons (`game/hud/icon_button.gd`): paper-and-wood buttons for the shop and the menu.
+  Tapped on touch; on desktop and pad they wear their key (Tab, N, or whatever is bound).
+- Head keycaps: WASD floats over the chef until all four keys have been pressed; E already
+  shows over the chef in range of something to use.
+- Door card glow: the CLOSED / OPEN card glows faintly at night so it reads as something to
+  flip, instead of a line telling the player to.
+- Basket stock tag: tomorrow's stock is a basket of produce with the cost over it and a minus,
+  the money the night's restock takes.
+
 **Design review (18 November 2026)**
 - Beards sit lower, on the chin and jaw, not the "full beard" of sheets 2 and 4: seen
   face-on in a portrait (a CV, the critic's byline) the full beard and a hat hid the eyes

@@ -302,15 +302,12 @@ func test_no_join_before_any_device_is_used():
 	assert_false(game.controls.joins("pad:0"), "the first device used is player one's")
 
 
-func test_each_players_hint_line_uses_their_own_device():
-	assert_string_contains(game.hud.hints_ui._hint_text(0), "WASD")
+func test_each_players_prompt_uses_their_own_device():
 	_two()
 	assert_eq(game.controls.input_of(1).mode, "pad")
-	assert_string_contains(game.hud.hints_ui._hint_text(0), "WASD", "player one is on the keyboard")
-	assert_string_contains(game.hud.hints_ui._hint_text(1), "Stick", "player two is on a pad")
 	game.hud.day_ui.show_prompt(Vector2(300, 300), "Cook", 1)
 	assert_eq(game.hud._prompts[1].key_label.text, "A", "chef 2's bubble shows the pad's button")
 	assert_true(game.hud._prompts[1].tag.visible, "and their numbered tag")
 	_to_build()
-	assert_string_contains(game.hud.hints_ui._build_tip(1), "A pick up a piece")
-	assert_string_contains(game.hud.hints_ui._build_tip(0), "E pick up a piece")
+	assert_false(game.hud.hints_ui.has_method("_build_tip"), "no build slip of key words")
+	assert_false(game.hud.hints_ui.has_method("_hint_text"), "no corner key line")
