@@ -279,3 +279,23 @@ func test_guest_mess_lands_free_cells_near_the_seat():
 		assert_true(maxi(absi(d.x), absi(d.y)) <= 2)
 	assert_eq(m.level(seat), 0, "never lands under furniture directly")
 	assert_gt(m.total(), 0)
+
+
+# ---------- Disgust pacing ----------
+
+func _watch(level: int, cells: int, seconds: float) -> GuestMood:
+	var mood := GuestMood.new()
+	var strength := cells * FloorMess.sight_disgust_of(level) + (FloorMess.smell_disgust_of(level) if cells > 0 else 0.0)
+	for i in int(seconds * 10):
+		mood.see_gross(strength, 0.1, "x")
+	return mood
+
+
+func test_one_level_3_patch_disgusts_a_normal_guest_in_about_five_seconds():
+	assert_lt(_watch(3, 1, 4.0).disgust_level(), 2)
+	assert_gte(_watch(3, 1, 6.0).disgust_level(), 2)
+
+
+func test_light_dirt_never_puts_a_guest_off():
+	assert_eq(_watch(2, 6, 60.0).disgust_level(), 0)
+	assert_eq(_watch(1, 10, 60.0).disgust_level(), 0)
