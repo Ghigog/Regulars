@@ -29,7 +29,6 @@ func join(source: String) -> int:
 	game.audio.door_bell()
 	ch.punch()
 	game.hud.day_ui.say("Chef %d joined." % (p + 1))
-	game.hud.coop_hint_time = 25.0
 	game.hud.hints_ui.refresh_input()
 	if game.phase == Game.Phase.BUILD:
 		game.hud.hints_ui.show_build()

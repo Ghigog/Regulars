@@ -37,7 +37,6 @@ var money: Label
 var money_tag: HudWidgets.Sheet
 var stamps: Array[HudWidgets.Punch] = []
 var rep_meter: HudWidgets.RepMeter
-var hint: Label
 var ticket_rail: HBoxContainer
 const RAIL_MAX := 5   # tickets shown on the rail; more are counted on a last tab
 var banner: HudWidgets.Sheet
@@ -66,21 +65,17 @@ var _category := ""
 var _search_box: LineEdit
 var _tabs: Array[Button] = []
 var _cards: Control
-var _tip: Label
-var _tip_rows: Array[Dictionary] = []   # the build slip, one row per chef: {row, tag, label}; 0 holds `_tip`
-var _hints: Array[Dictionary] = []      # the corner hint lines, one per player: {box, tag, label}; 0 holds `hint`
-var coop_hint_time := 0.0              # seconds the co-op hint lines stay up after someone joins
 var _ready_row: HBoxContainer           # the receipt's ready markers, in co-op
 var _door_ready: Control                # the ready markers over the door card
 var _door_ready_row: HBoxContainer
 var _shop_tag: Control                  # "Chef 1 is shopping", over the shop in co-op
-var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, over the slip
-var _strip: VBoxContainer  # build phase: a lifted piece's upgrades and boxes, over the slip
+var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, at the bottom
+var _strip: VBoxContainer  # build phase: a lifted piece's upgrades and boxes, at the bottom
 var _dirty_label: Label
 var menu: MenuScreen           # the menu screen, while it is open
 var bill: BillScreen           # the bill screen at the till (PRD 11.3), while it is open
 var desk: DeskScreen           # the desk screen (PRD 10.3), while it is open
-var menu_notes: MenuScreen.BuildNotes   # night zero's hint and the restock note, over the slip
+var menu_notes: MenuScreen.BuildNotes   # night zero's hint and the restock note, at the bottom
 var _shop: Control             # the shop's sliding tray; null while the shop is shut
 var _tree: TreeScreen          # the upgrade tree of the piece in hand (PRD 8.3); null while shut
 var _info: Label
@@ -95,7 +90,7 @@ var _toast_tween: Tween
 var day_ui := HudDay.new(self)   # the clock, the calendar's day tags, the board, prompts, tickets and banners
 var options_ui := HudOptions.new(self)   # the options screen, the title and the pause menu
 var receipt_ui := HudReceipt.new(self)   # the end-of-day receipt and the critic's review
-var hints_ui := HudHints.new(self)   # hint lines, ready marks, the build tip and the lifted piece's strip
+var hints_ui := HudHints.new(self)   # ready marks, the build notes and the lifted piece's strip
 var shop_ui := HudShop.new(self)   # the build shop: tabs, cards, info and buying
 var buttons_ui := HudButtons.new(self)   # the discs for every action the keys have, tapped on touch
 var screens_ui := HudScreens.new(self)   # the upgrade tree, the town book and the closed sign
@@ -171,9 +166,6 @@ func setup(game_) -> void:
 	ticket_rail.add_theme_constant_override("separation", 8)
 	ticket_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(ticket_rail)
-
-	hint = hints_ui._make_hint(0).label
-	hint.text = hints_ui._hint_text()
 
 	# Over the door card in co-op: who is ready to flip it.
 	_door_ready = HudWidgets.Sheet.new("note").pad(10, 6, 10, 6)
@@ -411,7 +403,6 @@ func update_status() -> void:
 	if not _turning:
 		clock.night = game.phase != P.SERVICE
 	clock.progress = game.day.day_progress()
-	hints_ui._update_hints(l.day <= 1 and game.phase == P.SERVICE)   # the controls reminder is for the first day
 	if l.money != _shown_money:
 		if _shown_money >= 0 and l.money > _shown_money:
 			money_tag.pivot_offset = money_tag.size * Vector2(0.5, 0.0)
@@ -524,7 +515,6 @@ func hide_build() -> void:
 	build_bar = null
 	_shop = null
 	_tree = null
-	hint.visible = true
 
 
 func set_search(text: String) -> void:
