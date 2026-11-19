@@ -7,10 +7,13 @@ extends GutTest
 var game
 
 const THEME_TEST_PATH := "user://regulars_theme_test.cfg"
+const OPTIONS_TEST_PATH := "user://regulars_options_test.cfg"
 
 
 
 func before_each():
+	HudOptions.options_path = OPTIONS_TEST_PATH   # never the player's real settings
+	DirAccess.remove_absolute(OPTIONS_TEST_PATH)
 	game = load("res://game/main.tscn").instantiate()
 	game.first_night = false   # straight into day 1
 	add_child_autofree(game)

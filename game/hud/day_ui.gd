@@ -245,7 +245,108 @@ func show_prompt(at: Vector2, text: String, p := 0, ready := true) -> void:
 		var o: Control = hud._prompts[q].sheet
 		if o.visible and Rect2(o.position, o.size).grow(-2).intersects(Rect2(sheet.position, sheet.size)):
 			sheet.position.y = o.position.y - sheet.size.y + 4.0
+	var cluster := walk_rect(p)   # the walk keys stay readable: the bubble stacks above them
+	if cluster.size != Vector2.ZERO and cluster.grow(-2).intersects(Rect2(sheet.position, sheet.size)):
+		sheet.position.y = cluster.position.y - sheet.size.y - 2.0
 	sheet.position.y = maxf(sheet.position.y, 6.0)  # never off the top of the screen
+
+
+# ---------------------------------------------------------------- walk keycaps
+
+const WALK_KEYS := {"W": [KEY_W, KEY_UP], "A": [KEY_A, KEY_LEFT], "S": [KEY_S, KEY_DOWN], "D": [KEY_D, KEY_RIGHT]}
+const WALK_LAYOUT := {"W": Vector2(1, 0), "A": Vector2(0, 1), "S": Vector2(1, 1), "D": Vector2(2, 1)}
+const CAP := Vector2(30, 30)
+const CAP_GAP := 3.0
+var _walk: Array[Dictionary] = []   # per chef: {root, caps, pressed, retired}
+
+
+func _make_walk() -> Dictionary:
+	var root := Control.new()
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.size = Vector2(CAP.x * 3 + CAP_GAP * 2, CAP.y * 2 + CAP_GAP)
+	root.pivot_offset = Vector2(root.size.x / 2.0, root.size.y)
+	root.visible = false
+	hud.root.add_child(root)
+	var d := {"root": root, "caps": {}, "pressed": {}, "retired": false, "tween": null}
+	for k: String in WALK_LAYOUT:
+		var cap := HudWidgets.Sheet.new("key", 6, 2).pad(6, 0, 6, 4)
+		cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cap.position = WALK_LAYOUT[k] * (CAP + Vector2(CAP_GAP, CAP_GAP))
+		root.add_child(cap)
+		var l := hud._label(cap, 20, k)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		d.caps[k] = cap
+	return d
+
+
+## The cluster over one chef's head: WASD for a keyboard, one stick cap for a pad,
+## nothing on touch. Each new key ticks and dims; the last pops it away, and the
+## lesson is remembered in the options so it never returns. `head` is the chef's
+## head on screen. The E prompt bubble stacks above it (see show_prompt).
+func update_walk_keys(p: int, head: Vector2) -> void:
+	while _walk.size() <= p:
+		_walk.append(_make_walk())
+	var d: Dictionary = _walk[p]
+	var game: Game = hud.game
+	var mode: String = game.controls.input_of(p).mode if game.controls and p < game.controls.players.size() else "keys"
+	var flag := "stick_learned" if mode == "pad" else "walk_learned"
+	var shown: bool = mode != "touch" and not hud.options_ui.options[flag] and not d.retired \
+		and hud.options_ui.title == null and not hud.options_ui.options_open() and not game.shopping
+	var root: Control = d.root
+	if d.retired:
+		root.position = (head - Vector2(root.size.x / 2.0, root.size.y)).round()
+		return
+	root.visible = shown
+	if not shown:
+		return
+	if mode == "pad":
+		_walk_pad(d, p, flag)
+	else:
+		_walk_keys(d, p, flag)
+	root.position = (head - Vector2(root.size.x / 2.0, root.size.y)).round()
+
+
+func _walk_keys(d: Dictionary, p: int, flag: String) -> void:
+	for k: String in WALK_KEYS:
+		(d.caps[k] as Control).visible = true
+	if hud.game.controls.owner_of("keys") == p:
+		for k: String in WALK_KEYS:
+			if not d.pressed.has(k) and WALK_KEYS[k].any(func(c: int) -> bool: return Input.is_physical_key_pressed(c)):
+				d.pressed[k] = true
+				(d.caps[k] as Control).modulate = Color(1, 1, 1, 0.4)
+				hud.game.audio.sfx("tick")
+	if d.pressed.size() == WALK_KEYS.size():
+		_retire_walk(d, flag)
+
+
+func _walk_pad(d: Dictionary, p: int, flag: String) -> void:
+	for k: String in WALK_KEYS:
+		(d.caps[k] as Control).visible = k == "W"
+	var cap: Control = d.caps["W"]
+	cap.position = Vector2(d.root.size.x / 2.0 - CAP.x / 2.0, CAP.y + CAP_GAP)
+	((cap.get_child(0)) as Label).text = hud.game.controls.glyph("move", p)
+	if hud.game.controls.stick(p).length() > 0.3:
+		hud.game.audio.sfx("tick")
+		_retire_walk(d, flag)
+
+
+## Pops the cluster up a little, fades it, and remembers it was learned.
+func _retire_walk(d: Dictionary, flag: String) -> void:
+	d.retired = true
+	hud.options_ui.options[flag] = true
+	hud.options_ui.save_options()
+	var root: Control = d.root
+	var tw := root.create_tween().set_parallel(true)
+	tw.tween_property(root, "scale", Vector2(1.25, 1.25), 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(root, "modulate:a", 0.0, 0.35).set_delay(0.1)
+	tw.chain().tween_callback(root.hide)
+
+
+## Where player p's walk cluster is, on screen, or an empty rect when hidden.
+func walk_rect(p: int) -> Rect2:
+	if p >= _walk.size() or not _walk[p].root.visible:
+		return Rect2()
+	return Rect2(_walk[p].root.position, _walk[p].root.size)
 
 
 ## Hides the bubbles of players with no chef (one left).
