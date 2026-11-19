@@ -54,8 +54,8 @@ Survive as many days as you can; three walkouts in one day ends the run.
   A stove and everything up its tree is the counter upgraded (`Kitchen.TOP_LINKS`,
   `Kitchen.grows_from_counter`): its card is a counter's (its boxes, its own tree), it
   moves and sells as one piece with its counter (worth both), and goes on open floor,
-  never onto another counter (held over one, it is refused with the red cross, no
-  message). Tools (board, fountain, wine barrel) stand on a counter and come off it. A
+  never onto another counter (held over one, it is refused with the red cross; on E or a click the cross
+  wobbles, "fail" sounds and a toast says why). Tools (board, fountain, wine barrel) stand on a counter and come off it. A
   full fridge says so ("The fridge is full").
   The shop sells every tree node outright, priced as the whole way there: "buy a Twin
   fryer" stands one up, on its own counter for the stove line (`Catalog.tree_blueprint`;
@@ -93,7 +93,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   combines on a worktop: a bun put on a cooked patty makes a loose burger, in any order,
   but only into something the menu makes ("Nothing on the menu has patty with fries",
   "One bun is enough", "Patty needs grilling first"). A plate from the plate stack then
-  takes it up ("Plate it"), or food goes onto a plate already put down. A drink station
+  takes it up ("Plate it"), and a loose stack already in hand is plated at the stack too (no extra hand slot), or food goes onto a plate already put down. A drink station
   fills the cup in hand (a cup from the cup stack; "Bring a cup"); a two-tap station
   turns with empty hands or Turn. The hands hold two plates or cups; a tray from the
   tray stack (bought, optional) holds four. At a table, every dish in hand that a
@@ -608,7 +608,9 @@ Survive as many days as you can; three walkouts in one day ends the run.
   for 3 s (`Guest.CHAT_TIME`; speech bubbles with company, none alone), then waits for
   the bill (`to_pay`). When everyone at the table who ordered has finished chatting, the
   table is ready to pay: one bill per table, paid by the whole party. Their patience runs
-  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`). While a chef, or a helper
+  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`). Every payer's bar shows the party's lowest patience
+  (`GamePaying.pay_patience`), so no bar reads full while someone is about to give up; the
+  corner line names the guest who did. While a chef, or a helper
   with the `take_payment` duty, can see the table (`Grid.has_los`, checked every half
   second), one guest waves with the bill bubble (a torn-edged slip with a coin) and a soft
   bell rings once. After 12 s ready with no slip printed for them (`TILL_AFTER`), the one
