@@ -25,6 +25,13 @@ func day_progress() -> float:
 	return clampf(game.clock / day_length(), 0.0, 1.0) if game.phase == Game.Phase.SERVICE else 1.0
 
 
+const GLOW_LOW := 0.15
+const GLOW_HIGH := 0.4
+var _glow: MeshInstance3D
+var _glow_tween: Tween
+var _glow_on := false
+
+
 func start_day() -> void:
 	if game.phase == Game.Phase.CLOSED:
 		return
@@ -151,6 +158,58 @@ func _build_door_card() -> void:
 		l.position = Vector3(0, -0.4, z * 1.6)
 		l.rotation.y = 0.0 if open else PI
 		game._door_turn.add_child(l)
+	_build_door_glow()
+
+
+## A faint warm halo behind the card that breathes at night, while the card can be
+## flipped to OPEN. It hangs on the nail, not on the card, so it does not spin.
+func _build_door_glow() -> void:
+	var fade := Gradient.new()
+	fade.colors = PackedColorArray([Color.WHITE, Color(1, 1, 1, 0)])
+	var tex := GradientTexture2D.new()
+	tex.gradient = fade
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)   # clear at the rim, so no hard edge
+	tex.width = 128
+	tex.height = 128
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.albedo_texture = tex
+	mat.albedo_color = Color(Build.WARN, 0.0)
+	var quad := QuadMesh.new()
+	quad.size = Vector2(1.5, 1.1)
+	quad.material = mat
+	_glow = MeshInstance3D.new()
+	_glow.mesh = quad
+	_glow.position = Vector3(0, -0.53, -0.04)
+	_glow.visible = false
+	_glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	game._door_hang.add_child(_glow)
+
+
+## Starts or stops the halo as the card's state changes (called every frame).
+func update_door_glow() -> void:
+	var want := game.phase == Game.Phase.BUILD and not game.door_open and game.menu_stock.open_block() == ""
+	if want == _glow_on or _glow == null:
+		return
+	_glow_on = want
+	if _glow_tween:
+		_glow_tween.kill()
+	var mat := _glow.mesh.material as StandardMaterial3D
+	_glow_tween = _glow.create_tween()
+	if want:
+		_glow.visible = true
+		_glow_tween.tween_property(mat, "albedo_color:a", GLOW_HIGH, 0.5)
+		_glow_tween.set_loops()   # then breathes: slow in, slow out
+		_glow_tween.tween_property(mat, "albedo_color:a", GLOW_LOW, 1.0).set_trans(Tween.TRANS_SINE)
+		_glow_tween.tween_property(mat, "albedo_color:a", GLOW_HIGH, 1.0).set_trans(Tween.TRANS_SINE)
+	else:
+		_glow_tween.tween_property(mat, "albedo_color:a", 0.0, 0.4)
+		_glow_tween.tween_callback(func() -> void: _glow.visible = false)
 
 
 ## Flips the card, with a spin on its string and a swing from the nail.
