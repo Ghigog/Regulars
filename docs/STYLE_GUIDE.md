@@ -193,7 +193,8 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 - Applicants stand in the street's line outside the door at night, like guests waiting,
   so the player sees who applied before reading the pile.
 - The desk screen is the menu screen's paper on wood, with coral tabs (CVs, Job posts,
-  Staff). A CV is a cream card pinned at two corners: the face as a peg portrait, the
+  Staff). Once anyone is hired the Staff tab carries the night's total wages as a big
+  figure ("$42") beside it; the staff list has no footer text or controls line. A CV is a cream card pinned at two corners: the face as a peg portrait, the
   name, the post, three rows of stars (Cooking, Serving, Cleaning) and the overall
   rating, and the ask with a coin. Dragged, it tilts and fades toward pale green (hire)
   or pale coral (dismiss) as it nears the swipe point. Haggling swaps the buttons for minus, the figure,
