@@ -369,14 +369,14 @@ func tick(delta: float) -> void:
 			if game.paying.ready_to_pay(table):
 				mood.wait_to_pay(delta, game.day.table_patience())
 				if mood.skipped_bill:
-					game.paying.leave_unpaid(table)
+					game.paying.leave_unpaid(table, self)
 		"to_till":
 			if _advance(delta):
 				state = "at_till"
 			if game.paying.ready_to_pay(table):
 				mood.wait_to_pay(delta, game.day.table_patience())
 				if mood.skipped_bill:
-					game.paying.leave_unpaid(table)
+					game.paying.leave_unpaid(table, self)
 		"company":   # nothing to eat: they sit with friends and go when the friends go
 			_face(Grid.center(table.cell) - position, delta)
 			var staying := party.any(func(m) -> bool:
@@ -400,7 +400,10 @@ func tick(delta: float) -> void:
 
 func _refresh(delta: float) -> void:
 	var p := mood.patience
-	_bar.visible = state == "queue" or seated_waiting() or state == "to_seat" or (paying() and game.paying.ready_to_pay(table))
+	var on_bill: bool = paying() and game.paying.ready_to_pay(table)
+	if on_bill:
+		p = game.paying.pay_patience(table)   # the party's lowest, so no bar reads full while one is about to snap
+	_bar.visible = state == "queue" or seated_waiting() or state == "to_seat" or on_bill
 	_fill.scale.x = maxf(p, 0.001)
 	_fill.position.x = (p - 1.0) * BAR_WIDTH / 2.0
 	var shade := snappedf(p, 0.1)  # few distinct colours, so materials stay cached

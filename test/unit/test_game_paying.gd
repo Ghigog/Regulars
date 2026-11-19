@@ -135,6 +135,27 @@ func test_a_party_left_too_long_leaves_without_paying_and_no_strike():
 
 
 
+func test_every_payer_shows_the_partys_lowest_patience_and_the_quitter_is_named():
+	var pair: Array[Guest] = game.seating.spawn_group([0, 1])
+	_run(14.0)
+	game.cooking.use_station(pair[0].table)
+	for g in pair:
+		game.serving.serve(g, game.serving.full_tray_for(g))
+	_run(pair[0].eat_time + pair[1].eat_time + Guest.CHAT_TIME)
+	assert_true(game.paying.ready_to_pay(pair[0].table), "both are on the bill")
+	pair[0].mood.patience = 1.0
+	pair[1].mood.patience = 0.2
+	_run(0.1)
+	assert_lt(game.paying.pay_patience(pair[0].table), 0.25)
+	assert_lt(pair[0]._fill.scale.x, 0.25, "the full-patience guest's bar shows the party's")
+	pair[1].mood.patience = 0.001
+	_run(0.5)
+	assert_eq(pair[0].state, "leaving")
+	assert_string_contains(game.hud.toast.text, "gave up", "the corner line names who snapped")
+	assert_eq(int(game.ledger.today.unpaid_bills), 1)
+	assert_eq(game.ledger.strikes(), 0)
+
+
 func test_the_night_cleaner_clears_everything_in_one_press():
 	_to_build()
 	var table: Station = game.stations[Vector2i(8, 3)]
