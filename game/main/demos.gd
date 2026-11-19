@@ -255,6 +255,10 @@ func _apply_demo(demo: String) -> void:
 					g.mood.think("Nobody has cleared that table")
 					game.day.inspect(g)
 					return)
+	elif demo == "orders_long":  # more order notes than fit in the left column; shoot at 10
+		for a in game.arrivals:
+			a.time = 0.2
+		game.get_tree().create_timer(8.0).timeout.connect(game.demo_scenes._demo_orders_long)
 	elif demo == "tolerance":  # a seated guest who hates to wait and doesn't mind a mess, card open; shoot at 10
 		for a in game.arrivals:
 			a.time = 0.2

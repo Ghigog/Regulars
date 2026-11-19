@@ -813,3 +813,105 @@ class Sheet extends MarginContainer:
 				var k := 34.0
 				draw_colored_polygon(PackedVector2Array([Vector2(size.x - 10 - k, size.y - 10), Vector2(size.x - 10, size.y - 10 - k), Vector2(size.x - 10 - k, size.y - 10 - k)]), Hud.PAPER.darkened(0.12))
 				draw_polyline(PackedVector2Array([Vector2(size.x - 10 - k, size.y - 10), Vector2(size.x - 10, size.y - 10 - k)]), Color(Hud.INK, 0.4), 2.0, true)
+
+
+## A small white chevron on the order column: press it to move one note.
+class Chevron extends Control:
+	signal pressed
+	var up := false
+
+	func _init(up_: bool) -> void:
+		up = up_
+		custom_minimum_size = Vector2(44, 28)
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		visible = false
+
+	func _gui_input(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			pressed.emit()
+			accept_event()
+		elif e is InputEventScreenTouch and e.pressed:
+			pressed.emit()
+			accept_event()
+
+	func _draw() -> void:
+		var c := size / 2.0
+		var d := -1.0 if up else 1.0
+		var pts := PackedVector2Array([c + Vector2(-13, -5 * d), c + Vector2(0, 5 * d), c + Vector2(13, -5 * d)])
+		draw_polyline(pts, Hud.INK, 9.0, true)
+		draw_polyline(pts, Color("#fffaf0"), 4.5, true)
+
+
+## A ScrollContainer that also scrolls by dragging, which Godot only does itself on touchscreens.
+class DragScroll extends ScrollContainer:
+	func _gui_input(e: InputEvent) -> void:
+		if DisplayServer.is_touchscreen_available():
+			return   # the container's own touch drag
+		if e is InputEventScreenDrag:
+			scroll_vertical -= int(e.relative.y)
+			accept_event()
+		elif e is InputEventMouseMotion and (e.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+			scroll_vertical -= int(e.relative.y)
+			accept_event()
+
+
+## The open order tickets, oldest at the top, in a scrolling column down the left edge.
+## Chevrons at the top and bottom show when notes are hidden that way.
+class OrderColumn extends Control:
+	const WIDTH := 210.0
+	var scroll: DragScroll
+	var list: VBoxContainer
+	var up: Chevron
+	var down: Chevron
+	var _tween: Tween
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		scroll = DragScroll.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+		scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(scroll)
+		list = VBoxContainer.new()
+		list.add_theme_constant_override("separation", 8)
+		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		list.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		scroll.add_child(list)
+		up = Chevron.new(true)
+		up.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		up.pressed.connect(_step.bind(-1))
+		add_child(up)
+		down = Chevron.new(false)
+		down.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+		down.pressed.connect(_step.bind(1))
+		add_child(down)
+
+	func _process(_delta: float) -> void:
+		var hidden_above := scroll.scroll_vertical > 1
+		var hidden_below := scroll.scroll_vertical < max_scroll() - 1
+		if up.visible != hidden_above:
+			up.visible = hidden_above
+		if down.visible != hidden_below:
+			down.visible = hidden_below
+
+	func max_scroll() -> int:
+		return maxi(0, int(list.get_combined_minimum_size().y - scroll.size.y))
+
+	## Glides to the next note's top in that direction (1 down, -1 up).
+	func _step(dir: int) -> void:
+		var here := scroll.scroll_vertical
+		var want := here
+		if dir > 0:
+			for c: Control in list.get_children():
+				if c.position.y > here + 1.0:
+					want = int(c.position.y)
+					break
+		else:
+			for c: Control in list.get_children():
+				if c.position.y < here - 1.0:
+					want = int(c.position.y)
+		want = clampi(want, 0, max_scroll())
+		if _tween:
+			_tween.kill()
+		_tween = create_tween()
+		_tween.tween_property(scroll, "scroll_vertical", want, 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

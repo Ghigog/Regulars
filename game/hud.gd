@@ -37,8 +37,10 @@ var money: Label
 var money_tag: HudWidgets.Sheet
 var stamps: Array[HudWidgets.Punch] = []
 var rep_meter: HudWidgets.RepMeter
-var ticket_rail: HBoxContainer
-const RAIL_MAX := 5   # tickets shown on the rail; more are counted on a last tab
+var order_column: HudWidgets.OrderColumn
+var ticket_rail: VBoxContainer   # the column's list of tickets
+const ORDERS_TOP := 320.0     # below the calendar, clock, hanging money tag and toast
+const ORDERS_BOTTOM := 290.0  # clear of the touch stick (home 150 up, radius 92 + 40)
 var banner: HudWidgets.Sheet
 var banner_label: Label
 var center: CenterContainer
@@ -156,16 +158,15 @@ func setup(game_) -> void:
 	rep_meter = HudWidgets.RepMeter.new()
 	cbox.add_child(rep_meter)
 
-	# Top middle: the rail of open tickets, oldest on the left.
-	ticket_rail = HBoxContainer.new()
-	ticket_rail.anchor_left = 0.5
-	ticket_rail.anchor_right = 0.5
-	ticket_rail.offset_top = 14
-	ticket_rail.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	ticket_rail.alignment = BoxContainer.ALIGNMENT_CENTER
-	ticket_rail.add_theme_constant_override("separation", 8)
-	ticket_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(ticket_rail)
+	# Left: the open tickets, oldest at the top, below the money tag and above the touch stick.
+	order_column = HudWidgets.OrderColumn.new()
+	order_column.offset_left = 22
+	order_column.offset_right = 22 + HudWidgets.OrderColumn.WIDTH
+	order_column.offset_top = ORDERS_TOP
+	order_column.anchor_bottom = 1.0
+	order_column.offset_bottom = -ORDERS_BOTTOM
+	root.add_child(order_column)
+	ticket_rail = order_column.list
 
 	# Over the door card in co-op: who is ready to flip it.
 	_door_ready = HudWidgets.Sheet.new("note").pad(10, 6, 10, 6)
