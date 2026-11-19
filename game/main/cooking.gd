@@ -230,6 +230,17 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				if not dry_run:
 					st.count += 1
 					ch.drop_dish(spare)
+			elif st.count > 0 and _loose_in_hand(ch, v) != null:
+				# A loose stack in hand is plated in place: no extra hand slot.
+				act = "Plate it" if v == Dish.PLATE else "Pour into cup"
+				if not dry_run:
+					var loose := _loose_in_hand(ch, v)
+					var d := Dish.make(v)
+					st.count -= 1
+					d.take_all(loose)
+					var i := ch.dishes.find(loose)
+					ch.dishes[i] = d
+					ch.show_held()
 			elif st.count > 0 and held in ["", "tray", "dishes"] and ch.has_room():
 				act = "Take %s" % noun
 				if not dry_run:
@@ -375,7 +386,7 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 			game.audio.sfx("grill_drop")
 		elif act == "Take off the heat":
 			game.audio.sfx("patty_flip")   # the spatula under the patty
-		elif act.begins_with("Add "):
+		elif act.begins_with("Add ") or act == "Plate it" or act == "Pour into cup":
 			game.audio.sfx("plate_food")   # onto a plate
 		elif not (act.begins_with("Serve") or act.begins_with("Half") or act.begins_with("Free") or act.begins_with("Take order") or act.ends_with(" orders")):
 			game.audio.sfx("pickup" if ch.held != "" else "putdown")
@@ -536,6 +547,18 @@ func _empty_in_hand(ch: Player, vessel: String) -> Dish:
 	for i in range(ch.dishes.size() - 1, -1, -1):
 		if ch.dishes[i].vessel == vessel and ch.dishes[i].is_empty():
 			return ch.dishes[i]
+	return null
+
+
+## The loose stack in hand (no vessel) that this plate or cup would take, last taken
+## first; null for none or when the vessel refuses it.
+func _loose_in_hand(ch: Player, vessel: String) -> Dish:
+	if ch.held != "dishes":
+		return null
+	for i in range(ch.dishes.size() - 1, -1, -1):
+		var l: Dish = ch.dishes[i]
+		if l.vessel == "" and not l.is_empty():
+			return l if Dish.make(vessel).merge_refusal(l, game.menu.items) == "" else null
 	return null
 
 
