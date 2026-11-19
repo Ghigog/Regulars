@@ -41,6 +41,7 @@ var cell := Vector2i.ZERO
 var seat := Vector2i(-1, -1)
 var seen := {}          # nasty thing -> seconds this guest has had it in view
 var decor := 0.0        # the joy decor gave them when they sat down
+var came_in := false    # stepped through the front doorway (the party's bell rings once)
 var party: Array = []   # the guests who came in together, this one included
 var table: Station
 var timer := 0.0
@@ -159,6 +160,17 @@ func _advance(delta: float) -> bool:
 			return true
 		cell = path.pop_front()
 	return false
+
+
+## The first of a party to step through the doorway rings the shop bell for all of them.
+func _ring_bell_at_door(was_x: float) -> void:
+	if came_in or was_x < Game.DOORWAY.x or position.x >= Game.DOORWAY.x:
+		return
+	came_in = true
+	for m: Guest in party:
+		if m != self and m.came_in:
+			return
+	game.audio.door_bell()
 
 
 func _stand() -> void:
@@ -336,7 +348,10 @@ func tick(delta: float) -> void:
 			if mood.walked_out():
 				game.paying.walk_out(self)
 		"to_seat":
-			if _advance(delta):
+			var was_x := position.x
+			var done := _advance(delta)
+			_ring_bell_at_door(was_x)
+			if done:
 				_sit()
 		"ordering", "waiting":
 			_face(Grid.center(table.cell) - position, delta)
