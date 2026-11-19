@@ -652,6 +652,7 @@ class ModelView extends TextureRect:
 class Sheet extends MarginContainer:
 	var kind := "paper"
 	var tint := Hud.CORAL
+	var unavailable := false   # the "tab" prompt in its muted, can't-do-that-now look
 
 	func _init(kind_: String, mx := 14, my := 10) -> void:
 		kind = kind_
@@ -769,7 +770,7 @@ class Sheet extends MarginContainer:
 			"tab":  # the prompt: a keycap and a word on one wood-edged tab
 				_box(Rect2(r.position + Vector2(0, 5), r.size), Hud.SHADOW, 11)
 				_box(r, Hud.WOOD.lightened(0.1), 11, 2, Hud.INK)
-				_box(r.grow(-5), Color("#f0d9ae"), 7)
+				_box(r.grow(-5), Color("#c9b9a3") if unavailable else Color("#f0d9ae"), 7)
 			"receipt":  # torn at the bottom
 				var shape := PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0)])
 				var teeth := int(size.x / 16.0)

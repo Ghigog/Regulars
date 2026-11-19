@@ -54,8 +54,8 @@ Survive as many days as you can; three walkouts in one day ends the run.
   A stove and everything up its tree is the counter upgraded (`Kitchen.TOP_LINKS`,
   `Kitchen.grows_from_counter`): its card is a counter's (its boxes, its own tree), it
   moves and sells as one piece with its counter (worth both), and goes on open floor,
-  never onto another counter (held over one, it is refused with the red cross, no
-  message). Tools (board, fountain, wine barrel) stand on a counter and come off it. A
+  never onto another counter (held over one, it is refused with the red cross; on E or a click the cross
+  wobbles, "fail" sounds and a toast says why). Tools (board, fountain, wine barrel) stand on a counter and come off it. A
   full fridge says so ("The fridge is full").
   The shop sells every tree node outright, priced as the whole way there: "buy a Twin
   fryer" stands one up, on its own counter for the stove line (`Catalog.tree_blueprint`;

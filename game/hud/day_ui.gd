@@ -216,7 +216,7 @@ func _make_prompt() -> Dictionary:
 ## Shows "[E] COOK" over a point on screen for player p's chef, or hides it when
 ## `text` is empty. In co-op each bubble carries its player's numbered tag and
 ## their own device's button; a second bubble that would cover the first sits above it.
-func show_prompt(at: Vector2, text: String, p := 0) -> void:
+func show_prompt(at: Vector2, text: String, p := 0, ready := true) -> void:
 	while hud._prompts.size() <= p:
 		_make_prompt()
 	var d: Dictionary = hud._prompts[p]
@@ -233,6 +233,12 @@ func show_prompt(at: Vector2, text: String, p := 0) -> void:
 	d.key.visible = m != "touch"
 	d.key_label.text = hud.game.controls.glyph("use", p) if hud.game.controls and p < hud.game.controls.players.size() else "E"
 	d.label.text = text.to_upper()
+	sheet.unavailable = not ready   # muted tan, cream text, as a disabled stamp button
+	if ready:
+		d.label.remove_theme_color_override("font_color")
+	else:
+		d.label.add_theme_color_override("font_color", Hud.CREAM)
+	sheet.queue_redraw()
 	sheet.reset_size()
 	sheet.position = (at - Vector2(sheet.size.x / 2.0, sheet.size.y)).round()
 	for q in p:   # never on top of an earlier player's bubble

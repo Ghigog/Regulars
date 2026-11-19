@@ -388,7 +388,7 @@ func _apply_demo(demo: String) -> void:
 		game.ledger.money = 300
 		game.arrivals.clear()
 		game.get_tree().create_timer(1.0).timeout.connect(_demo_counters)
-	elif demo.begins_with("build") or demo == "door":  # build (the shop), build_find (a search), build_no (refused spot), build_move, door
+	elif demo.begins_with("build") or demo == "door":  # build (the shop), build_find (a search), build_no (refused spot), build_refused (E pressed on it; shoot at 1.4), build_move, door
 		game.ledger.record_sale(Game.DEMO_BILL, 5)
 		game.ledger.money = 300
 		game.ledger.xp = 250

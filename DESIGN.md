@@ -196,7 +196,8 @@ States every component must handle:
   prop in motion (a turning page, a swinging tag) and keep input responsive.
 - **Error / refused:** a coral line or a coral cross in the place of the thing, gentle wording,
   and a wobble or soft "fail" sound. Placement that cannot happen shows the piece hidden and a red
-  cross on the spot. Never a modal error box.
+  cross on the spot, and the prompt dims to muted tan (`#c9b9a3`, cream text). Pressing E or
+  clicking there plays "fail", wobbles the cross and a toast says why. Never a modal error box.
 - **Success:** a gold star spins up, a coin pops and banks, a soft ding. Small and brief.
 - **Shape plus colour:** done = green + tick, miss = coral + cross, hit = star, quality = pips by
   count. State must read in greyscale.
