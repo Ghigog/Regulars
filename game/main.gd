@@ -384,6 +384,7 @@ func step(delta: float) -> void:
 	for st: Station in stations.values():
 		st.dirty_age = Cleaning.aged(st.dirty_age, delta, st.messy(), phase == Phase.SERVICE)
 	seating._tick_floor(delta)
+	day.update_door_glow()
 	if phase != Phase.SERVICE:
 		return
 	clock += delta
