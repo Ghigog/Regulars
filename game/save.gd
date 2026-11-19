@@ -86,6 +86,8 @@ static func capture(g: Node3D) -> Dictionary:
 			p["cell"] = c
 			p["high"] = st.high
 			p["till"] = st.has_node("till")
+			if st.has_node("till"):
+				p["till_facing"] = int(st.get_node("till").get_meta("facing", 0))
 			pieces.append(p)
 	var screens := {}
 	for e: Vector3i in g.wall_nodes:
@@ -150,7 +152,7 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 		if p.till:
 			var host: Station = g.paying._till_host(p.cell)
 			if host != null:
-				BuildStations.register(host)
+				BuildStations.register(host, int(p.get("till_facing", 0)))
 	for c: Vector2i in d.stock:
 		g.kitchen.give_stock(c, (d.stock[c] as Dictionary).duplicate(true))
 		g.world._show_boxes(c)

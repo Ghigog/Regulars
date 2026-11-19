@@ -103,8 +103,9 @@ func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool
 		var till: Node3D = game.stations[c].get_node("till")
 		till.reparent(game, false)   # off its counter: while carried, there is no till
 		till.visible = false
-		ch.hand = {"id": "till", "tier": 1, "price": 0, "facing": 0, "moving": true, "node": till,
-			"from": Vector3i(c.x, c.y, 0), "from_facing": 0}
+		var tf := int(till.get_meta("facing", 0))
+		ch.hand = {"id": "till", "tier": 1, "price": 0, "facing": tf, "moving": true, "node": till,
+			"from": Vector3i(c.x, c.y, 0), "from_facing": tf}
 		game.audio.sfx("pickup")
 		game.hud.hints_ui.show_build()
 		_warn_shut_in()
@@ -195,6 +196,7 @@ func _put_down(h: Dictionary, spot: Vector3i, facing: int) -> void:
 	var cell := Vector2i(spot.x, spot.y)
 	if h.id == "till":
 		n.reparent(game.paying._till_host(cell), false)
+		BuildStations.face_till(n, facing)
 		return
 	var hn := GameWorld.hand_node(h)
 	if n is Station and Kitchen.can_go_high(hn):
@@ -584,7 +586,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		add_rug(cell, int(ch.hand.facing))
 		_bought_tonight(rug_at(cell), paid)
 	elif ch.hand.id == "till":
-		BuildStations.register(game.paying._till_host(cell))
+		BuildStations.register(game.paying._till_host(cell), int(ch.hand.facing))
 		_bought_tonight(game.stations[cell].get_node("till"), paid)
 	elif Kitchen.is_counter(ch.hand.id) and ch.hand.get("base", "") == "" and game.world._bare_counter(cell) != null:
 		_bought_tonight(game.world._bare_counter(cell), paid)
