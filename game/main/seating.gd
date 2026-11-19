@@ -170,7 +170,6 @@ func _seat_waiting_guests() -> void:
 			game.seat_taken[g.seat] = g
 			g.state = "to_seat"
 			g.walk_to(g.seat)
-		game.audio.door_bell()
 		_reflow_queue()
 
 
