@@ -37,10 +37,10 @@ const HELPED_THOUGHT := "Thanks for the hand"
 
 ## Disgust per second to anyone who can see a dirty cell, by level. Same scale as GROSS
 ## in game/main.gd. (tunable)
-const SIGHT_DISGUST: Array[float] = [0.0, 0.003, 0.008, 0.015, 0.03]
+const SIGHT_DISGUST: Array[float] = [0.0, 0.0002, 0.0005, 0.075, 0.12]
 ## Disgust per second from smell, seen or not, by level of a cell within SMELL_RADIUS
 ## (Chebyshev distance, so the 5x5 square around it). (tunable)
-const SMELL_DISGUST: Array[float] = [0.0, 0.0, 0.0, 0.006, 0.012]
+const SMELL_DISGUST: Array[float] = [0.0, 0.0, 0.0, 0.015, 0.03]
 const SMELL_RADIUS := 2
 
 ## Grease: the chance per prep done that a level drops on the chef's cell or one beside the

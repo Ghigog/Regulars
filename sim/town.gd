@@ -343,7 +343,7 @@ static func day_length(day: int) -> float:
 
 ## How long a table waits, in seconds: less each day, down to a floor.
 static func table_patience(day: int) -> float:
-	return maxf(24.0, 46.0 - 1.5 * day)
+	return maxf(32.0, 55.0 - 1.5 * day)
 
 
 ## The fewest guests a day brings, whatever the town thinks: grows by one every other day.

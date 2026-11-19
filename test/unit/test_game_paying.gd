@@ -124,9 +124,13 @@ func test_the_till_writes_a_bill_for_a_table_waiting_to_pay():
 
 
 func test_a_party_left_too_long_leaves_without_paying_and_no_strike():
-	var g := _ready_to_pay()
-	g.mood.patience = 0.001
-	_run(0.5)
+	var g := _ordered_guest(0)
+	game.serving.serve(g, game.serving.full_tray_for(g))
+	g.mood.patience = 0.001   # almost none left when the table becomes ready to pay
+	_run(g.eat_time + Guest.CHAT_TIME + 0.5)
+	_run(GuestMood.PAY_GRACE - 1.5)
+	assert_ne(g.state, "leaving", "still waiting inside the grace")
+	_run(GuestMood.PAY_GRACE * 0.5 + 3.0)
 	assert_eq(g.state, "leaving")
 	assert_true(g.mood.skipped_bill)
 	assert_eq(int(game.ledger.today.unpaid_bills), 1)

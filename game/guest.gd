@@ -3,7 +3,7 @@ extends Node3D
 ## A named townsperson visiting the restaurant. Driven by main.gd's step().
 
 const SPEED := 2.4
-const QUEUE_PATIENCE := 40.0
+const QUEUE_PATIENCE := 50.0
 const EAT_TIME := 5.0
 const BAR_WIDTH := 0.6
 const SEAT_HEIGHT := 0.33

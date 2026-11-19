@@ -719,7 +719,7 @@ func test_dirty_table_disgusts_guests_unless_a_wall_hides_it():
 	other.dirty_age = 40.0
 	_run(2.0)
 	var seen: float = g.mood.disgust
-	assert_gt(seen - fresh, fresh * 8.0, "one left sitting is far worse")
+	assert_gt(seen - fresh, fresh * 3.0, "one left sitting is far worse")
 	assert_true(g.mood.thoughts.has("Nobody has cleared that table"))
 	for c: Vector2i in [g.cell, g.cell + Vector2i(1, 0), g.cell + Vector2i(0, 1)]:
 		game.grid.walls[Vector3i(c.x, c.y, 0)] = true
