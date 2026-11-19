@@ -114,9 +114,11 @@ func _demo_build(demo: String) -> void:
 		game.card.open_card()
 		game.card.card_act("till")
 		game._demo_hover = Vector3(4.5, 0, 4.5)
-	else:   # a stove from the shop, held over a good spot or (build_no) a refused one
+	else:   # a stove from the shop, held over a good spot or (build_no, build_refused) a refused one
 		game.placing.pick_catalog("stove", 2)
-		game._demo_hover = Vector3(6.5, 0, 5.5) if demo == "build_no" else Vector3(3.5, 0, 5.5)
+		game._demo_hover = Vector3(6.5, 0, 5.5) if demo in ["build_no", "build_refused"] else Vector3(3.5, 0, 5.5)
+		if demo == "build_refused":   # E pressed over it: fail sound, cross wobble, the reason
+			game.room_edit.build_interact()
 
 
 ## A fuller kitchen and menu: mains, sides (one with no onion to make it, greyed)

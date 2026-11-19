@@ -418,7 +418,7 @@ func build_interact(ch: Player = null) -> void:
 		"Put down":
 			ch.last_paint = game.placing.snap(_hover_point(ch), ch)
 			if not game.placing.place(ch.last_paint, ch):
-				game.audio.sfx("fail")
+				refuse(ch.last_paint, ch)
 		"Pick up":
 			ch.strip_pick = 0
 			if not game.placing.pick_up(_piece_in_front(ch), ch, true):
@@ -428,6 +428,26 @@ func build_interact(ch: Player = null) -> void:
 		"Open up", "Take out rubbish":
 			game.day.use_door(ch)
 			game.hud.hints_ui.show_build()
+
+
+## A put-down that did not happen: the soft fail sound, the cross wobbling and, when the
+## spot has a reason, the line saying why. (A piece the chef cannot pay for says nothing here.)
+func refuse(spot: Vector3i, ch: Player) -> void:
+	game.audio.sfx("fail")
+	var why := game.placing.place_refusal(spot, ch)
+	if why != "":
+		game.hud.day_ui.say(why)
+	var mark := ch.no_mark
+	if mark == null or not mark.visible:
+		return
+	var tw := mark.get_meta("wobble", null) as Tween
+	if tw != null:
+		tw.kill()
+	mark.rotation.y = 0.0
+	tw = mark.create_tween()
+	mark.set_meta("wobble", tw)
+	for a: float in [0.2, -0.2, 0.12, -0.08, 0.0]:
+		tw.tween_property(mark, "rotation:y", a, 0.05)
 
 
 ## The piece in hand is held over the spot in front of the chef; a cross marks

@@ -515,7 +515,10 @@ func _update_cursor(ch: Player = null) -> void:
 		elif action == "Use desk":
 			p = desk.desk_in_front(ch).position + Vector3(0, 1.9, 0)
 		at = cam.unproject_position(p)
-	hud.day_ui.show_prompt(at, action, chefs.find(ch))
+	var ready := true   # a piece held over a spot that refuses it: the bubble is dimmed
+	if phase == Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) and room_edit._hover_point(ch) != Vector3.INF:
+		ready = placing.place_refusal(placing.snap(room_edit._hover_point(ch), ch), ch) == ""
+	hud.day_ui.show_prompt(at, action, chefs.find(ch), ready)
 
 
 ## The messy piece under the mouse at night, when the mouse is aiming with empty hands.
@@ -616,8 +619,9 @@ func _build_mouse(event: InputEvent, ch: Player) -> void:
 		elif right:
 			placing.cancel_hand(ch)
 		elif not ch.hand.is_empty():
-			if not placing.place(placing.snap(p, ch), ch):
-				audio.sfx("fail")
+			var spot := placing.snap(p, ch)
+			if not placing.place(spot, ch):
+				room_edit.refuse(spot, ch)
 		else:
 			ch.strip_pick = 0
 			placing.pick_up(p, ch, true)   # as E does: the piece is lifted whole
