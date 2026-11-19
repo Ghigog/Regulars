@@ -35,7 +35,8 @@ func render() -> void:
 			screen.staff_ui._staff_list()
 	else:
 		_cvs()
-	_keys_line()
+	if not (screen.tab == "staff" and screen._person < 0 and screen._draft.is_empty()):
+		_keys_line()
 	screen._sel = 0
 	for i in screen._targets.size():
 		if screen._targets[i].get_meta("key") == screen._sel_key:
@@ -56,6 +57,10 @@ func _header() -> void:
 			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			if screen.tab == t[0]:
 				screen._mark(b)
+		if not screen.game.staff.employees.is_empty():
+			var wages: Label = screen._label(top, 36, "$%d" % screen.game.staff.wages_due())
+			wages.name = "Wages"
+			wages.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var gap := Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(gap)

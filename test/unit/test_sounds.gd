@@ -48,3 +48,32 @@ func test_loops_fade_in_and_out():
 	for i in 30:
 		game.prep_games._fade_loops({}, 0.1)
 	assert_false(game._sfx.sizzle_raw.playing, "faded out and stopped")
+
+
+func _door_sounds_playing() -> bool:
+	return game._sfx.bell.playing or game._sfx.creaky_door.playing
+
+
+func test_door_bell_rings_once_as_the_first_guest_comes_through_the_door():
+	game.menu_stock.test_kitchen()   # a one-Burger menu, so nobody just browses
+	for p in game.town.people:
+		p.likes = []
+		p.dislikes = []
+	var party: Array[Guest] = game.seating.spawn_group([0, 1])
+	game.seating._seat_waiting_guests()
+	assert_eq(party[0].state, "to_seat")
+	assert_false(_door_sounds_playing(), "given a table outside: no bell yet")
+	var first_in := false
+	for i in 4000:
+		for g: Guest in party:
+			g.tick(0.05)
+		if not first_in and party[0].came_in:
+			first_in = true
+			assert_true(game._sfx.bell.playing, "bell as the first comes in")
+			assert_true(game._sfx.creaky_door.playing, "creak too")
+			game._sfx.bell.stop()
+			game._sfx.creaky_door.stop()
+		if party[0].came_in and party[1].came_in:
+			break
+	assert_true(party[1].came_in, "the second came in too")
+	assert_false(_door_sounds_playing(), "the second did not ring it again")
