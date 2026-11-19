@@ -118,7 +118,7 @@ func test_mess_does_not_age_at_night_and_a_carried_plate_goes_into_service():
 func _counters_with_food(n: int) -> Array[Station]:
 	var out: Array[Station] = []
 	for st: Station in game.stations.values():
-		if st.type == "counter" and st.item == "" and out.size() < n:
+		if st.type == "counter" and st.item == "" and out.size() < n and not st.has_node("till"):
 			st.item = "raw:patty"
 			st.refresh()
 			out.append(st)
@@ -160,7 +160,7 @@ func test_use_clears_leftover_food_and_the_chef_holds_nothing():
 func test_the_night_cleaner_clears_leftover_food():
 	var counters := _counters_with_food(2)
 	_to_build()
-	var price := game.room_edit.cleaner_price()
+	var price: int = game.room_edit.cleaner_price()
 	assert_eq(price, Cleaning.cleaner_price(2, 0))
 	game.ledger.money = 100
 	assert_true(game.room_edit.hire_cleaner())
