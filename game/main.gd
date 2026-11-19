@@ -519,7 +519,12 @@ func _update_cursor(ch: Player = null) -> void:
 	var ready := true   # a piece held over a spot that refuses it: the bubble is dimmed
 	if phase == Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) and room_edit._hover_point(ch) != Vector3.INF:
 		ready = placing.place_refusal(placing.snap(room_edit._hover_point(ch), ch), ch) == ""
-	hud.day_ui.show_prompt(at, action, chefs.find(ch), ready)
+	var extras := []
+	if phase == Phase.BUILD and not ch.hand.is_empty():
+		var held := room_edit.held_prompt(ch, action)
+		action = held.text
+		extras = held.extras
+	hud.day_ui.show_prompt(at, action, chefs.find(ch), ready, extras)
 
 
 ## The messy piece under the mouse at night, when the mouse is aiming with empty hands.

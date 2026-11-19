@@ -155,8 +155,8 @@ func _build_tip(p := 0) -> String:
 	var use := hud._g("use", p)
 	if hand.is_empty() and Cleaning.carrying_mess(ch.held):
 		if ch.held == "rubbish_bag":
-			return "Carrying the rubbish bag.      Take it out the front door before building or shopping"
-		return "Carrying a dirty plate.      Put it in the sink before building or shopping"
+			return "The rubbish bag.      Take it out the front door before building or shopping"
+		return "A dirty plate.      Put it in the sink before building or shopping"
 	if hand.is_empty():
 		if m == "touch":
 			return "Joystick walk      Tap a piece to pick it up      Shop      Dishes for the menu      Flip the door card to open for day %d" % hud.game.ledger.day
@@ -201,15 +201,15 @@ func _build_tip(p := 0) -> String:
 		var tail := "%s drop" % ("Drop" if m == "touch" else hud._g("back", p))
 		if hand.get("moving", false):
 			var why: String = hud.game.placing.sell_block(ch)
-			lead = "Carrying the %s." % hud.game.placing.piece_name(hand).to_lower()
+			lead = "The %s." % hud.game.placing.piece_name(hand).to_lower()
 			tail = ("%s for $%d" % ["Sell" if m == "touch" else hud._g("sell", p) + " sell", hud.game.placing.sell_value(ch)]) if why == "" else why
 		return "%s      %s hang it on a wall, over anything      %s" % [lead, "Tap a cell by a wall to" if m == "touch" else use, tail]
 	if hand.get("moving", false):
 		var why: String = hud.game.placing.sell_block(ch)
 		var sell := ("%s for $%d" % ["Sell" if m == "touch" else hud._g("sell", p) + " sell", hud.game.placing.sell_value(ch)]) if why == "" else why
 		if m == "touch":
-			return "Carrying the %s.      Tap the floor to put it down      Turn      %s      Drop puts it back" % [hud.game.placing.piece_name(hand).to_lower(), sell]
-		return "Carrying the %s.      %s put down      %s turn      %s      %s put back" % [
+			return "The %s.      Tap the floor to put it down      Turn      %s      Drop puts it back" % [hud.game.placing.piece_name(hand).to_lower(), sell]
+		return "The %s.      %s put down      %s turn      %s      %s put back" % [
 			hud.game.placing.piece_name(hand).to_lower(), use, turn, sell, hud._g("back", p)]
 	if m == "touch":
 		return "%s, $%d when it is put down.      Tap the floor to put it down      Turn      Drop" % [Catalog.label(hand), int(hand.price)]
