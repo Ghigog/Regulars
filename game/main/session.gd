@@ -84,7 +84,25 @@ func continue_game() -> void:
 		game.get_tree().call_deferred("reload_current_scene")
 
 
-## Quit to title from the pause menu: back to the first screen of a fresh launch.
+## Save and quit from the pause menu: in the build phase the night's work so far is
+## saved first; in any other phase the night-start save stands and the day is lost.
+func save_and_quit() -> void:
+	save_night()
+	quit_to_title()
+
+
+## The build-phase save on quit: the shop closed and every chef's hand put down (a lifted
+## piece goes back to its cell; a new, unpaid one is dropped), then the room is written.
+func save_night() -> void:
+	if game.phase != Game.Phase.BUILD:
+		return
+	close_shop()
+	for ch in game.chefs:
+		game.placing.cancel_hand(ch)
+	autosave()
+
+
+## Quit to title: back to the first screen of a fresh launch.
 func quit_to_title() -> void:
 	Game._theme_picked = false
 	Game._title_seen = false

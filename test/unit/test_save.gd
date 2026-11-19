@@ -108,3 +108,53 @@ func test_turned_till_round_trips_and_old_saves_face_as_before():
 	add_child_autofree(old)
 	old.set_process(false)
 	assert_almost_eq(old.stations[Vector2i(4, 2)].get_node("till").rotation.y, PI / 2, 0.001)
+
+
+func _saved_cells() -> Array:
+	var cells := []
+	for p in SaveGame.read(SAVE_TEST_PATH).pieces:
+		cells.append(p.cell)
+	return cells
+
+
+func test_build_quit_saves_changes_made_after_the_night_opened():
+	game.phase = Game.Phase.BUILD
+	game.session.autosave()
+	game.ledger.money -= 55
+	game.world.add_station("table", Vector2i(7, 4), 1, 0)
+	game.session.save_night()
+	var d := SaveGame.read(SAVE_TEST_PATH)
+	assert_eq(int(d.ledger.money), game.ledger.money)
+	assert_true(_saved_cells().has(Vector2i(7, 4)))
+
+
+func test_build_quit_puts_a_lifted_piece_back():
+	game.phase = Game.Phase.BUILD
+	var c := Vector2i(7, 4)
+	game.world.add_station("table", c, 1, 0)
+	game.placing.pick_up(Grid.center(c), game.player)
+	assert_true(game.player.hand.get("moving", false), "the table is lifted")
+	game.session.save_night()
+	assert_true(game.player.hand.is_empty())
+	assert_true(_saved_cells().has(c))
+
+
+func test_service_quit_leaves_the_save_alone():
+	game.phase = Game.Phase.BUILD
+	game.session.autosave()
+	var before := FileAccess.get_file_as_string(SAVE_TEST_PATH)
+	game.phase = Game.Phase.SERVICE
+	game.ledger.money -= 10
+	game.session.save_night()
+	assert_eq(FileAccess.get_file_as_string(SAVE_TEST_PATH), before)
+
+
+func test_pause_quit_label_differs_by_phase():
+	game.phase = Game.Phase.BUILD
+	game.hud.options_ui.toggle_pause()
+	assert_eq(game.hud.options_ui.pause.buttons[2].text, "Save and quit")
+	game.hud.options_ui.toggle_pause()
+	game.phase = Game.Phase.SERVICE
+	game.hud.options_ui.toggle_pause()
+	assert_eq(game.hud.options_ui.pause.buttons[2].text, "Quit to title")
+	game.hud.options_ui.toggle_pause()

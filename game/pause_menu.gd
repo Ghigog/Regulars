@@ -2,8 +2,9 @@ class_name PauseMenu
 extends Control
 ## The pause menu: Resume, Options and Quit to title on a paper card over the room,
 ## which stands still behind it. Keys and the controller move a framed pointer (as on
-## the title); touch taps. Quit to title asks first, since the day in play is not kept
-## (the game is saved at the start of each night).
+## the title); touch taps. Quit asks first. In the build phase it reads "Save and quit"
+## and keeps the night's work; in service the day in play is not kept (the game is saved
+## at the start of each night and when quitting from the build phase).
 
 var hud: Hud
 var buttons: Array[Button] = []
@@ -65,21 +66,31 @@ func show_main() -> void:
 	hud.receipt_ui._ribbon(_box, "PAUSED", Hud.CORAL)
 	_add_button("Resume", "resume")
 	_add_button("Options", "options")
-	_add_button("Quit to title", "quit")
+	_add_button(quit_label(), "quit")
 	_add_keys()
 	sel = 0
 	refresh()
+
+
+func saving() -> bool:
+	return hud.game.phase == Game.Phase.BUILD
+
+
+func quit_label() -> String:
+	return "Save and quit" if saving() else "Quit to title"
 
 
 ## "Leave this day?": the day in play is lost, the night's save is not.
 func show_confirm() -> void:
 	_clear()
 	confirming = true
-	var l := hud._label(_box, 22, "Leave for the title?\nThe game is saved at the start of each night; today's progress is lost.")
+	var msg := "Save and leave for the title?\nTonight's work is saved; Continue picks up here." if saving() \
+			else "Leave for the title?\nThe game is saved at the start of each night; today's progress is lost."
+	var l := hud._label(_box, 22, msg)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size.x = 320
-	_add_button("Quit to title", "yes")
+	_add_button(quit_label(), "yes")
 	_add_button("Stay", "no")
 	_add_keys()
 	sel = 1
@@ -148,4 +159,4 @@ func press_id(id: String) -> void:
 		"no":
 			show_main()
 		"yes":
-			hud.game.session.quit_to_title()
+			hud.game.session.save_and_quit()
