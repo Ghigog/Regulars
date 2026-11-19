@@ -239,16 +239,84 @@ func _has_worktop(cell: Vector2i) -> bool:
 	return st != null and (game.world._bare_counter(cell) != null or Kitchen.is_counter(st.type) or Kitchen.is_top(st.type))
 
 
-## A point on the piece the chef could pick up: the partition on the edge ahead,
-## or else whatever stands in the next cell. Vector3.INF when there is nothing.
+## A point on the piece the chef would pick up: the nearest within reach, the one they
+## face winning a near tie (as in `Player.target_cell` by day). Candidates are a piece in
+## a cell (the cell's middle) and a partition on a nearby edge (the edge's middle). The
+## last pick is kept unless another beats it by a little, so the highlight does not flick
+## between two pieces. Vector3.INF when there is nothing.
 func _piece_in_front(ch: Player = null) -> Vector3:
 	ch = game._me(ch)
-	if game.wall_nodes.has(GamePlacing.snap_edge(_front_point(true, ch))):
-		return _front_point(true, ch)
-	var c := Grid.to_cell(_front_point(false, ch))
-	if game.stations.has(c) or game.highs.has(c) or game.placing.rug_at(c) != null:   # a hood over bare floor too
-		return _front_point(false, ch)
-	return Vector3.INF
+	var here := ch.cell()
+	var spots: Array[Vector3] = []
+	var scores: Array[float] = []
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			var n := here + Vector2i(dx, dy)
+			if n == here or (game.world.station_at(n) == null and game.placing.rug_at(n) == null):
+				continue
+			var faced_aim: bool = ch.aiming and n == here + ch.facing
+			if game.world.station_at(n) == null and game.placing.rug_at(n) == game.placing.rug_at(here) and not faced_aim:
+				continue   # the rug underfoot is not offered: it only gets in the way of the door card
+			if absi(dx) + absi(dy) == 1 and not game.grid.edge_open(here, n):
+				continue   # a partition is in the way
+			var spot := Grid.center(n)
+			var to := spot - ch.position
+			to.y = 0.0
+			var dist := to.length()
+			if dist > Player.REACH and not faced_aim:
+				continue   # aiming picks the faced cell exactly, a diagonal one too
+			spots.append(spot)
+			scores.append(_pick_score(to, dist, ch))
+	for e: Vector3i in game.wall_nodes:
+		var mid := Vector3(e.x + (0.0 if e.z == 1 else 0.5), 0, e.y + (0.5 if e.z == 1 else 0.0))
+		var to := mid - ch.position
+		to.y = 0.0
+		var dist := to.length()
+		if dist > Player.REACH or not _edge_reachable(e, here):
+			continue
+		spots.append(mid + to.normalized() * -0.05)   # nudged to the chef's side, still on this edge
+		scores.append(_pick_score(to, dist, ch) + 0.15)   # walls stay easy to grab
+	var best := -1
+	var kept := -1
+	var last: Vector3 = ch.get_meta("pick_last", Vector3.INF)
+	for i in spots.size():
+		if best == -1 or scores[i] > scores[best]:
+			best = i
+		if last != Vector3.INF and _same_piece(spots[i], last):
+			kept = i
+	if best == -1:
+		ch.set_meta("pick_last", Vector3.INF)
+		return Vector3.INF
+	if kept != -1 and scores[best] - scores[kept] < PICK_STICK:
+		best = kept
+	ch.set_meta("pick_last", spots[best])
+	return spots[best]
+
+
+const PICK_STICK := 0.15   # how much better another piece must score to take the highlight
+
+
+func _pick_score(to: Vector3, dist: float, ch: Player) -> float:
+	return -dist + (2.0 if ch.aiming else 0.4) * to.normalized().dot(ch.aim)
+
+
+## Whether the same piece: the same cell, or the same partition edge.
+func _same_piece(a: Vector3, b: Vector3) -> bool:
+	var ea := game.wall_nodes.has(GamePlacing.snap_edge(a))
+	if ea != game.wall_nodes.has(GamePlacing.snap_edge(b)):
+		return false
+	return GamePlacing.snap_edge(a) == GamePlacing.snap_edge(b) if ea else Grid.to_cell(a) == Grid.to_cell(b)
+
+
+## A partition edge is in reach only from the chef's cell or a cell it can step into.
+func _edge_reachable(e: Vector3i, here: Vector2i) -> bool:
+	var sides := [Vector2i(e.x, e.y), Vector2i(e.x - 1, e.y)] if e.z == 1 else [Vector2i(e.x, e.y), Vector2i(e.x, e.y - 1)]
+	for c: Vector2i in sides:
+		if c == here:
+			return true
+		if absi(c.x - here.x) + absi(c.y - here.y) == 1 and game.grid.edge_open(here, c):
+			return true
+	return false
 
 
 ## What E would do in the build phase: "Put down", "Pick up", "Open up" or nothing.
