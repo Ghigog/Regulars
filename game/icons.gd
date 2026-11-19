@@ -420,6 +420,77 @@ static func icon(id: String) -> Array:
 		"sun":
 			o.append([star(0, 0, 0.98, 8, 0.62), GOLD])
 			o.append([ell(0, 0, 0.56), "#ffd76a"])
+		"shop":  # a market awning: scalloped stripes over a counter
+			o.append([rect(0, 0.5, 2.0, 0.56), INK])
+			o.append([PackedVector2Array([Vector2(-1, 0.22), Vector2(-0.7, 0.9), Vector2(0.7, 0.9), Vector2(1, 0.22)]), INK])
+			for i in 4:
+				var x0 := -0.84 + i * 0.42
+				var bite := ell(x0 + 0.21, 0.22, 0.2, 0.2, 180, 360, 8)
+				o.append([rect(x0 + 0.21, 0.58, 0.4, 0.62), CREAM if i % 2 == 0 else CORAL])
+				o.append([bite, CREAM if i % 2 == 0 else CORAL])
+			o.append([rect(0, -0.62, 1.7, 0.84), INK])
+			o.append([rect(0, -0.72, 1.3, 0.54), CREAM])
+			o.append([rect(0, -0.5, 1.7, 0.1), INK])
+		"dishes":  # a plate with a fork beside it
+			o.append([ell(0.3, 0, 0.62), INK])
+			o.append([ell(0.3, 0, 0.5), CREAM])
+			o.append([ell(0.3, 0, 0.28), INK])
+			o.append([rect(-0.78, -0.25, 0.1, 1.1), INK])
+			o.append([rect(-0.78, -0.55, 0.14, 0.9), INK])
+			for dx in [-0.92, -0.78, -0.64]:
+				o.append([rect(dx, 0.62, 0.07, 0.5), INK])
+			o.append([rect(-0.78, 0.42, 0.34, 0.1), INK])
+		"cog":  # options: a toothed wheel with a hub hole
+			o.append([star(0, 0, 0.98, 8, 0.78, PI / 8), INK])
+			o.append([ell(0, 0, 0.7), INK])
+			o.append([ell(0, 0, 0.3), CREAM])
+		"back":  # a return arrow: a hooked shaft, head left
+			o.append([PackedVector2Array([Vector2(-0.95, 0.1), Vector2(-0.2, 0.8), Vector2(-0.2, 0.4), Vector2(0.3, 0.4), Vector2(0.6, 0.15), Vector2(0.6, -0.3), Vector2(0.3, -0.5), Vector2(-0.2, -0.5), Vector2(-0.2, -0.9), Vector2(0.35, -0.9), Vector2(0.95, -0.35), Vector2(0.95, 0.25), Vector2(0.45, 0.8), Vector2(-0.2, 0.8)]), INK])
+			o.append([PackedVector2Array([Vector2(-0.95, 0.1), Vector2(-0.2, 0.8), Vector2(-0.2, 0.4)]), INK])
+		"sell":  # a coin with a minus
+			o.append([ell(0, 0, 0.95), INK])
+			o.append([ell(0, 0, 0.74), GOLD])
+			o.append([rect(0, 0, 1.0, 0.24), INK])
+		"erase":  # an eraser block, a stripe of coral on one end, slanted
+			o.append([rect(0, 0, 1.9, 0.96, 0.5), INK])
+			o.append([rect(-0.22, 0.12, 0.86, 0.66, 0.5), CREAM])
+			o.append([rect(0.42, -0.2, 0.9, 0.66, 0.5), CORAL])
+			o.append([rect(-0.5, -0.55, 1.2, 0.07, 0.5), INK])
+		"turn":  # a curved arrow: three-quarter ring with a head
+			var ring := ell(0, 0, 0.7, 0.7, 40, 330, 18)
+			var band := PackedVector2Array()
+			for p: Vector2 in ring:
+				band.append(p * (1.0 + 0.22 / 0.7))
+			for k in range(ring.size() - 1, -1, -1):
+				band.append(ring[k] * (1.0 - 0.22 / 0.7))
+			o.append([band, INK])
+			var tip := Vector2(cos(deg_to_rad(40)), sin(deg_to_rad(40))) * 0.7
+			o.append([PackedVector2Array([tip + Vector2(-0.5, 0.18), tip + Vector2(0.5, 0.18), tip + Vector2(0.0, -0.45)]), INK])
+		"aim":  # a crosshair: ring, four ticks, centre dot
+			o.append([ell(0, 0, 0.66), INK])
+			o.append([ell(0, 0, 0.46), CREAM])
+			o.append([ell(0, 0, 0.12), INK])
+			o.append([rect(0, 0.78, 0.16, 0.4), INK])
+			o.append([rect(0, -0.78, 0.16, 0.4), INK])
+			o.append([rect(0.78, 0, 0.4, 0.16), INK])
+			o.append([rect(-0.78, 0, 0.4, 0.16), INK])
+		"use":  # a hand: palm, four fingers, a thumb
+			o.append([rect(0, -0.35, 1.2, 1.0), INK])
+			for i in 4:
+				o.append([rect(-0.45 + i * 0.3, 0.3 + (0.12 if i % 3 == 0 else 0.3) * 0.5, 0.24, 0.9 - (0.2 if i % 3 == 0 else 0.0)), INK])
+			o.append([rect(0.75, -0.15, 0.5, 0.26, 0.6), INK])
+			o.append([rect(0, -0.7, 1.0, 0.1), CREAM])
+		"basket":  # a wicker basket with produce poking out
+			o.append([ell(-0.35, 0.3, 0.36), INK])
+			o.append([ell(-0.35, 0.3, 0.26), RED])
+			o.append([ell(0.3, 0.38, 0.34), INK])
+			o.append([ell(0.3, 0.38, 0.24), GREEN])
+			o.append([PackedVector2Array([Vector2(-0.12, 0.2), Vector2(0.18, 0.8), Vector2(0.02, 0.9), Vector2(-0.3, 0.3)]), INK])
+			o.append([PackedVector2Array([Vector2(-1.0, 0.0), Vector2(1.0, 0.0), Vector2(0.72, -0.9), Vector2(-0.72, -0.9)]), INK])
+			o.append([PackedVector2Array([Vector2(-0.88, -0.08), Vector2(0.88, -0.08), Vector2(0.64, -0.8), Vector2(-0.64, -0.8)]), "#e6c07a"])
+			for y in [-0.3, -0.55]:
+				o.append([rect(0, y, 1.6, 0.07), INK])
+			o.append([rect(0, -0.45, 0.07, 0.7), INK])
 		"anger":
 			pass
 	if id == "anger":  # four curved arms: keep only the red crescents
