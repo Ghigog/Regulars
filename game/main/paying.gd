@@ -62,6 +62,15 @@ func ready_to_pay(table: Station) -> bool:
 	return not p.is_empty() and p.all(func(g: Guest) -> bool: return g.paying())
 
 
+## The patience the party is leaving on: the lowest among the payers. Every payer's bar
+## shows this, so no bar reads full while someone at the table is about to give up.
+func pay_patience(table: Station) -> float:
+	var low := 1.0
+	for g in payers(table):
+		low = minf(low, g.mood.patience)
+	return low
+
+
 ## Seconds this guest's table has been ready to pay, or -1 when it is not.
 func pay_wait(g: Guest) -> float:
 	if not g.paying() or not pay_since.has(g.table):
@@ -266,7 +275,7 @@ func pay_bill(table: Station) -> void:
 
 ## A party waited to pay until they gave up (PRD 11): no money, no tip, an opinion drop
 ## friends hear about. Not a walkout and not a strike.
-func leave_unpaid(table: Station) -> void:
+func leave_unpaid(table: Station, quitter: Guest = null) -> void:
 	var p := payers(table)
 	if p.is_empty():
 		return
@@ -277,7 +286,12 @@ func leave_unpaid(table: Station) -> void:
 		g.mood.think("Nobody came with the bill")
 		game.day._critic_leaves(g, false)
 		talk = game.town.left_unpaid(g.idx)
-	game.hud.day_ui.say(talk if p.size() == 1 else "Table %d left without paying. Nobody came." % table_number(table))
+	if p.size() == 1:
+		game.hud.day_ui.say(talk)
+	elif quitter != null:
+		game.hud.day_ui.say("%s gave up: table %d left without paying. Nobody came." % [game.town.people[quitter.idx].name, table_number(table)])
+	else:
+		game.hud.day_ui.say("Table %d left without paying. Nobody came." % table_number(table))
 	game.audio.sfx("fail")
 	_party_leaves(table)
 
