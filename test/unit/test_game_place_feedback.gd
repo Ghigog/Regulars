@@ -21,8 +21,8 @@ func test_e_on_a_refused_spot_keeps_the_hand_and_says_why():
 func test_click_on_a_refused_spot_says_why():
 	_to_build()
 	_hold_over("board", Vector3(3.5, 0, 5.5))
-	var spot := game.placing.snap(Vector3(3.5, 0, 5.5))
-	var why := game.placing.place_refusal(spot)
+	var spot: Vector3i = game.placing.snap(Vector3(3.5, 0, 5.5))
+	var why: String = game.placing.place_refusal(spot)
 	assert_ne(why, "")
 	game.room_edit.refuse(spot, game.player)
 	assert_eq(game.hud.toast.text, why)
@@ -31,14 +31,14 @@ func test_click_on_a_refused_spot_says_why():
 func test_prompt_is_dimmed_over_a_refused_spot_and_ready_over_a_fitting_one():
 	_to_build()
 	_hold_over("stove", Vector3(3.5, 0, 5.5))
-	var good := game.placing.place_refusal(game.placing.snap(Vector3(3.5, 0, 5.5))) == ""
+	var good: bool = game.placing.place_refusal(game.placing.snap(Vector3(3.5, 0, 5.5))) == ""
 	game._update_cursor()
 	var sheet = game.hud._prompts[0].sheet
 	assert_true(good)
 	assert_false(sheet.unavailable, "ready over a fitting spot")
-	_hold_over("stove", Vector3(6.5, 0, 5.5))
+	_hold_over("stove", Vector3(4.5, 0, 6.5))
 	game._update_cursor()
-	assert_eq(game.placing.place_refusal(game.placing.snap(Vector3(6.5, 0, 5.5))), "That would shut someone in")
+	assert_eq(game.placing.place_refusal(game.placing.snap(Vector3(4.5, 0, 6.5))), "That would shut someone in")
 	assert_true(sheet.unavailable, "dimmed over a refused spot")
 	game.hud.day_ui.show_prompt(Vector2(100, 100), "Put down", 0, false)
 	assert_true(sheet.unavailable)
