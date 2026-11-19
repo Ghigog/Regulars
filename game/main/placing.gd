@@ -6,6 +6,13 @@ extends RefCounted
 var game: Game
 
 
+const WONT_GO := "That won't go here"
+const TAKEN := "Something's already there"
+const NEEDS_COUNTER := "Tools go on a counter"
+const NEEDS_FRIDGE := "That box needs a fridge"
+const NO_WALL := "Nothing to hang it on here"
+
+
 func _init(game_: Game) -> void:
 	game = game_
 
@@ -100,6 +107,7 @@ func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool
 			"from": Vector3i(c.x, c.y, 0), "from_facing": 0}
 		game.audio.sfx("pickup")
 		game.hud.hints_ui.show_build()
+		_warn_shut_in()
 		return true
 	if game.stations.has(c) and game.room_edit.needs_cleaning(game.stations[c]):
 		game.audio.sfx("fail")   # a messy piece is not moved or sold until it is clean
@@ -166,7 +174,15 @@ func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool
 		return false
 	game.audio.sfx("pickup")
 	game.hud.hints_ui.show_build()
+	_warn_shut_in()
 	return true
+
+
+## On a lift: say so when the room already shuts someone in, so a refused spot is no surprise.
+func _warn_shut_in() -> void:
+	var line := shut_in_line()
+	if line != "":
+		game.hud.day_ui.say(line)
 
 
 ## Stands the carried piece on a spot. No checks: callers have made them.
@@ -432,47 +448,100 @@ func _touch() -> Array[Vector2i]:
 	return touch
 
 
-## Would the piece in hand fit at this spot without cutting anyone off?
+## Would the piece in hand fit at this spot without making the room worse?
 func can_place(spot: Vector3i, ch: Player = null) -> bool:
+	return place_refusal(spot, ch) == ""
+
+
+## Why the piece in hand cannot go at this spot, in a line for the player; "" when it fits.
+## A moving piece always fits the spot it came from (`place` turns it back if it must), unless
+## `strict`, which judges that spot like any other (for trying a turn there).
+func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String:
 	ch = game._me(ch)
 	if ch.hand.is_empty():
-		return false
+		return WONT_GO
+	if not strict and _is_own_spot(spot, ch):
+		return ""
 	var cell := Vector2i(spot.x, spot.y)
 	if Catalog.is_box(ch.hand.id):   # a box goes into a free storage slot that takes it
-		return game.kitchen.can_store(cell, ch.hand.id)
+		var why := game.kitchen.store_refusal(cell, ch.hand.id)
+		return "" if why == "" else (why if game.kitchen.slots(cell) > 0 else NEEDS_FRIDGE)
 	var reach := _reach()
 	var touch := _touch()
 	match tool_kind(ch.hand.id):
 		"floor":   # floor laid behind a wall takes the wall away: not from under a hung piece
-			return game.plan.can_lay(cell, floor_kind(ch.hand.id)) \
+			var ok: bool = game.plan.can_lay(cell, floor_kind(ch.hand.id)) \
 				and (game.plan.has_floor(cell) or not game.world._strands_high(Floorplan.cell_edges(cell)))
+			return "" if ok else WONT_GO
 		"finish":
-			return game.plan.can_finish(spot, ch.hand.id)
+			return "" if game.plan.can_finish(spot, ch.hand.id) else "Paint and paper go on a wall"
 		"treat":   # any floor, one treatment a cell: a new one replaces the old
-			return game.plan.has_floor(cell) and game.treat_laid.get(cell, "") != Treatments.key_of(ch.hand.id)
+			var ok: bool = game.plan.has_floor(cell) and game.treat_laid.get(cell, "") != Treatments.key_of(ch.hand.id)
+			return "" if ok else WONT_GO
 		"rug":
-			return can_lay_rug(cell, int(ch.hand.facing))
+			return "" if can_lay_rug(cell, int(ch.hand.facing)) else WONT_GO
 		"wall":
-			return game.plan.can_build(spot) and game.grid.can_place_wall(spot, Game.LOT, Game.DOOR, reach, touch)
+			if not game.plan.can_build(spot):
+				return WONT_GO
+			return _grid_words(game.grid.wall_refusal(spot, Game.LOT, Game.DOOR, reach, touch))
 		"door", "arch":
-			return game.plan.can_open(spot, ch.hand.id) and not game.world._strands_high([spot])
+			var ok: bool = game.plan.can_open(spot, ch.hand.id) and not game.world._strands_high([spot])
+			return "" if ok else WONT_GO
 	if ch.hand.id == "screen":
-		return game.grid.can_place_wall(spot, Game.LOT, Game.DOOR, reach, touch) and not game.plan.is_wall(spot)
+		var why := _grid_words(game.grid.wall_refusal(spot, Game.LOT, Game.DOOR, reach, touch))
+		return why if why != "" else (TAKEN if game.plan.is_wall(spot) else "")
 	if ch.hand.id == "till":   # on a counter, or a tool standing on one
-		return game.paying._till_host(cell) != null
+		return "" if game.paying._till_host(cell) != null else NEEDS_COUNTER
 	var hn := GameWorld.hand_node(ch.hand)
 	if Kitchen.can_go_high(hn):   # the wall layer (PRD 8.5): hung high, or a shelf low
 		var layer := game.world.layer_for(cell, hn)
 		if layer != "base":
-			return layer == "high"
+			return "" if layer == "high" else NO_WALL
 	elif Kitchen.is_tall(hn) and game.kitchen.get_piece(cell, "high") != "":
-		return false   # a tall piece fills both wall layers
-	if Kitchen.grows_from_counter(GameWorld.hand_node(ch.hand)):   # a stove is its counter upgraded: the floor only
-		return not game.stations.has(cell) and game.kitchen.layer_for(cell, "counter") == "base" \
-			and game.grid.can_place_block(cell, Station.seats_for("counter", cell, int(ch.hand.facing)), Game.LOT, Game.DOOR, reach, touch)
+		return TAKEN   # a tall piece fills both wall layers
+	if Kitchen.grows_from_counter(hn):   # a stove is its counter upgraded: the floor only
+		if game.stations.has(cell) or game.kitchen.layer_for(cell, "counter") != "base":
+			return "A stove stands on the floor"
+		return _grid_words(game.grid.block_refusal(cell, Station.seats_for("counter", cell, int(ch.hand.facing)), Game.LOT, Game.DOOR, reach, touch))
 	if game.stations.has(cell) or Kitchen.is_top(ch.hand.id):
-		return game.world._stacks_on(cell, ch.hand)   # a tool needs a counter under it
-	return game.grid.can_place_block(cell, Station.seats_for(ch.hand.id, cell, int(ch.hand.facing)), Game.LOT, Game.DOOR, reach, touch)
+		if game.world._stacks_on(cell, ch.hand):   # a tool needs a counter under it
+			return ""
+		return NEEDS_COUNTER if Kitchen.is_top(ch.hand.id) and not game.stations.has(cell) else TAKEN
+	return _grid_words(game.grid.block_refusal(cell, Station.seats_for(ch.hand.id, cell, int(ch.hand.facing)), Game.LOT, Game.DOOR, reach, touch))
+
+
+## The player's words for a Grid refusal code.
+static func _grid_words(code: String) -> String:
+	match code:
+		"off_lot": return "That's off the lot"
+		"taken": return TAKEN
+		"shut_in": return "That would shut someone in"
+	return ""
+
+
+## Whether `spot` is where the piece in hand was lifted from, on the layer it was lifted from.
+func _is_own_spot(spot: Vector3i, ch: Player) -> bool:
+	if not ch.hand.get("moving", false) or spot != ch.hand.from:
+		return false
+	var hn := GameWorld.hand_node(ch.hand)
+	return (game.world.layer_for(Vector2i(spot.x, spot.y), hn) == "high") == (ch.hand.get("layer", "") == "high")
+
+
+## What is shut in, in a line, when the room already breaks the rule; "" when it does not.
+func shut_in_line() -> String:
+	var cut := game.grid.cut_off(Game.DOOR, _reach(), _touch())
+	if cut.is_empty():
+		return ""
+	var c := cut[0]
+	if game.stations.has(c):
+		var st: Station = game.stations[c]
+		var name := str(Kitchen.NODES[st.node].name) if Kitchen.has_node(st.node) \
+			else piece_name({"id": st.type, "tier": st.tier})
+		return "The %s can't be reached" % name.to_lower()
+	for st: Station in game.stations.values():
+		if st.seats.has(c):
+			return "A %s's seat can't be reached" % piece_name({"id": st.type, "tier": st.tier}).to_lower().trim_suffix(" for two")
+	return "You're shut in"
 
 
 ## Builds the piece in hand and pays for it, so cancelling before this is free.
@@ -491,7 +560,8 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		return true
 	var cell := Vector2i(spot.x, spot.y)
 	if ch.hand.get("moving", false):
-		_put_down(ch.hand, spot, int(ch.hand.facing))
+		var back: bool = spot == ch.hand.from and place_refusal(spot, ch, true) != ""
+		_put_down(ch.hand, spot, int(ch.hand.from_facing) if back else int(ch.hand.facing))
 		ch.hand = {}
 		game.audio.sfx("putdown")
 		game.hud.hints_ui.show_build()

@@ -204,7 +204,7 @@ func _card_turn(ch: Player, c: Vector2i, layer: String) -> bool:
 	var from_facing := int(ch.hand.from_facing)
 	game.placing.rotate_hand(ch)
 	var spot: Vector3i = ch.hand.from
-	if int(ch.hand.facing) != from_facing and game.placing.can_place(spot, ch):
+	if int(ch.hand.facing) != from_facing and game.placing.place_refusal(spot, ch, true) == "":
 		var h: Dictionary = ch.hand
 		game.placing._put_down(h, spot, int(h.facing))
 	else:
