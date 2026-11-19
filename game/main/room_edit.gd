@@ -455,7 +455,7 @@ func refuse(spot: Vector3i, ch: Player) -> void:
 	var mark := ch.no_mark
 	if mark == null or not mark.visible:
 		return
-	var tw := mark.get_meta("wobble", null) as Tween
+	var tw := (mark.get_meta("wobble") if mark.has_meta("wobble") else null) as Tween
 	if tw != null:
 		tw.kill()
 	mark.rotation.y = 0.0
