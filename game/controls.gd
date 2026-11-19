@@ -290,6 +290,9 @@ func _pad_button(e: InputEventJoypadButton) -> void:
 		_start_button(source, e.pressed)
 		return
 	var action: String = PAD_ACTIONS.get(e.button_index, "")
+	if e.pressed and game.phase == game.Phase.SUMMARY and e.button_index in [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_DOWN]:
+		if game.hud.receipt_ui.scroll_paper(-90.0 if e.button_index == JOY_BUTTON_DPAD_UP else 90.0):
+			return
 	# A confirms the receipt and the end screen; Y opens the town book on the receipt.
 	if action == "use" and game.phase in [game.Phase.SUMMARY, game.Phase.CLOSED]:
 		action = "confirm"
@@ -336,6 +339,9 @@ func _pad_axis(e: InputEventJoypadMotion) -> void:
 		if e.axis_value > 0.5:
 			_use(source)
 		return
+	if e.axis in [JOY_AXIS_LEFT_Y, JOY_AXIS_RIGHT_Y] and game.phase == game.Phase.SUMMARY and absf(e.axis_value) > 0.2:
+		if game.hud.receipt_ui.scroll_paper(e.axis_value * 30.0):   # a long receipt: the stick reads it
+			return
 	if e.axis == JOY_AXIS_LEFT_X:
 		v.x = e.axis_value
 	elif e.axis == JOY_AXIS_LEFT_Y:

@@ -78,7 +78,7 @@ func show_town() -> void:
 	stack.add_theme_constant_override("separation", 14)
 	clip.add_child(stack)
 	var page := HudWidgets.Sheet.new("note").pad(26, 24, 26, 20)
-	stack.add_child(page)
+	hud.receipt_ui.paper_box(clip, stack).add_child(page)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	page.add_child(box)
@@ -117,6 +117,7 @@ func show_town() -> void:
 		hud.receipt_ui._button(stack, "Last review: %d %s" % [int(hud.game.critic.last_review.stars),
 			"star" if int(hud.game.critic.last_review.stars) == 1 else "stars"], hud.receipt_ui.show_review)
 	hud.receipt_ui._button(stack, "Back   (T)", toggle_town)
+	hud.receipt_ui._fit_when_laid_out(hud.receipt_ui.paper_scroll)
 	hud.receipt_ui._pop_in(clip)
 
 
