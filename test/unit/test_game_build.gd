@@ -194,3 +194,16 @@ func test_one_counter_of_a_double_counter_keeps_its_turn():
 	game.placing.rotate_hand()
 	assert_true(game.placing.place(Vector3i(4, 4, 0)))
 	assert_true(game.stations[Vector2i(4, 4)].stacked, "back on top")
+
+
+func test_pass_piece_shows_which_way_it_faces():
+	var plain := Node3D.new()
+	var marked := Node3D.new()
+	BuildStations._pass(plain)
+	BuildStations._pass(marked, true)
+	assert_gt(marked.get_child_count(), plain.get_child_count(), "door and pull on the front")
+	var piece: Station = game.stations[Vector2i(4, 3)]
+	piece.place_at(piece.cell, 1)
+	assert_almost_eq(piece._vis.rotation.y, PI / 2, 0.001, "the marked front turns with the piece")
+	plain.free()
+	marked.free()
