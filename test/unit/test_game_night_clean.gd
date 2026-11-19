@@ -111,3 +111,66 @@ func test_mess_does_not_age_at_night_and_a_carried_plate_goes_into_service():
 	game.room_edit.build_interact()
 	game.day.start_day()
 	assert_eq(game.player.held, "dirty_dishes")
+
+
+# ---------- Leftover food (T-7) ----------
+
+func _counters_with_food(n: int) -> Array[Station]:
+	var out: Array[Station] = []
+	for st: Station in game.stations.values():
+		if st.type == "counter" and st.item == "" and out.size() < n:
+			st.item = "raw:patty"
+			st.refresh()
+			out.append(st)
+	return out
+
+
+func _face_station(st: Station) -> void:
+	var c := game.stations.find_key(st) as Vector2i
+	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+		_face(c + d, -d)
+		if game.world.station_at(game.player.target_cell()) == st:
+			return
+
+
+func test_leftover_food_waits_at_night_and_blocks_moving_the_piece():
+	var counters := _counters_with_food(2)
+	counters[1].item = "dish"
+	counters[1].dish = Dish.make(Dish.PLATE)
+	counters[1].dish.add("prep:patty", 1.0)
+	_to_build()
+	assert_eq(counters[0].item, "raw:patty", "service ending wipes nothing")
+	assert_true(counters[1].has_leftover_food())
+	assert_true(game.room_edit.dirty_note().begins_with("Still dirty: 2 counters of food."))
+	var c := game.stations.find_key(counters[0]) as Vector2i
+	assert_false(game.placing.pick_up(Grid.center(c)), "clean it first")
+
+
+func test_use_clears_leftover_food_and_the_chef_holds_nothing():
+	var st := _counters_with_food(1)[0]
+	_to_build()
+	_face_station(st)
+	assert_eq(game.room_edit.build_action(), "Clear food")
+	game.room_edit.build_interact()
+	assert_eq(st.item, "")
+	assert_eq(game.player.held, "")
+	assert_eq(game.room_edit.dirty_note(), "")
+
+
+func test_the_night_cleaner_clears_leftover_food():
+	var counters := _counters_with_food(2)
+	_to_build()
+	var price := game.room_edit.cleaner_price()
+	assert_eq(price, Cleaning.cleaner_price(2, 0))
+	game.ledger.money = 100
+	assert_true(game.room_edit.hire_cleaner())
+	assert_false(counters[0].has_leftover_food())
+	assert_false(counters[1].has_leftover_food())
+	assert_eq(game.room_edit.dirty_note(), "")
+
+
+func test_food_in_hand_is_gone_when_the_door_opens():
+	_to_build()
+	game.player.set_held("raw:patty")
+	game.day.start_day()
+	assert_eq(game.player.held, "")

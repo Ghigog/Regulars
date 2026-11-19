@@ -33,6 +33,8 @@ func start_day() -> void:
 		if ch.hand.get("moving", false):
 			game.placing.cancel_hand(ch)   # a piece still being carried goes back where it was
 		ch.hand = {}
+		if ch.held == "dishes" or not Tray.parse(ch.held).is_empty():
+			ch.set_held("")   # yesterday's food does not carry into the new day
 	game.phase = Game.Phase.SERVICE
 	game.clock = 0.0
 	game.shopper = null
