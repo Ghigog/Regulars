@@ -501,12 +501,18 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 				why = "Get a plate for that" if not Pantry.is_drink(loose.ings[0]) else "Get a cup for that"
 			if target != null:
 				why = ""
-				act = "Plate it" if target.vessel == Dish.PLATE and target.is_empty() else (
+				var was_empty := target.is_empty() and target.vessel != ""
+				act = ("Plate it" if target.vessel == Dish.PLATE else "Pour into cup") if was_empty else (
 					"Add %s" % Pantry.name_of(loose.ings[0]).to_lower() if loose.ings.size() == 1 else "Add it")
 				if not dry_run:
 					target.take_all(loose)
-					st.set_item("")
-					ch.show_held()
+					if was_empty:
+						# The empty plate (or cup) slides under the food and stays on the worktop.
+						ch.drop_dish(target)
+						st.set_dish(target)
+					else:
+						st.set_item("")
+						ch.show_held()
 		elif here != null:
 			# A loose stack in hand goes onto the plate on the worktop; else it is picked up.
 			var stack: Dish = null

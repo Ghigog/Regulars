@@ -232,6 +232,7 @@ func test_seaside_fish_roll_from_ticket_to_bill():
 	game.cooking.use_station(_the_pass())
 	_use("plates")
 	game.cooking.use_station(_the_pass())
+	game.cooking.use_station(_the_pass())
 	assert_true(game.player.dishes[0].is_ready(game.menu.items))
 	game.cooking.use_station(g.table)
 	_run(g.eat_time + 0.5)
