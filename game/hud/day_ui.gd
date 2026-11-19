@@ -208,7 +208,7 @@ func _make_prompt() -> Dictionary:
 	var key := HudWidgets.Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
 	prow.add_child(key)
 	var key_label := hud._label(key, 24, "E")
-	var d := {"sheet": sheet, "key": key, "key_label": key_label, "label": hud._label(prow, 26), "tag": tag}
+	var d := {"sheet": sheet, "key": key, "key_label": key_label, "label": hud._label(prow, 26), "tag": tag, "row": prow, "extras": []}
 	hud._prompts.append(d)
 	return d
 
@@ -216,7 +216,9 @@ func _make_prompt() -> Dictionary:
 ## Shows "[E] COOK" over a point on screen for player p's chef, or hides it when
 ## `text` is empty. In co-op each bubble carries its player's numbered tag and
 ## their own device's button; a second bubble that would cover the first sits above it.
-func show_prompt(at: Vector2, text: String, p := 0, ready := true) -> void:
+## `extras` are small keycap tags beside the main one while a piece is held:
+## [[action, word], ...], each cap from that chef's device (words only on touch).
+func show_prompt(at: Vector2, text: String, p := 0, ready := true, extras := []) -> void:
 	while hud._prompts.size() <= p:
 		_make_prompt()
 	var d: Dictionary = hud._prompts[p]
@@ -233,6 +235,7 @@ func show_prompt(at: Vector2, text: String, p := 0, ready := true) -> void:
 	d.key.visible = m != "touch"
 	d.key_label.text = hud.game.controls.glyph("use", p) if hud.game.controls and p < hud.game.controls.players.size() else "E"
 	d.label.text = text.to_upper()
+	_show_extras(d, p, m, extras)
 	sheet.unavailable = not ready   # muted tan, cream text, as a disabled stamp button
 	if ready:
 		d.label.remove_theme_color_override("font_color")
@@ -249,6 +252,29 @@ func show_prompt(at: Vector2, text: String, p := 0, ready := true) -> void:
 	if cluster.size != Vector2.ZERO and cluster.grow(-2).intersects(Rect2(sheet.position, sheet.size)):
 		sheet.position.y = cluster.position.y - sheet.size.y - 2.0
 	sheet.position.y = maxf(sheet.position.y, 6.0)  # never off the top of the screen
+	sheet.position.x = clampf(sheet.position.x, 4.0, maxf(4.0, hud.root.size.x - sheet.size.x - 4.0))  # nor the sides (a phone)
+
+
+## Fills the small tags after the main word: shrunk to about 70%, the main cap too.
+func _show_extras(d: Dictionary, p: int, mode: String, extras: Array) -> void:
+	var small := not extras.is_empty()
+	var fs := 18 if small else 26
+	d.label.add_theme_font_size_override("font_size", fs)
+	d.key_label.add_theme_font_size_override("font_size", 17 if small else 24)
+	while d.extras.size() < extras.size():
+		var cap := HudWidgets.Sheet.new("key", 9, 3).pad(9, 1, 9, 5)
+		d.row.add_child(cap)
+		var kl := hud._label(cap, 17, "")
+		d.extras.append({"cap": cap, "key_label": kl, "label": hud._label(d.row, 18)})
+		d.row.move_child(d.extras[-1].label, cap.get_index() + 1)
+	for i in d.extras.size():
+		var e: Dictionary = d.extras[i]
+		var on: bool = i < extras.size()
+		e.cap.visible = on and mode != "touch"
+		e.label.visible = on
+		if on:
+			e.key_label.text = hud.game.controls.glyph(extras[i][0], p) if hud.game.controls and p < hud.game.controls.players.size() else ""
+			e.label.text = String(extras[i][1]).to_upper()
 
 
 # ---------------------------------------------------------------- walk keycaps
