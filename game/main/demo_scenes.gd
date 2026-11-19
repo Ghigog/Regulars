@@ -265,6 +265,21 @@ func _demo_order(take: bool) -> void:
 			return
 
 
+## Takes the seated orders, then copies the first ticket until the column overflows.
+func _demo_orders_long() -> void:
+	for g in game.guests:
+		if g.state == "ordering":
+			game.serving.take_orders(g.table)
+	if game.tickets.is_empty():
+		return
+	var first: Dictionary = game.tickets[0]
+	for k in 8:
+		var copy := first.duplicate()
+		copy.id = int(first.id) + 1000 + k
+		game.tickets.append(copy)
+	game.hud.day_ui.refresh_tickets()
+
+
 func _demo_ticket(full: bool) -> void:
 	for g in game.guests:
 		if g.state == "ordering":

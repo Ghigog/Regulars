@@ -58,6 +58,7 @@ var _heart_time := 0.0
 var _last_stage := 0
 var _age := 0.0
 var helping: Node3D       # someone down after a slip (9.3) this guest is helping up
+var _gross_bubble: Node3D   # the disgust stage icon, up and to one side of `_order`
 var _alarm_time := 0.0    # saw someone fall: a "!" in the bubble for a moment
 const DOWN_TILT := -1.45   # lying on their back after a slip, face to the sky
 const DOWN_LIFT := 0.24    # so the body lies on the floor, not through it
@@ -90,6 +91,9 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	_order = Fx.bubble()
 	_order.position = Vector3(0, 2.0 * Peg.SCALE - 0.1, 0)
 	add_child(_order)
+	# Disgust has its own smaller bubble beside it, so the request stays readable.
+	_gross_bubble = Fx.bubble()
+	add_child(_gross_bubble)
 	# A paper name tag.
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -307,6 +311,7 @@ func _lie(delta: float) -> void:
 	_body.pose = "idle"
 	_body.position.x = 0.0
 	Fx.set_bubble(_order, "")
+	Fx.set_bubble(_gross_bubble, "")
 	_label.position = FloorDirt.lying_dir(self) * 1.0 + Vector3(0, 1.75, 0)   # over the head
 	_alarm_time -= delta
 
@@ -327,6 +332,7 @@ func _help(delta: float) -> void:
 	_bar.visible = false
 	_alarm_time -= delta
 	Fx.set_bubble(_order, "warning" if _alarm_time > 0.0 else "")
+	Fx.set_bubble(_gross_bubble, "")
 	_order.position.y = 2.72
 	_label.position.y = 3.24 if _alarm_time > 0.0 else 2.1
 
@@ -450,8 +456,6 @@ func _refresh(delta: float) -> void:
 	var want := ""
 	if _alarm_time > 0.0:
 		want = "warning"   # someone just fell beside them
-	elif stage > 0 and (seated_waiting() or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
-		want = GuestMood.DISGUST_ICONS[stage]
 	elif state == "ordering" and not orders_nothing:
 		want = "order"   # a notepad: come and take my order (not from one who wants nothing)
 	elif state == "waiting":
@@ -466,4 +470,12 @@ func _refresh(delta: float) -> void:
 		want = "heart"
 	Fx.set_bubble(_order, want)
 	_order.position.y = 2.72 + sin(_age * 3.0) * 0.03   # clear of the patience bar below it
+	var gross := ""
+	if stage > 0 and (seated_waiting() or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
+		gross = GuestMood.DISGUST_ICONS[stage]
+	Fx.set_bubble(_gross_bubble, gross, 0.3 if want == "" else 0.2)
+	# Beside the main bubble (up and to the camera's right), or in its place when that is empty.
+	_gross_bubble.position = _order.position + (Build.CAM_BASIS.x * 0.62 + Build.CAM_BASIS.y * 0.3 if want != "" else Vector3.ZERO)
+	if gross != "" and want == "":
+		want = gross   # the name tag rides above whichever bubble is up
 	_label.position.y = 3.24 if want != "" else (2.32 if _bar.visible else 2.1)

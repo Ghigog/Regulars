@@ -5,8 +5,8 @@ extends "res://test/helpers/game_case.gd"
 
 func test_a_one_item_order_goes_from_ticket_to_paid_bill():
 	var g := _ordered_guest()
-	var rail: int = game.hud.ticket_rail.get_child_count()
-	assert_eq(rail, 1, "the ticket is on the rail")
+	var rail: int = game.hud.ticket_rail.get_child_count()   # the order column
+	assert_eq(rail, 1, "the ticket is in the order column")
 	_cook_burger()
 	assert_string_contains(game.cooking.prompt_for(g.table), "Serve")
 	game.cooking.use_station(g.table)

@@ -368,17 +368,13 @@ func trim_prompts(count: int) -> void:
 		hud._prompts[p].sheet.visible = false
 
 
-## Rebuilds the ticket rail from the game's open tickets.
+## Rebuilds the order column from the game's open tickets.
 func refresh_tickets() -> void:
 	if hud.ticket_rail == null:
 		return
 	for c in hud.ticket_rail.get_children():
 		c.queue_free()
-	var shown := 0
 	for tk: Dictionary in hud.game.tickets:
-		if shown >= Hud.RAIL_MAX:
-			break
-		shown += 1
 		var card := HudWidgets.Sheet.new("paper", 10, 6)
 		hud.ticket_rail.add_child(card)
 		var col := VBoxContainer.new()
@@ -405,10 +401,6 @@ func refresh_tickets() -> void:
 				hud._label(box, 14, it.name)
 				box.add_child(HudWidgets.Marks.new(hud.game, int(tk.id), line, it.ingredients.size()))
 				line += 1
-	if hud.game.tickets.size() > shown:
-		var more := HudWidgets.Sheet.new("paper", 8, 6)
-		hud.ticket_rail.add_child(more)
-		hud._label(more, 18, "+%d" % (hud.game.tickets.size() - shown))
 
 
 func say(s: String) -> void:

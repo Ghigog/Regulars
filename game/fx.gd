@@ -76,7 +76,8 @@ static func bubble() -> Node3D:
 	return b
 
 
-static func set_bubble(b: Node3D, id: String) -> void:
+## `size` is the bubble's scale when it has popped up; a side bubble is smaller.
+static func set_bubble(b: Node3D, id: String, size := 0.3) -> void:
 	if b.get_meta("icon") == id:
 		return
 	b.set_meta("icon", id)
@@ -91,4 +92,4 @@ static func set_bubble(b: Node3D, id: String) -> void:
 		Build.flat(holder, Icons._moved([layers[i]], Vector2.ZERO, 0.62)[0][0], layers[i][1], i * 0.004)
 	# It forms from the dots: a quick pop.
 	b.scale = Vector3.ONE * 0.05
-	b.create_tween().tween_property(b, "scale", Vector3(0.3, 0.3, 1.0), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	b.create_tween().tween_property(b, "scale", Vector3(size, size, 1.0), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
