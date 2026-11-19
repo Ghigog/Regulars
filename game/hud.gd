@@ -97,6 +97,7 @@ var options_ui := HudOptions.new(self)   # the options screen, the title and the
 var receipt_ui := HudReceipt.new(self)   # the end-of-day receipt and the critic's review
 var hints_ui := HudHints.new(self)   # hint lines, ready marks, the build tip and the lifted piece's strip
 var shop_ui := HudShop.new(self)   # the build shop: tabs, cards, info and buying
+var buttons_ui := HudButtons.new(self)   # the discs for every action the keys have, tapped on touch
 var screens_ui := HudScreens.new(self)   # the upgrade tree, the town book and the closed sign
 
 
@@ -113,6 +114,7 @@ func setup(game_) -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = _theme()
 	add_child(root)
+	buttons_ui.build()
 
 	# Top left: the desk calendar, the clock that rolls out from behind it, and
 	# the money tag hanging from it on a string.
@@ -429,6 +431,7 @@ func _process(delta: float) -> void:
 		options_ui._options_frame.queue_redraw()   # follows the card as it pops in
 	if not calendar:
 		return
+	buttons_ui.update()
 	dangle.step(calendar.knot(), delta)
 	for j in _views.size() if _shop else 0:   # the piece in the middle turns ever so slowly
 		var turn: Node3D = _views[j].spin
