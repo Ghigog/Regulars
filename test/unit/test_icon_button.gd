@@ -27,6 +27,12 @@ func test_every_new_icon_builds_layers():
 			assert_gte(l[0].size(), 3, id + " layer is a polygon")
 
 
+func test_every_new_icon_layer_triangulates():
+	for id: String in NEW_ICONS:
+		for l: Array in Icons.icon(id):
+			assert_gt(Geometry2D.triangulate_polygon(l[0]).size(), 0, id + " layer fills")
+
+
 func test_new_icons_are_distinct():
 	var seen := {}
 	for id: String in NEW_ICONS:

@@ -420,42 +420,46 @@ static func icon(id: String) -> Array:
 		"sun":
 			o.append([star(0, 0, 0.98, 8, 0.62), GOLD])
 			o.append([ell(0, 0, 0.56), "#ffd76a"])
-		"shop":  # a market awning: scalloped stripes over a counter
-			o.append([rect(0, 0.5, 2.0, 0.56), INK])
-			o.append([PackedVector2Array([Vector2(-1, 0.22), Vector2(-0.7, 0.9), Vector2(0.7, 0.9), Vector2(1, 0.22)]), INK])
-			for i in 4:
-				var x0 := -0.84 + i * 0.42
-				var bite := ell(x0 + 0.21, 0.22, 0.2, 0.2, 180, 360, 8)
-				o.append([rect(x0 + 0.21, 0.58, 0.4, 0.62), CREAM if i % 2 == 0 else CORAL])
-				o.append([bite, CREAM if i % 2 == 0 else CORAL])
-			o.append([rect(0, -0.62, 1.7, 0.84), INK])
-			o.append([rect(0, -0.72, 1.3, 0.54), CREAM])
-			o.append([rect(0, -0.5, 1.7, 0.1), INK])
+		"shop":  # a market awning: wide scalloped stripes over a light counter
+			o.append([rect(0, -0.5, 2.0, 0.9), INK])
+			for i in 3:
+				var sx := -0.62 + i * 0.62
+				var stripe := CORAL if i % 2 == 0 else CREAM
+				o.append([rect(sx, -0.55, 0.6, 0.7), stripe])
+				o.append([ell(sx, -0.05, 0.31, 0.27, 0, 180, 8), INK])
+				o.append([ell(sx, -0.05, 0.25, 0.2, 0, 180, 8), stripe])
+			o.append([rect(0, 0.65, 1.7, 0.7), INK])
+			o.append([rect(0, 0.7, 1.46, 0.5), CREAM])
 		"dishes":  # a plate with a fork beside it
 			o.append([ell(0.3, 0, 0.62), INK])
 			o.append([ell(0.3, 0, 0.5), CREAM])
 			o.append([ell(0.3, 0, 0.28), INK])
-			o.append([rect(-0.78, -0.25, 0.1, 1.1), INK])
-			o.append([rect(-0.78, -0.55, 0.14, 0.9), INK])
-			for dx in [-0.92, -0.78, -0.64]:
-				o.append([rect(dx, 0.62, 0.07, 0.5), INK])
-			o.append([rect(-0.78, 0.42, 0.34, 0.1), INK])
+			o.append([rect(-0.78, -0.2, 0.2, 1.2), INK])
+			for dx in [-0.97, -0.78, -0.59]:
+				o.append([rect(dx, 0.65, 0.13, 0.5), INK])
+			o.append([rect(-0.78, 0.42, 0.5, 0.14), INK])
 		"cog":  # options: a toothed wheel with a hub hole
 			o.append([star(0, 0, 0.98, 8, 0.78, PI / 8), INK])
 			o.append([ell(0, 0, 0.7), INK])
 			o.append([ell(0, 0, 0.3), CREAM])
-		"back":  # a return arrow: a hooked shaft, head left
-			o.append([PackedVector2Array([Vector2(-0.95, 0.1), Vector2(-0.2, 0.8), Vector2(-0.2, 0.4), Vector2(0.3, 0.4), Vector2(0.6, 0.15), Vector2(0.6, -0.3), Vector2(0.3, -0.5), Vector2(-0.2, -0.5), Vector2(-0.2, -0.9), Vector2(0.35, -0.9), Vector2(0.95, -0.35), Vector2(0.95, 0.25), Vector2(0.45, 0.8), Vector2(-0.2, 0.8)]), INK])
-			o.append([PackedVector2Array([Vector2(-0.95, 0.1), Vector2(-0.2, 0.8), Vector2(-0.2, 0.4)]), INK])
+		"back":  # a return arrow: a U-turn band with the head pointing left
+			var u := ell(0.3, 0, 0.7, 0.7, -90, 90, 10)
+			u.append_array(PackedVector2Array([Vector2(-0.25, 0.7), Vector2(-0.25, 0.3)]))
+			u.append_array(ell(0.3, 0, 0.3, 0.3, 90, -90, 10))
+			u.append(Vector2(-0.3, -0.3))
+			u.append(Vector2(-0.3, -0.7))
+			o.append([u, INK])
+			o.append([PackedVector2Array([Vector2(-0.95, 0.5), Vector2(-0.25, -0.05), Vector2(-0.25, 1.05)]), INK])
 		"sell":  # a coin with a minus
 			o.append([ell(0, 0, 0.95), INK])
 			o.append([ell(0, 0, 0.74), GOLD])
 			o.append([rect(0, 0, 1.0, 0.24), INK])
-		"erase":  # an eraser block, a stripe of coral on one end, slanted
-			o.append([rect(0, 0, 1.9, 0.96, 0.5), INK])
-			o.append([rect(-0.22, 0.12, 0.86, 0.66, 0.5), CREAM])
-			o.append([rect(0.42, -0.2, 0.9, 0.66, 0.5), CORAL])
-			o.append([rect(-0.5, -0.55, 1.2, 0.07, 0.5), INK])
+		"erase":  # an eraser block, a coral end and a cream body, one slant
+			var sk := func(u0: float, u1: float, v: float) -> PackedVector2Array:
+				return PackedVector2Array([Vector2(u0 - v * 0.4, v), Vector2(u1 - v * 0.4, v), Vector2(u1 + v * 0.4, -v), Vector2(u0 + v * 0.4, -v)])
+			o.append([sk.call(-0.75, 0.75, 0.55), INK])
+			o.append([sk.call(-0.6, 0.05, 0.4), CREAM])
+			o.append([sk.call(0.15, 0.6, 0.4), CORAL])
 		"turn":  # a curved arrow: three-quarter ring with a head
 			var ring := ell(0, 0, 0.7, 0.7, 40, 330, 18)
 			var band := PackedVector2Array()
