@@ -19,6 +19,7 @@ const NIGHT_ACTIONS := {
 	"Put in sink": "Put in sink",
 	"Wash": "Wash up",
 	"Empty bin": "Take the bag out",
+	"Clear food": "Clear food",   # leftover food on a station (see Station.has_leftover_food)
 }
 
 const CLEAN_FIRST := "Clean it first."              # trying to move or sell a messy piece
@@ -41,10 +42,11 @@ static func cleaner_price(pieces: int, floor_levels: int) -> int:
 
 
 ## Whether a piece has anything left to clean: plates on a table, plates soaking
-## in a sink, scraps in a bin. `dirty` is plates (tables, sinks); `count` is scraps (bins).
+## in a sink, scraps in a bin, leftover food on a counter or stove. `dirty` is plates
+## (tables, sinks) or, for "food", the pieces of food (0 or 1); `count` is scraps (bins).
 static func needs_cleaning(kind: String, dirty: int, count: int) -> bool:
 	match kind:
-		"table", "sink":
+		"table", "sink", "food":
 			return dirty > 0
 		"bin":
 			return count > 0
@@ -71,8 +73,8 @@ static func aged(age: float, delta: float, messy: bool, in_service: bool) -> flo
 
 ## The build-phase note for what is still dirty, e.g.
 ## "Still dirty: 2 tables, the sink, the bin." Empty when nothing is. Sinks and
-## bins are counted like tables: one is "the sink", more are "2 sinks".
-static func dirty_note(tables: int, sinks: int, bins: int) -> String:
+## bins are counted like tables: one is "the sink", more are "2 sinks"; food is "a counter of food".
+static func dirty_note(tables: int, sinks: int, bins: int, food := 0) -> String:
 	var parts: Array[String] = []
 	for pair: Array in [[tables, "a table", "tables"], [sinks, "the sink", "sinks"], [bins, "the bin", "bins"]]:
 		var n: int = pair[0]
@@ -80,6 +82,10 @@ static func dirty_note(tables: int, sinks: int, bins: int) -> String:
 			parts.append(pair[1])
 		elif n > 1:
 			parts.append("%d %s" % [n, pair[2]])
+	if food == 1:
+		parts.append("a counter of food")
+	elif food > 1:
+		parts.append("%d counters of food" % food)
 	if parts.is_empty():
 		return ""
 	return "Still dirty: %s." % ", ".join(parts)

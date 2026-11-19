@@ -291,6 +291,24 @@ func lift_to_rack(kind: String, q: float, res: String) -> void:
 	_update_cooking_visuals()
 
 
+## Food left on the piece when the day ends: an ingredient, or a plate, cup or tray with food on it.
+## A clean empty plate is not food.
+func has_leftover_food() -> bool:
+	if item == "dish":
+		return dish != null and not dish.is_empty()
+	return not Tray.parse(item).is_empty()
+
+
+## Throws the food away: the piece is left empty and cold.
+func clear_food() -> void:
+	item = ""
+	dish = null
+	cook = 0.0
+	rest = 0.0
+	result = ""
+	refresh()
+
+
 ## Whether a fryer's piece has been lifted onto the drain rack.
 func on_rack() -> bool:
 	return is_heat_tool() and mode() == "fryer" and result != ""
