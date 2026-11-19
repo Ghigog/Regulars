@@ -506,7 +506,11 @@ func _update_cursor(ch: Player = null) -> void:
 		if not ch.hand.is_empty() and room_edit._hover_point(ch) != Vector3.INF:
 			p = room_edit._hover_point(ch) + Vector3(0, 2.9 if world.hand_layer(ch) == "high" else 2.0, 0)
 		elif action == "Pick up":
-			p = room_edit._piece_in_front(ch) + Vector3(0, 2.0, 0)
+			var piece := room_edit._piece_in_front(ch)
+			p = piece + Vector3(0, 2.0, 0)
+			ch.cursor.visible = not wall_nodes.has(GamePlacing.snap_edge(piece))   # a partition: the bubble only
+			if ch.cursor.visible:   # a cell piece: the brackets sit on it
+				ch.cursor.position = Grid.center(Grid.to_cell(piece)) + Vector3(0, 0.9, 0)
 			action = "%s %s" % [action, card.lift_name(ch)]
 		elif action == "Use desk":
 			p = desk.desk_in_front(ch).position + Vector3(0, 1.9, 0)
