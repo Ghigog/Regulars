@@ -10,7 +10,14 @@ func _init(hud_: Hud) -> void:
 	hud = hud_
 
 
+## Room kept clear above and below a clipboard on screen.
+const CLIP_MARGIN := 24.0
+## The paper's scroll on the board now open (null when none), for the pad to nudge.
+var paper_scroll: ScrollContainer
+
+
 func hide_card() -> void:
+	paper_scroll = null
 	for c in hud.center.get_children():
 		hud.center.remove_child(c)
 		c.queue_free()
@@ -25,6 +32,73 @@ func _pop_in(panel: Control) -> void:
 	tw.tween_property(panel, "modulate:a", 1.0, 0.2)
 
 
+## Puts the board's paper in a scroll inside `stack` and returns the box to fill with it.
+## The buttons added to `stack` afterwards stay pinned under it. Call `fit_paper` once the
+## box is filled; it is repeated when the window is resized.
+func paper_box(clip: Control, stack: VBoxContainer) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_theme_scrollbar(scroll.get_v_scroll_bar())
+	stack.add_child(scroll)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", stack.get_theme_constant("separation"))
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
+	paper_scroll = scroll
+	scroll.set_meta("clip", clip)
+	var refit := func() -> void:
+		if is_instance_valid(scroll) and scroll.is_inside_tree():
+			fit_paper(scroll)
+	hud.center.resized.connect(refit)
+	scroll.tree_exited.connect(func() -> void:
+		if is_instance_valid(hud) and is_instance_valid(hud.center) and hud.center.resized.is_connected(refit):
+			hud.center.resized.disconnect(refit))
+	return box
+
+
+## A ScrollContainer reports no height of its own, so give it the paper's, or the room the
+## screen has left once the clip's padding, buttons and gaps are taken out, whichever is less.
+func fit_paper(scroll: ScrollContainer) -> void:
+	var clip: Control = scroll.get_meta("clip")
+	var stack := scroll.get_parent() as VBoxContainer
+	var screen := hud.center.size.y
+	if screen <= 0.0:
+		screen = hud.get_viewport().get_visible_rect().size.y
+	var room := screen - 2.0 * CLIP_MARGIN - clip.get_theme_constant("margin_top") - clip.get_theme_constant("margin_bottom")
+	var shown := 1
+	for c in stack.get_children():
+		if c != scroll and c is Control and c.visible:
+			room -= c.get_combined_minimum_size().y
+			shown += 1
+	room -= (shown - 1) * stack.get_theme_constant("separation")
+	var paper_h: float = (scroll.get_child(0) as Control).get_combined_minimum_size().y
+	scroll.custom_minimum_size.y = maxf(minf(paper_h, room), 0.0)
+
+
+## A thin ink grabber on a clear track, so the wood shows through.
+func _theme_scrollbar(bar: ScrollBar) -> void:
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = Color(Hud.INK, 0.8)
+	grab.set_corner_radius_all(3)
+	grab.content_margin_left = 3
+	grab.content_margin_right = 3
+	var hot := grab.duplicate() as StyleBoxFlat
+	hot.bg_color = Hud.INK
+	for n: String in ["grabber", "grabber_highlight", "grabber_pressed"]:
+		bar.add_theme_stylebox_override(n, grab if n == "grabber" else hot)
+	for n: String in ["scroll", "scroll_focus"]:
+		bar.add_theme_stylebox_override(n, StyleBoxEmpty.new())
+
+
+## Nudge the open board's paper (the pad's stick or D-pad). False when nothing scrolls.
+func scroll_paper(dy: float) -> bool:
+	if not is_instance_valid(paper_scroll) or not paper_scroll.is_inside_tree():
+		return false
+	paper_scroll.scroll_vertical += roundi(dy)
+	return true
+
+
 func _ribbon(box: VBoxContainer, text: String, col: Color) -> void:
 	var ribbon := HudWidgets.Sheet.new("ribbon", 30, 6)
 	ribbon.tint = col
@@ -32,6 +106,15 @@ func _ribbon(box: VBoxContainer, text: String, col: Color) -> void:
 	box.add_child(ribbon)
 	var l := hud._label(ribbon, 26, text)
 	l.add_theme_color_override("font_color", Hud.CREAM)
+
+
+## Fit now, and again once the labels have their widths.
+func _fit_when_laid_out(scroll: ScrollContainer) -> void:
+	fit_paper(scroll)
+	var again := func() -> void:
+		if is_instance_valid(scroll) and scroll.is_inside_tree():
+			fit_paper(scroll)
+	again.call_deferred()
 
 
 ## A rule with a small round token in the middle, as on the game-over card.
@@ -94,18 +177,19 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 14)
 	clip.add_child(stack)
+	var paper := paper_box(clip, stack)
 	var receipt := HudWidgets.Sheet.new("receipt").pad(30, 22, 30, 34)
 	receipt.custom_minimum_size = Vector2(430, 0)
 	if rec.has("review"):   # the critic's review, cut from tonight's paper, beside the receipt
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 22)
-		stack.add_child(row)
+		paper.add_child(row)
 		row.add_child(receipt)
 		var cutting := clipping(rec.review)
 		cutting.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		row.add_child(cutting)
 	else:
-		stack.add_child(receipt)
+		paper.add_child(receipt)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	receipt.add_child(box)
@@ -154,7 +238,7 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	_new_in_shop(box, rec)
 	var note := HudWidgets.Sheet.new("note").pad(18, 14, 18, 12)
 	note.rotation = -0.035
-	stack.add_child(note)
+	paper.add_child(note)
 	var gossip := hud._label(note, 19, "TOWN GOSSIP: " + hud.game.town.headline())
 	gossip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	gossip.custom_minimum_size = Vector2(380, 0)
@@ -167,6 +251,7 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	hud._ready_row.add_theme_constant_override("separation", 14)
 	stack.add_child(hud._ready_row)
 	hud.hints_ui.refresh_ready()
+	_fit_when_laid_out(paper_scroll)
 	if animate:
 		_pop_in(clip)
 
@@ -260,8 +345,9 @@ func show_review() -> void:
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 14)
 	clip.add_child(stack)
-	stack.add_child(clipping(hud.game.critic.last_review))
+	paper_box(clip, stack).add_child(clipping(hud.game.critic.last_review))
 	_button(stack, "Back", hud.screens_ui.show_town)
+	_fit_when_laid_out(paper_scroll)
 	_pop_in(clip)
 
 

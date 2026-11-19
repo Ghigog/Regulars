@@ -60,6 +60,15 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+**End-of-day clipboard fits the screen**
+- The clipboard (receipt, town book, last review) never grows past the screen: its height is
+  capped to the screen less about 24 px top and bottom. The paper (receipt and clipping, gossip
+  note, town page) sits in a `ScrollContainer` (`HudReceipt.paper_box`/`fit_paper`) under the
+  clamp; the Town book / Set up / Back buttons and the co-op ready row stay pinned below it.
+  A day that fits looks as it always did, with no scrollbar. Refits when the window resizes.
+- Scrollbar: a thin ink grabber (6 px, rounded) on a clear track over the wood; no default
+  Godot grey. Mouse wheel, touch drag, and on a pad the stick or D-pad scroll it.
+
 **Controls taught in place (epic "Replace the bottom controls bar")**
 - The bottom controls bar is gone: no build slip of key words at night, no corner key line
   by day (one chef or co-op). What stays at the bottom: the night cleaning note, the restock
