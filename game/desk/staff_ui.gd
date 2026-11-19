@@ -43,9 +43,6 @@ func _staff_list() -> void:
 		_person_row(row, person, 84)
 		var m := screen._paper_button(row, "manage:%d" % person, open_person.bind(person), "Manage", 20)
 		m.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var wages := screen._label(screen._content, 18, "Wages tonight: $%d, paid with the stock as the door opens. Days off are paid." % staff.wages_due())
-	wages.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wages.modulate.a = 0.75
 	if screen.note != "":
 		var n := screen._label(screen._content, 18, screen.note)
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
