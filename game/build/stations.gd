@@ -286,8 +286,14 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 
 ## The frame's long teal counter (the starting counters). Each piece runs a little past
 ## its cell, so a row of them is one unbroken body under one unbroken worktop.
-static func _pass(n: Node3D) -> void:
+## `front`: a door panel and a brass pull on the +z face, so a turned piece shows which
+## way it faces (the body alone is the same on every side). Inside a run the marks sit
+## in the next piece's body, so only an end of the run, or a turned piece, shows them.
+static func _pass(n: Node3D, front := false) -> void:
 	Build.box(n, Vector3.ZERO, Vector3(0.9, 0.15, 1.04), Build.CORAL)
+	if front:
+		Build.box(n, Vector3(0, 0.2, 0.545), Vector3(0.7, 0.5, 0.03), _tint(Build.CABINET, 0.07))
+		Build.box(n, Vector3(0, 0.5, 0.565), Vector3(0.3, 0.035, 0.03), "#d9a441", 0.0, Build.R_WOOD)
 	Build._add(n, Build.bevel_mesh(Vector3(0.94, 0.7, 1.08), 0.03), Vector3(0, 0.47, 0), Color(Build.CABINET), 0.0)
 	Build._add(n, Build.bevel_mesh(Vector3(1.0, 0.13, 1.1), 0.03), Vector3(0, 0.835, 0), Color(Build.WORKTOP), 0.0, Build.R_WOOD)
 

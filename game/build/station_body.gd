@@ -170,7 +170,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 				Build.ball(n, Vector3(-0.3 + i * 0.2, 0.79, 0.475), 0.04, "#2b2f31")
 		"counter":
 			if pass_look and not Kitchen.is_tall(base):   # a tall fridge stands whole, the pass broken round it
-				BuildStations._pass(n)
+				BuildStations._pass(n, base in ["", "counter"])   # a bare length shows its front
 			else:
 				BuildStations._counter(n, Build.CABINET, Build.WORKTOP, base != "double_counter")
 		"pass":
