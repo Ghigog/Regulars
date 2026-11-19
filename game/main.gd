@@ -426,7 +426,7 @@ func _process(delta: float) -> void:
 			if input != Vector2.ZERO:
 				ch.aim_mouse = false   # walking hands aim back to the chef
 			if ch.aim_mouse:
-				ch.mouse_point = room_edit.floor_point(get_viewport().get_mouse_position())
+				ch.mouse_point = room_edit.aim_point(get_viewport().get_mouse_position(), ch)
 			_paint_held(p)
 			card._tick_card_hold(ch, controls.holding(p, "use"), delta)
 		if phase in [Phase.SERVICE, Phase.BUILD] and shopper != ch and not preps.has(p):
@@ -600,7 +600,7 @@ func _build_mouse(event: InputEvent, ch: Player) -> void:
 	var mb := event as InputEventMouseButton
 	if mb == null or (mb.button_index != MOUSE_BUTTON_LEFT and mb.button_index != MOUSE_BUTTON_RIGHT):
 		return
-	var p := room_edit.floor_point(mb.position)
+	var p := room_edit.aim_point(mb.position, ch)
 	ch.aim_mouse = true
 	ch.mouse_point = p
 	if p == Vector3.INF:

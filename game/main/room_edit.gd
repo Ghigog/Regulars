@@ -208,6 +208,37 @@ func floor_point(screen: Vector2) -> Vector3:
 	return o + d * (-o.y / d.y)
 
 
+const WORKTOP_Y := 0.9   # the top of a counter (BuildStations._counter: a slab 0.13 thick at 0.77)
+const AIM_STEP := 0.05
+
+
+## Where the build-phase mouse points. Over a worktop (a bare counter, a counter base or a
+## tool standing on one) it is that counter's cell, flattened to the floor, so the piece
+## goes where the cursor looks; anywhere else it is the floor projection. Edge pieces and
+## the build tools always aim at the floor.
+func aim_point(screen: Vector2, ch: Player = null) -> Vector3:
+	var floor_p := floor_point(screen)
+	ch = game._me(ch)
+	if not ch.hand.is_empty() and (GamePlacing.on_edge(ch.hand.id) or Catalog.is_build_tool(ch.hand.id)):
+		return floor_p
+	var o := game.cam.project_ray_origin(screen)
+	var d := game.cam.project_ray_normal(screen)
+	if d.y > -0.0001:
+		return floor_p
+	var y := WORKTOP_Y
+	while y > 0.0:
+		var p := o + d * ((y - o.y) / d.y)
+		if _has_worktop(Grid.to_cell(p)):
+			return Vector3(p.x, 0.0, p.z)
+		y -= AIM_STEP
+	return floor_p
+
+
+func _has_worktop(cell: Vector2i) -> bool:
+	var st: Station = game.stations.get(cell)
+	return st != null and (game.world._bare_counter(cell) != null or Kitchen.is_counter(st.type) or Kitchen.is_top(st.type))
+
+
 ## A point on the piece the chef would pick up: the nearest within reach, the one they
 ## face winning a near tie (as in `Player.target_cell` by day). Candidates are a piece in
 ## a cell (the cell's middle) and a partition on a nearby edge (the edge's middle). The
