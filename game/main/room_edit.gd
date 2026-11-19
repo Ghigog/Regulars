@@ -358,6 +358,32 @@ func build_action(ch: Player = null) -> String:
 	return game.day.door_action(ch)
 
 
+## The head prompt for a chef holding something at night: {text, extras}. A new piece
+## carries its price on "put down" (a moved one none: its sell value is on the sell key),
+## a box its nightly fee, a build tool its price each. A piece also gets turn and aim tags.
+func held_prompt(ch: Player, action: String) -> Dictionary:
+	var hand: Dictionary = ch.hand
+	var text := action
+	var extras := []
+	if Treatments.is_laying_tool(hand.id):
+		return {"text": text, "extras": extras}
+	if Catalog.is_build_tool(hand.id):
+		if ch.drag.is_empty():
+			text = "%s $%d each" % [action, int(hand.price)]
+	elif Treatments.is_box(hand.id):
+		if action == "Put in":
+			text = "%s %s" % [action, Treatments.fee_words(Treatments.key_of(hand.id))]
+	elif Catalog.is_box(hand.id):
+		var b := Pantry.station_ingredient(hand.id)
+		if action == "Put in":
+			text = "%s $%d a night" % [action, Pantry.fee_of(b.id, b.ready)]
+	else:
+		if not hand.get("moving", false) and action in ["Put down", "Hang"]:
+			text = "%s $%d" % [action, int(hand.price)]
+		extras = [["turn", "turn"], ["aim", "aim"]]
+	return {"text": text, "extras": extras}
+
+
 ## What E does with cleaning tools at night (PRD 9.4): at a home or sink, else on the floor.
 func _kit_action(ch: Player) -> String:
 	if game.clean_kit.floor_first(ch):

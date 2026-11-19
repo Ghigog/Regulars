@@ -156,6 +156,27 @@ func test_every_payer_shows_the_partys_lowest_patience_and_the_quitter_is_named(
 	assert_eq(game.ledger.strikes(), 0)
 
 
+func test_a_till_guest_running_out_drags_the_tables_bars_low_and_is_named():
+	var pair: Array[Guest] = game.seating.spawn_group([0, 1])
+	_run(14.0)
+	game.cooking.use_station(pair[0].table)
+	for g in pair:
+		game.serving.serve(g, game.serving.full_tray_for(g))
+	_run(pair[0].eat_time + pair[1].eat_time + Guest.CHAT_TIME)
+	_run(game.paying.TILL_AFTER + 0.5)
+	var at_till: Guest = pair.filter(func(g: Guest) -> bool: return g.state == "to_till" or g.state == "at_till")[0]
+	var seated: Guest = pair.filter(func(g: Guest) -> bool: return g != at_till)[0]
+	at_till.mood.patience = 0.2
+	_run(0.1)
+	assert_lt(game.paying.pay_patience(at_till.table), 0.25, "the table reads the till guest's patience")
+	assert_lt(seated._fill.scale.x, 0.25, "the seated guest's bar is low too")
+	at_till.mood.patience = 0.001
+	_run(0.5)
+	assert_eq(seated.state, "leaving", "the whole table gives up")
+	assert_string_contains(game.hud.toast.text, "gave up", "the corner line names who snapped")
+	assert_string_contains(game.hud.toast.text, game.town.people[at_till.idx].name, "and it is the till guest")
+
+
 func test_the_night_cleaner_clears_everything_in_one_press():
 	_to_build()
 	var table: Station = game.stations[Vector2i(8, 3)]
