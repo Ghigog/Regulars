@@ -88,3 +88,23 @@ func test_quit_asks_first():
 	game.hud.options_ui.pause.press_id("no")
 	assert_false(game.hud.options_ui.pause.confirming)
 	game.hud.options_ui.toggle_pause()
+
+
+func test_turned_till_round_trips_and_old_saves_face_as_before():
+	var till: Node3D = game.stations[Vector2i(4, 2)].get_node("till")
+	BuildStations.face_till(till, 3)
+	var data := SaveGame.capture(game)
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = data
+	add_child_autofree(other)
+	other.set_process(false)
+	var back: Node3D = other.stations[Vector2i(4, 2)].get_node("till")
+	assert_eq(int(back.get_meta("facing")), 3)
+	assert_almost_eq(back.rotation.y, PI / 2 + 3 * PI / 2, 0.001)
+	for p: Dictionary in data.pieces:
+		p.erase("till_facing")
+	var old = load("res://game/main.tscn").instantiate()
+	old._resume_data = data
+	add_child_autofree(old)
+	old.set_process(false)
+	assert_almost_eq(old.stations[Vector2i(4, 2)].get_node("till").rotation.y, PI / 2, 0.001)
