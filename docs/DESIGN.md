@@ -217,8 +217,9 @@ Survive as many days as you can; three walkouts in one day ends the run.
   card on CLOSED and the starting $150 to spend. Tests and `REGULARS_DEMO` shots skip it
   (`first_night` in `game/main.gd`).
 - **Build phase, between days only, played from the keyboard.** Receipt, then Enter. The
-  chef walks the room (WASD or arrows). E picks up the piece in front (a partition on the
-  edge ahead first, else the next cell) and puts it down again in front; R turns it, X
+  chef walks the room (WASD or arrows). E picks up the nearest piece within reach (a partition
+  on a nearby edge included), the one the chef faces winning a near tie, and puts it down
+  again in front; aiming (Shift, trigger, touch Aim) picks exactly; R turns it, X
   sells it, Esc puts it back. Tab opens the shop: a tray along the bottom holds one row of
   every piece in the category. The row slides so the selected piece is always in the
   middle, much bigger than the small ones either side (about five show each way), on a
