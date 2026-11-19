@@ -116,7 +116,7 @@ Rules:
 
 ## Spacing and radii
 
-- The game's unit is the 1 m grid; walls are 0.24 m thick (`Scenery.WALL_T`), full walls 2.4 m,
+- The game's unit is the 1 m grid; walls are 0.3 m thick (`Scenery.WALL_T`), full walls 2.4 m,
   cutaways 0.55 m, work surfaces 0.9 m, `Build.BEVEL` 0.05 m.
 - Interface spacing is on a 4 px grid: separation 5 to 8 between lines, panel margins 14 by 10
   (`HudWidgets.Sheet` default), label cards 16 by 12, wider cards 20 to 28. Gaps between sibling
@@ -125,7 +125,7 @@ Rules:
   trays and plaques, **24** the clipboard. Round everything; a sharp corner is a mistake, except
   the torn zigzag foot of a bill.
 - A raised thing has a plum-brown shadow offset straight down (3 to 6 px) and, for wood, a dark
-  foot and a lighter lip (the "3 cm bevel"). Build these with `HudWidgets.Sheet` kinds (`paper`,
+  foot and a lighter lip (the 5 cm bevel). Build these with `HudWidgets.Sheet` kinds (`paper`,
   `label`, `inset`, `wood`, `clip`, `key`), not by hand.
 - Camera is fixed: orthographic, 37 degrees down, rotated 45 degrees. Never add a free camera or
   perspective view.
