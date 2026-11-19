@@ -414,7 +414,8 @@ Survive as many days as you can; three walkouts in one day ends the run.
     a fried or meat dish, more when fed up).
   - *Feet.* Stepping off a dirty cell carries a level onto the next one, with footprints.
     Speed on a cell by level: 1, 0.9, 0.8, 0.65, 0.5. Guests see dirty cells (sight
-    disgust by level, through `GuestMood`'s sightlines) and smell level 3 and 4 within
+    disgust by level: levels 1 and 2 are nearly harmless, level 3 bites (sight 0.075 plus smell
+    0.015 a second, so about 5 s to Disgusted for an average guest), level 4 0.12 + 0.03; through `GuestMood`'s sightlines) and smell level 3 and 4 within
     two cells, seen or not; the critic notices it in their thoughts.
   - *Slipping (9.3).* Stepping onto a level 4 cell: a 25% chance for a guest, 15% for a
     chef. A guest down loses patience and joy and every guest within a cell who saw it
@@ -557,11 +558,11 @@ Survive as many days as you can; three walkouts in one day ends the run.
 
   | Source | Starts | Doubles every | Tops out | Ages from |
   | --- | --- | --- | --- | --- |
-  | Used plate on a table | 0.002 | 10 s | 0.06 | when the plate was left |
+  | Used plate on a table | 0.002 | 20 s | 0.06 | when the plate was left |
   | Burning food on a stove | 0.01 | 5 s | 0.06 | when it burnt |
-  | The bin (within 5 cells) | 0.004 | 15 s | 0.02 | when this guest first saw it |
+  | The bin (within 5 cells) | 0.004 | 25 s | 0.02 | when this guest first saw it |
   | Overflowing bin (any distance) | 0.008 | 8 s | 0.06 | when it overflowed (replaces the line above) |
-  | Sink piled with 3+ plates | 0.003 | 10 s | 0.04 | when it piled up |
+  | Sink piled with 3+ plates | 0.003 | 20 s | 0.04 | when it piled up |
   | Chef carrying rubbish | 0.05 | 1.5 s | 0.4 | when this guest first saw it |
 
   Below 0.005 a second a guest has not noticed: no thought, and it does not spoil the
@@ -608,7 +609,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   for 3 s (`Guest.CHAT_TIME`; speech bubbles with company, none alone), then waits for
   the bill (`to_pay`). When everyone at the table who ordered has finished chatting, the
   table is ready to pay: one bill per table, paid by the whole party. Their patience runs
-  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`). Every payer's bar shows the party's lowest patience
+  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`), with a grace: on the first wait, patience is raised so that they wait at least `GuestMood.PAY_GRACE` (10 s) whatever was left from waiting for food. Every payer's bar shows the party's lowest patience
   (`GamePaying.pay_patience`), so no bar reads full while someone is about to give up; the
   corner line names the guest who did. While a chef, or a helper
   with the `take_payment` duty, can see the table (`Grid.has_los`, checked every half

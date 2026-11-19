@@ -12,6 +12,8 @@ var comped := false      # the chef made the meal free
 var skipped_bill := false  # ran out of patience waiting to pay, and left without (PRD 11)
 
 ## Paying (PRD 11). Waiting for the bill drains patience slower than waiting for food.
+const PAY_GRACE := 10.0   # tunable: seconds a guest waits for the bill, whatever patience is left
+var _pay_grace_given := false
 const PAY_PATIENCE_SCALE := 1.5   # tunable: seconds to snap, as a multiple of the table's
 const WRONG_BILL_JOY := 0.1       # tunable: joy lost when handed a wrong bill
 
@@ -285,7 +287,11 @@ func walked_out() -> bool:
 ## Waiting to pay (PRD 11): patience runs at `PAY_PATIENCE_SCALE` of the table's.
 ## Running out means they leave without paying: `skipped_bill`, not a walkout strike.
 func wait_to_pay(delta: float, table_seconds: float) -> void:
-	wait(delta, table_seconds * PAY_PATIENCE_SCALE)
+	var seconds_to_snap := table_seconds * PAY_PATIENCE_SCALE
+	if not _pay_grace_given:
+		_pay_grace_given = true
+		patience = maxf(patience, minf(1.0, PAY_GRACE * scale_for("service") / seconds_to_snap))
+	wait(delta, seconds_to_snap)
 	if walked_out():
 		skipped_bill = true
 

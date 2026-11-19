@@ -93,3 +93,21 @@ func test_leaving_unpaid_costs_less_opinion_than_a_walkout_and_is_no_strike():
 	assert_eq(int(l.today.unpaid_bills), 1)
 	assert_eq(l.strikes(), 0)
 	assert_eq(int(l.today.unpaid), 0, "staff wages stay their own")
+
+
+func test_a_fussy_payer_with_no_patience_left_still_waits_the_grace():
+	var m := GuestMood.new()
+	m.tolerance["service"] = 1
+	m.patience = 0.001
+	for i in 90:
+		m.wait_to_pay(0.1, 20.0)
+	assert_false(m.skipped_bill, "still waiting at 9 s")
+	for i in 40:
+		m.wait_to_pay(0.1, 20.0)
+	assert_true(m.skipped_bill, "gone by 13 s")
+
+
+func test_a_patient_payer_keeps_their_patience():
+	var m := GuestMood.new()
+	m.wait_to_pay(0.1, 100.0)
+	assert_gt(m.patience, 0.99)

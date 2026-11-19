@@ -147,7 +147,7 @@ func test_a_seated_guest_is_put_off_by_dirt_they_can_see():
 	var game = _game()
 	var g: Guest = game.seating.spawn_guest(0)
 	g.cell = Vector2i(6, 4)
-	_dirty(game, Vector2i(8, 4), 2)   # a puddle: seen, no smell
+	_dirty(game, Vector2i(8, 4), 3)   # level 3: the first level anyone minds
 	assert_true(game.floor_dirt.disgust(g, 1.0, game.SIGHT_RANGE))
 	assert_gt(g.mood.disgust, 0.0)
 

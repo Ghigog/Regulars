@@ -32,10 +32,10 @@ const DEMO_BILL := 12   # a bill for the receipt demos
 ## GuestMood.gross_rate. A plate and burning food age from when they appeared; the bin
 ## and carried rubbish age from when each guest first had them in view.
 const GROSS := {
-	"plate": [0.002, 10.0, 0.06],
+	"plate": [0.002, 20.0, 0.06],
 	"burning": [0.01, 5.0, 0.06],
-	"bin": [0.004, 15.0, 0.02],
-	"sink": [0.003, 10.0, 0.04],
+	"bin": [0.004, 25.0, 0.02],
+	"sink": [0.003, 20.0, 0.04],
 	"overflow": [0.008, 8.0, 0.06],
 	"rubbish": [0.05, 1.5, 0.4],
 }
