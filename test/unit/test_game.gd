@@ -285,8 +285,8 @@ func test_furniture_is_carried_and_put_down_in_front_of_the_chef():
 	game.room_edit.build_interact()
 	assert_true(game.hand.is_empty())
 	assert_true(game.stations.has(Vector2i(8, 3)))
-	game.player.look(Vector2i(0, -1))
-	assert_eq(game.room_edit.build_action(), "", "nothing in front and not at the door")
+	game.player.position = Grid.center(Vector2i(9, 6))
+	assert_eq(game.room_edit.build_action(), "", "nothing within reach and not at the door")
 
 
 
