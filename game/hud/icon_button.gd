@@ -15,6 +15,12 @@ var icon_id := ""
 var badge := ""
 var blocked := false
 var touch := false
+## A disc of another width (the touch Use button is bigger); 0 keeps the usual one.
+var span := 0.0
+## A face colour other than paper (the touch Use button is coral); transparent keeps paper.
+var face := Color(0, 0, 0, 0)
+## Pressed down by something other than a click: a finger held on it.
+var held := false
 ## Plays a named sound; the owner binds it to `game.audio.sfx`. Silent when unset.
 var sfx := Callable()
 
@@ -74,7 +80,16 @@ func key_shown() -> bool:
 	return _key.visible
 
 
+func set_held(on: bool) -> void:
+	if on != held:
+		held = on
+		_place_key()
+		queue_redraw()
+
+
 func disc_width() -> float:
+	if span > 0.0:
+		return span
 	return THUMB if touch else REACH
 
 
@@ -128,7 +143,7 @@ func _place_key() -> void:
 	var d := disc_width()
 	var ks := _key.get_combined_minimum_size()
 	_key.size = ks
-	_key.position = Vector2((size.x - ks.x) / 2.0, d - ks.y * 0.5 + (SINK if _down else 0.0) - 2.0)
+	_key.position = Vector2((size.x - ks.x) / 2.0, d - ks.y * 0.5 + (SINK if _down or held else 0.0) - 2.0)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -157,13 +172,15 @@ func _notification(what: int) -> void:
 func _draw() -> void:
 	var d := disc_width()
 	var r := d / 2.0
-	var c := Vector2(size.x / 2.0, r + (SINK if _down else 0.0))
+	var c := Vector2(size.x / 2.0, r + (SINK if _down or held else 0.0))
 	var fade := 0.5 if blocked else 1.0
 	draw_circle(Vector2(c.x, r + 5.0), r, Color(Hud.SHADOW, Hud.SHADOW.a * fade))   # sits on the board
 	draw_circle(c, r, Hud.INK)
 	draw_circle(c, r - 2.0, Hud.WOOD.darkened(0.14))
 	draw_circle(c - Vector2(0, 1), r - 3.0, Hud.WOOD)                                  # the wood rim
-	var cream := Hud.CREAM.darkened(0.15) if _down else Hud.CREAM
+	var cream := face if face.a > 0.0 else Hud.CREAM
+	if _down or held:
+		cream = cream.darkened(0.15)
 	draw_circle(c, r - RIM, Color(Hud.INK, 0.6))
 	draw_circle(c, r - RIM - 1.5, Color(cream, fade) if not blocked else Color(cream.darkened(0.2), 1.0))
 	var ink_r := (r - RIM) * 0.52
