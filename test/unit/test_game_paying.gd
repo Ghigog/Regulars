@@ -151,6 +151,7 @@ func test_every_payer_shows_the_partys_lowest_patience_and_the_quitter_is_named(
 	pair[1].mood.patience = 0.001
 	_run(0.5)
 	assert_eq(pair[0].state, "leaving")
+	assert_string_contains(game.hud.toast.text, "gave up", "the corner line names who snapped")
 	assert_eq(int(game.ledger.today.unpaid_bills), 1)
 	assert_eq(game.ledger.strikes(), 0)
 
