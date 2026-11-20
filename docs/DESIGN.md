@@ -37,8 +37,10 @@ Survive as many days as you can; three walkouts in one day ends the run.
 - **Storage (PRD 8.4) and lifting a piece.** Ingredients live in storage the player
   builds. At night (owner's review of night zero, which replaced review item 4's card),
   E (or a click) **lifts** a piece: the till off its counter first, a tool off its
-  counter, what hangs on the wall before what stands under it; a counter lifts whole,
-  its boxes with it. While a piece is lifted a **strip along the bottom** shows the
+  counter, then what hangs on the wall (its boxes first, last in first, then the piece),
+  then what stands under it (its boxes, then the piece): move the bread before the
+  counter, as in real life (owner's request). Only the shop-close re-lift takes a piece
+  whole, boxes with it. While a piece is lifted a **strip along the bottom** shows the
   upgrades it can take at this level (Z and X choose, Space buys; LB, RB and Y on a pad)
   and then the boxes it carries (Space takes one out, stopping its fee). R turns it, C
   sells it (X on a pad), E puts it down, Esc puts it back. A lifted counter can grow a

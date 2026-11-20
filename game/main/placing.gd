@@ -86,6 +86,14 @@ static func piece_name(bp: Dictionary) -> String:
 	return Catalog.label(bp) if Catalog.ITEMS.has(bp.id) else str(Game.PIECE_NAMES.get(bp.id, bp.id))
 
 
+## The box E would lift off a layer ("base" or "high") of a cell, last in first; "" if none.
+func lift_box(c: Vector2i, layer: String) -> String:
+	if layer not in ["base", "high"]:
+		return ""
+	var boxes: Array = game.kitchen.take_stock(c).get(layer, [])
+	return "" if boxes.is_empty() else str(boxes.back())
+
+
 ## Picks up the piece standing at a point on the floor, to move, turn or sell it.
 ## `whole`: a piece that keeps boxes is lifted with them, rather than its boxes one by one.
 ## `layer` names the piece to lift on a cell ("high" or "base"); by default `_lift_layer`.
@@ -118,10 +126,11 @@ func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool
 		var st: Station = game.stations.get(c)
 		if st != null and Kitchen.is_top(st.type) and not Kitchen.grows_from_counter(st.node):
 			game.world._off_counter(st)   # the tool comes off first; its counter stays
-		elif not whole and not game.kitchen.stock(c).is_empty():
-			# Then the boxes, last in first; the counter only once it is empty (PRD 8.4).
-			var box: String = game.kitchen.stock(c).back()
-			game.kitchen.unstore(c, box)
+		elif not whole and lift_box(c, layer) != "":
+			# The boxes of the piece being lifted come first, last in first; the piece
+			# only once it is empty (PRD 8.4).
+			var box := lift_box(c, layer)
+			game.kitchen.unstore(c, box, layer)
 			game.world._show_boxes(c)
 			ch.hand = {"id": box, "tier": 1, "price": 0, "facing": 0, "moving": true,
 				"from": Vector3i(c.x, c.y, 0), "from_facing": 0}
