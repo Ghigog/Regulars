@@ -451,7 +451,7 @@ func build_interact(ch: Player = null) -> void:
 				refuse(ch.last_paint, ch)
 		"Pick up":
 			ch.strip_pick = 0
-			if not game.placing.pick_up(_piece_in_front(ch), ch, true):
+			if not game.placing.pick_up(_piece_in_front(ch), ch):
 				game.audio.sfx("fail")
 		"Use desk":
 			game.desk.open_desk(ch)

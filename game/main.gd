@@ -640,7 +640,7 @@ func _build_mouse(event: InputEvent, ch: Player) -> void:
 				room_edit.refuse(spot, ch)
 		else:
 			ch.strip_pick = 0
-			placing.pick_up(p, ch, true)   # as E does: the piece is lifted whole
+			placing.pick_up(p, ch)   # as E does: boxes come off first, then the piece
 	elif not ch.drag.is_empty() and (right == bool(ch.drag.remove) or erase):
 		room_edit.finish_drag(ch.drag.from, p, ch.drag.remove, ch)
 

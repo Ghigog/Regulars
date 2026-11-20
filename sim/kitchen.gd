@@ -619,10 +619,12 @@ func store(cell: Vector2i, kind: String) -> bool:
 	return true
 
 
-func unstore(cell: Vector2i, kind: String) -> bool:
+func unstore(cell: Vector2i, kind: String, only := "") -> bool:
 	if not cells.has(cell):
 		return false
 	for layer: String in ["base", "high"]:
+		if only != "" and layer != only:
+			continue
 		if cells[cell].stock[layer].has(kind):
 			cells[cell].stock[layer].erase(kind)
 			return true

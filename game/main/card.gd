@@ -305,9 +305,13 @@ func lift_name(ch: Player = null) -> String:
 	if game.wall_nodes.has(GamePlacing.snap_edge(p)):
 		return GamePlacing.piece_name({"id": "screen", "tier": 1}).to_lower()
 	var c := Grid.to_cell(p)
-	if _lift_layer(c, ch) == "till":
+	var layer := _lift_layer(c, ch)
+	if layer == "till":
 		return "till"
-	var st: Station = game.highs.get(c) if _lift_layer(c, ch) == "high" else game.stations.get(c)
+	var box := game.placing.lift_box(c, layer)
+	if box != "":
+		return GamePlacing.piece_name({"id": box, "tier": 1}).to_lower()   # its boxes come off first
+	var st: Station = game.highs.get(c) if layer == "high" else game.stations.get(c)
 	if st == null:
 		return "rug"
 	return GamePlacing.piece_name({"id": st.type, "tier": st.tier}).to_lower()

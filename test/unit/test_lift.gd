@@ -75,14 +75,62 @@ func test_a_box_from_the_shop_goes_into_a_counter():
 	assert_true(game.player.hand.is_empty())
 
 
-func test_e_carries_a_counter_with_its_boxes_and_the_strip_takes_one_out():
+func test_e_lifts_a_box_before_its_counter_and_esc_puts_it_back():
 	var c := Vector2i(4, 3)
 	game.kitchen.store(c, "box_bun")
 	_face(Vector2i(5, 3), Vector2i(-1, 0))
+	assert_eq(game.card.lift_name(game.player), game.placing.piece_name({"id": "box_bun", "tier": 1}).to_lower())
+	game.room_edit.build_interact()
+	assert_eq(game.player.hand.id, "box_bun", "the box comes up first")
+	assert_true(game.stations.has(c), "the counter stays")
+	assert_false(game.kitchen.stock(c).has("box_bun"))
+	game.placing.cancel_hand(game.player)   # Esc
+	assert_true(game.kitchen.stock(c).has("box_bun"), "back in its counter")
+	game.room_edit.build_interact()   # E again lifts it; E on the same counter puts it back
+	assert_eq(game.player.hand.id, "box_bun")
+	game.room_edit.build_interact()
+	assert_true(game.player.hand.is_empty())
+	assert_true(game.kitchen.stock(c).has("box_bun"))
+	game.kitchen.unstore(c, "box_bun")   # empty now: the counter itself
 	game.room_edit.build_interact()
 	assert_eq(game.player.hand.id, "counter")
-	assert_eq(game.player.hand.get("stock", []), ["box_bun"])
 	assert_false(game.stations.has(c))
+
+
+func test_a_click_lifts_the_box_too():
+	var c := Vector2i(4, 3)
+	game.kitchen.store(c, "box_bun")
+	game.placing.pick_up(Grid.center(c), game.player)
+	assert_eq(game.player.hand.id, "box_bun")
+	assert_true(game.stations.has(c))
+
+
+func test_a_wall_piece_gives_up_its_boxes_then_itself_then_the_counters_boxes_then_the_counter():
+	var c := Vector2i(0, 6)   # the starter cabinet hangs here
+	if not game.stations.has(c):
+		game.world.add_station("counter", c)
+	if not game.highs.has(c):
+		game.world.add_high("shelf", c)
+	var cells: Dictionary = game.kitchen.cells[c]
+	cells.stock.high.assign(["box_bun"])
+	cells.stock.base.assign(["box_cheese"])
+	_face(Vector2i(1, 6), Vector2i(-1, 0))
+	var order: Array[String] = []
+	for i in 6:
+		game.room_edit.build_interact()
+		if game.player.hand.is_empty():
+			break
+		order.append(game.player.hand.id)
+		game.player.hand = {}   # set it aside: this test follows the order only
+	assert_eq(order, ["box_bun", "cabinet", "box_cheese", "counter"])
+
+
+func test_a_counter_lifted_whole_keeps_its_boxes_and_the_strip_takes_one_out():
+	var c := Vector2i(4, 3)
+	_face(Vector2i(5, 3), Vector2i(-1, 0))
+	game.room_edit.build_interact()
+	assert_eq(game.player.hand.id, "counter")
+	game.player.hand.stock = ["box_bun"]
 	var last: Dictionary = game.upgrades.strip_choices()[-1]
 	assert_eq(last, {"kind": "box", "id": "box_bun"}, "its boxes are on the strip after its upgrades")
 	game.player.strip_pick = game.upgrades.strip_choices().size() - 1
