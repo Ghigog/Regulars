@@ -232,14 +232,28 @@ func at_door(ch: Player = null) -> bool:
 	return Vector2(d.x, d.z).length() < Game.DOOR_REACH
 
 
+## Within reach of the outside bin: on the pavement cell beside it, not at the door.
+func at_outside_bin(ch: Player = null) -> bool:
+	ch = game._me(ch)
+	var d := ch.position - Scenery.outside_bin_at()
+	return Vector2(d.x, d.z).length() < Game.BIN_REACH
+
+
+## The bag is for the outside bin only: at the front door the chef is told where it is.
+func bin_is_outside(ch: Player = null) -> bool:
+	ch = game._me(ch)
+	return ch.held == "rubbish_bag" and at_door(ch) and not at_outside_bin(ch)
+
+
 ## What the chef can do with the door card from here: "Open up" at the end of the
-## build phase, "Close early" from the middle of the day on, or nothing.
+## build phase, "Close early" from the middle of the day on, or nothing. With the
+## rubbish bag, "Take out rubbish" beside the outside bin, and nothing at the door.
 func door_action(ch: Player = null) -> String:
 	ch = game._me(ch)
+	if ch.held == "rubbish_bag":
+		return "Take out rubbish" if at_outside_bin(ch) else ""
 	if not at_door(ch):
 		return ""
-	if ch.held == "rubbish_bag":
-		return "Take out rubbish"
 	if game.phase == Game.Phase.BUILD and ch.hand.is_empty() and game.shopper != ch:
 		return "Open up"
 	if game.phase == Game.Phase.SERVICE and game.door_open and not game.arrivals.is_empty() and day_progress() >= Game.CLOSE_EARLY_FROM:
@@ -265,6 +279,7 @@ func use_door(ch: Player = null) -> bool:
 		"Take out rubbish":
 			ch.set_held("")
 			game.audio.sfx("putdown")
+			Scenery.flip_bin_lid()
 		_:
 			return false
 	ch.punch()

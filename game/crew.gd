@@ -12,7 +12,7 @@ const REBUILD_EVERY := 0.2
 const HELPER_PREP := 99        # `Station.prep_by` while a helper works a press tool or dispenser
 const BIN_FULL := 3            # a bin with this many scraps is worth emptying (it overflows at 4)
 const RETRY_AFTER := -1.0      # idle seconds set after a failed task, so they do not retry at once
-const STASH: Array[String] = ["stash", "to_sink", "to_door", "bin", "drop"]
+const STASH: Array[String] = ["stash", "to_sink", "to_outside_bin", "bin", "drop"]
 
 var game
 var helpers: Array[Helper] = []

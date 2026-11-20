@@ -576,8 +576,10 @@ func test_bin_fills_overflows_and_is_emptied_out_the_front():
 	assert_eq(bin.count, 0)
 	assert_eq(game.player.held, "rubbish_bag")
 	assert_true(game.player.carrying_something_gross())
-	assert_eq(game.day.door_action(), "", "the bag goes out of the front door")
+	assert_eq(game.day.door_action(), "", "the bag does not go out of the front door")
 	game.player.position = game.DOORWAY
+	assert_eq(game.day.door_action(), "", "no drop at the door either")
+	game.player.position = Grid.center(Scenery.outside_bin_cell() - Vector2i(1, 0))
 	assert_eq(game.day.door_action(), "Take out rubbish")
 	assert_true(game.day.use_door())
 	assert_eq(game.player.held, "")

@@ -134,9 +134,9 @@ func _start(h: Helper, s: Dictionary) -> bool:
 			if stack == null:
 				return false
 			s.at = stack.cell
-		"to_door":
-			s.at = crew.game.ENTRANCE_CELL
-			return h.go_to(crew.game.ENTRANCE_CELL)
+		"to_outside_bin":
+			s.at = Scenery.outside_bin_cell() - Vector2i(1, 0)   # the pavement cell beside the bin
+			return h.go_to(s.at)
 		"drop":
 			return h.go_to(h.cell())
 		"set_plates":
@@ -192,7 +192,7 @@ func _stand_for(h: Helper, s: Dictionary) -> Variant:
 	var at: Vector2i = s.at
 	if s.do == "wipe" and _open(at):
 		return at
-	if s.do == "to_door":
+	if s.do == "to_outside_bin":
 		return at
 	var targets: Array[Vector2i] = [at]
 	var st: Station = crew.game.world.station_at(at)
@@ -301,7 +301,7 @@ func _work(h: Helper, s: Dictionary) -> float:
 			if st == null or st.count <= 0 or h.held != "":
 				return -1.0
 			return HelperWork.task_seconds("empty_bin", h.rating, sat)
-		"to_door", "drop":
+		"to_outside_bin", "drop":
 			return 0.1
 		"wipe":
 			if crew.game.floor_dirt.mess.level(s.at) <= 0:
