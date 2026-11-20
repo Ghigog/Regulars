@@ -60,6 +60,8 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+- *Shop and tree previews of counter-top pieces* (`HudWidgets.ModelView.show_piece`): the plate, cup and tray stacks and every tool that stands on a counter (slicer, board, grater, blender...) are shown as themselves, with no cabinet or worktop (the node carries meta `bare`, which `BuildStations._counter` reads; appliance bodies in steel stay). The stacks carry their full load of plates, cups or trays. The piece is dropped by the worktop height and scaled 1.7 to fill the card. Pieces placed in the room keep their counter.
+
 **End-of-day clipboard fits the screen**
 - The clipboard (receipt, town book, last review) never grows past the screen: its height is
   capped to the screen less about 24 px top and bottom. The paper (receipt and clipping, gossip
