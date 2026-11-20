@@ -263,16 +263,13 @@ func _off_counter(top: Station) -> void:
 
 
 ## Whether the piece in hand can go onto the station at a cell: a tool onto a bare
-## counter, or a counter onto a bare counter (a double counter). Neither while
-## something sits on the counter below or on the counter carried.
+## counter, with nothing on the counter below. A counter never goes onto a counter.
 func _stacks_on(cell: Vector2i, h: Dictionary) -> bool:
 	var under := _bare_counter(cell)
-	if under == null or under.item != "" or not (Kitchen.is_top(h.id) or Kitchen.is_counter(h.id)) \
-			or Kitchen.grows_from_counter(hand_node(h)):
+	if under == null or under.item != "" or not Kitchen.is_top(h.id) or Kitchen.grows_from_counter(hand_node(h)):
 		return false
-	if h.get("moving", false) and ((h.node as Station).item != "" \
-			or (Kitchen.is_counter(h.id) and (h.node as Station).base != "counter")):
-		return false   # an upgraded counter (a fridge, a long counter) does not stack
+	if h.get("moving", false) and (h.node as Station).item != "":
+		return false
 	return game.kitchen.can_place(cell, Kitchen.node_of(h.id))
 
 
