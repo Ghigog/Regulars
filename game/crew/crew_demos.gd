@@ -80,7 +80,7 @@ const STAFF_ROOM := {
 		[Vector2i(2, 0), "steamer", "counter", []],
 		[Vector2i(3, 0), "fryer", "double_counter", ["box_potato", "box_corn"]],
 		[Vector2i(0, 4), "slicer", "fridge", ["box_cheese"]],
-		[Vector2i(2, 6), "grater", "fridge", ["box_shredded_cheese"]],
+		[Vector2i(2, 6), "grater", "fridge", ["box_cheese"]],
 		[Vector2i(3, 6), "bread_knife", "double_counter", ["box_sourdough", "box_orange_juice"]],
 		[Vector2i(4, 4), "juicer", "", []],
 		[Vector2i(4, 5), "blender", "", []],
