@@ -454,3 +454,19 @@ func _demo_fx() -> void:
 		seated[2]._gross_time = 6.0               # green cloud
 	game.menu_stock.storage_of(GameWorld.fixed_main().grill).used()
 	game.audio.burst(game.world.find_station("sink").position + Vector3(0, 1.15, 0), "bubbles", 0.4)
+
+
+## night_clean demo: a loose plate on one counter and a patty on another, for the nightfall tidy to move.
+func leftovers_on_counters() -> void:
+	var n := 0
+	for st: Station in game.stations.values():
+		if st.type != "counter" or st.item != "" or st.has_node("till"):
+			continue
+		if n == 0:
+			st.set_dish(Dish.make(Dish.PLATE))
+		elif n == 1:
+			st.item = "raw:patty"
+			st.refresh()
+		else:
+			break
+		n += 1

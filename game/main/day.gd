@@ -295,6 +295,7 @@ func _end_day() -> void:
 	game.upgrading = false
 	game.ready_chefs.clear()
 	game.phase = Game.Phase.SUMMARY
+	game.tidy.tidy_up()   # plates to the rack, food to the bin (shown when the night opens)
 	game.audio.play_music("night")
 	inspect(null)
 	var unordered := game.menu_stock.unordered_nudges()

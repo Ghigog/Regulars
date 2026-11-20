@@ -187,6 +187,7 @@ func open_build() -> void:
 		game.staff.start_week(game.ledger.day)
 	game.desk.roll_applicants()
 	game.hud.hints_ui.show_build()
+	game.tidy.play()
 	autosave()   # the night's start: where Continue picks up
 
 
