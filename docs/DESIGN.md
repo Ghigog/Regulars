@@ -158,7 +158,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
   next day as they closed, and so does how old the mess is, so guests notice it at once.
   Mess does not age at night. In the build phase, with empty hands, E at a messy piece
   cleans it with the service actions ("Clear table", "Put in sink", "Wash up", "Take
-  the bag out"); cleaning comes before "Pick up". A messy piece cannot be picked up to
+  the bag out"); cleaning comes before "Pick up". At nightfall the kitchen tidies itself
+  (`game/main/tidy.gd`): clean plates, cups and trays, on stations or in hands, go back to
+  their stack, and every piece of food, plated or carried, goes into the nearest bin as one
+  scrap (it may overflow); with no bin it is just cleared. Dirty plates stay as mess.
+  The state changes in `_end_day`; opening the build phase plays it (plates slide to the
+  rack 0.15 s apart, food hops into the bin and its lid bounces). There is no "Clear food". A messy piece cannot be picked up to
   move or sell ("Clean it first."); the mouse cannot clean ("Walk over and press Use").
   While a dirty plate or the bag is carried, the shop stays shut and nothing is picked
   up; whatever is carried when the door card flips goes into service. A taped note over

@@ -403,13 +403,11 @@ func night_clean_action(st: Station, ch: Player = null) -> String:
 	ch = game._me(ch)
 	if st == null or game.phase != Game.Phase.BUILD or game.shopper == ch or not ch.hand.is_empty():
 		return ""
-	if st.has_leftover_food():
-		return "Clear food"
 	return Cleaning.night_action(game.cooking.use_station(st, true, ch))
 
 
 func needs_cleaning(st: Station) -> bool:
-	return _mess_to_clean(st) or st.has_leftover_food()
+	return _mess_to_clean(st)
 
 
 func _mess_to_clean(st: Station) -> bool:
@@ -421,15 +419,12 @@ func dirty_note() -> String:
 	var tables := 0
 	var sinks := 0
 	var bins := 0
-	var food := 0
 	for st: Station in game.stations.values():
 		if _mess_to_clean(st):
 			tables += 1 if Station.is_table(st.type) else 0
 			sinks += 1 if st.type == "sink" else 0
 			bins += 1 if st.type == "bin" else 0
-		elif st.has_leftover_food():
-			food += 1
-	var note := Cleaning.dirty_note(tables, sinks, bins, food)
+	var note := Cleaning.dirty_note(tables, sinks, bins)
 	if note != "":   # or one press: the night cleaner (review, item 8)
 		note += " Or hire the night cleaner in the shop's Extras ($%d)." % cleaner_price()
 	return note
@@ -445,12 +440,6 @@ func build_interact(ch: Player = null) -> void:
 	var action := build_action(ch)
 	if not ch.hand.is_empty():
 		action = "Put down"   # hung or stood, place() decides
-	if action == "Clear food":
-		var food_st: Station = game.world.station_at(ch.target_cell())
-		food_st.clear_food()
-		game.audio.sfx("putdown")
-		game.hud.hints_ui.show_build()
-		return
 	if action in Cleaning.NIGHT_ACTIONS.values():
 		game.cooking.use_station(game.world.station_at(ch.target_cell()), false, ch)
 		game.hud.hints_ui.show_build()   # the dirty note counts down
@@ -650,8 +639,6 @@ func hire_cleaner() -> bool:
 		elif st.type == "bin" and st.count > 0:
 			st.count = 0
 			st.refresh()
-		if st.has_leftover_food():
-			st.clear_food()
 	var m: FloorMess = game.floor_dirt.mess
 	for c: Vector2i in m.dirt.keys():
 		m.clean(c, FloorMess.MAX_LEVEL)

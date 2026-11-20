@@ -409,6 +409,7 @@ func _apply_demo(demo: String) -> void:
 		var bin := game.world.find_station("bin")
 		bin.count = Station.BIN_HOLDS
 		bin.refresh()
+		game.demo_scenes.leftovers_on_counters()   # a loose plate and a patty, tidied at nightfall
 		game.get_tree().create_timer(1.0).timeout.connect(func() -> void:
 			game.session.open_build()
 			game.player.position = Grid.center(Vector2i(6, 4))
