@@ -7,7 +7,7 @@ extends RefCounted
 ## side is game/crew.gd, which walks the steps in the room.
 ##
 ## A step is {do, at?: cell, ...}. The game resolves the steps that name no cell ("deliver",
-## "to_sink", "to_door", "stash") when it reaches them, since what is free changes.
+## "to_sink", "to_outside_bin", "stash") when it reaches them, since what is free changes.
 ##   take      at a storage cell, take `kind` out of a box
 ##   pick      at a station, pick up the raw `kind` lying there
 ##   cook      at a tool, cook the raw `kind` in hand by `job` (`in_place`: it is already there)
@@ -28,7 +28,7 @@ extends RefCounted
 ##   to_sink   put the dirty dishes in hand in the sink
 ##   wash      at a sink, wash up until it is empty
 ##   empty_bin at a bin, take the bag out of it
-##   to_door   take the rubbish bag in hand out of the front door
+##   to_outside_bin   take the rubbish bag in hand out to the outside bin
 ##   wipe      at a dirty cell, clean it with `tool`
 ##   help      beside someone down on the floor, help them up
 
@@ -173,7 +173,7 @@ static func steps(task: Dictionary, duties: Array, dest_duty := "") -> Array:
 		"wash":
 			return [{"do": "wash", "at": task.cell}]
 		"bin":
-			return [{"do": "empty_bin", "at": task.cell}, {"do": "to_door"}]
+			return [{"do": "empty_bin", "at": task.cell}, {"do": "to_outside_bin"}]
 	return []
 
 
@@ -196,7 +196,7 @@ static func clean_tool(duties: Array) -> String:
 
 
 ## What to do with what is in hand when a task is dropped: a tool goes back, dirty dishes
-## to the sink, a bag out of the door, anything else down on a free surface. "" for empty hands.
+## to the sink, a bag out to the outside bin, anything else down on a free surface. "" for empty hands.
 static func stash_for(held: String) -> String:
 	if held == "":
 		return ""
@@ -206,7 +206,7 @@ static func stash_for(held: String) -> String:
 		"dirty_dishes":
 			return "to_sink"
 		"rubbish_bag":
-			return "to_door"
+			return "to_outside_bin"
 	if held.begins_with("burnt:"):
 		return "bin"
 	return "stash"

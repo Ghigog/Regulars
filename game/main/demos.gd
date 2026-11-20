@@ -397,7 +397,7 @@ func _apply_demo(demo: String) -> void:
 		game.ledger.xp = 250
 		game.arrivals.clear()
 		game.get_tree().create_timer(1.0).timeout.connect(game.demo_scenes._demo_build.bind(demo))
-	elif demo == "night_clean":  # a messy day carried into the night, the chef with a plate; shoot at 4 and 6
+	elif demo == "night_clean":  # a messy day carried into the night, the chef with a plate; shoot at 4 and 6; at 6.8 the bag goes in the outside bin
 		game.ledger.record_sale(Game.DEMO_BILL, 5)
 		game.arrivals.clear()
 		for c: Vector2i in [Vector2i(6, 5), Vector2i(8, 3)]:
@@ -419,6 +419,11 @@ func _apply_demo(demo: String) -> void:
 			game.room_edit.build_interact()              # a plate in hand, carried to the sink
 			game.player.position = Grid.center(Vector2i(3, 3))
 			game.player.look(Vector2i(0, -1)))
+		game.get_tree().create_timer(6.5).timeout.connect(func() -> void:
+			game.player.set_held("rubbish_bag")   # out to the pavement, beside the outside bin
+			game.player.position = Grid.center(Scenery.outside_bin_cell() - Vector2i(1, 0))
+			game.player.look(Vector2i(1, 0))
+			game.day.use_door())
 	elif demo == "newday":  # the receipt, then building, then the next day turning over
 		game.ledger.record_sale(Game.DEMO_BILL, 5)
 		game.arrivals.clear()

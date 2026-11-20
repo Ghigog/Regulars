@@ -162,9 +162,10 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			st.refresh()
 			h.set_held("rubbish_bag")
 			crew.game.audio.sfx("pickup")
-		"to_door":
+		"to_outside_bin":
 			h.set_held("")
 			crew.game.audio.sfx("putdown")
+			Scenery.flip_bin_lid()
 		"drop":
 			h.set_held("")
 		"wipe":

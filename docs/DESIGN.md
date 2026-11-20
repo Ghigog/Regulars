@@ -152,7 +152,8 @@ Survive as many days as you can; three walkouts in one day ends the run.
   with its filling, a fish as a fish, so it never reads as a burger.
 - **A dirty kitchen.** Six or more dishes soaking pile up in suds (ten with a dish rack). Every patty thrown
   away or burger scraped off goes in the bin; at four it overflows (it still takes more).
-  "Empty bin" hands the chef a bag, which goes out of the front door ("Take out rubbish");
+  "Empty bin" hands the chef a bag, which is carried out to the bin on the pavement outside ("Take out rubbish", offered only beside it; at the
+  front door the hint reads "The bin is outside."), in service and at night. Helpers walk it out too;
   carried, it counts as rubbish. Both are disgust sources (table below).
 - **Night cleaning.** Mess carries over: plates on tables, the sink and the bin open the
   next day as they closed, and so does how old the mess is, so guests notice it at once.

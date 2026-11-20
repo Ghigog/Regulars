@@ -702,7 +702,7 @@ func test_serving_and_cleaning_steps():
 		func(s: Dictionary) -> String: return s.do), ["pick_dish", "bin", "restack"])
 	assert_eq(HelperWork.steps({"type": "order", "cell": c}, [])[0].do, "order")
 	assert_eq(HelperWork.steps({"type": "clear", "cell": c}, []).map(func(s: Dictionary) -> String: return s.do), ["clear", "to_sink"])
-	assert_eq(HelperWork.steps({"type": "bin", "cell": c}, []).map(func(s: Dictionary) -> String: return s.do), ["empty_bin", "to_door"])
+	assert_eq(HelperWork.steps({"type": "bin", "cell": c}, []).map(func(s: Dictionary) -> String: return s.do), ["empty_bin", "to_outside_bin"])
 	assert_eq(HelperWork.steps({"type": "wash", "cell": c}, [])[0].do, "wash")
 	assert_eq(HelperWork.steps({"type": "help_up", "cell": c, "person": 7}, [])[0].do, "help")
 	var wipe := HelperWork.steps({"type": "dirt", "cell": c}, ["sponge", "mop"])
@@ -713,7 +713,7 @@ func test_serving_and_cleaning_steps():
 func test_what_is_in_hand_is_put_away_where_it_belongs():
 	assert_eq(HelperWork.stash_for(""), "")
 	assert_eq(HelperWork.stash_for("dirty_dishes"), "to_sink")
-	assert_eq(HelperWork.stash_for("rubbish_bag"), "to_door")
+	assert_eq(HelperWork.stash_for("rubbish_bag"), "to_outside_bin")
 	assert_eq(HelperWork.stash_for("burnt:patty"), "bin")
 	assert_eq(HelperWork.stash_for("tool:mop"), "drop")
 	assert_eq(HelperWork.stash_for("prep:patty"), "stash")
