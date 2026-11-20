@@ -203,6 +203,7 @@ var demos := GameDemos.new(self)   # the REGULARS_DEMO dispatcher and the kitche
 var demo_scenes := GameDemoScenes.new(self)   # building, menu, paying, orders, prep and mood demo scenes
 var world := GameWorld.new(self)   # the room: scenery, layout, stations, walls, the wall layer
 var audio := GameAudio.new(self)   # sound, music, shake, daylight and popups
+var tidy := GameTidy.new(self)   # nightfall: plates back to the rack, food into the bin
 var day := GameDay.new(self)   # the day: start, critic booking, door card, end of day
 var session := GameSession.new(self)   # night zero, saving, title, themes and the shop
 var upgrades := GameUpgrades.new(self)   # upgrade tree buys and the lifted piece's strip
