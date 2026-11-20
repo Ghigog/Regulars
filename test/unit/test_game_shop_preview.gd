@@ -19,16 +19,13 @@ func _slabs(root: Node) -> int:
 
 
 func test_stack_previews_hold_their_items() -> void:
-	var plates := _preview("plates")
-	var cups := _preview("cups")
-	var trays := _preview("tray_stack")
-	var want := {plates: Station.PLATES, cups: Station.CUPS, trays: Station.TRAYS}
-	for n: Node3D in want:
-		var probe := Node3D.new()
-		var type := "plates" if n == plates else ("cups" if n == cups else "tray_stack")
-		BuildFood.stack_load(probe, type, want[n])
-		assert_eq(n.get_child_count() - 1 >= probe.get_child_count(), true, type)
-		probe.free()
+	var want := {"plates": Station.PLATES, "cups": Station.CUPS, "tray_stack": Station.TRAYS}
+	for id: String in want:
+		var base := Node3D.new()   # the same piece, bare, without its load
+		add_child_autofree(base)
+		base.set_meta("bare", true)
+		BuildStations.station(base, id, 1, "", false, "")
+		assert_eq(_preview(id).get_child_count() - base.get_child_count(), want[id], "%s items" % id)
 
 
 func test_counter_top_previews_have_no_counter() -> void:
