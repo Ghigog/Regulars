@@ -519,19 +519,17 @@ func test_the_new_kinds_follow_the_table_and_the_balance():
 
 
 
-func test_cheese_grates_at_a_grater_and_a_slicer_cannot():
+func test_cheese_grates_at_a_grater_and_slices_at_a_slicer():
 	_game(false)
-	game.menu_stock.stock_box("shredded_cheese", Vector2i(2, 6))
+	game.menu_stock.stock_box("cheese", Vector2i(2, 6))
 	var grater := _tool_on("grater", Vector2i(2, 5))
 	var slicer := _tool_on("slicer", Vector2i(3, 5))
 	assert_eq([grater.type, grater.main_job()], ["grater", "grate"])
 	assert_has(game.menu_stock.kitchen_tools(), "grate")
-	assert_true(game.cooking.use_station(game.menu_stock.storage_of("shredded_cheese")).begins_with("Take"))
-	assert_eq(game.player.held, "raw:shredded_cheese")
-	assert_eq(game.cooking.use_station(slicer, true), "Put down", "a slicer does not grate: it only rests there")
-	slicer.set_item(Tray.kind("prep", "cheese"))
-	assert_eq(game.cooking.use_station(slicer, true), "Shredded cheese doesn't go on the slicer")
-	assert_eq(game.cooking.use_station(grater), "Grate")
+	assert_true(game.cooking.use_station(game.menu_stock.storage_of("cheese")).begins_with("Take"))
+	assert_eq(game.player.held, "raw:cheese")
+	assert_eq(game.cooking.use_station(slicer, true), "Slice", "the slicer slices the same raw cheese")
+	assert_eq(game.cooking.use_station(grater), "Grate", "the grater's own job wins over its slicing stand-in")
 	assert_eq(game.cooking.prompt_for(grater), "Hold to grate, keep it green")
 	_grate()
 	assert_eq(game.player.held, "prep:shredded_cheese")
@@ -539,12 +537,27 @@ func test_cheese_grates_at_a_grater_and_a_slicer_cannot():
 	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.BURST_SPEED, 0.01, "a good grate gives a burst")
 
 
+func test_raw_lemon_still_slices_at_a_grater():
+	_game(false)
+	var grater := _tool_on("grater", Vector2i(2, 5))
+	assert_eq(GameCooking.press_job(grater, {"id": "lemon", "state": "raw"}), ["slice", "lemon"])
+
+
+func test_each_food_has_one_box_per_theme():
+	for theme: String in ["diner", "seaside"]:
+		var boxed: Array = Pantry.ITEMS.keys().filter(func(k: String) -> bool:
+			return Pantry.ITEMS[k].theme == theme and Pantry.has_box(k))
+		assert_eq(boxed.count("cheese") if theme == "diner" else 0, 1 if theme == "diner" else 0)
+		assert_false(boxed.has("shredded_cheese"), "grated cheese comes from the cheese box")
+	assert_false(Catalog.ITEMS.has("box_shredded_cheese"))
+	assert_eq(Pantry.source_of("shredded_cheese"), "cheese")
+
 
 func test_grating_too_fast_scrapes_a_knuckle():
 	_game(false)
-	game.menu_stock.stock_box("shredded_cheese", Vector2i(2, 6))
+	game.menu_stock.stock_box("cheese", Vector2i(2, 6))
 	var grater := _tool_on("grater", Vector2i(2, 5))
-	game.cooking.use_station(game.menu_stock.storage_of("shredded_cheese"))
+	game.cooking.use_station(game.menu_stock.storage_of("cheese"))
 	game.cooking.use_station(grater)
 	var who: PlayerInput = game.controls.players[0]
 	who.hold("test", "a", "use", true)
