@@ -220,7 +220,7 @@ func _put_down(h: Dictionary, spot: Vector3i, facing: int) -> void:
 	elif game.world._bare_counter(Vector2i(spot.x, spot.y)) != null and Kitchen.is_top(h.id):
 		game.world._onto_counter(n, Vector2i(spot.x, spot.y), facing)
 	elif game.world._bare_counter(Vector2i(spot.x, spot.y)) != null and Kitchen.is_counter(h.id):
-		_stack_counter(Vector2i(spot.x, spot.y))
+		_restack(Vector2i(spot.x, spot.y))   # only the own spot of a lifted hand-stacked counter gets here
 		n.queue_free()
 	else:
 		(n as Station).place_at(Vector2i(spot.x, spot.y), facing)
@@ -253,11 +253,12 @@ func _store_box(cell: Vector2i, box: String) -> bool:
 	return true
 
 
-## A counter placed on a bare counter: the two make a double counter.
-func _stack_counter(cell: Vector2i) -> void:
+## A counter put back on the spot it was lifted from, where the other half still stands:
+## the old hand-stacked double counter is whole again.
+func _restack(cell: Vector2i) -> void:
 	var under := game.world._bare_counter(cell)
-	game.kitchen.place(cell, "counter")
-	under.set_base(game.kitchen.get_piece(cell, "base"))
+	under.set_base("double_counter")
+	game.kitchen.set_cell(cell, under.base)
 	under.stacked = true
 
 
@@ -588,9 +589,6 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 	elif ch.hand.id == "till":
 		BuildStations.register(game.paying._till_host(cell), int(ch.hand.facing))
 		_bought_tonight(game.stations[cell].get_node("till"), paid)
-	elif Kitchen.is_counter(ch.hand.id) and ch.hand.get("base", "") == "" and game.world._bare_counter(cell) != null:
-		_bought_tonight(game.world._bare_counter(cell), paid)
-		_stack_counter(cell)
 	elif game.world.layer_for(cell, GameWorld.hand_node(ch.hand)) == "high":
 		var hung := game.world.add_high(GameWorld.hand_node(ch.hand) if ch.hand.id == "sponge" else str(ch.hand.get("up", ch.hand.id)), cell)
 		_bought_tonight(hung, paid)

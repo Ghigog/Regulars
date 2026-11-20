@@ -187,10 +187,13 @@ func test_counter_with_stock_turned_in_hand_lands_turned_on_a_free_cell():
 func test_one_counter_of_a_double_counter_keeps_its_turn():
 	_to_build()
 	game.ledger.money = 500
-	assert_true(game.placing.pick_up(Vector3(4.5, 0, 3.5), null, true))
-	assert_true(game.placing.place(Vector3i(4, 4, 0)))   # stacks on the counter at (4, 4)
-	assert_true(game.stations[Vector2i(4, 4)].stacked)
+	var st: Station = game.stations[Vector2i(4, 4)]   # as a save holds it: two counters stacked by hand
+	st.set_base("double_counter")
+	st.stacked = true
+	game.kitchen.set_cell(Vector2i(4, 4), "double_counter")
 	assert_true(game.placing.pick_up(Vector3(4.5, 0, 4.5), null, true))
+	assert_eq(game.stations[Vector2i(4, 4)].base, "counter", "a counter stays standing")
+	assert_false(game.placing.can_place(Vector3i(5, 4, 0)) and game.stations.has(Vector2i(5, 4)))
 	game.placing.rotate_hand()
 	assert_true(game.placing.place(Vector3i(4, 4, 0)))
 	assert_true(game.stations[Vector2i(4, 4)].stacked, "back on top")
