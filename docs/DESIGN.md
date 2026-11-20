@@ -372,7 +372,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   their tiers, priced and levelled as before. The shop sells tier 1 and tree roots only:
   the fryer, pot and slicer are reached from the stove and board. Selling pays half the
   piece's whole price, as before. A counter bought into a double in its tree lifts off
-  whole; two counters stacked by hand still come apart one at a time.
+  whole. A counter can no longer be put on a counter (refused as taken); the tree is the only way to a double counter. Only a double counter stacked by hand in an old save still comes apart one at a time.
 - **Quality is difficulty (PRD 8.3).** The tools' three tiers are gone; each tool does
   its jobs at a quality from its tree node, and the minigames read it (`Prep`): 1.0
   plays as before; a stand-in (0.6) has a narrower chop notch and faster marker, less

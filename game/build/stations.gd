@@ -79,7 +79,11 @@ static func _tint(col: String, amount := 0.08) -> String:
 
 ## A 0.9 m counter: darker toe-kick, body with two doors and brass handles on the
 ## front (+z), bevelled worktop. Everything that takes a carried item sits flush.
+## A node marked "bare" (a shop preview of a counter-top piece) gets no plain counter
+## stand; an appliance's own steel body stays.
 static func _counter(n: Node3D, body: String, top: String, doors := true, kick := "") -> void:
+	if n.has_meta("bare") and body != Build.STEEL:
+		return
 	Build.box(n, Vector3.ZERO, Vector3(0.9, 0.15, 0.9), _shade(body) if kick == "" else kick)
 	Build.box(n, Vector3(0, 0.12, 0), Vector3(0.94, 0.7, 0.94), body)
 	Build.box(n, Vector3(0, 0.77, 0), Vector3(1.0, 0.13, 1.0), top, 0.0, Build.R_WOOD)  # a thick slab of worktop

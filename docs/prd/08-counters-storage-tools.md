@@ -20,14 +20,14 @@ sit on counters, and tools that do similar jobs form an upgrade tree.
 | --- | --- |
 | Stock amount | Unchanged: a flat fee per stocked kind per night, never runs out. A stocked kind now needs a storage slot. |
 | Counters | The base of the kitchen. A counter says "I am using this cell". Tools go on top of counters, stove and fridge included. A stove on a counter changes the counter's look and use, but still works as a surface. |
-| Double counter | Adding a counter to a counter makes a double counter with more storage. |
+| Double counter | More storage, one cell. It comes only from the counter's upgrade tree in the shop; a counter cannot be put on a counter (it is refused: "Something's already there"). |
 | Sell anything | Every kitchen piece can be bought and sold, the starting counters included. |
 | Shelf | Storage only, nothing on top, so it is smaller than a counter. |
 | Chilled food | Must be stored in a fridge. Fridge level 1: one kind, lower half of the wall only. Level 2: two kinds, both wall layers, so nothing goes above it. |
 | Wall layers | A cell against a wall has two layers: low (floor pieces) and high (wall pieces), so storage can climb the wall into a closet. |
 | Tools | An upgrade tree, not equals. Each step is efficient (a bit better at the same jobs) or specialist (much better at one niche, or a new job). Opened by opening the shop with a piece in hand. |
 | Grater | In, with shredded cheese (diner) and breadcrumbs to coat fish (seaside). |
-| Double counter | A counter placed on a counter; still one cell. |
+| Double counter | An upgrade of the counter, bought from its tree; still one cell. A counter cannot go onto a counter. |
 | New ingredients | In this PRD, with their jobs and trees. |
 | Fridges | The specialist line of the counter. They store anything, chilled or not. |
 | Hood | Bought and placed over a stove. A flag only for now (see "Later: floor mess"). |
@@ -56,7 +56,7 @@ counter** as a tall piece. A level 3 fridge, if wanted: three kinds, still one c
 | Piece | Kinds held | Chilled |
 | --- | --- | --- |
 | Counter | 1 | no |
-| Double counter (a counter added to a counter) | 2 | no |
+| Double counter (from the counter's upgrade tree) | 2 | no |
 | Low or high shelf, wall cabinet | 1 | no |
 | Fridge level 1 (under-counter) | 1, any kind | yes |
 | Fridge level 2 (tall) | 2, any kind | yes |

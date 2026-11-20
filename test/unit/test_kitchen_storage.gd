@@ -117,8 +117,8 @@ func test_e_takes_the_top_first_then_storage_and_swaps_through_the_kinds():
 	_game(false)
 	var cell := Vector2i(2, 6)
 	game.world.add_station("counter", cell)
-	game.kitchen.place(cell, "counter")   # a double counter: two kinds
-	game.stations[cell].set_base("double_counter")
+	game.stations[cell].set_base("double_counter")   # a double counter: two kinds
+	game.kitchen.set_cell(cell, "double_counter")
 	game.menu_stock.stock_box("bun", cell)
 	game.menu_stock.stock_box("lettuce", cell)
 	var st: Station = game.stations[cell]

@@ -144,9 +144,9 @@ const NODES := {
 
 ## Catalog pieces that are kitchen nodes under another id (none since the crates went, 8.4).
 const CATALOG_IDS := {}
-## A base that becomes another when one more of it is placed on it: a counter placed
-## on a counter is a double counter, still one cell (PRD 8, "Decided").
-const STACKS := {"counter": "double_counter"}
+## A double counter comes only from the counter's upgrade tree; a counter cannot go on a
+## counter. Old saves may hold one made by hand: it still comes apart one counter at a time.
+const UNSTACKS := {"double_counter": "counter"}
 ## Tools not sold in the shop: each grows from a bare counter, a branch of the counter's
 ## tree, and is a tree of its own after that. Buying one stands it on the counter, which
 ## stays under it, so its step costs the tool's whole price.
@@ -322,15 +322,9 @@ static func is_counter(catalog_id: String) -> bool:
 	return n != "" and fit_of(n) == "counter"
 
 
-## What a base becomes with `id` placed on it ("" if they do not stack).
-static func stacked(base: String, id: String) -> String:
-	return str(STACKS[id]) if STACKS.has(id) and base == id else ""
-
-
 ## What a stacked base leaves behind when one piece comes off it ("" if it is not stacked).
 static func unstacked(base: String) -> String:
-	var lower: Variant = STACKS.find_key(base)
-	return str(lower) if lower != null else ""
+	return str(UNSTACKS.get(base, ""))
 
 
 ## Whether an ingredient (a kind, or a box id: "box_patty", "ready_cheese") must be
@@ -393,8 +387,6 @@ func layer_for(cell: Vector2i, id: String) -> String:
 		return ""
 	var base := get_piece(cell, "base")
 	var fit := fit_of(id)
-	if fit == "counter" and stacked(base, id) != "" and get_piece(cell, "top") == "":
-		return "base"   # a counter on a bare counter: a double counter
 	for layer: String in FITS[fit]:
 		if get_piece(cell, layer) != "":
 			continue
@@ -437,8 +429,7 @@ func place(cell: Vector2i, id: String) -> String:
 	var layer := layer_for(cell, id)
 	if layer == "":
 		return ""
-	var up := stacked(get_piece(cell, "base"), id) if layer == "base" else ""
-	_cell(cell)[layer] = up if up != "" else id
+	_cell(cell)[layer] = id
 	return layer
 
 
