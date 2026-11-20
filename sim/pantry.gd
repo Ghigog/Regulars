@@ -42,8 +42,8 @@ const ITEMS := {
 	"soda": {"name": "Soda", "theme": "diner", "tool": "pour", "tags": ["drink"], "worth": 3, "fee": 3, "drink": true,
 		"colour": "#7a3b2e", "prepped": "#7a3b2e", "shape": "cup"},
 	# PRD 8.6: the new jobs' kinds (tunable worth and fees).
-	"shredded_cheese": {"name": "Shredded cheese", "theme": "diner", "tool": "grate", "tags": ["dairy"], "chilled": true,
-		"worth": 2, "fee": 3, "colour": "#f2c53d", "prepped": "#f7d258", "shape": "shreds"},
+	"shredded_cheese": {"name": "Grated cheese", "theme": "diner", "tool": "grate", "tags": ["dairy"], "chilled": true,
+		"from": "cheese", "worth": 2, "fee": 0, "colour": "#f2c53d", "prepped": "#f7d258", "shape": "shreds"},
 	"sourdough": {"name": "Sourdough", "theme": "diner", "tool": "saw", "tags": ["bread"], "worth": 3, "fee": 4,
 		"colour": "#c98a4a", "prepped": "#ead2a4", "shape": "loaf"},
 	"steamed_corn": {"name": "Steamed corn", "theme": "diner", "tool": "steam", "tags": ["vegetable"], "from": "corn",

@@ -390,7 +390,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   without rocking the lid off) and steam (steamer off the stock pot; lift the lid while
   the gauge is green). Two more dispensers: the coffee machine off the soda fountain and
   the beer tap off the wine barrel; the two-tap fountain adds cola, the wine rack red
-  wine. New kinds, diner: shredded cheese, sourdough, steamed corn (from the corn box),
+  wine. New kinds, diner: grated cheese (id `shredded_cheese`, from the cheese box), sourdough, steamed corn (from the corn box),
   ice cream (frozen: freezer only), orange juice, milkshake (from the ice cream box),
   cola, coffee. Seaside: breadcrumbs (a coating: bread to taste, never wraps; makes a
   breaded fillet), crusty loaf, mussels (chilled), lemonade (from the lemon box), fruit

@@ -110,6 +110,21 @@ func test_turned_till_round_trips_and_old_saves_face_as_before():
 	assert_almost_eq(old.stations[Vector2i(4, 2)].get_node("till").rotation.y, PI / 2, 0.001)
 
 
+func test_old_cheese_block_box_becomes_the_cheese_box():
+	var data := SaveGame.capture(game)
+	var cells: Array = game.kitchen.cells.keys()
+	var a: Vector2i = cells[0]
+	var b: Vector2i = cells[1]
+	data.stock[a] = {"base": ["box_shredded_cheese"], "high": []}
+	data.stock[b] = {"base": ["box_cheese", "box_shredded_cheese"], "high": []}
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = data
+	add_child_autofree(other)
+	other.set_process(false)
+	assert_eq(other.kitchen.take_stock(a).base, ["box_cheese"])
+	assert_eq(other.kitchen.take_stock(b).base, ["box_cheese"], "one box of a kind per cell")
+
+
 func _saved_cells() -> Array:
 	var cells := []
 	for p in SaveGame.read(SAVE_TEST_PATH).pieces:

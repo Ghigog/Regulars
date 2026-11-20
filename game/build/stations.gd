@@ -158,7 +158,7 @@ static func _store_kind(id: String) -> String:
 		return "drink"
 	if id in ["fish", "calamari", "mussels"]:
 		return "ice"
-	if id in ["patty", "cheese", "shredded_cheese", "ice_cream"]:
+	if id in ["patty", "cheese", "ice_cream"]:
 		return "cold"
 	if id in ["onion", "potato", "new_potato"]:
 		return "sack"

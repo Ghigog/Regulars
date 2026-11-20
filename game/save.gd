@@ -154,7 +154,19 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 			if host != null:
 				BuildStations.register(host, int(p.get("till_facing", 0)))
 	for c: Vector2i in d.stock:
-		g.kitchen.give_stock(c, (d.stock[c] as Dictionary).duplicate(true))
+		var held: Dictionary = (d.stock[c] as Dictionary).duplicate(true)
+		# Before there was one cheese box, grated cheese had its own: it is the cheese box now,
+		# or dropped when the cell already has one (a cell holds one box of a kind).
+		for layer: String in held:
+			var boxes: Array = (held[layer] as Array).duplicate()
+			var at := boxes.find("box_shredded_cheese")
+			if at >= 0:
+				if boxes.has("box_cheese"):
+					boxes.remove_at(at)
+				else:
+					boxes[at] = "box_cheese"
+				held[layer] = boxes
+		g.kitchen.give_stock(c, held)
 		g.world._show_boxes(c)
 	g.treat_laid = d.treat_laid.duplicate(true)
 	g.treat_off = d.treat_off.duplicate(true)
