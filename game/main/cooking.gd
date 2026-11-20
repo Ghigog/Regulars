@@ -48,7 +48,24 @@ func use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	var kit := game.clean_kit.station_use(st, dry_run, ch)   # cleaning tools first (PRD 9.4)
 	if kit != "" or CleanKit.holding(ch):
 		return kit   # a tool fills the hands: nothing else is done with it
+	if game.phase == Game.Phase.BUILD and _fills_hands(_use_station(st, true, ch)):
+		# The night is for building: no plate, cup or food into the hands.
+		if not dry_run:
+			game.hud.day_ui.say(NIGHT_HANDS + ".")
+			game.audio.sfx("fail")
+		return NIGHT_HANDS
 	return _use_station(st, dry_run, ch)
+
+
+const NIGHT_HANDS := "Plates and food wait for the morning"
+const NIGHT_TAKES := ["Take off the heat", "Take out", "Pick up", "Lift basket", "Plate it", "Pour into cup"]
+
+
+## Whether an action's name puts a plate, cup, tray or food in the chef's hands.
+static func _fills_hands(act: String) -> bool:
+	if act in NIGHT_TAKES or act.begins_with("Pour ") or act.begins_with("Swap for "):
+		return true
+	return act.begins_with("Take ") and not act.begins_with("Take order") and not act.contains(" orders")
 
 
 func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
