@@ -742,8 +742,8 @@ static func _street(root: Node3D, w: int, x1: float, lights: Array[OmniLight3D])
 	# Tall things stand at the far end, where they hide nothing; low ones near.
 	_tree(root, Vector3(x1 - 0.65, 0, kerb - 0.05))
 	_lamp_post(root, Vector3(x1 - 2.4, 0, kerb), lights)
-	_bench(root, Vector3(X0 + 2.0, 0, kerb))
-	_street_bin(root, Vector3(X0 + 0.6, 0, kerb))
+	_bench(root, Vector3(X0 + 0.6, 0, kerb))
+	_street_bin(root, _bin_spot())
 	_bike(root, Vector3(X0 + 4.0, 0, kerb))
 	_street_dressing(root, x1)
 
@@ -787,11 +787,57 @@ static func _bench(root: Node3D, at: Vector3) -> void:
 		_rb(root, at + Vector3(sx, 0.37, 0.04), Vector3(0.12, 0.09, 0.6), leg, 0.04)
 
 
-## Sheet 12: a teal drum with a thick dark rim.
+## Where the outside bin stands: on the kerb side of the pavement, just past
+## the doorway and well clear of the queue, which runs the other way. Both
+## themes put it at the same place, so the chef's walk to it is the same.
+static func outside_bin_at() -> Vector3:
+	return Vector3(Game.W + 2.3, 0, Game.DOOR.y + 0.7)
+
+
+## The cell the bin stands in: past the walkable pavement, so it is out of reach
+## of the queue and the chef steps up beside it.
+static func outside_bin_cell() -> Vector2i:
+	return Grid.to_cell(outside_bin_at())
+
+
+const BIN_LID_OPEN := 1.9   # radians the lid swings up
+
+## The bin's place in the street's own frame (drawn along x, turned to run down the right).
+static func _bin_spot() -> Vector3:
+	var at := outside_bin_at()
+	return Vector3(Game.W - at.z, 0, at.x - X0)
+
+
+static var _bin_lid: Node3D
+static var _bin_tween: Tween
+
+
+## The outside bin's lid flips up, waits a moment and drops shut with a small bounce.
+static func flip_bin_lid() -> void:
+	if not is_instance_valid(_bin_lid) or not _bin_lid.is_inside_tree():
+		return
+	if _bin_tween:
+		_bin_tween.kill()
+	_bin_tween = _bin_lid.create_tween()
+	_bin_tween.tween_property(_bin_lid, "rotation:x", BIN_LID_OPEN, 0.18) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_bin_tween.tween_interval(0.45)
+	_bin_tween.tween_property(_bin_lid, "rotation:x", 0.0, 0.5) \
+		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+## Sheet 12b: a teal drum with a thick dark rim, and a lid on a hinge at the
+## road side. The lid is a node of its own so it can flip.
 static func _street_bin(root: Node3D, at: Vector3) -> void:
 	Build.lathe(root, at, [[0.0, 0.0], [0.23, 0.0], [0.26, 0.04], [0.275, 0.32], [0.26, 0.62], [0.0, 0.62]], Build.CABINET)
 	Build.lathe(root, at, [[0.2, 0.6], [0.29, 0.6], [0.315, 0.66], [0.29, 0.72], [0.2, 0.72], [0.2, 0.6]], "#4a372c")
 	Build.cyl(root, at + Vector3(0, 0.63, 0), 0.2, 0.02, "#173f47")
+	var hinge := Node3D.new()
+	hinge.position = at + Vector3(0, 0.74, 0.3)
+	root.add_child(hinge)
+	Build.lathe(hinge, Vector3(0, 0, -0.3), [[0.0, 0.0], [0.31, 0.0], [0.33, 0.03], [0.3, 0.07], [0.0, 0.08]], "#4a372c")
+	Build.ball(hinge, Vector3(0, 0.1, -0.3), 0.06, Build.CORAL)
+	_bin_lid = hinge
 
 
 ## Sheet 12: a wooden balance bike. Wooden wheels with dark tyres, a chunky coral
@@ -987,3 +1033,4 @@ static func _pier(root: Node3D, w: int, x1: float) -> void:
 				Build.ball(root, Vector3(x + u * 1.5, 0.5 - sin(u * PI) * 0.14, rail), 0.045, "#e8dcc0").scale = Vector3(4.0, 1, 1)
 		x += 1.5
 	_pier_dressing(root, x1)
+	_street_bin(root, _bin_spot())   # by the rail
