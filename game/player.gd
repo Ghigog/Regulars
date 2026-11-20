@@ -336,13 +336,13 @@ func _can_stand(from: Vector3, to: Vector3) -> bool:
 	var g: Grid = game.grid
 	var c := Grid.to_cell(to)
 	var c0 := Grid.to_cell(from)
-	if g.is_blocked(c):
+	if g.chef_blocked(c):
 		return false
 	if c != c0 and (absi(c.x - c0.x) + absi(c.y - c0.y) != 1 or not g.edge_open(c0, c)):
 		return false
 	for d in Grid.DIRS:
 		var n := Grid.to_cell(to + Vector3(d.x, 0, d.y) * RADIUS)
-		if n != c and (g.is_blocked(n) or not g.edge_open(c, n)):
+		if n != c and (g.chef_blocked(n) or not g.edge_open(c, n)):
 			return false
 	return true
 
@@ -363,7 +363,7 @@ func _way_out() -> Vector3:
 		for dy in range(-3, 4):
 			var c := here + Vector2i(dx, dy)
 			var d := (Grid.center(c) - position).length()
-			if d < best_d and not game.grid.is_blocked(c):
+			if d < best_d and not game.grid.chef_blocked(c):
 				best_d = d
 				best = c
 	return Grid.center(best)
