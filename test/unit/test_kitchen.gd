@@ -267,19 +267,16 @@ func test_best_quality_reads_tools_on_counters():
 
 # ---------- Counters and tops (8.2) ----------
 
-func test_a_counter_on_a_bare_counter_makes_a_double_counter():
+func test_a_counter_cannot_go_on_a_counter():
 	var k := _kitchen()
 	k.place(C, "counter")
-	assert_eq(k.place(C, "counter"), "base")
-	assert_eq(k.get_piece(C, "base"), "double_counter")
-	assert_eq(k.slots(C), 2)
-	assert_false(k.can_place(C, "counter"), "a double counter takes no third")
-	var k2 := _kitchen()
-	k2.place(C, "counter")
-	k2.place(C, "board")
-	assert_false(k2.can_place(C, "counter"), "not under a tool")
-	assert_eq(Kitchen.stacked("counter", "counter"), "double_counter")
-	assert_eq(Kitchen.unstacked("double_counter"), "counter")
+	assert_false(k.can_place(C, "counter"))
+	assert_eq(k.place(C, "counter"), "")
+	assert_eq(k.get_piece(C, "base"), "counter")
+	assert_eq(k.slots(C), 1)
+	k.set_cell(C, "double_counter")
+	assert_false(k.can_place(C, "counter"), "nor on a double counter")
+	assert_eq(Kitchen.unstacked("double_counter"), "counter", "an old hand-stacked one still comes apart")
 	assert_eq(Kitchen.unstacked("counter"), "")
 
 

@@ -102,31 +102,41 @@ func test_a_moved_stove_goes_on_the_floor_never_onto_a_counter():
 
 
 
-func test_a_counter_on_a_counter_makes_a_double_and_lifts_off_again():
+func test_a_counter_on_a_counter_is_refused():
 	_game()
 	var c := Vector2i(2, 5)
-	for i in 2:
-		assert_true(game.placing.pick_catalog("counter"))
-		assert_true(game.placing.place(Vector3i(2, 5, 0)))
-		game.placing.cancel_hand()
-	assert_eq(game.stations[c].base, "double_counter")
-	assert_eq(game.kitchen.slots(c), 2)
+	game.world.add_station("counter", c)
+	var money: int = game.ledger.money
 	assert_true(game.placing.pick_catalog("counter"))
-	assert_false(game.placing.can_place(Vector3i(2, 5, 0)), "no triple")
+	var spot := Vector3i(2, 5, 0)
+	assert_false(game.placing.can_place(spot))
+	assert_eq(game.placing.place_refusal(spot), GamePlacing.TAKEN)
+	assert_false(game.placing.place(spot))
+	assert_eq(game.ledger.money, money, "nothing spent")
+	assert_eq(game.stations[c].base, "counter")
+	assert_eq(game.kitchen.slots(c), 1)
 	game.placing.cancel_hand()
+
+
+func test_a_moved_counter_is_refused_on_a_counter_and_goes_on_the_floor():
+	_game()
+	game.world.add_station("counter", Vector2i(2, 5))
+	game.world.add_station("counter", Vector2i(3, 5))
+	assert_true(game.placing.pick_up(_at(2, 5)))
+	assert_false(game.placing.can_place(Vector3i(3, 5, 0)))
+	assert_eq(game.placing.place_refusal(Vector3i(3, 5, 0)), GamePlacing.TAKEN)
+	assert_true(game.placing.place(Vector3i(6, 6, 0)), "open floor still works")
+
+
+func test_a_tool_goes_on_a_tree_bought_double_counter():
+	_game()
+	var c := Vector2i(2, 5)
+	game.world.add_station("counter", c, 1, 0, "double_counter")
+	assert_eq(game.kitchen.slots(c), 2)
 	assert_true(game.placing.pick_catalog("board"))
 	assert_true(game.placing.place(Vector3i(2, 5, 0)), "a tool on a double counter")
 	game.placing.cancel_hand()
 	assert_eq(game.stations[c].base, "double_counter")
-	assert_true(game.placing.pick_up(_at(2, 5)))
-	assert_eq(game.player.hand.id, "board")
-	game.placing.sell_hand()
-	assert_true(game.placing.pick_up(_at(2, 5)))
-	assert_eq(game.player.hand.id, "counter", "one counter comes off")
-	assert_eq(game.stations[c].base, "counter", "the other stays")
-	game.placing.cancel_hand()
-	assert_eq(game.stations[c].base, "double_counter", "and goes back on")
-
 
 
 func test_the_starting_pass_is_counters_that_sell_and_take_tools():
