@@ -159,10 +159,8 @@ const ITEMS := {
 		"ingredient": "new_potato", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
 	"box_beans": {"name": "Bean box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "seaside",
 		"ingredient": "beans", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge"},
-	# PRD 8.6: boxes of the new kinds. Derived kinds (lemonade, milkshake, steamed corn) and
+	# PRD 8.6: boxes of the new kinds. Derived kinds (grated cheese, lemonade, milkshake, steamed corn) and
 	# dispenser drinks have none.
-	"box_shredded_cheese": {"name": "Cheese block box", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
-		"ingredient": "shredded_cheese", "box": true, "blurb": "Stocks it every night. A fridge slot only. Grate it"},
 	"box_sourdough": {"name": "Sourdough loaves", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",
 		"ingredient": "sourdough", "box": true, "blurb": "Stocks it every night. A counter slot, or a fridge. Saw it"},
 	"box_orange_juice": {"name": "Orange crate", "price": 0, "level": 1, "category": "Pantry", "tiers": 1, "theme": "diner",

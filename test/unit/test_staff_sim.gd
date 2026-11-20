@@ -722,6 +722,7 @@ func test_a_new_job_needs_its_new_tool():
 		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["shredded_cheese"]}],
 	})
 	assert_eq(b.tasks["prep:1"].duties, ["grater"])
+	assert_eq(HelperWork.hold_for("shredded_cheese"), "raw:cheese")
 
 
 func test_dirt_grows_more_urgent_by_level_and_waiting_adds_urgency():

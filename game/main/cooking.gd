@@ -627,6 +627,10 @@ static func press_job(st: Station, held_ing: Dictionary) -> Array:
 		return ["", ""]
 	var id: String = held_ing.id
 	if held_ing.state == "raw":
+		# The station's own main job wins when it makes a kind from this one (a grater grates cheese).
+		for k: String in Pantry.made_from(id):
+			if st.main_job() == Pantry.tool_of(k) and PRESS_VERBS.has(st.main_job()) and st.q(st.main_job()) > 0.0:
+				return [st.main_job(), k]
 		var own := Pantry.tool_of(id)
 		if PRESS_VERBS.has(own) and st.q(own) > 0.0:
 			return [own, id]
