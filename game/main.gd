@@ -233,6 +233,8 @@ var _shot_time := 0.0
 func _ready() -> void:
 	var seed_value := int(Time.get_unix_time_from_system())
 	grid = Grid.new(W + 2 - LOT.position.x, LOT.size.y, LOT.position)   # columns W and W + 1 are the pavement outside
+	grid.pavement_from = W   # a chef steps out only as far as the outside bin
+	grid.chef_pavement = {DOOR: true, DOOR + Vector2i(1, 0): true}
 	town = Town.new(seed_value, Scenery.theme_id)
 	critic = Critic.new(seed_value, town.people.size())
 	staff = Staff.new(seed_value)
