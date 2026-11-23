@@ -328,15 +328,6 @@ func test_mess_ages_in_service_only():
 
 
 
-func test_dirty_note_lists_what_is_left():
-	assert_eq(Cleaning.dirty_note(2, 1, 1), "Still dirty: 2 tables, the sink, the bin.")
-	assert_eq(Cleaning.dirty_note(1, 0, 1), "Still dirty: a table, the bin.")
-	assert_eq(Cleaning.dirty_note(0, 1, 0), "Still dirty: the sink.")
-	assert_eq(Cleaning.dirty_note(0, 2, 2), "Still dirty: 2 sinks, 2 bins.", "a second sink and bin each count")
-	assert_eq(Cleaning.dirty_note(0, 0, 0), "")
-
-
-
 func test_every_ingredient_has_its_fields():
 	for id: String in Pantry.ITEMS:
 		var it: Dictionary = Pantry.ITEMS[id]

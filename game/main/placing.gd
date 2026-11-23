@@ -502,10 +502,8 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 	if ch.hand.id == "till":   # on a counter, or a tool standing on one
 		return "" if game.paying._till_host(cell) != null else NEEDS_COUNTER
 	var hn := GameWorld.hand_node(ch.hand)
-	if Kitchen.can_go_high(hn):   # the wall layer (PRD 8.5): hung high, or a shelf low
-		var layer := game.world.layer_for(cell, hn)
-		if layer != "base":
-			return "" if layer == "high" else NO_WALL
+	if Kitchen.can_go_high(hn):   # the wall layer (PRD 8.5): it hangs on a wall or not at all
+		return "" if game.world.layer_for(cell, hn) == "high" else NO_WALL
 	elif Kitchen.is_tall(hn) and game.kitchen.get_piece(cell, "high") != "":
 		return TAKEN   # a tall piece fills both wall layers
 	if Kitchen.grows_from_counter(hn):   # a stove is its counter upgraded: the floor only

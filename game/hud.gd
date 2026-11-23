@@ -71,9 +71,7 @@ var _ready_row: HBoxContainer           # the receipt's ready markers, in co-op
 var _door_ready: Control                # the ready markers over the door card
 var _door_ready_row: HBoxContainer
 var _shop_tag: Control                  # "Chef 1 is shopping", over the shop in co-op
-var _dirty_note: Control   # build phase: "Still dirty: ..." with a stink cloud, at the bottom
 var _strip: VBoxContainer  # build phase: a lifted piece's upgrades and boxes, at the bottom
-var _dirty_label: Label
 var menu: MenuScreen           # the menu screen, while it is open
 var bill: BillScreen           # the bill screen at the till (PRD 11.3), while it is open
 var desk: DeskScreen           # the desk screen (PRD 10.3), while it is open

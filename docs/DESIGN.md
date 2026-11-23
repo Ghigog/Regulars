@@ -21,11 +21,10 @@ Survive as many days as you can; three walkouts in one day ends the run.
   (what it adds to a price) and a fee (what stocking it costs a night).
 - **Wall layer (PRD 8.5).** A cell against a full-height back wall (no window, door or
   archway in it) has a high layer over whatever stands below, even bare floor. Wall
-  pieces in the shop's Kitchen tab: a wall shelf ($10, one kind; stands low on a free
-  cell, hangs high over anything else; its efficient step the wide shelf, two kinds), a
+  pieces in the shop's Kitchen tab: a wall shelf ($10, one kind, hangs only like a
+  hook; its efficient step the wide shelf, two kinds; for something low use a counter), a
   wall cabinet ($20, one kind, hangs only) and a hood ($30, hangs only; over a stove it
-  cuts that stove's grease, PRD 9's `FloorMess.HOOD`). A low and a high shelf on one
-  cell draw as one closet. The counter's tree goes on from the under-counter fridge to
+  cuts that stove's grease, PRD 9's `FloorMess.HOOD`). The counter's tree goes on from the under-counter fridge to
   the tall fridge (two kinds, fills both wall layers, no top), then the glass-door tall
   fridge (three kinds) or the freezer (two kinds; takes frozen kinds, of which there are
   ice cream since 8.6). The first room starts with two hoods over the cooking line, two
@@ -154,8 +153,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   with its filling, a fish as a fish, so it never reads as a burger.
 - **A dirty kitchen.** Six or more dishes soaking pile up in suds (ten with a dish rack). Every patty thrown
   away or burger scraped off goes in the bin; at four it overflows (it still takes more).
-  "Empty bin" hands the chef a bag, which is carried out to the bin on the pavement outside ("Take out rubbish", offered only beside it; at the
-  front door the hint reads "The bin is outside."), in service and at night. Helpers walk it out too;
+  "Empty bin" hands the chef a bag, which is carried out to the bin on the pavement outside ("Take out rubbish", offered only beside it), in service and at night. Helpers walk it out too;
   carried, it counts as rubbish. Both are disgust sources (table below).
 - **Night cleaning.** Mess carries over: plates on tables, the sink and the bin open the
   next day as they closed, and so does how old the mess is, so guests notice it at once.
@@ -617,12 +615,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
   for 3 s (`Guest.CHAT_TIME`; speech bubbles with company, none alone), then waits for
   the bill (`to_pay`). When everyone at the table who ordered has finished chatting, the
   table is ready to pay: one bill per table, paid by the whole party. Their patience runs
-  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`), with a grace: on the first wait, patience is raised so that they wait at least `GuestMood.PAY_GRACE` (10 s) whatever was left from waiting for food. Every payer's bar shows the party's lowest patience
+  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`) at the till, and 3.5x slower again while still seated (`GuestMood.PAY_TABLE_SLOWER`), with a grace: on the first (seated) wait, patience is raised so that they wait at least `GuestMood.PAY_GRACE` (35 s) whatever was left from waiting for food. Every payer's bar shows the party's lowest patience
   (`GamePaying.pay_patience`), so no bar reads full while someone is about to give up; the
   corner line names the guest who did. While a chef, or a helper
   with the `take_payment` duty, can see the table (`Grid.has_los`, checked every half
   second), one guest waves with the bill bubble (a torn-edged slip with a coin) and a soft
-  bell rings once. After 12 s ready with no slip printed for them (`TILL_AFTER`), the one
+  bell rings once. After 42 s ready with no slip printed for them (`TILL_AFTER`), the one
   who called (else the first) stands and queues at the till, on the room side of the
   pass, bubble always up; the line follows the till if the pass moves. A chef facing the
   till with empty hands (and nothing on that counter top) gets "Write the bill": the
@@ -673,7 +671,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   `variety`, kindness, walkouts and forgiving are `other`; friends hear it under the
   same topic. The review, printed at the end of the day, replaces everyone's four topics
   with (rating - 3) x 0.1, leaves `other`, grudges and "never coming back" alone, and
-  gives `roll_guests` an extra -0.25 to +0.25 for the next four days (stacks with flyers,
+  gives `roll_guests` an extra -0.25 to +0.25 for the next four days (stacks with flyers, which add a fixed `Town.FLYER_GUESTS` extra guests,
   replaced by the next review). The clipping (headline by stars, the four ratings with
   icons and pips, stars, a line confirming or contradicting the town's average on the
   topic with the biggest gap, the critic's name and peg) comes with the receipt. The
@@ -728,7 +726,7 @@ Where an older paragraph above disagrees, this list wins.
 
 - **Crowd** (`sim/town.gd`): each theme's town is forty named people (the fourteen drawn
   ones and a seeded pool, `Town.MORE_NAMES`; looks from the peg kit, `Peg.look_for`).
-  Visit chance is 0.1 + 0.45 x affinity; flyers add 0.1 each and a review +-0.1 at most.
+  Visit chance is 0.1 + 0.45 x affinity; flyers add `Town.FLYER_GUESTS` (2) extra guests after the floor top-up, never anyone with a grudge or gone, and a review +-0.1 at most.
   A thin day is topped up to `crowd_floor` = 2 + day / 2. The day is 75 s every day
   (95 and 85 s on days 1 and 2); later days are harder for the crowd, shorter patience,
   and bigger parties (more bring every friend; from day 8 a friend brings a friend).
@@ -782,7 +780,7 @@ focused. The logic and tests still exist.
 | Walls on cell edges, line of sight, placement pathing | `sim/grid.gd` | **Built**, see section 1. Placement rules are `Grid.can_place_block` and `can_place_wall`. |
 | Word of mouth between friends | `sim/town.gd` | **Built**, see section 1. |
 | Kindness / discounts | `GuestMood.offer_discount` / `offer_comp`, `Town.record_kindness` / `paid_full_price` | **Built**, see section 1: half price, free meals, and guests who come to expect them. |
-| Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
+| Flyers (ad boost) | `Town.roll_guests(day, boost, extra)` | **Built**, see section 1. |
 
 - **Bill screen**: consider filling the slip from the tickets if testers find writing
   the bill tedious.

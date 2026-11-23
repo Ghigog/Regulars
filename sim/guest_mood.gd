@@ -12,8 +12,9 @@ var comped := false      # the chef made the meal free
 var skipped_bill := false  # ran out of patience waiting to pay, and left without (PRD 11)
 
 ## Paying (PRD 11). Waiting for the bill drains patience slower than waiting for food.
-const PAY_GRACE := 10.0   # tunable: seconds a guest waits for the bill, whatever patience is left
+const PAY_GRACE := 35.0   # tunable: seconds a guest waits for the bill, whatever patience is left
 var _pay_grace_given := false
+const PAY_TABLE_SLOWER := 3.5   # tunable: seated at the table they wait this much longer for the bill than at the till
 const PAY_PATIENCE_SCALE := 1.5   # tunable: seconds to snap, as a multiple of the table's
 const WRONG_BILL_JOY := 0.1       # tunable: joy lost when handed a wrong bill
 
@@ -284,10 +285,11 @@ func walked_out() -> bool:
 	return patience <= 0.0
 
 
-## Waiting to pay (PRD 11): patience runs at `PAY_PATIENCE_SCALE` of the table's.
+## Waiting to pay (PRD 11): patience runs at `PAY_PATIENCE_SCALE` of the table's, and
+## `PAY_TABLE_SLOWER` times slower again while still `seated` (at the till it is not).
 ## Running out means they leave without paying: `skipped_bill`, not a walkout strike.
-func wait_to_pay(delta: float, table_seconds: float) -> void:
-	var seconds_to_snap := table_seconds * PAY_PATIENCE_SCALE
+func wait_to_pay(delta: float, table_seconds: float, seated: bool) -> void:
+	var seconds_to_snap := table_seconds * PAY_PATIENCE_SCALE * (PAY_TABLE_SLOWER if seated else 1.0)
 	if not _pay_grace_given:
 		_pay_grace_given = true
 		patience = maxf(patience, minf(1.0, PAY_GRACE * scale_for("service") / seconds_to_snap))

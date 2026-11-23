@@ -61,10 +61,14 @@ func test_waiting_to_pay_drains_patience_at_the_paying_scale():
 	var food := GuestMood.new()
 	var pay := GuestMood.new()
 	food.wait(10.0, 100.0)
-	pay.wait_to_pay(10.0, 100.0)
-	assert_almost_eq(1.0 - pay.patience, (1.0 - food.patience) / GuestMood.PAY_PATIENCE_SCALE, 0.0001)
+	var till := GuestMood.new()
+	pay.wait_to_pay(10.0, 100.0, true)
+	till.wait_to_pay(10.0, 100.0, false)
+	var scale := GuestMood.PAY_PATIENCE_SCALE
+	assert_almost_eq(1.0 - pay.patience, (1.0 - food.patience) / (scale * GuestMood.PAY_TABLE_SLOWER), 0.0001)
+	assert_almost_eq(1.0 - till.patience, (1.0 - food.patience) / scale, 0.0001)
 	assert_false(pay.skipped_bill)
-	pay.wait_to_pay(1000.0, 100.0)
+	pay.wait_to_pay(1000.0, 100.0, true)
 	assert_true(pay.walked_out())
 	assert_true(pay.skipped_bill, "running out while waiting to pay is leaving unpaid")
 
@@ -99,15 +103,15 @@ func test_a_fussy_payer_with_no_patience_left_still_waits_the_grace():
 	var m := GuestMood.new()
 	m.tolerance["service"] = 1
 	m.patience = 0.001
-	for i in 90:
-		m.wait_to_pay(0.1, 20.0)
-	assert_false(m.skipped_bill, "still waiting at 9 s")
+	for i in 340:
+		m.wait_to_pay(0.1, 20.0, true)
+	assert_false(m.skipped_bill, "still waiting at 34 s")
 	for i in 40:
-		m.wait_to_pay(0.1, 20.0)
-	assert_true(m.skipped_bill, "gone by 13 s")
+		m.wait_to_pay(0.1, 20.0, true)
+	assert_true(m.skipped_bill, "gone by 38 s")
 
 
 func test_a_patient_payer_keeps_their_patience():
 	var m := GuestMood.new()
-	m.wait_to_pay(0.1, 100.0)
+	m.wait_to_pay(0.1, 100.0, true)
 	assert_gt(m.patience, 0.99)

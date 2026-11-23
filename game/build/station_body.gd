@@ -184,21 +184,10 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			Build.box(n, Vector3(0, 0.89, 0.04), Vector3(0.58, 0.03, 0.44), "#8fc3cf", 0.0, Build.R_GLOSS)
 			Build.cyl(n, Vector3(0, 0.9, -0.36), 0.035, 0.26, "#c9d0d1", 0.0, Build.R_WOOD)
 			Build.box(n, Vector3(0, 1.12, -0.25), Vector3(0.06, 0.05, 0.26), "#c9d0d1", 0.0, Build.R_WOOD)
-		"shelf":
-			# A low open shelf (PRD 8.5): half depth against the back, no worktop, so it
-			# reads smaller than a counter. A wide shelf has a third board.
-			var boards := 3 if tier > 1 or base == "wide_shelf" else 2
-			for sx: float in [-1.0, 1.0]:
-				Build.box(n, Vector3(sx * 0.44, 0, -0.27), Vector3(0.06, 0.86, 0.46), Build.WOOD_DARK, 0.0, Build.R_WOOD)
-			Build.box(n, Vector3(0, 0, -0.48), Vector3(0.88, 0.86, 0.04), BuildStations._shade(Build.WOOD))
-			for i in boards:
-				Build.box(n, Vector3(0, 0.04 + i * 0.78 / (boards - 1), -0.27), Vector3(0.84, 0.05, 0.44), Build.WOOD, 0.0, Build.R_WOOD)
-			for j in 2:   # a couple of tins on the lower board
-				Build.cyl(n, Vector3(-0.2 + j * 0.36, 0.09, -0.27), 0.09, 0.2, [Build.CORAL, Build.TILE_TEAL][j], 0.0, Build.R_GLOSS)
-		"cabinet", "hood", "hook":
-			BuildStations.wall_piece(n, type, false, BuildStations.HIGH_Y0 - 0.3)
+		"cabinet", "hood", "hook", "shelf", "wide_shelf":
+			BuildStations.wall_piece(n, type, BuildStations.HIGH_Y0 - 0.3)
 		"sponge":   # sold on its own hook (PRD 9.4): seen in hand as both; up its tree, the node's tool (9.5)
-			BuildStations.wall_piece(n, "hook", false, BuildStations.HIGH_Y0 - 0.3)
+			BuildStations.wall_piece(n, "hook", BuildStations.HIGH_Y0 - 0.3)
 			var hung := BuildClean.hand_tool(n, Kitchen.tool_of(node) if Kitchen.tool_of(node) != "" else "sponge", 1.0)
 			hung.position = BuildClean.hook_spot(BuildStations.HIGH_Y0 - 0.3)
 		"mop_bucket":

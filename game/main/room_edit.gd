@@ -414,19 +414,6 @@ func _mess_to_clean(st: Station) -> bool:
 	return Cleaning.needs_cleaning("table" if Station.is_table(st.type) else st.type, st.dirty, st.count)
 
 
-## The build-phase note on what is still dirty; "" when everything is clean.
-func dirty_note() -> String:
-	var tables := 0
-	var sinks := 0
-	var bins := 0
-	for st: Station in game.stations.values():
-		if _mess_to_clean(st):
-			tables += 1 if Station.is_table(st.type) else 0
-			sinks += 1 if st.type == "sink" else 0
-			bins += 1 if st.type == "bin" else 0
-	return Cleaning.dirty_note(tables, sinks, bins)
-
-
 func build_interact(ch: Player = null) -> void:
 	ch = game._me(ch)
 	if ch.hand.is_empty() and _kit_action(ch) != "":   # a cleaning tool (PRD 9.4)
@@ -508,8 +495,7 @@ func _update_ghost(ch: Player = null) -> void:
 			elif ch.hand.id == "till":
 				BuildStations.register(ch.ghost)
 			elif layer == "high":
-				var closet := hn.ends_with("shelf") and game.kitchen.is_closet_with(cell, hn)
-				BuildStations.wall_piece(ch.ghost, hn, closet)
+				BuildStations.wall_piece(ch.ghost, hn)
 			elif ch.hand.get("node") is Station:
 				var hs: Station = ch.hand.node
 				BuildStations.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" or Kitchen.grows_from_counter(hs.node) else "", hs.pass_look, hs.node)

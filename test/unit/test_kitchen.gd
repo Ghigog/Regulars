@@ -128,13 +128,14 @@ func test_under_counter_fridge_keeps_its_top_free():
 
 func test_shelf_has_no_top_and_goes_high_on_a_wall():
 	var k := _kitchen()
-	assert_eq(k.place(C, "shelf"), "base")
 	assert_false(k.can_place(C, "board"))
+	assert_eq(k.layer_for(C, "shelf"), "", "never on the floor: no wall, no shelf")
+	assert_eq(k.layer_for(C, "wide_shelf"), "")
 	assert_false(k.can_place(C, "shelf"), "no high layer away from a wall")
-	assert_eq(k.place(W, "shelf"), "base")
-	assert_eq(k.place(W, "wide_shelf"), "high")
-	assert_true(k.is_closet(W))
-	assert_false(k.is_closet(C))
+	assert_eq(k.layer_for(W, "shelf"), "high", "a wall cell with free floor below still hangs it")
+	assert_eq(k.place(W, "shelf"), "high")
+	assert_eq(k.layer_for(W, "wide_shelf"), "", "one high piece a cell")
+	assert_eq(k.get_piece(W, "base"), "")
 
 
 
