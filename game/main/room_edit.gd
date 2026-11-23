@@ -414,22 +414,6 @@ func _mess_to_clean(st: Station) -> bool:
 	return Cleaning.needs_cleaning("table" if Station.is_table(st.type) else st.type, st.dirty, st.count)
 
 
-## The build-phase note on what is still dirty; "" when everything is clean.
-func dirty_note() -> String:
-	var tables := 0
-	var sinks := 0
-	var bins := 0
-	for st: Station in game.stations.values():
-		if _mess_to_clean(st):
-			tables += 1 if Station.is_table(st.type) else 0
-			sinks += 1 if st.type == "sink" else 0
-			bins += 1 if st.type == "bin" else 0
-	var note := Cleaning.dirty_note(tables, sinks, bins)
-	if note != "":   # or one press: the night cleaner (review, item 8)
-		note += " Or hire the night cleaner in the shop's Extras ($%d)." % cleaner_price()
-	return note
-
-
 func build_interact(ch: Player = null) -> void:
 	ch = game._me(ch)
 	if ch.hand.is_empty() and _kit_action(ch) != "":   # a cleaning tool (PRD 9.4)

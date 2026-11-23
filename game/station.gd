@@ -555,12 +555,20 @@ func refresh() -> void:
 		BuildStations.sink_load(_stack, dirty, messy())
 	elif type == "bin":
 		BuildStations.bin_load(_stack, count, BIN_HOLDS)
-		if overflowing() and not _fx.has("wisps"):
-			_fx.wisps = Fx.play(self, "wisps", Vector3(0, 1.25, 0), 0.32, true)
-			_fx.wisps.fps = 3.0
-		elif not overflowing() and _fx.has("wisps"):
-			_fx.wisps.queue_free()
-			_fx.erase("wisps")
+	_show_grime(messy())
+
+
+## The heavy-dirt cloud over a messy piece, made once and freed when it is clean.
+func _show_grime(on: bool) -> void:
+	if on and not _fx.has("grime"):
+		var p := FloorDirt.motes(FloorDirt.MOTES.size() - 1, randi())
+		p.emission_box_extents = Vector3(0.4, 0.02, 0.4)
+		p.position = Vector3(0, 0.85, 0)
+		add_child(p)
+		_fx.grime = p
+	elif not on and _fx.has("grime"):
+		_fx.grime.queue_free()
+		_fx.erase("grime")
 
 
 ## Shows which kinds this cell stores: a row of tags over it (PRD 8.4).

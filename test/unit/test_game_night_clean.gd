@@ -42,7 +42,6 @@ func test_night_cleaning_clears_a_table_and_washes_up():
 	assert_eq(game.player.held, "dirty_dishes")
 	assert_eq(t.dirty, 0, "both plates in the hands")
 	assert_eq(game.room_edit.build_action(), "", "plates in hand: nothing is picked up")
-	assert_false(game.room_edit.dirty_note().contains("a table"), "the table is clear")
 	_face_sink()
 	assert_eq(game.room_edit.build_action(), "Put in sink")
 	game.room_edit.build_interact()
@@ -62,11 +61,9 @@ func test_night_cleaning_takes_the_bag_out():
 	bin.count = Station.BIN_HOLDS
 	_face(Vector2i(1, 5), Vector2i(-1, 0))
 	assert_eq(game.room_edit.build_action(), "Take the bag out")
-	assert_true(game.room_edit.dirty_note().begins_with("Still dirty: the bin."))
 	game.room_edit.build_interact()
 	assert_eq(game.player.held, "rubbish_bag")
 	assert_eq(bin.count, 0)
-	assert_eq(game.room_edit.dirty_note(), "", "nothing left once the bag is out of the bin")
 
 
 
@@ -130,7 +127,6 @@ func test_the_night_cleaner_leaves_nothing_to_clean():
 	_to_build()
 	game.ledger.money = 100
 	assert_true(game.room_edit.hire_cleaner())
-	assert_eq(game.room_edit.dirty_note(), "")
 
 
 func test_food_in_hand_is_gone_when_the_door_opens():

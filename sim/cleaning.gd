@@ -68,19 +68,3 @@ static func aged(age: float, delta: float, messy: bool, in_service: bool) -> flo
 	if not messy:
 		return 0.0
 	return age + delta if in_service or AGES_AT_NIGHT else age
-
-
-## The build-phase note for what is still dirty, e.g.
-## "Still dirty: 2 tables, the sink, the bin." Empty when nothing is. Sinks and
-## bins are counted like tables: one is "the sink", more are "2 sinks".
-static func dirty_note(tables: int, sinks: int, bins: int) -> String:
-	var parts: Array[String] = []
-	for pair: Array in [[tables, "a table", "tables"], [sinks, "the sink", "sinks"], [bins, "the bin", "bins"]]:
-		var n: int = pair[0]
-		if n == 1:
-			parts.append(pair[1])
-		elif n > 1:
-			parts.append("%d %s" % [n, pair[2]])
-	if parts.is_empty():
-		return ""
-	return "Still dirty: %s." % ", ".join(parts)
