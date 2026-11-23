@@ -883,9 +883,8 @@ static func _lamp_post(root: Node3D, at: Vector3, lights: Array[OmniLight3D]) ->
 
 
 ## Sheet 12, second pass: a raised stone kerb with drain grates, a zebra crossing,
-## a coral pillar box, a teal hydrant, flowers round the tree and a toy car parked
-## on the far lane. Everything stands on the kerb row or the road, well clear of
-## the queue line along the shop wall.
+## a coral pillar box, a teal hydrant and flowers round the tree. Everything stands on the kerb row or
+## the road, well clear of the queue line along the shop wall.
 static func _street_dressing(root: Node3D, x1: float) -> void:
 	var x := X0
 	var i := 0
@@ -910,7 +909,6 @@ static func _street_dressing(root: Node3D, x1: float) -> void:
 		var a := TAU * k / 6.0 + 0.3
 		var at := tree + Vector3(cos(a) * 0.3, 0.23, sin(a) * 0.3)
 		Build.ball(root, at, 0.05, [Build.CORAL, Build.PAPER, "#ffd27a"][k % 3])
-	_toy_car(root, Vector3(X0 + 2.6, -0.08, Z1 - 0.85))
 
 
 ## A coral pillar box: a fat drum with a dark band, a domed cap and a mail slot.
@@ -931,29 +929,6 @@ static func _hydrant(root: Node3D, at: Vector3) -> void:
 	Build.ball(root, at + Vector3(0, 0.63, 0), 0.045, BRASS, 0.0, Build.R_WOOD)
 	for side: float in [-1.0, 1.0]:
 		Build.cyl(root, at + Vector3(side * 0.11, 0.3, 0), 0.055, 0.08, BRASS).rotation.z = -side * PI / 2
-
-
-## A chunky toy car (sheet 12's playset feel): a cream body with a teal cabin,
-## dark windows, wooden wheels with dark tyres like the bike, and lamps.
-static func _toy_car(root: Node3D, at: Vector3) -> void:
-	var car := Node3D.new()
-	car.position = at
-	root.add_child(car)
-	_rb(car, Vector3(0, 0.36, 0), Vector3(1.9, 0.38, 0.9), Build.CORAL, 0.12)
-	_rb(car, Vector3(-0.15, 0.7, 0), Vector3(1.05, 0.38, 0.8), Build.PAPER, 0.12)
-	for sz: float in [-1.0, 1.0]:
-		_rb(car, Vector3(-0.15, 0.72, sz * 0.395), Vector3(0.84, 0.22, 0.02), "#2f3a3e", 0.04)
-		for sx: float in [-0.6, 0.6]:
-			var wheel := Node3D.new()
-			wheel.position = Vector3(sx, 0.2, sz * 0.43)
-			wheel.rotation.x = PI / 2
-			car.add_child(wheel)
-			Build.lathe(wheel, Vector3.ZERO, [[0.0, -0.06], [0.13, -0.06], [0.13, 0.06], [0.0, 0.06]], "#dba865", 0.0, Build.R_WOOD)
-			Build.lathe(wheel, Vector3.ZERO, [[0.12, -0.07], [0.18, -0.07], [0.2, 0.0], [0.18, 0.07], [0.12, 0.07], [0.12, -0.07]], "#4a372c")
-		Build.ball(car, Vector3(0.94, 0.42, sz * 0.28), 0.07, "#fff1c4", 0.6)
-		Build.ball(car, Vector3(-0.94, 0.42, sz * 0.28), 0.06, Build.CORAL_DARK)
-	_rb(car, Vector3(0.97, 0.24, 0), Vector3(0.08, 0.08, 0.84), "#9aa3a6", 0.03, Build.R_WOOD)
-	_rb(car, Vector3(-0.97, 0.24, 0), Vector3(0.08, 0.08, 0.84), "#9aa3a6", 0.03, Build.R_WOOD)
 
 
 ## Seaside: what stands on the boardwalk by the rail, and a rowing boat and a buoy
