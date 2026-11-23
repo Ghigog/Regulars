@@ -359,8 +359,8 @@ func test_review_boost_lasts_four_days_and_stacks_with_flyers():
 	var plain := 0
 	var both := 0
 	for s in 40:
-		plain += Town.new(s).roll_guests(1, Town.FLYER_BOOST).size()
-		both += Town.new(s).roll_guests(1, Town.FLYER_BOOST + c.visit_boost(6)).size()
+		plain += Town.new(s).roll_guests(1, 0.0, Town.FLYER_GUESTS).size()
+		both += Town.new(s).roll_guests(1, c.visit_boost(6), Town.FLYER_GUESTS).size()
 	assert_gt(both, plain, "a good review on top of flyers brings more")
 	c.publish({"speed": 1, "clean": 1, "quality": 1, "variety": 1}, false, Town.new(1), 10)
 	assert_eq(c.visit_boost(11), Critic.BOOST[1], "the next review replaces it")
