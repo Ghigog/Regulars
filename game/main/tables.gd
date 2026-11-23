@@ -6,6 +6,9 @@ extends RefCounted
 
 var game: Game
 var list: Array[Dictionary] = []   # TableJoins.runs of the room: {pieces: numbers, seats}
+var cards: Array[Label3D] = []     # the seat-count card at each table's centre, one per run
+
+const CARD_HEIGHT := 0.95          # just above the table top
 
 
 func _init(game_: Game) -> void:
@@ -20,6 +23,31 @@ func rebuild() -> void:
 		var st: Station = dining[i]
 		pieces.append({"type": st.type, "cell": st.cell, "facing": st.facing, "number": i + 1})
 	list = TableJoins.runs(pieces)
+	_draw_cards()
+
+
+## One card per table, at the middle of its pieces, saying how many it seats.
+func _draw_cards() -> void:
+	for c in cards:
+		c.queue_free()
+	cards.clear()
+	for t in list:
+		var mid := Vector3.ZERO
+		for n in t.pieces:
+			mid += game.paying.table_by_number(int(n)).position
+		mid /= t.pieces.size()
+		var l := Label3D.new()
+		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.font = Hud.lettering()
+		l.font_size = 40
+		l.pixel_size = 0.006
+		l.outline_size = 12
+		l.modulate = Color(Build.TRIM)
+		l.outline_modulate = Color(Build.PAPER)
+		l.text = str(t.seats)
+		l.position = Vector3(mid.x, CARD_HEIGHT, mid.z)
+		game.add_child(l)
+		cards.append(l)
 
 
 func _run_of(st: Station) -> Dictionary:
