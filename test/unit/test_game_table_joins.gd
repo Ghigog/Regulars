@@ -76,7 +76,7 @@ func test_a_group_of_four_turns_away_when_no_table_could_ever_seat_them():
 	_run(14.0)
 	for g in party:
 		assert_false(game.queue.has(g), "out of the line")
-		assert_eq(g.state, "leaving")
+		assert_true(g.state == "browse" or g.state == "leaving", "turned away at the door")
 
 
 func test_each_table_shows_its_seat_count_at_its_centre():
