@@ -239,12 +239,6 @@ func at_outside_bin(ch: Player = null) -> bool:
 	return Vector2(d.x, d.z).length() < Game.BIN_REACH
 
 
-## The bag is for the outside bin only: at the front door the chef is told where it is.
-func bin_is_outside(ch: Player = null) -> bool:
-	ch = game._me(ch)
-	return ch.held == "rubbish_bag" and at_door(ch) and not at_outside_bin(ch)
-
-
 ## What the chef can do with the door card from here: "Open up" at the end of the
 ## build phase, "Close early" from the middle of the day on, or nothing. With the
 ## rubbish bag, "Take out rubbish" beside the outside bin, and nothing at the door.

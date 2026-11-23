@@ -48,7 +48,6 @@ const ENTRANCE_CELL := Vector2i(W - 1, DOOR.y)   # the floor just inside the fro
 const DOORWAY := Vector3(W, 0, DOOR.y + 0.5)   # the middle of the doorway, on the floor
 const DOOR_REACH := 1.25
 const BIN_REACH := 1.3   # how near the outside bin the chef must stand to put the bag in
-const BIN_OUTSIDE := "The bin is outside."   # the hint at the front door with the bag
 const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
 const FLYERS := {"id": "flyers", "tier": 1}   # sold in the shop's Extras, never placed
 const CLEANER := {"id": "night_cleaner", "tier": 1}   # the night's clean-up, paid for in Extras (review, item 8)
@@ -491,10 +490,6 @@ func _update_cursor(ch: Player = null) -> void:
 			var fc: Vector2i = clean_kit.floor_cell(ch)
 			hud.day_ui.show_prompt(cam.unproject_position(Grid.center(fc) + Vector3(0, 1.3, 0)), fl, chefs.find(ch))
 			return
-	if st == null and day.bin_is_outside(ch):   # the bag does not go out of the door: say where
-		ch.cursor.visible = false
-		hud.day_ui.show_prompt(cam.unproject_position(DOORWAY + Vector3(0, 2.9, 0)), BIN_OUTSIDE, chefs.find(ch), false)
-		return
 	var messy := _messy_at_mouse(ch)
 	if messy != null and messy != st:   # the mouse cannot clean: that is the chef's job
 		ch.cursor.visible = false
