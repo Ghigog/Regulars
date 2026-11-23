@@ -125,12 +125,20 @@ func _counters_with_food(n: int) -> Array[Station]:
 	return out
 
 
-func test_the_night_cleaner_leaves_nothing_to_clean():
+func test_the_shop_sells_only_flyers():
 	_dirty_table()
+	game.world.find_station("bin").count = 3
 	_to_build()
-	game.ledger.money = 100
-	assert_true(game.room_edit.hire_cleaner())
-	assert_eq(game.room_edit.dirty_note(), "")
+	for q in ["", "cleaner", "mop"]:
+		var ids := []
+		for bp: Dictionary in game.session.shop_items(q, "Extras"):
+			ids.append(bp.id)
+		assert_false(ids.has("night" + "_cleaner"), "no cleaner piece for '%s'" % q)
+	assert_eq(game.session.shop_items("", "Extras").size(), 1, "Flyers alone")
+	var note: String = game.room_edit.dirty_note()
+	assert_string_contains(note, "Still dirty")
+	assert_false(note.to_lower().contains("clean"), "no cleaner on offer")
+	assert_false(note.contains("Extras"))
 
 
 func test_food_in_hand_is_gone_when_the_door_opens():

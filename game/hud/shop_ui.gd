@@ -165,11 +165,6 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 		return {"name": "Flyers", "price": "Out" if hud.game.flyers_out else "$%d" % Town.FLYER_PRICE,
 			"blurb": "More guests tomorrow",
 			"can": not hud.game.flyers_out and l.money >= Town.FLYER_PRICE, "locked": false}
-	if bp.id == "night_cleaner":
-		var p: int = hud.game.room_edit.cleaner_price()
-		return {"name": "Night cleaner", "price": "Clean" if p <= 0 else "$%d" % p,
-			"blurb": "Clears every table, washes up, takes the bags out and mops the floor" if p > 0 else "Nothing to clean tonight",
-			"can": p > 0 and l.money >= p, "locked": false}
 	if hud.game.card.storing():
 		return _storage_info(bp)
 	var id: String = bp.id

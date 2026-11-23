@@ -232,11 +232,6 @@ func shop_items(query := "", category := "") -> Array[Dictionary]:
 			hit = hit and "flyers extras more guests tomorrow".contains(w)
 		if hit:
 			found.append(Game.FLYERS)
-		var hit_c := true
-		for w in query.strip_edges().to_lower().split(" ", false):
-			hit_c = hit_c and "cleaner extras clean up tidy mop wash".contains(w)
-		if hit_c:
-			found.append(Game.CLEANER)
 	return found
 
 

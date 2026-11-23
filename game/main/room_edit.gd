@@ -1,7 +1,7 @@
 class_name GameRoomEdit
 extends RefCounted
 ## Building the room: floors, walls and doors laid and removed (also by drag), the build
-## prompt and E at night, the placement ghost and the build-tool ghost, night cleaner, flyers.
+## prompt and E at night, the placement ghost and the build-tool ghost, flyers.
 
 var game: Game
 
@@ -424,10 +424,7 @@ func dirty_note() -> String:
 			tables += 1 if Station.is_table(st.type) else 0
 			sinks += 1 if st.type == "sink" else 0
 			bins += 1 if st.type == "bin" else 0
-	var note := Cleaning.dirty_note(tables, sinks, bins)
-	if note != "":   # or one press: the night cleaner (review, item 8)
-		note += " Or hire the night cleaner in the shop's Extras ($%d)." % cleaner_price()
-	return note
+	return Cleaning.dirty_note(tables, sinks, bins)
 
 
 func build_interact(ch: Player = null) -> void:
@@ -615,40 +612,6 @@ func _update_tool_ghost(ch: Player = null) -> void:
 
 
 ## Flyers: bought from the shop's Extras at night for a bigger crowd tomorrow. One batch a night.
-## What the night cleaner charges tonight: 0 when there is nothing to clean.
-func cleaner_price() -> int:
-	var pieces := 0
-	for st: Station in game.stations.values():
-		if needs_cleaning(st):
-			pieces += 1
-	return Cleaning.cleaner_price(pieces, game.floor_dirt.mess.total())
-
-
-## The night cleaner: every table cleared and washed up, every bag out, the floor mopped,
-## in one press (review, item 8). The plates and cups go back on their stacks.
-func hire_cleaner() -> bool:
-	var price := cleaner_price()
-	if game.phase != Game.Phase.BUILD or price <= 0 or not game.ledger.spend(price):
-		if price <= 0:
-			game.hud.day_ui.say("Nothing to clean tonight.")
-		return false
-	for st: Station in game.stations.values():
-		if Station.is_table(st.type) or st.type == "sink":
-			while st.dirty > 0:
-				game.cooking.wash_one(st)
-		elif st.type == "bin" and st.count > 0:
-			st.count = 0
-			st.refresh()
-	var m: FloorMess = game.floor_dirt.mess
-	for c: Vector2i in m.dirt.keys():
-		m.clean(c, FloorMess.MAX_LEVEL)
-	game.floor_dirt.redraw()
-	game.audio.sfx("wash")
-	game.hud.day_ui.say("The cleaner came: everything is clean for tomorrow.")
-	game.hud.hints_ui.show_build()
-	return true
-
-
 func buy_flyers() -> bool:
 	if game.phase != Game.Phase.BUILD or game.flyers_out or not game.ledger.spend(Town.FLYER_PRICE):
 		return false

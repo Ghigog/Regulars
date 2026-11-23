@@ -181,32 +181,6 @@ func test_a_till_guest_running_out_drags_the_tables_bars_low_and_is_named():
 	assert_string_contains(game.hud.toast.text, game.town.people[at_till.idx].name, "and it is the till guest")
 
 
-func test_the_night_cleaner_clears_everything_in_one_press():
-	_to_build()
-	var table: Station = game.stations[Vector2i(8, 3)]
-	table.dirty = 2
-	table.dirty_cups = 1
-	game.world.find_station("bin").count = 3
-	game.floor_dirt.mess.add_dirt(Vector2i(7, 4))
-	game.ledger.money = 100
-	var price: int = game.room_edit.cleaner_price()
-	assert_gt(price, 0)
-	assert_true(game.room_edit.dirty_note().contains("night cleaner"), "the dirty note offers it")
-	game.session.open_shop()
-	var plates: int = game.world.find_station("plates").count
-	assert_true(game.placing.buy(game.CLEANER))
-	assert_eq(game.ledger.money, 100 - price)
-	assert_eq(table.dirty, 0)
-	assert_eq(game.world.find_station("bin").count, 0)
-	assert_eq(game.floor_dirt.mess.total(), 0)
-	assert_eq(game.world.find_station("plates").count, plates + 1, "the plates go back on their stack")
-	assert_eq(game.room_edit.dirty_note(), "")
-	assert_eq(game.room_edit.cleaner_price(), 0)
-	assert_false(game.placing.buy(game.CLEANER), "nothing left to clean")
-	game.session.close_shop()
-
-
-
 func test_one_press_makes_a_counter_the_fridge_a_box_needs():
 	_to_build()
 	game.ledger.money = 200

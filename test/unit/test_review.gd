@@ -242,12 +242,6 @@ func test_the_first_days_are_a_little_longer_and_then_steady():
 
 # ---------- Item 8: cleaning ----------
 
-func test_the_night_cleaner_is_priced_by_the_mess():
-	assert_eq(Cleaning.cleaner_price(0, 0), 0, "nothing to clean, nothing to pay")
-	assert_gt(Cleaning.cleaner_price(3, 0), Cleaning.cleaner_price(1, 0))
-	assert_gt(Cleaning.cleaner_price(1, 12), Cleaning.cleaner_price(1, 0))
-
-
 # ---------- Item 9: a rolling reputation ----------
 
 func _bad_day(l: Ledger, walkouts := 5, unhappy := 3) -> void:
