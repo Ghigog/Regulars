@@ -61,7 +61,7 @@ const SOUNDS := {  # name -> volume in dB
 	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -15.2, "perfect": -4.0, "sizzle": -10.0,
 	"roll": -8.0, "lift": -10.0, "rattle": -9.0, "page": -7.0, "thump": -6.0, "rip": -6.0,
 	"flutter": -10.0, "rustle": -9.0, "rope": -8.0, "stamp": -4.0,
-	"slide": -8.0, "tick": -9.0, "tab": -8.0, "flip": -5.0,
+	"slide": -8.0, "clack": -7.0, "tick": -9.0, "tab": -8.0, "flip": -5.0,
 	"zoom": -6.0, "wobble": -6.0, "chop": -7.0, "slice": -9.0, "glug": -8.0,
 	# Recorded (docs/AUDIO_GUIDE.md), peak-normalised; levels match what each replaces.
 	"grill_drop": 5.7, "patty_flip": 0.2, "plate_food": 2.3, "creaky_door": -13.1, "sit": -4.7,
