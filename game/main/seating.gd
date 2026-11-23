@@ -12,12 +12,10 @@ func _init(game_: Game) -> void:
 
 # ---------------------------------------------------------------- guests
 
-## The most guests one table can seat, which is also the biggest group that comes.
+## The biggest group that comes: four, whatever the room holds. A group the room can
+## never seat turns away at the door.
 func max_party() -> int:
-	var most := 1
-	for st: Station in game.stations.values():
-		most = maxi(most, st.seats.size())
-	return most
+	return TableJoins.PAIR_SEATS
 
 
 ## A lone guest: a group of one.
@@ -136,18 +134,15 @@ func guest_in_way(g: Guest, dir: Vector3) -> Guest:
 	return best
 
 
-## A table nobody is sitting at with room for `count`; the smallest that fits.
+## The lead of a table nobody is sitting at with room for `count`: the smallest that
+## fits, a joined pair only when no single piece will do. The whole table is theirs.
 func _free_table_for(count: int) -> Station:
-	var best: Station = null
-	for st: Station in game.stations.values():
-		if st.seats.size() < count or (best != null and st.seats.size() >= best.seats.size()):
-			continue
-		var empty := true
-		for s in st.seats:
-			empty = empty and not game.seat_taken.has(s)
-		if empty:
-			best = st
-	return best
+	var taken: Array = []
+	for st: Station in game.paying.dining_tables():
+		if st.seats.any(func(s: Vector2i) -> bool: return game.seat_taken.has(s)):
+			taken.append(game.paying.table_number(st))
+	var i := TableJoins.pick(count, game.tables.list, taken)
+	return null if i < 0 else game.paying.table_by_number(int(game.tables.list[i].pieces.min()))
 
 
 ## Seats the group at the head of the queue once a whole table is free for them.
@@ -158,15 +153,23 @@ func _seat_waiting_guests() -> void:
 		for m: Guest in game.queue[0].party:
 			if game.queue.has(m):
 				party.append(m)
+		if not TableJoins.fits_ever(party.size(), game.tables.list):
+			if party.any(func(m: Guest) -> bool: return not m.path.is_empty()):
+				return   # still walking up to the line: they turn away once they are at the door
+			for k in party.size():   # no table could ever seat them: they turn away at the door
+				party[k].hold = 0.5 * k   # one after another, as in a walkout
+				game.paying.leave_with_friends(party[k])
+			continue
 		var table := _free_table_for(party.size())
 		if table == null:
 			return
+		var chairs := game.tables.seats_of(table)
 		for i in party.size():
 			var g := party[i]
 			game.queue.erase(g)
 			g.line_place = -1
 			g.table = table
-			g.seat = table.seats[i]
+			g.seat = chairs[i]
 			game.seat_taken[g.seat] = g
 			g.state = "to_seat"
 			g.walk_to(g.seat)
@@ -174,11 +177,12 @@ func _seat_waiting_guests() -> void:
 
 
 func on_seated(g: Guest) -> void:
-	if g.table.tier > 1:
-		g.mood.delight(0.05 * (g.table.tier - 1), "What a lovely table")
-	if g.table.type == "booth":
+	var half := game.tables.half_of_seat(g.table, g.seat)   # tier and booth are the guest's own half's
+	if half.tier > 1:
+		g.mood.delight(0.05 * (half.tier - 1), "What a lovely table")
+	if half.type == "booth":
 		g.mood.delight(Game.BOOTH_DELIGHT, "A booth! How cosy")
-	for other in g.table.seats:
+	for other in game.tables.seats_of(g.table):
 		if other != g.seat and game.seat_taken.has(other):
 			var mate: Guest = game.seat_taken[other]
 			if game.town.are_friends(g.idx, mate.idx):
@@ -255,7 +259,7 @@ func _collect_gross() -> void:
 ## The most impatient guest sat at this table, waiting to order or for food.
 func _waiting_guest_at(table: Station) -> Guest:
 	var best: Guest = null
-	for s in table.seats:
+	for s in game.tables.seats_of(table):
 		if game.seat_taken.has(s):
 			var g: Guest = game.seat_taken[s]
 			if g.seated_waiting() and (best == null or g.mood.patience < best.mood.patience):
@@ -266,7 +270,7 @@ func _waiting_guest_at(table: Station) -> Guest:
 ## Everyone at this table who is sat down and has not ordered yet.
 func _guests_to_order(table: Station) -> Array[Guest]:
 	var out: Array[Guest] = []
-	for s in table.seats:
+	for s in game.tables.seats_of(table):
 		if game.seat_taken.has(s) and game.seat_taken[s].state == "ordering":
 			out.append(game.seat_taken[s])
 	return out
