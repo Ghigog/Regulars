@@ -18,14 +18,14 @@ const SPECIALIST_STEP := "specialist"
 ## How a piece sits in a cell:
 ## "top": a tool, on a counter-type base only.
 ## "counter": a base with a top (and storage below).
-## "shelf": storage, no top; a base, or a high piece on a wall cell.
+## "shelf": storage, no top; a high piece on a wall cell only (a low open box is a counter).
 ## "tall": a base that also fills the high layer; no top.
 ## "cabinet", "hood": high layer only, on a wall cell.
 ## "hook": a wall hook (PRD 9.4), high layer only; holds one small cleaning tool.
 ## "floor": stands on the floor outside the kitchen's cells (the mop bucket, the robot's
 ## dock, PRD 9.5); in the trees only.
 const FITS := {
-	"top": ["top"], "counter": ["base"], "shelf": ["base", "high"], "tall": ["base"],
+	"top": ["top"], "counter": ["base"], "shelf": ["high"], "tall": ["base"],
 	"cabinet": ["high"], "hood": ["high"], "hook": ["high"], "floor": [],
 }
 
@@ -247,12 +247,12 @@ static func freezes(id: String) -> bool:
 	return NODES.has(id) and NODES[id].get("frozen", false)
 
 
-## A piece that hangs in the high layer only (wall cabinet, hood).
+## A piece that hangs in the high layer only (wall shelf, wall cabinet, hood, hook).
 static func is_high_only(id: String) -> bool:
 	return NODES.has(id) and FITS[fit_of(id)] == ["high"]
 
 
-## A piece that may go in the high layer (a shelf, a wall cabinet, a hood).
+## A piece that may go in the high layer (a wall shelf, a wall cabinet, a hood, or a tall piece's top).
 static func can_go_high(id: String) -> bool:
 	return NODES.has(id) and (FITS[fit_of(id)] as Array).has("high")
 
@@ -380,8 +380,8 @@ func get_piece(cell: Vector2i, layer: String) -> String:
 	return str(cells[cell][layer]) if cells.has(cell) else ""
 
 
-## The layer a piece would go into on this cell, or "" if it does not fit. A shelf goes
-## low first, then high on a wall cell.
+## The layer a piece would go into on this cell, or "" if it does not fit. A high-only piece
+## (a wall shelf) goes up on a wall cell.
 func layer_for(cell: Vector2i, id: String) -> String:
 	if not NODES.has(id):
 		return ""
@@ -448,19 +448,6 @@ func remove(cell: Vector2i, layer: String) -> Dictionary:
 	if c.base == "" and c.high == "":
 		cells.erase(cell)
 	return {"id": id, "stock": held}
-
-
-## A low shelf under a high shelf draws as one closet.
-func is_closet(cell: Vector2i) -> bool:
-	var base := get_piece(cell, "base")
-	var high := get_piece(cell, "high")
-	return base != "" and high != "" and fit_of(base) == "shelf" and fit_of(high) == "shelf"
-
-
-## Whether hanging this piece here would make a closet (a high shelf over a low one).
-func is_closet_with(cell: Vector2i, id: String) -> bool:
-	var base := get_piece(cell, "base")
-	return base != "" and fit_of(base) == "shelf" and NODES.has(id) and fit_of(id) == "shelf"
 
 
 ## Whether a hood hangs over this cell (PRD 9 reads it: a hood cuts a stove's grease).

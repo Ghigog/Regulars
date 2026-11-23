@@ -27,7 +27,6 @@ var tier := 1
 var facing := 0       # quarter turns; 0 puts the front toward +z
 var base := ""        # the counter this piece is or stands on ("counter", "double_counter"); "" for the rest
 var high := false     # hung in a wall cell's high layer (PRD 8.5): a cabinet, a high shelf, a hood
-var closet := false   # a high shelf over a low one, drawn as one closet
 var pass_look := false  # a counter drawn as a length of the frame's long teal pass (the starting ones)
 var lamp: OmniLight3D # a table's lamp light, owned by the game
 var item := ""        # what is sitting on a counter or stove: an ingredient kind ("raw:patty") or "dish"
@@ -97,8 +96,6 @@ func setup(type_: String, cell_: Vector2i, tier_: int, facing := 0, base_ := "",
 	tier = tier_
 	pass_look = pass_look_
 	base = base_ if base_ != "" else ("counter" if Kitchen.is_top(type) or Kitchen.is_counter(type) else "")
-	if Kitchen.has_node(node) and Kitchen.fit_of(node) == "shelf":
-		base = node   # a shelf is its own base when it stands low
 	_vis = Node3D.new()
 	add_child(_vis)
 	_draw()
@@ -162,17 +159,16 @@ func _draw() -> void:
 		_vis.remove_child(c)
 		c.queue_free()
 	if high:
-		BuildStations.wall_piece(_vis, node, closet)
+		BuildStations.wall_piece(_vis, node)
 	else:
 		BuildStations.station(_vis, type, tier, base, pass_look, node)
 
 
 ## Hangs this piece in the high layer, or stands it low, and redraws it (PRD 8.5).
-func set_wall(high_: bool, closet_ := false) -> void:
-	if high == high_ and closet == closet_:
+func set_wall(high_: bool) -> void:
+	if high == high_:
 		return
 	high = high_
-	closet = closet_
 	_draw()
 
 

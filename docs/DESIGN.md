@@ -21,11 +21,10 @@ Survive as many days as you can; three walkouts in one day ends the run.
   (what it adds to a price) and a fee (what stocking it costs a night).
 - **Wall layer (PRD 8.5).** A cell against a full-height back wall (no window, door or
   archway in it) has a high layer over whatever stands below, even bare floor. Wall
-  pieces in the shop's Kitchen tab: a wall shelf ($10, one kind; stands low on a free
-  cell, hangs high over anything else; its efficient step the wide shelf, two kinds), a
+  pieces in the shop's Kitchen tab: a wall shelf ($10, one kind, hangs only like a
+  hook; its efficient step the wide shelf, two kinds; for something low use a counter), a
   wall cabinet ($20, one kind, hangs only) and a hood ($30, hangs only; over a stove it
-  cuts that stove's grease, PRD 9's `FloorMess.HOOD`). A low and a high shelf on one
-  cell draw as one closet. The counter's tree goes on from the under-counter fridge to
+  cuts that stove's grease, PRD 9's `FloorMess.HOOD`). The counter's tree goes on from the under-counter fridge to
   the tall fridge (two kinds, fills both wall layers, no top), then the glass-door tall
   fridge (three kinds) or the freezer (two kinds; takes frozen kinds, of which there are
   ice cream since 8.6). The first room starts with two hoods over the cooking line, two

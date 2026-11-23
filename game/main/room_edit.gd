@@ -511,8 +511,7 @@ func _update_ghost(ch: Player = null) -> void:
 			elif ch.hand.id == "till":
 				BuildStations.register(ch.ghost)
 			elif layer == "high":
-				var closet := hn.ends_with("shelf") and game.kitchen.is_closet_with(cell, hn)
-				BuildStations.wall_piece(ch.ghost, hn, closet)
+				BuildStations.wall_piece(ch.ghost, hn)
 			elif ch.hand.get("node") is Station:
 				var hs: Station = ch.hand.node
 				BuildStations.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" or Kitchen.grows_from_counter(hs.node) else "", hs.pass_look, hs.node)

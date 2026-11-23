@@ -1,7 +1,7 @@
 class_name CleanKit
 extends Node3D
 ## Cleaning tools in the room (PRD 9.4): wires sim/clean_tools.gd into the scene. Tools
-## live in homes (a mop bucket, a wall hook, a closet), are taken and put back with E, and
+## live in homes (a mop bucket, a wall hook), are taken and put back with E, and
 ## while held fill the chef's hands. E at a dirty cell in front clears a level (held E
 ## repeats at the tool's pace); a dirty tool spreads instead until rinsed at the bucket or
 ## a sink. A tool put down anywhere else lies on the floor, in the way. The robot sweeper
@@ -27,21 +27,19 @@ func setup(game_) -> void:
 # ---------------------------------------------------------------- homes
 
 ## The piece at a cell that keeps a tool: a mop bucket standing there, a hook hung there,
-## or the high shelf of a closet. Null for none.
+## Null for none.
 func home_at(cell: Vector2i) -> Station:
 	var st: Station = game.stations.get(cell)
 	if st != null and CleanTools.home_kind(st.type) != "":
 		return st
 	var h: Station = game.highs.get(cell)
-	if h != null and (CleanTools.home_kind(h.type) != "" or game.kitchen.is_closet(cell)):
+	if h != null and CleanTools.home_kind(h.type) != "":
 		return h
 	return null
 
 
-## What kind of home a piece is: "bucket", "hook", or "closet" for a closet's high shelf.
+## What kind of home a piece is: "bucket" or "hook".
 func kind_of(home: Station) -> String:
-	if home.high and game.kitchen.is_closet(home.cell):
-		return CleanTools.CLOSET
 	return CleanTools.home_kind(home.type)
 
 
@@ -135,10 +133,6 @@ func show_home(home: Station) -> void:
 			BuildClean.bucket_mop(n, clean, home.kit_tool)
 		"hook":
 			BuildClean.hand_tool(n, home.kit_tool, clean).position = BuildClean.hook_spot(BuildStations.HIGH_Y0)
-		_:   # a closet: the mop stands in the corner, a sponge sits on the low shelf
-			var mop := CleanTools.is_mop(home.kit_tool)
-			var t: Node3D = BuildClean.mop(n, clean, home.kit_tool) if mop else BuildClean.hand_tool(n, home.kit_tool, clean)
-			t.position = Vector3(0.28, 0.02, -0.28) if mop else Vector3(-0.2, 0.2, -0.28)
 
 
 # ---------------------------------------------------------------- held tools
@@ -190,7 +184,7 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 		return ""
 	if ch.held != "" or home == null or home.kit_tool == "":
 		return ""
-	if home != st and not game.kitchen.is_closet(st.cell) and game.cooking._use_station(st, true, ch) != "":
+	if home != st and game.cooking._use_station(st, true, ch) != "":
 		return ""   # a hook over a working piece: the piece comes first
 	var what := CleanTools.name_of(home.kit_tool).to_lower()
 	if not dry_run:
