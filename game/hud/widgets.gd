@@ -600,9 +600,6 @@ class ModelView extends TextureRect:
 				n.add_child(FloorDirt.sheen_look(c, Treatments.key_of(bp.id)))
 		elif Catalog.is_build_tool(bp.id):
 			Scenery.tool_preview(n, bp.id)
-		elif bp.id == "night_cleaner":   # a mop in its bucket: the cleaner's kit
-			BuildStations.station(n, "mop_bucket", 1, "", false, "mop_bucket")
-			BuildClean.bucket_mop(n, 1.0, "mop")
 		elif bp.id == "rug":
 			Scenery.rug(n)
 			n.scale = Vector3.ONE * 0.55

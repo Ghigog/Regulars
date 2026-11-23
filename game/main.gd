@@ -50,7 +50,6 @@ const DOOR_REACH := 1.25
 const BIN_REACH := 1.3   # how near the outside bin the chef must stand to put the bag in
 const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
 const FLYERS := {"id": "flyers", "tier": 1}   # sold in the shop's Extras, never placed
-const CLEANER := {"id": "night_cleaner", "tier": 1}   # the night's clean-up, paid for in Extras (review, item 8)
 const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this impatient
 ## Taking orders (DESIGN.md section 9). A seated guest waits to order, then for food.
 const ORDER_PATIENCE_SCALE := 0.8   # waiting to order drains patience 1.25x as fast as waiting for food

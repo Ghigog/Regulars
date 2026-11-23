@@ -751,8 +751,8 @@ Where an older paragraph above disagrees, this list wins.
   pace with a red wear pip, never spreading dirt. Laying a floor treatment is free; its box is
   restocked each night for a flat fee like a food box, whatever the tiles (cleaner $2,
   strong cleaner $3, primer $3, sealing primer $5, finish $4, high gloss $6; switched
-  off, not restocked), on the restock note with the food. The shop's Extras sell a night cleaner (one press:
-  every table cleared, washed up, bags out, floor mopped, priced by the mess). One Wash
+  off, not restocked), on the restock note with the food. Cleaning help comes only from hired
+  staff; the shop's Extras sell Flyers alone. One Wash
   clears the whole sink.
 - **Reputation** (`Ledger.reputation`): 0 to 100, starting at 50, carried over the
   nights. Walkouts -8, unpaid bills -3, unhappy guests -1.5, found nothing -0.5; happy

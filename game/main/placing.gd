@@ -26,9 +26,6 @@ func buy(bp: Dictionary) -> bool:
 	if bp.id == Game.FLYERS.id:
 		if game.room_edit.buy_flyers():
 			return true
-	elif bp.id == Game.CLEANER.id:
-		if game.room_edit.hire_cleaner():
-			return true
 	elif bp.get("locked", false):
 		game.hud.day_ui.say("The %s needs level %d." % [Catalog.label(bp), Catalog.bp_level(bp)])
 	elif game.upgrades.pick_tree(bp, game.shopper) if bp.has("tree") else pick_catalog(bp.id, int(bp.tier), game.shopper, bp.get("base", "")):
