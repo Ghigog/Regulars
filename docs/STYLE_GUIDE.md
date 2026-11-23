@@ -60,6 +60,8 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+- *Seat-count card* (`BuildSeatCard`, managed by `GameTableCards`): a cream paper tent card (`PAPER`, a darker folded foot) with a dark trim-brown numeral (`#3a2c22`), leaning back a little on a soft plum-brown blot of shadow, at the centre of every table (the seam of a joined pair): 4, 2, 1. Real paper, not a HUD label: it has thickness and sits in the room. Shown in the build phase and on free tables in service; it folds flat (0.15 s) when a group sits or plates are left on any half, and pops back with a small squash once the table is free and clear. Screenshot: `REGULARS_DEMO=seat_cards`, at about 4 s.
+
 - *Messy pieces* (`Station._show_grime`): a table with plates, a piled sink and an overflowing bin show the floor's heaviest grime motes (`FloorDirt.motes`) rising over them. The bin's green wisps are gone, and the build phase has no "Still dirty" note.
 - *Shop and tree previews of counter-top pieces* (`HudWidgets.ModelView.show_piece`): the plate, cup and tray stacks and every tool that stands on a counter (slicer, board, grater, blender...) are shown as themselves, with no cabinet or worktop (the node carries meta `bare`, which `BuildStations._counter` reads; appliance bodies in steel stay). The stacks carry their full load of plates, cups or trays. The piece is dropped by the worktop height and scaled 1.7 to fill the card. Pieces placed in the room keep their counter.
 

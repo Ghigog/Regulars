@@ -10,8 +10,22 @@ func _init(game_: Game) -> void:
 	game = game_
 
 
+## EPIC 28: the room cleared of dining pieces, then a pair pushed together and a lone table
+## (cards 4 and 2) and a run of three (a pair and a leftover: cards 4 and 2 again).
+func _demo_seat_cards() -> void:
+	for st: Station in game.paying.dining_tables():
+		game.world._unregister(st)
+		st.queue_free()
+	for spot: Array in [[5, 5, 0], [5, 6, 0], [8, 5, 1], [5, 1, 1], [6, 1, 1], [7, 1, 1]]:   # pair, lone, run of three
+		game.world.add_station("table", Vector2i(spot[0], spot[1]), 1, spot[2])
+	game.player.position = Grid.center(Vector2i(3, 3))
+
+
 func _demo_build(demo: String) -> void:
 	game.session.open_build()
+	if demo == "seat_cards":
+		_demo_seat_cards()
+		return
 	if demo == "build_new":   # every PRD 7 piece placed for this theme (run once per theme)
 		var show := "jukebox" if not Scenery.seaside() else "aquarium"
 		var small := "gumball" if not Scenery.seaside() else "lantern"
