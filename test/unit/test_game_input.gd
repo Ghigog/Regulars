@@ -439,3 +439,15 @@ func test_seated_guests_get_the_decor_bonus_as_they_sit():
 		return
 	assert_gt(g.decor, 0.0)
 	assert_almost_eq(g.decor, game.decor.decor_bonus(g.seat).joy, 0.0001)
+
+
+func test_m_maps_to_no_action_and_never_mutes():
+	assert_eq(Controls.action_for_key(KEY_M), "")
+	_key(KEY_M)
+	_key(KEY_M, false)
+	assert_false(AudioServer.is_bus_mute(0), "M does nothing in build")
+	game.day.use_door(game.player)
+	assert_eq(game.phase, game.Phase.SERVICE)
+	_key(KEY_M)
+	_key(KEY_M, false)
+	assert_false(AudioServer.is_bus_mute(0), "M does nothing in service")
