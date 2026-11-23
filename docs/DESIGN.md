@@ -322,7 +322,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   a step; in service the station turned to wins over a nearer one. Taps on the room work as clicks (pick a guest,
   place a piece, drag floors), and a touch on a control never reaches the room. Keys,
   pad buttons and touch buttons all become the same actions (use, back, turn, sell,
-  shop, town, options, confirm, search, mute and the four browse directions), sent to the
+  shop, town, options, confirm, search and the four browse directions), sent to the
   game as `act(player, action)`, so there is one set of rules; held actions (hold Use to
   keep laying floor) and movement are read per player. The options screen works from the keys and the pad: up and down (d-pad,
   arrows or the stick) choose a row (the tabs, each slider, the switch, Done), left and

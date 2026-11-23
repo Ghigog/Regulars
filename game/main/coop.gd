@@ -222,9 +222,6 @@ func act(p: int, action: String, echo := false) -> void:
 	if action == "options":
 		game.hud.options_ui.toggle_pause()
 		return
-	if action == "mute":
-		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
-		return
 	if p >= game.chefs.size():
 		return   # a seated player with no chef yet
 	var ch := game.chefs[p]
