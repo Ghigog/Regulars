@@ -138,6 +138,9 @@ func _advance(delta: float) -> bool:
 	var move := dir
 	if other != null:
 		_waited += delta
+		if path.size() <= 1 and _waited >= GIVE_WAY and position.distance_to(goal) < PERSONAL * 2.0:
+			_stand()   # someone else already holds the spot: close enough, don't circle it forever
+			return true
 		if other.heading.normalized().dot(dir) > 0.3 and _waited < GIVE_WAY:
 			heading = dir * 0.001   # still "going that way", so whoever is behind waits too
 			_body.position.y = 0.0

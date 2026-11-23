@@ -36,3 +36,13 @@ func test_four_wait_in_line_for_a_combined_table_that_is_taken():
 	assert_eq(next[0].state, "queue", "the table is only taken right now")
 	assert_true(game.queue.has(next[0]))
 	assert_eq(int(game.ledger.today.no_table), 0)
+
+
+func test_a_rush_of_turned_away_groups_all_leave_and_each_counts_once():
+	_room([Vector2i(6, 1), Vector2i(9, 4)])
+	for i in 6:   # fours and threes at once, all at the same door
+		game.seating.spawn_group([0, 1, 2, 3])
+		_run(0.7)
+	_run(60.0)
+	assert_eq(game.guests.size(), 0, "nobody is stuck on the pavement")
+	assert_eq(int(game.ledger.today.no_table), 6, "one per group")
