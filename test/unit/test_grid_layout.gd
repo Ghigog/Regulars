@@ -95,3 +95,20 @@ func test_pavement_is_never_buildable():
 	g.chef_pavement = {Vector2i(5, 2): true, Vector2i(6, 2): true}
 	var room := Rect2i(0, 0, 5, 5)
 	assert_eq(g.block_refusal(Vector2i(6, 2), _cells([]), room, Vector2i(5, 2), _cells([]), _cells([])), "off_lot")
+
+
+func test_reach_stops_at_a_wall_and_passes_a_doorway_or_door():
+	var g := Grid.new(6, 5)
+	g.walls[Grid.edge_between(Vector2i(2, 2), Vector2i(3, 2))] = true   # a wall column at x = 3
+	g.walls[Grid.edge_between(Vector2i(2, 1), Vector2i(3, 1))] = true
+	g.walls[Grid.edge_between(Vector2i(2, 3), Vector2i(3, 3))] = true
+	assert_false(g.reach_open(Vector2i(2, 2), Vector2i(3, 2)), "straight through a wall")
+	assert_false(g.reach_open(Vector2i(2, 2), Vector2i(3, 3)), "diagonally through a wall")
+	assert_false(g.reach_open(Vector2i(2, 2), Vector2i(4, 2)), "two away through a wall")
+	assert_true(g.reach_open(Vector2i(2, 2), Vector2i(2, 4)), "along the wall")
+	g.walls.erase(Grid.edge_between(Vector2i(2, 2), Vector2i(3, 2)))   # a doorway
+	assert_true(g.reach_open(Vector2i(2, 2), Vector2i(3, 2)), "through a doorway")
+	g.doors[Grid.edge_between(Vector2i(2, 1), Vector2i(3, 1))] = true   # a door edge is no wall
+	g.walls.erase(Grid.edge_between(Vector2i(2, 1), Vector2i(3, 1)))
+	assert_true(g.reach_open(Vector2i(2, 1), Vector2i(3, 1)), "through a door edge")
+	assert_false(g.has_los(Vector2i(2, 1), Vector2i(3, 1)), "sight still stops at the door")
