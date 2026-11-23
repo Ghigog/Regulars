@@ -302,6 +302,9 @@ func clear_food() -> void:
 	cook = 0.0
 	rest = 0.0
 	result = ""
+	_show_item("")
+	if is_heat_tool():
+		_update_cooking_visuals()
 	refresh()
 
 
@@ -509,6 +512,9 @@ func place_at(cell_: Vector2i, facing_: int) -> void:
 	_vis.rotation.y = facing * PI / 2
 	if _crates:
 		_crates.rotation.y = _vis.rotation.y
+	var tool_node := get_node_or_null("kit_tool")   # a hook's tool hangs on the hook's own wall
+	if tool_node:
+		tool_node.rotation.y = _vis.rotation.y
 	seats = seats_for(type, cell, facing)
 	if lamp:
 		lamp.position = position + Vector3(0, 1.0, 0)
