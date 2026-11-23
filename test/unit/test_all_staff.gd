@@ -222,3 +222,39 @@ func test_the_crew_covers_every_duty_the_room_gives():
 			assert_true(offered.has(d), "%s: the cleaning trees give %s" % [theme, d])
 		assert_eq(game.floor_dirt.mess.treat.size(), game.treat_laid.size(), "%s: every laid cell treated today" % theme)
 		assert_eq(game.menu_stock.treat_boxed().size(), 3, "%s: cleaner, primer and finish boxed apart from food" % theme)
+
+
+## A group of four at two tables pushed together: the helpers take one order, serve all four,
+## bring one bill and clear the plates on both halves.
+func test_helpers_serve_bill_and_clear_a_combined_table():
+	_start("diner", 11)
+	if is_failing():
+		return
+	for st: Station in game.paying.dining_tables():
+		game.world._unregister(st)
+		st.queue_free()
+	var halves: Array[Station] = [game.world.add_station("table", Vector2i(6, 1)), game.world.add_station("table", Vector2i(6, 2))]
+	game.phase = game.Phase.SERVICE
+	game.door_open = true
+	var party: Array[Guest] = game.seating.spawn_group([0, 1, 2, 3])
+	var t := 0.0
+	var paid := false
+	var ordered := false
+	while t < 400.0 and not paid:
+		game.step(STEP)
+		t += STEP
+		for g: Guest in game.guests:
+			g.mood.patience = 1.0
+		ordered = ordered or party.any(func(g: Guest) -> bool: return int(g.order.get("ticket", -1)) >= 0 or g.state == "waiting")
+		paid = ordered and party.all(func(g: Guest) -> bool: return g.state == "leaving" or not is_instance_valid(g))
+	assert_true(ordered, "the helpers took the order")
+	assert_true(paid, "all four were served, billed and left (%.0f s)" % t)
+	assert_eq(game.tickets.size(), 0, "no ticket left on the rail")
+	for g: Guest in party:
+		assert_false(game.seat_taken.get(g.seat) == g, "the party gave up its chairs on both halves")
+	var open := t
+	while t < open + 120.0 and (halves[0].dirty > 0 or halves[1].dirty > 0):
+		game.step(STEP)
+		t += STEP
+	assert_eq(halves[0].dirty, 0, "the lead half was cleared")
+	assert_eq(halves[1].dirty, 0, "and the other half too")

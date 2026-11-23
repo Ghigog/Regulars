@@ -197,7 +197,7 @@ func _stand_for(h: Helper, s: Dictionary) -> Variant:
 	var targets: Array[Vector2i] = [at]
 	var st: Station = crew.game.world.station_at(at)
 	if st != null and Station.is_table(st.type):
-		targets.append_array(st.seats)
+		targets.append_array(crew.game.tables.seats_of(crew.game.tables.lead(st)))
 	var best: Variant = null
 	var best_d := INF
 	for t: Vector2i in targets:

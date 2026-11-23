@@ -100,7 +100,7 @@ func _guest_for_dish(table: Station, d: Dish, taken := {}) -> Guest:
 	if it.is_empty():
 		return null
 	var best: Guest = null
-	for s in table.seats:
+	for s in game.tables.seats_of(table):   # either half of a combined table
 		if not game.seat_taken.has(s):
 			continue
 		var g: Guest = game.seat_taken[s]
@@ -182,7 +182,7 @@ func tear_ticket(g: Guest) -> void:
 	game.tickets.erase(tk)
 	var t: Tray = tk.get("order")
 	if t != null and t.served_count() > 0 and g.state in ["waiting", "ordering"] and g.table != null:
-		_leave_dirty(g.table, t)
+		_leave_dirty(game.tables.half_of_seat(g.table, g.seat), t)   # on the half they sat at
 		g.clear_meal()
 	game.hud.day_ui.refresh_tickets()
 
@@ -307,11 +307,12 @@ func offer_comp(g: Guest) -> void:
 ## The last bite (PRD 11): the plate is left on the table and they sit back to chat.
 ## Paying comes later, when the bill is handed over (`pay_bill`).
 func finish_meal(g: Guest) -> void:
+	var half := game.tables.half_of_seat(g.table, g.seat)   # the plate stays where they sat
 	if g._meal_tray != null:
-		_leave_dirty(g.table, g._meal_tray)
+		_leave_dirty(half, g._meal_tray)
 	else:
-		g.table.dirty += 1
-		g.table.refresh()
+		half.dirty += 1
+		half.refresh()
 	game.floor_dirt.meal_mess(g)
 	if g._meal:
 		g._meal.queue_free()
