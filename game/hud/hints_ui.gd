@@ -95,19 +95,6 @@ func show_build() -> void:
 		stack.add_theme_constant_override("separation", 6)
 		stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		holder.add_child(stack)
-		# Night cleaning: a note taped at the bottom while anything is still dirty.
-		var note := HudWidgets.Sheet.new("note").pad(14, 8, 18, 8)
-		note.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		note.rotation = -0.02
-		stack.add_child(note)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		note.add_child(row)
-		row.add_child(HudWidgets.Icon.new("stink", 30))
-		hud._dirty_label = hud._label(row, 20)
-		hud._dirty_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		hud._dirty_note = note
 		hud.menu_notes = MenuScreen.BuildNotes.new(hud.game, hud)
 		stack.add_child(hud.menu_notes)
 		stack.move_child(hud.menu_notes, 0)
@@ -120,8 +107,6 @@ func show_build() -> void:
 		holder.create_tween().tween_property(holder, "modulate:a", 1.0, 0.3)
 		hud.game.audio.sfx("rustle")
 	hud.build_bar.visible = hud._shop == null
-	hud._dirty_label.text = hud.game.room_edit.dirty_note()
-	hud._dirty_note.visible = hud._dirty_label.text != ""
 	_fill_strip()
 	hud.menu_notes.refresh()
 	hud.shop_ui._refresh_catalog()

@@ -201,7 +201,6 @@ func test_the_night_cleaner_clears_everything_in_one_press():
 	game.ledger.money = 100
 	var price: int = game.room_edit.cleaner_price()
 	assert_gt(price, 0)
-	assert_true(game.room_edit.dirty_note().contains("night cleaner"), "the dirty note offers it")
 	game.session.open_shop()
 	var plates: int = game.world.find_station("plates").count
 	assert_true(game.placing.buy(game.CLEANER))
@@ -210,7 +209,6 @@ func test_the_night_cleaner_clears_everything_in_one_press():
 	assert_eq(game.world.find_station("bin").count, 0)
 	assert_eq(game.floor_dirt.mess.total(), 0)
 	assert_eq(game.world.find_station("plates").count, plates + 1, "the plates go back on their stack")
-	assert_eq(game.room_edit.dirty_note(), "")
 	assert_eq(game.room_edit.cleaner_price(), 0)
 	assert_false(game.placing.buy(game.CLEANER), "nothing left to clean")
 	game.session.close_shop()

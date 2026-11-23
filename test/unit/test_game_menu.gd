@@ -418,10 +418,8 @@ func test_a_second_sink_and_bin_each_have_their_own_mess():
 	var bin2: Station = game.world.add_station("bin", Vector2i(1, 5))
 	game.world.find_station("sink").dirty = 1
 	sink2.dirty = 1
-	assert_true(game.room_edit.dirty_note().begins_with("Still dirty: 2 sinks."))
 	sink2.dirty = 0
 	bin2.count = 2
-	assert_true(game.room_edit.dirty_note().begins_with("Still dirty: the sink, the bin."))
 	game.seating._collect_gross()
 	var keys := {}
 	for g: Dictionary in game._gross:
