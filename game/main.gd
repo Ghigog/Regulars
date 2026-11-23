@@ -201,6 +201,7 @@ var clean_kit: CleanKit                # mops, sponges and robot sweepers (PRD 9
 var crew: Crew                         # the hired helpers at work in the room (PRD 10.6)
 var demos := GameDemos.new(self)   # the REGULARS_DEMO dispatcher and the kitchen, storage, cleaning and staff scenes
 var demo_scenes := GameDemoScenes.new(self)   # building, menu, paying, orders, prep and mood demo scenes
+var tables := GameTables.new(self)   # which pieces make one table, worked out again as the room changes
 var world := GameWorld.new(self)   # the room: scenery, layout, stations, walls, the wall layer
 var audio := GameAudio.new(self)   # sound, music, shake, daylight and popups
 var tidy := GameTidy.new(self)   # nightfall: plates back to the rack, food into the bin

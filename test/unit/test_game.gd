@@ -901,7 +901,7 @@ func test_a_group_takes_a_whole_table_and_singles_do_not_share():
 	assert_ne(solo_a.table, solo_b.table, "two singles do not share")
 	assert_ne(solo_a.table, pair[0].table)
 	assert_eq(late.state, "queue", "three tables, three groups: the fourth waits outside")
-	assert_eq(game.seating.max_party(), 2)
+	assert_eq(game.seating.max_party(), 4, "groups of four come whatever the room holds")
 
 
 

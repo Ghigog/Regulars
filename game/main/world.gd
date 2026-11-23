@@ -283,6 +283,7 @@ func _register(st: Station) -> void:
 	st.set_wall(false)
 	_refresh_wall(st.cell)
 	_update_racks()
+	game.tables.rebuild()
 
 
 ## Redraws the tags naming what a cell stores: over the piece standing there, else over
@@ -412,6 +413,7 @@ func _unregister(st: Station) -> void:
 	_refresh_wall(st.cell)
 	_show_boxes(st.cell)
 	_update_racks()
+	game.tables.rebuild()
 
 
 ## Marks each sink that has a dish rack standing beside it (one cell, diagonals too).
