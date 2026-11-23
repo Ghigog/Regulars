@@ -310,7 +310,7 @@ func bill_target(ch: Player) -> Station:
 func bill_place(st: Station) -> bool:
 	if st == null:
 		return false
-	if not st.seats.is_empty() and ready_to_pay(st):
+	if not st.seats.is_empty() and ready_to_pay(game.tables.lead(st)):
 		return true
 	return st == till_station() and till_line().any(func(g: Guest) -> bool: return g.state == "at_till")
 
@@ -319,7 +319,7 @@ func bill_place(st: Station) -> bool:
 ## the table of the guest there it is written for (else the guest at the front).
 func _bill_table_at(at: Station, bill: Bill) -> Station:
 	if at != till_station():
-		return at
+		return game.tables.lead(at)   # a bill handed at either half is for the one table
 	var front: Station = null
 	for g in till_line():
 		if g.state != "at_till":
