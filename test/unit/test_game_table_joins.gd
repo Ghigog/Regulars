@@ -77,3 +77,19 @@ func test_a_group_of_four_turns_away_when_no_table_could_ever_seat_them():
 	for g in party:
 		assert_false(game.queue.has(g), "out of the line")
 		assert_eq(g.state, "leaving")
+
+
+func test_each_table_shows_its_seat_count_at_its_centre():
+	var t := _room([Vector2i(6, 1), Vector2i(6, 2), Vector2i(9, 4)])
+	var shown := {}
+	for c: Label3D in game.tables.cards:
+		shown[c.text] = c.position
+	assert_eq(game.tables.cards.size(), 2, "a card per table, not per piece")
+	assert_true(shown.has("4") and shown.has("2"))
+	var mid: Vector3 = (t[0].position + t[1].position) / 2.0
+	assert_almost_eq(shown["4"].x, mid.x, 0.01)
+	assert_almost_eq(shown["4"].z, mid.z, 0.01)
+	game.world._unregister(t[1])
+	assert_eq(game.tables.cards.size(), 2)
+	for c: Label3D in game.tables.cards:
+		assert_eq(c.text, "2", "pulled apart, both tables seat two")
