@@ -246,7 +246,7 @@ func test_wall_pieces_hang_over_anything_but_a_tall_piece():
 	t.place(W, "tall_fridge")
 	assert_false(t.can_hang(W, "cabinet"))
 	assert_true(Kitchen.is_high_only("cabinet") and Kitchen.is_high_only("hood"))
-	assert_false(Kitchen.is_high_only("shelf"), "a shelf may stand low")
+	assert_true(Kitchen.is_high_only("shelf") and Kitchen.is_high_only("wide_shelf"), "a shelf only hangs")
 
 
 
@@ -262,16 +262,6 @@ func test_lifting_the_base_leaves_the_wall_piece_and_its_stock():
 	assert_eq(k.stock(W), ["lettuce"], "the cabinet's box stays")
 	assert_eq(k.remove(W, "high"), {"id": "cabinet", "stock": ["lettuce"]})
 	assert_false(k.cells.has(W), "an empty cell is forgotten")
-
-
-
-func test_a_closet_needs_a_shelf_low_and_high():
-	var k := _kitchen()
-	k.place(W, "shelf")
-	assert_true(k.is_closet_with(W, "wide_shelf"))
-	assert_false(k.is_closet_with(W, "cabinet"))
-	k.hang(W, "cabinet")
-	assert_false(k.is_closet(W))
 
 
 
@@ -346,26 +336,32 @@ func test_a_cabinet_hangs_over_a_piece_and_comes_off_before_it():
 
 
 
-func test_a_shelf_stands_low_then_hangs_high_as_a_closet():
+func test_a_shelf_in_hand_only_hangs_on_a_wall():
 	_game()
-	var c := Vector2i(2, 2)
+	var c := Vector2i(4, 4)
+	for x in range(3, 8):   # bare floor away from a wall
+		if not game.kitchen.is_wall(Vector2i(x, 4)) and not game.stations.has(Vector2i(x, 4)):
+			c = Vector2i(x, 4)
+			break
+	assert_false(game.stations.has(c), "the test needs bare floor away from a wall")
+	assert_true(game.placing.pick_catalog("shelf"))
+	game._demo_hover = _at(c.x, c.y)
+	assert_eq(game.world.hand_layer(), "", "bare floor away from a wall takes no shelf")
+	assert_false(game.placing.can_place(Vector3i(c.x, c.y, 0)))
+	assert_eq(game.placing.place_refusal(Vector3i(c.x, c.y, 0)), GamePlacing.NO_WALL)
+	assert_false(game.placing.place(Vector3i(c.x, c.y, 0)))
+	assert_false(game.stations.has(c), "no low box is built")
+	assert_false(game.player.hand.is_empty(), "it stays in hand")
+	game.placing.cancel_hand()
 	assert_true(game.placing.pick_up(_at(2, 2)), "the tray stack makes room")
 	assert_true(game.placing.place(Vector3i(2, 5, 0)))
 	assert_true(game.placing.pick_catalog("shelf"))
-	game._demo_hover = _at(2, 2)
-	assert_eq(game.world.hand_layer(), "base", "on bare floor a shelf stands")
-	assert_true(game.placing.place(Vector3i(2, 2, 0)))
-	assert_eq(game.stations[c].type, "shelf")
-	assert_eq(game.kitchen.get_piece(c, "base"), "shelf")
-	assert_true(game.grid.blocked.has(c))
-	assert_eq(game.world.hand_layer(), "high", "over a shelf, the next one hangs")
-	assert_true(game.placing.place(Vector3i(2, 2, 0)))
-	game.placing.cancel_hand()
-	assert_true(game.kitchen.is_closet(c))
-	assert_true(game.highs[c].closet, "drawn as one closet")
-	assert_true(game.placing.pick_up(_at(2, 2)))
-	assert_false(game.kitchen.is_closet(c))
-	assert_false(game.highs.has(c))
+	var w := Vector2i(2, 2)
+	game._demo_hover = _at(w.x, w.y)
+	assert_eq(game.world.hand_layer(), "high")
+	assert_true(game.placing.place(Vector3i(w.x, w.y, 0)))
+	assert_eq(game.kitchen.get_piece(w, "high"), "shelf")
+	assert_false(game.stations.has(w), "hung, not standing")
 
 
 

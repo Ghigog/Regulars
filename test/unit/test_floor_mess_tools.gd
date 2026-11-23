@@ -65,8 +65,6 @@ func test_where_each_tool_lives():
 	assert_false(CleanTools.fits("bucket", "sponge"))
 	assert_true(CleanTools.fits("hook", "sponge"))
 	assert_false(CleanTools.fits("hook", "mop"))
-	assert_true(CleanTools.fits(CleanTools.CLOSET, "mop"), "a closet holds either")
-	assert_true(CleanTools.fits(CleanTools.CLOSET, "sponge"))
 	assert_true(CleanTools.rinses("mop_bucket"))
 	assert_true(CleanTools.rinses("sink"))
 	for used in 5:
@@ -244,21 +242,6 @@ func test_a_sponge_hangs_on_its_hook():
 	game.cooking.use_station(h)
 	assert_eq(h.kit_tool, "sponge")
 	assert_eq(h.kit_used, 2, "a hook does not rinse")
-
-
-
-func test_a_closet_holds_a_mop_or_a_sponge():
-	var game = _game()
-	var w := _wall_cell(game)
-	var low: Station = game.world.add_station("shelf", w)
-	var high: Station = game.world.add_high("shelf", w)
-	assert_true(game.kitchen.is_closet(w))
-	assert_eq(game.clean_kit.home_at(w), high)
-	CleanKit.hold(game.player, "mop", 1)
-	assert_eq(game.cooking.use_station(low, true), "Put mop back")
-	game.cooking.use_station(low)
-	assert_eq(high.kit_tool, "mop")
-	assert_eq(game.cooking.use_station(low, true), "Take mop")
 
 
 

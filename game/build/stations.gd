@@ -427,9 +427,8 @@ const HOOD_COL := "#7fa3a8"
 
 
 ## A piece hung in a cell's high layer: a wall cabinet, an open shelf (two planks when
-## wide), or a hood. `closet`: a high shelf over a low one, drawn as one tall closet
-## (side panels to the floor, a back and a cornice). `drop` lowers it (shop previews).
-static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) -> void:
+## wide), or a hood. `drop` lowers it (shop previews).
+static func wall_piece(n: Node3D, node: String, drop := 0.0) -> void:
 	var y0 := HIGH_Y0 - drop
 	var back := -0.5
 	match node:
@@ -449,9 +448,8 @@ static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) ->
 			for i in planks:
 				var y := y0 + 0.12 + i * 0.44
 				Build.box(n, Vector3(0, y, back + 0.15), Vector3(0.94, 0.05, 0.3), Build.WOOD, 0.0, Build.R_WOOD)
-				if not closet:   # brass brackets under each plank
-					for sx: float in [-0.36, 0.36]:
-						Build.box(n, Vector3(sx, y - 0.16, back + 0.04), Vector3(0.04, 0.16, 0.08), "#d9a441", 0.0, Build.R_WOOD)
+				for sx: float in [-0.36, 0.36]:   # brass brackets under each plank
+					Build.box(n, Vector3(sx, y - 0.16, back + 0.04), Vector3(0.04, 0.16, 0.08), "#d9a441", 0.0, Build.R_WOOD)
 				# Jars on the plank: the jar shelf of sheet 1.
 				var jars := [Build.PAPER, Build.CORAL, Build.TILE_TEAL, Build.WARN]
 				for j in 3:
@@ -459,14 +457,6 @@ static func wall_piece(n: Node3D, node: String, closet := false, drop := 0.0) ->
 					var tall := 0.18 + 0.05 * ((i + j) % 2)
 					Build.cyl(n, Vector3(jx, y + 0.05, back + 0.15), 0.08, tall, jars[(i + j) % jars.size()], 0.0, Build.R_GLOSS)
 					Build.cyl(n, Vector3(jx, y + 0.05 + tall, back + 0.15), 0.065, 0.04, Build.WOOD_DARK)
-			if closet:
-				# Side panels from the floor, a back and a cornice: the low shelf and this
-				# one read as a single closet.
-				var top := y0 + 0.94
-				for sx: float in [-1.0, 1.0]:
-					Build.box(n, Vector3(sx * 0.475, -drop, back + 0.24), Vector3(0.05, top + drop, 0.48), Build.CABINET)
-				Build.box(n, Vector3(0, -drop, back + 0.02), Vector3(0.94, top + drop, 0.04), _shade(Build.CABINET))
-				Build.box(n, Vector3(0, top, back + 0.25), Vector3(1.02, 0.07, 0.52), Build.WOOD, 0.0, Build.R_WOOD)
 		"hook":
 			# A wooden plate on the wall with a brass hook bent up off it (PRD 9.4).
 			Build.box(n, Vector3(0, y0 + 0.08, back + 0.03), Vector3(0.3, 0.36, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
