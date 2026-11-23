@@ -30,7 +30,7 @@ var history: Array[Dictionary] = []
 
 
 static func _blank() -> Dictionary:
-	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0, "unpaid_bills": 0, "perfect": 0, "best_streak": 0, "rep_change": 0.0, "ordered": {}}
+	return {"sales": 0, "tips": 0, "served": 0, "walkouts": 0, "spent": 0, "stock": 0, "staff": 0, "unpaid": 0, "found_nothing": 0, "no_table": 0, "unpaid_bills": 0, "perfect": 0, "best_streak": 0, "rep_change": 0.0, "ordered": {}}
 
 
 func level() -> int:
@@ -102,6 +102,12 @@ func record_review(stars: int) -> void:
 func record_found_nothing(count := 1) -> void:
 	today.found_nothing += count
 	move_reputation(-REP_NOTHING * count)
+
+
+## A group turned away at the door: no table in the room could ever seat them. Counts
+## groups, not people, and is not a strike or a hit on reputation.
+func record_no_table() -> void:
+	today.no_table += 1
 
 
 ## A party left without paying (PRD 11): no money, and not a strike.

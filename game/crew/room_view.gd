@@ -68,7 +68,7 @@ func world() -> Dictionary:
 		if Station.is_table(st.type):
 			var tid := "%d,%d" % [c.x, c.y]
 			var waiting: Array = crew.game.seating._guests_to_order(st)
-			if not waiting.is_empty():
+			if not waiting.is_empty() and crew.game.tables.lead(st) == st:   # one order for the whole table
 				tables.append({"id": tid, "cell": c, "state": "order", "wait": _wait_of(waiting[0])})
 			if st.dirty > 0:
 				tables.append({"id": tid, "cell": c, "state": "clear", "wait": st.dirty_age})

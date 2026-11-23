@@ -227,6 +227,10 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	if nothing > 0:
 		var nl := hud._label(box, 15, "%d %s nothing they liked." % [nothing, "person found" if nothing == 1 else "people found"])
 		nl.modulate.a = 0.75
+	var no_table := int(rec.get("no_table", 0))
+	if no_table > 0:
+		var tl := hud._label(box, 15, "%d %s no table." % [no_table, "group found" if no_table == 1 else "groups found"])
+		tl.modulate.a = 0.75
 	_rule(box)
 	var earned: int = rec.sales + rec.tips
 	var total := _row(box, "", "TOTAL EARNED:", "$%d" % earned, 32)

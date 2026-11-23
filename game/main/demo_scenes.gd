@@ -479,8 +479,7 @@ func leftovers_on_counters() -> void:
 		if n == 0:
 			st.set_dish(Dish.make(Dish.PLATE))
 		elif n == 1:
-			st.item = "raw:patty"
-			st.refresh()
+			st.set_item("raw:patty")
 		else:
 			break
 		n += 1

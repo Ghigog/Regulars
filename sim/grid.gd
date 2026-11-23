@@ -98,6 +98,18 @@ func reachable(from: Vector2i, to: Vector2i) -> bool:
 
 ## Line of sight between two cell centres. Only walls block sight; furniture is low.
 func has_los(a: Vector2i, b: Vector2i) -> bool:
+	return _line_open(a, b, sight_open)
+
+
+## Whether a chef at `a` can reach cell `b`: the same line walk as has_los, but only walls
+## and partitions stop a hand. A doorway, an archway or a door edge lets it through.
+func reach_open(a: Vector2i, b: Vector2i) -> bool:
+	return _line_open(a, b, edge_open)
+
+
+## Walks the line between two cell centres; `open` says whether the edge between two
+## neighbouring cells lets it through.
+func _line_open(a: Vector2i, b: Vector2i, open: Callable) -> bool:
 	var from := Vector2(a) + Vector2(0.5, 0.5)
 	var to := Vector2(b) + Vector2(0.5, 0.5)
 	var steps := maxi(1, int(from.distance_to(to) * 10.0))
@@ -108,13 +120,13 @@ func has_los(a: Vector2i, b: Vector2i) -> bool:
 		if cur == prev:
 			continue
 		if cur.x == prev.x or cur.y == prev.y:
-			if not sight_open(prev, cur):
+			if not open.call(prev, cur):
 				return false
 		else:
 			var m1 := Vector2i(cur.x, prev.y)
 			var m2 := Vector2i(prev.x, cur.y)
-			var r1 := sight_open(prev, m1) and sight_open(m1, cur)
-			var r2 := sight_open(prev, m2) and sight_open(m2, cur)
+			var r1: bool = open.call(prev, m1) and open.call(m1, cur)
+			var r2: bool = open.call(prev, m2) and open.call(m2, cur)
 			if not (r1 or r2):
 				return false
 		prev = cur
