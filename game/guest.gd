@@ -28,6 +28,7 @@ var liked_meal := false   # their meal had something they like
 ## Empty until then. `planned` is what they will order, chosen at the door.
 var order := {}
 var planned := {}
+var no_table := false   # no table in the room could ever seat their group: they turn away at the door
 var orders_nothing := false   # found nothing on the menu at the door: no notepad, no ticket
 var bill_base := 0       # the order's price: what the bill is before mood and deals
 var _meal_tray: Tray
@@ -464,6 +465,8 @@ func _refresh(delta: float) -> void:
 		want = "bill"   # PRD 11: the call; at the till it is up all the time
 	elif state == "chatting" and party.size() > 1 and fmod(_age + idx * 0.7, 2.4) < 1.4:
 		want = "chat"
+	elif state == "browse" and no_table:
+		want = "no_table"
 	elif state == "queue" and p < 0.6:
 		want = "zzz"
 	elif _heart_time > 0.0:

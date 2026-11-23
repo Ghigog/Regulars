@@ -355,6 +355,16 @@ static func icon(id: String) -> Array:
 				o.append([rect(n[0], n[1], 1.32, 0.66, n[2]), "#bfe3d0"])
 				o.append([ell(n[0], n[1], 0.26), "#6fb6a8"])
 			o.append_array(_moved(icon("coin"), Vector2(0.48, -0.48), 0.5))
+		"no_table":  # a little square table with a red cross over it
+			o.append([rect(0, 0.2, 1.7, 0.2), INK])
+			o.append([rect(0, 0.2, 1.54, 0.08), "#c98f58"])
+			for sx: float in [-0.62, 0.62]:
+				o.append([rect(sx, -0.22, 0.2, 0.7), INK])
+				o.append([rect(sx, -0.2, 0.1, 0.62), "#7a5235"])
+			for turn: float in [PI / 4.0, -PI / 4.0]:
+				o.append([rect(0, 0, 2.0, 0.34, turn), INK])
+			for turn: float in [PI / 4.0, -PI / 4.0]:
+				o.append([rect(0, 0, 1.9, 0.2, turn), RED])
 		"walkout":  # a red token with an angry face pressed into it
 			o.append([ell(0, -0.06, 0.94), "#b83228"])
 			o.append([ell(0, 0.04, 0.9), "#e8564a"])

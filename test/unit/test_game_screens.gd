@@ -208,6 +208,7 @@ func test_everyone_in_line_has_their_own_place_and_the_line_moves_up():
 
 func test_a_group_comes_in_single_file_not_stacked():
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
+	game.world.add_station("table", Vector2i(6, 2))   # pushed against (6, 1): a table for four
 	for i in 6:
 		game.seating.spawn_guest(i)    # the tables fill, so the four have to queue too
 	var four: Array[Guest] = game.seating.spawn_group([6, 7, 8, 9])
@@ -221,8 +222,8 @@ func test_a_group_comes_in_single_file_not_stacked():
 
 func test_a_rush_never_walks_guests_through_one_another():
 	game.arrivals.assign([{"time": 0.3, "group": [0, 1]}, {"time": 0.6, "idx": 2},
-		{"time": 0.9, "group": [3, 4, 5]}, {"time": 1.2, "idx": 6}, {"time": 1.5, "group": [7, 8]},
-		{"time": 1.8, "group": [9, 10, 11, 12]}, {"time": 2.1, "idx": 13}])
+		{"time": 0.9, "group": [3, 4]}, {"time": 1.2, "idx": 6}, {"time": 1.5, "group": [7, 8]},
+		{"time": 1.8, "group": [9, 10, 11]}, {"time": 2.1, "idx": 13}])
 	for p in game.town.people:   # middling, so the line clears by walkouts in time (PRD 10.1)
 		p.tolerance = {"food": 3, "service": 3, "clean": 3}
 	var worst := 99.0
