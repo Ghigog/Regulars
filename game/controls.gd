@@ -5,7 +5,7 @@ extends CanvasLayer
 ## to one player (`seats`; anything unseated is player 0's), and each player has
 ## a `PlayerInput` that remembers the device they used last, their stick and
 ## what they hold down. A press becomes an action ("use", "back", "turn",
-## "sell", "shop", "town", "options", "confirm", "search", "mute" and the
+## "sell", "shop", "town", "options", "confirm", "search" and the
 ## browse directions "up", "down", "left", "right") and goes to the game as
 ## `game.coop.act(player, action)`, so all three devices share one set of rules.
 ## Movement is read with move(player).
@@ -18,7 +18,7 @@ extends CanvasLayer
 ##
 ## Keys: WASD or arrows walk (and browse), E/Space use, Enter confirm, Esc back,
 ## R turn, C sell, Tab shop, Z and X choose a lifted piece's upgrade and Space buys it
-## (Space is "use" everywhere else: `game.coop.act` turns "buy" back into "use"), T town, O options, F search, M mute, N the menu screen
+## (Space is "use" everywhere else: `game.coop.act` turns "buy" back into "use"), T town, O options, F search, N the menu screen
 ## (R on an ingredient station at night switches its stock). Shift held: the chef stands
 ## still and WASD only turns them, to aim (diagonals too at night).
 ## Controller: left stick or d-pad walk (the d-pad also browses), A use (confirm
@@ -52,7 +52,7 @@ const GLYPHS := {
 const KEY_ACTIONS := {
 	KEY_E: "use", KEY_SPACE: "buy", KEY_ENTER: "confirm", KEY_KP_ENTER: "confirm",
 	KEY_ESCAPE: "back", KEY_R: "turn", KEY_C: "sell", KEY_Z: "prev", KEY_X: "next", KEY_TAB: "shop", KEY_T: "town",
-	KEY_O: "options", KEY_F: "search", KEY_SLASH: "search", KEY_M: "mute", KEY_N: "menu",
+	KEY_O: "options", KEY_F: "search", KEY_SLASH: "search", KEY_N: "menu",
 	KEY_UP: "up", KEY_W: "up", KEY_DOWN: "down", KEY_S: "down",
 	KEY_LEFT: "left", KEY_A: "left", KEY_RIGHT: "right", KEY_D: "right",
 }
