@@ -81,3 +81,39 @@ func test_the_tidy_plays_and_clears_its_moves():
 			flying += 1
 	assert_gt(flying, 0, "a plate is in the air")
 	_run(1.0)
+
+
+func _model_gone(st: Station) -> bool:
+	return st._item_node == null or not is_instance_valid(st._item_node) or st._item_node.is_queued_for_deletion()
+
+
+func test_tidied_counters_draw_no_food_and_take_new_food_next_day():
+	var bin: Station = game.world.find_station("bin")
+	var b0 := bin.count
+	var cs := _counters(2)
+	cs[0].set_item("raw:patty")
+	_plate_on(cs[1], true)
+	_end_day_now()
+	game.session.open_build()
+	assert_eq(bin.count, b0 + 2)
+	assert_true(_model_gone(cs[0]), "no patty model left on the counter")
+	assert_true(_model_gone(cs[1]), "no plate model left on the counter")
+	cs[0].set_item("raw:bun")
+	assert_eq(cs[0].item, "raw:bun")
+	assert_false(_model_gone(cs[0]))
+	cs[0].clear_food()
+	assert_eq(cs[0].item, "")
+	assert_true(_model_gone(cs[0]))
+
+
+func test_food_left_on_a_stove_is_gone_and_the_cook_bar_hidden():
+	var stove: Station = game.world.find_station("stove")
+	stove.set_item("raw:patty")
+	stove.cook = 1.0
+	_end_day_now()
+	game.session.open_build()
+	assert_eq(stove.item, "")
+	assert_true(_model_gone(stove))
+	assert_false(stove._bar.visible)
+	stove.set_item("raw:patty")
+	assert_eq(stove.item, "raw:patty")

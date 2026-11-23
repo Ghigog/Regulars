@@ -302,6 +302,9 @@ func clear_food() -> void:
 	cook = 0.0
 	rest = 0.0
 	result = ""
+	_show_item("")
+	if is_heat_tool():
+		_update_cooking_visuals()
 	refresh()
 
 
