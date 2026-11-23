@@ -299,8 +299,8 @@ func target_cell() -> Vector2i:
 			var st: Station = game.world.station_at(n)   # a piece hung over bare floor too (PRD 8.5)
 			if st == null:
 				continue
-			if absi(dx) + absi(dy) == 1 and not game.grid.edge_open(here, n):
-				continue   # a partition is in the way
+			if not game.grid.reach_open(here, n):
+				continue   # a wall or partition is in the way
 			var to := Grid.center(n) - position
 			to.y = 0.0
 			var dist := to.length()
