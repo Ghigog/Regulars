@@ -388,14 +388,14 @@ func tick(delta: float) -> void:
 				_advance(delta)
 				_face(Grid.center(game.paying.till_cell()) - position, delta)
 			if game.paying.ready_to_pay(table):
-				mood.wait_to_pay(delta, game.day.table_patience())
+				mood.wait_to_pay(delta, game.day.table_patience(), state == "to_pay")
 				if mood.skipped_bill:
 					game.paying.leave_unpaid(table, self)
 		"to_till":
 			if _advance(delta):
 				state = "at_till"
 			if game.paying.ready_to_pay(table):
-				mood.wait_to_pay(delta, game.day.table_patience())
+				mood.wait_to_pay(delta, game.day.table_patience(), false)
 				if mood.skipped_bill:
 					game.paying.leave_unpaid(table, self)
 		"company":   # nothing to eat: they sit with friends and go when the friends go

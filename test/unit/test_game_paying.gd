@@ -123,6 +123,16 @@ func test_the_till_writes_a_bill_for_a_table_waiting_to_pay():
 
 
 
+func test_a_ready_party_is_still_seated_and_patient_after_30_seconds():
+	var g := _ordered_guest(0)
+	game.serving.serve(g, game.serving.full_tray_for(g))
+	_run(g.eat_time + Guest.CHAT_TIME + 0.5)
+	assert_true(game.paying.ready_to_pay(g.table))
+	_run(30.0)
+	assert_eq(g.state, "to_pay", "still seated")
+	assert_gt(g.mood.patience, 0.0)
+
+
 func test_a_party_left_too_long_leaves_without_paying_and_no_strike():
 	var g := _ordered_guest(0)
 	game.serving.serve(g, game.serving.full_tray_for(g))

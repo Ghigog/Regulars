@@ -36,14 +36,16 @@ sight, since a guest only waves at someone they can see.
 2. **Ready to pay.** When every guest in the party who ordered has finished chatting, the
    table is **ready to pay**. One bill per table (see Open). From here the party's
    patience runs again, at `PAY_PATIENCE_SCALE` (*tunable*, 1.5, slower than waiting for
-   food) of the table patience.
+   food) of the table patience, and `PAY_TABLE_SLOWER` (*tunable*, 3.5) times slower again
+   while still seated. A grace (`PAY_GRACE`, *tunable*, 35 s) keeps even a guest with almost
+   no patience left waiting that long.
 3. **Calling.** While a chef, or a helper with the `take_payment` duty, is in sight of
    the table (`Grid.sight_open` from the table's cell to theirs), one guest raises a hand
    with a **bill bubble** (a small paper slip with a coin, by shape: a torn-edged slip, not
    a plate). The bubble shows only while someone can see them; it is the "call". A soft
    bell plays once when a call starts.
 4. **Going to the till.** If the table has been ready to pay for `TILL_AFTER` (*tunable*,
-   12 s) and nobody has brought the bill, one guest (the one who called, else the first
+   42 s) and nobody has brought the bill, one guest (the one who called, else the first
    seated) stands up and **walks to the till**, queuing in front of the pass. The rest
    stay seated. A guest at the till shows the same bill bubble at all times.
 5. **Writing the bill.** A chef at the till presses E to open the **bill screen** (11.3).
