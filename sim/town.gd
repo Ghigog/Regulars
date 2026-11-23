@@ -26,7 +26,7 @@ const REGULAR_STREAK := 3   # good visits in a row that make someone a regular
 const REGULAR_TIP := 1.25
 const GRUDGE_DAYS := 2      # full days a guest stays away after walking out
 const FLYER_PRICE := 15
-const FLYER_BOOST := 0.1   # visit chance each, so about four more guests in a town of forty
+const FLYER_GUESTS := 2    # tunable: extra guests a batch of flyers brings, on top of the crowd floor
 ## Turnout (review, item 1). Everyone rolls to come from their own affinity, so a liked
 ## place fills up; a thin day is topped up to `crowd_floor`, which grows slowly.
 const VISIT_BASE := 0.1      # tunable: visit chance at no opinion either way
@@ -351,9 +351,10 @@ static func crowd_floor(day: int) -> int:
 	return 2 + day / 2
 
 
-## Who turns up today. Reputation (and `boost`, from flyers and reviews) decides the
-## crowd; a thin day is topped up to `crowd_floor`.
-func roll_guests(day: int, boost := 0.0) -> Array[int]:
+## Who turns up today. Reputation (and `boost`, from a review) decides the crowd; a thin
+## day is topped up to `crowd_floor`. Flyers (`extra`) then add up to that many more people
+## drawn from those staying home, so nobody holding a grudge or gone for good comes.
+func roll_guests(day: int, boost := 0.0, extra := 0) -> Array[int]:
 	var coming: Array[int] = []
 	var staying: Array[int] = []
 	for i in people.size():
@@ -365,6 +366,10 @@ func roll_guests(day: int, boost := 0.0) -> Array[int]:
 			staying.append(i)
 	var minimum := mini(crowd_floor(day), people.size())
 	while coming.size() < minimum and not staying.is_empty():
+		coming.append(staying.pop_at(rng.randi_range(0, staying.size() - 1)))
+	for _n in extra:
+		if staying.is_empty():
+			break
 		coming.append(staying.pop_at(rng.randi_range(0, staying.size() - 1)))
 	for i in range(coming.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)

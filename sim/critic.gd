@@ -107,7 +107,7 @@ func arrival_time(length: float) -> float:
 	return length * lerpf(MIDDLE.x, MIDDLE.y, _rng.randf())
 
 
-## The extra visit chance a review gives on `day`. Stacks with flyers.
+## The extra visit chance a review gives on `day`. Stacks with flyers (a fixed number of extra guests).
 func visit_boost(day: int) -> float:
 	return _boost if day >= _boost_from and day <= _boost_to else 0.0
 

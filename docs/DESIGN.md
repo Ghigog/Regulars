@@ -671,7 +671,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   `variety`, kindness, walkouts and forgiving are `other`; friends hear it under the
   same topic. The review, printed at the end of the day, replaces everyone's four topics
   with (rating - 3) x 0.1, leaves `other`, grudges and "never coming back" alone, and
-  gives `roll_guests` an extra -0.25 to +0.25 for the next four days (stacks with flyers,
+  gives `roll_guests` an extra -0.25 to +0.25 for the next four days (stacks with flyers, which add a fixed `Town.FLYER_GUESTS` extra guests,
   replaced by the next review). The clipping (headline by stars, the four ratings with
   icons and pips, stars, a line confirming or contradicting the town's average on the
   topic with the biggest gap, the critic's name and peg) comes with the receipt. The
@@ -726,7 +726,7 @@ Where an older paragraph above disagrees, this list wins.
 
 - **Crowd** (`sim/town.gd`): each theme's town is forty named people (the fourteen drawn
   ones and a seeded pool, `Town.MORE_NAMES`; looks from the peg kit, `Peg.look_for`).
-  Visit chance is 0.1 + 0.45 x affinity; flyers add 0.1 each and a review +-0.1 at most.
+  Visit chance is 0.1 + 0.45 x affinity; flyers add `Town.FLYER_GUESTS` (2) extra guests after the floor top-up, never anyone with a grudge or gone, and a review +-0.1 at most.
   A thin day is topped up to `crowd_floor` = 2 + day / 2. The day is 75 s every day
   (95 and 85 s on days 1 and 2); later days are harder for the crowd, shorter patience,
   and bigger parties (more bring every friend; from day 8 a friend brings a friend).
@@ -780,7 +780,7 @@ focused. The logic and tests still exist.
 | Walls on cell edges, line of sight, placement pathing | `sim/grid.gd` | **Built**, see section 1. Placement rules are `Grid.can_place_block` and `can_place_wall`. |
 | Word of mouth between friends | `sim/town.gd` | **Built**, see section 1. |
 | Kindness / discounts | `GuestMood.offer_discount` / `offer_comp`, `Town.record_kindness` / `paid_full_price` | **Built**, see section 1: half price, free meals, and guests who come to expect them. |
-| Flyers (ad boost) | `Town.roll_guests(day, boost)` | **Built**, see section 1. |
+| Flyers (ad boost) | `Town.roll_guests(day, boost, extra)` | **Built**, see section 1. |
 
 - **Bill screen**: consider filling the slip from the tickets if testers find writing
   the bill tedious.
