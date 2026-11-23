@@ -514,7 +514,7 @@ func _update_ghost(ch: Player = null) -> void:
 				BuildStations.wall_piece(ch.ghost, hn)
 			elif ch.hand.get("node") is Station:
 				var hs: Station = ch.hand.node
-				BuildStations.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" or Kitchen.grows_from_counter(hs.node) else "", false, hs.node)
+				BuildStations.station(ch.ghost, hs.type, hs.tier, hs.base if hs.type == "counter" or hs.type == "shelf" or Kitchen.grows_from_counter(hs.node) else "", hs.pass_look, hs.node)
 			else:
 				BuildStations.station(ch.ghost, ch.hand.id, int(ch.hand.tier), "counter" if ch.hand.get("counter", false) else ch.hand.get("base", ""), false, str(ch.hand.get("up", "")))
 			if layer != "" and game.wall_facing.has(cell):
