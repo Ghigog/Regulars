@@ -61,7 +61,7 @@ func start_day() -> void:
 	game.menu_board.refresh(game.menu_stock.tonight_menu())
 	game.town.new_day()
 	game.perfect_streak = 0
-	var coming := game.town.roll_guests(game.ledger.day, (Town.FLYER_BOOST if game.flyers_out else 0.0) + game.critic.visit_boost(game.ledger.day))
+	var coming := game.town.roll_guests(game.ledger.day, game.critic.visit_boost(game.ledger.day), Town.FLYER_GUESTS if game.flyers_out else 0)
 	coming = coming.filter(func(i: int) -> bool: return game.staff.may_visit(i, game.ledger.day))   # staff work; they eat out only on a day off
 	var critic_day := game.critic.visits_on(game.ledger.day)
 	if critic_day:   # they come alone, whatever the dice or a grudge say

@@ -344,13 +344,22 @@ func test_roll_guests_has_minimum_and_no_duplicates():
 
 
 
-func test_flyers_bring_a_bigger_crowd():
-	var plain := 0
-	var boosted := 0
+func test_flyers_bring_exactly_a_couple_of_extra_guests():
 	for seed_value in range(1, 21):
-		plain += Town.new(seed_value).roll_guests(1).size()
-		boosted += Town.new(seed_value).roll_guests(1, Town.FLYER_BOOST).size()
-	assert_gt(boosted, plain + 20, "at least one more guest a day on average")
+		var plain := Town.new(seed_value).roll_guests(3).size()
+		var flyered := Town.new(seed_value).roll_guests(3, 0.0, Town.FLYER_GUESTS).size()
+		assert_eq(flyered, plain + Town.FLYER_GUESTS, "seed %d" % seed_value)
+
+
+func test_flyers_skip_grudges_and_the_gone_and_never_fail():
+	var t := Town.new(7)
+	t.record_walkout(4, 3)
+	t.people[0].gone = true
+	for n in 20:
+		var coming := t.roll_guests(4, 0.0, 1000)
+		assert_false(coming.has(4), "holding a grudge")
+		assert_false(coming.has(0), "gone for good")
+		assert_eq(coming.size(), t.people.size() - 2, "everyone free comes, no more")
 
 
 
