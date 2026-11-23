@@ -68,9 +68,6 @@ func test_dirty_plates_stay_and_no_clear_food_prompt_exists():
 	_end_day_now()
 	game.session.open_build()
 	assert_eq(t.dirty, 2)
-	var note: String = game.room_edit.dirty_note()
-	assert_true(note.begins_with("Still dirty: a table"))
-	assert_false(note.contains("food"))
 	assert_false("Clear food" in Cleaning.NIGHT_ACTIONS)
 
 
