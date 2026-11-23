@@ -257,8 +257,8 @@ func _piece_in_front(ch: Player = null) -> Vector3:
 			var faced_aim: bool = ch.aiming and n == here + ch.facing
 			if game.world.station_at(n) == null and game.placing.rug_at(n) == game.placing.rug_at(here) and not faced_aim:
 				continue   # the rug underfoot is not offered: it only gets in the way of the door card
-			if absi(dx) + absi(dy) == 1 and not game.grid.edge_open(here, n):
-				continue   # a partition is in the way
+			if not game.grid.reach_open(here, n):
+				continue   # a wall or partition is in the way
 			var spot := Grid.center(n)
 			var to := spot - ch.position
 			to.y = 0.0
@@ -353,9 +353,26 @@ func build_action(ch: Player = null) -> String:
 		return clean
 	if game.desk.desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
 		return "Use desk"
-	if not Cleaning.carrying_mess(ch.held) and not CleanKit.holding(ch) and _piece_in_front(ch) != Vector3.INF:
-		return "Pick up"
+	if not Cleaning.carrying_mess(ch.held) and not CleanKit.holding(ch):
+		var spot := _piece_in_front(ch)
+		if spot != Vector3.INF:
+			var door := game.day.door_action(ch)
+			if door == "" or not _nearer_door(spot, ch):
+				return "Pick up"
+			return door
 	return game.day.door_action(ch)
+
+
+## Whether the door card is nearer the chef than a piece's spot (floor distance), unless
+## the chef is aiming at that very cell: an aimed piece always wins.
+func _nearer_door(spot: Vector3, ch: Player) -> bool:
+	if ch.aiming and Grid.to_cell(spot) == ch.cell() + ch.facing:
+		return false
+	var to_door := Game.DOORWAY - ch.position
+	var to_spot := spot - ch.position
+	to_door.y = 0.0
+	to_spot.y = 0.0
+	return to_door.length() < to_spot.length()
 
 
 ## The head prompt for a chef holding something at night: {text, extras}. A new piece
