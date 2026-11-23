@@ -617,12 +617,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
   for 3 s (`Guest.CHAT_TIME`; speech bubbles with company, none alone), then waits for
   the bill (`to_pay`). When everyone at the table who ordered has finished chatting, the
   table is ready to pay: one bill per table, paid by the whole party. Their patience runs
-  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`), with a grace: on the first wait, patience is raised so that they wait at least `GuestMood.PAY_GRACE` (10 s) whatever was left from waiting for food. Every payer's bar shows the party's lowest patience
+  again, at 1.5x the table's (`GuestMood.PAY_PATIENCE_SCALE`) at the till, and 3.5x slower again while still seated (`GuestMood.PAY_TABLE_SLOWER`), with a grace: on the first (seated) wait, patience is raised so that they wait at least `GuestMood.PAY_GRACE` (35 s) whatever was left from waiting for food. Every payer's bar shows the party's lowest patience
   (`GamePaying.pay_patience`), so no bar reads full while someone is about to give up; the
   corner line names the guest who did. While a chef, or a helper
   with the `take_payment` duty, can see the table (`Grid.has_los`, checked every half
   second), one guest waves with the bill bubble (a torn-edged slip with a coin) and a soft
-  bell rings once. After 12 s ready with no slip printed for them (`TILL_AFTER`), the one
+  bell rings once. After 42 s ready with no slip printed for them (`TILL_AFTER`), the one
   who called (else the first) stands and queues at the till, on the room side of the
   pass, bubble always up; the line follows the till if the pass moves. A chef facing the
   till with empty hands (and nothing on that counter top) gets "Write the bill": the

@@ -12,7 +12,7 @@ func _init(game_: Game) -> void:
 
 # ---------------------------------------------------------------- paying (PRD 11)
 
-const TILL_AFTER := 12.0   # tunable: seconds ready to pay before one of them goes to the till
+const TILL_AFTER := 42.0   # tunable: seconds ready to pay before one of them goes to the till
 const HAND_TIME := 1.0     # tunable: seconds of held E to hand a bill over
 const CALL_EVERY := 0.5    # how often a ready table looks for someone to wave at
 const TILL_GAP := 0.75     # metres between guests queued at the till
