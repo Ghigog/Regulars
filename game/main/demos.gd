@@ -381,7 +381,7 @@ func _apply_demo(demo: String) -> void:
 		game.ledger.money = 300
 		game.arrivals.clear()
 		game.get_tree().create_timer(1.0).timeout.connect(_demo_storage.bind(demo))
-	elif demo in ["wall", "wall_build"]:   # PRD 8.5: hoods, cabinets, a closet, a tall fridge; a cabinet's ghost on the wall; shoot at 3
+	elif demo in ["wall", "wall_build"]:   # PRD 8.5: hoods, cabinets, a hung shelf, a tall fridge; a cabinet's ghost on the wall; shoot at 3
 		game.ledger.record_sale(Game.DEMO_BILL, 5)
 		game.ledger.money = 300
 		game.arrivals.clear()
@@ -575,7 +575,7 @@ func _demo_storage(demo: String) -> void:
 
 
 ## The wall layer (PRD 8.5) at night. "wall": the start's hoods over the stoves and
-## cabinets by the back door (one holding a box), a low and a high shelf as one closet,
+## cabinets by the back door (one holding a box), a hung shelf holding two boxes,
 ## and the grill fridge turned into a tall fridge. "wall_build": a wall cabinet in hand,
 ## its ghost hung over the plate stack with the high band lit behind it.
 func _demo_wall(demo: String) -> void:
@@ -587,7 +587,6 @@ func _demo_wall(demo: String) -> void:
 	game.kitchen.set_cell(corner, "tall_fridge")
 	game.menu_stock.stock_box("cheese" if not sea else "calamari", corner)
 	game.world._show_boxes(corner)
-	game.world.add_station("shelf", Vector2i(1, 2))
 	game.world.add_high("shelf", Vector2i(1, 2))
 	game.menu_stock.stock_box("onion" if not sea else "lemon", Vector2i(1, 2))
 	game.menu_stock.stock_box("lettuce" if not sea else "courgette", Vector2i(1, 2))

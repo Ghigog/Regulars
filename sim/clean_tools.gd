@@ -5,7 +5,7 @@ extends RefCounted
 ## a FloorMess and plain cells; the scene side is game/clean_kit.gd. The tools' trees
 ## (PRD 9.5) are Kitchen.NODES: each home node there names the tool it keeps ("tool").
 
-## Each hand tool: the home it is kept in ("bucket" or "hook"; a closet takes either),
+## Each hand tool: the home it is kept in ("bucket" or "hook"),
 ## levels cleared a press (MAX_LEVEL: the whole cell), seconds a press takes (held E
 ## repeats at this pace), and how many presses it cleans before it is dirty (0: never).
 ## "grease": kitchen grease only. "uses": presses a day, each taking a level 4 cell to
@@ -36,7 +36,6 @@ const HAND_LEVELS := 1
 ## The pieces that are homes, and the kind of home each is (a catalog type).
 const HOMES := {"mop_bucket": "bucket", "hook": "hook", "sponge": "hook"}
 const SPILL_LEVEL := 4   # the spill kit works on a cell this dirty only
-const CLOSET := "closet"
 ## Where a home starts with its tool when bought: the bucket comes with a mop, and a
 ## sponge is sold hanging on its own hook.
 const COMES_WITH := {"mop_bucket": "mop", "sponge": "sponge"}
@@ -71,8 +70,7 @@ static func name_of(tool: String) -> String:
 	return str(TOOLS[tool].name) if TOOLS.has(tool) else ""
 
 
-## The kind of home a piece is ("bucket", "hook"), or "" for none. A closet is the cell,
-## not a piece: see fits().
+## The kind of home a piece is ("bucket", "hook"), or "" for none.
 static func home_kind(piece: String) -> String:
 	return str(HOMES.get(piece, ""))
 
@@ -81,7 +79,7 @@ static func home_kind(piece: String) -> String:
 static func fits(home: String, tool: String) -> bool:
 	if not TOOLS.has(tool) or home == "":
 		return false
-	return home == CLOSET or str(TOOLS[tool].home) == home
+	return str(TOOLS[tool].home) == home
 
 
 static func dirty_after(tool: String) -> int:

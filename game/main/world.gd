@@ -391,10 +391,10 @@ func _hang(st: Station, cell: Vector2i) -> void:
 	_show_boxes(cell)
 
 
-## Redraws a hung piece: a high shelf over a low one draws as one closet.
+## Redraws a hung piece.
 func _refresh_wall(cell: Vector2i) -> void:
 	if game.highs.has(cell):
-		(game.highs[cell] as Station).set_wall(true, game.kitchen.is_closet(cell))
+		(game.highs[cell] as Station).set_wall(true)
 
 
 ## The piece a chef uses at a cell: what stands there, else what hangs on the wall above
