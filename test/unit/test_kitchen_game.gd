@@ -174,9 +174,9 @@ func test_a_tops_surface_holds_one_thing_and_empty_hands_take_it_first():
 	assert_eq(game.player.held, "prep:bun")
 	var stove: Station = game.world.find_station("stove")
 	game.player.set_held("dishes", 1.0, [Dish.make(Dish.PLATE)])
-	assert_eq(game.cooking.use_station(stove), "Put down", "a plate rests on a cold stove")
+	assert_eq(game.cooking.use_station(stove), "Plates go on a clear counter", "no plate on a tool")
 	assert_false(stove.is_cooking())
-	assert_eq(game.cooking.use_station(stove), "Pick up")
+	assert_eq(game.player.dishes.size(), 1, "the plate stays in hand")
 
 
 
