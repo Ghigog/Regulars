@@ -1,9 +1,9 @@
 class_name BillScreen
 extends Control
 ## The bill screen (PRD 11.3): a paper slip on the till. At the top, the tables waiting to
-## pay, by number and party size (the ones at the till marked, a table whose slip is
-## already printed greyed). Below, tonight's menu in its three courses with a count beside
-## each item. Use (E, A, a click) adds one; Backspace, X or a right click takes one off.
+## pay, by number and party size (the ones at the till marked), as a line to read: the
+## slip is for whichever table it is handed to. Below, tonight's menu in its three courses
+## with a count beside each item. Use (E, A, a click) adds one; Backspace, X or a right click takes one off.
 ## "Print" puts the slip in the chef's hand. It never shows what a table ordered: the
 ## player remembers, or reads the guest card.
 
@@ -12,7 +12,7 @@ const DIRS := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "ri
 var game
 var hud
 var chef: Player            # who is writing
-var bill := Bill.new()      # the slip so far; `table` is -1 until a table is picked
+var bill := Bill.new()      # the slip so far; it carries no table
 var _card: Control
 var _content: VBoxContainer
 var _frame: Control
@@ -45,11 +45,6 @@ func setup(game_, hud_, chef_: Player) -> void:
 	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_frame.draw.connect(_draw_frame)
 	add_child(_frame)
-	# The first table nobody has a slip for yet is picked to start with.
-	for t: Dictionary in game.paying.bill_tables():
-		if not t.printed:
-			bill.table = int(t.number)
-			break
 	render()
 	hud.receipt_ui._pop_in(_card)
 
@@ -68,23 +63,13 @@ func render() -> void:
 	_content.add_child(top)
 	_ribbon(top, "THE BILL")
 	top.add_child(HudWidgets.Icon.new("bill", 40, false))
-	var tables := HBoxContainer.new()
-	tables.add_theme_constant_override("separation", 10)
-	_content.add_child(tables)
-	_label(tables, 22, "For")
-	var any := false
+	var waiting := []
 	for t: Dictionary in game.paying.bill_tables():
-		any = true
-		var words := "Table %d  ·  %d" % [t.number, t.size]
-		if t.till:
-			words += "  ·  at the till"
-		var b := _button(tables, "table:%d" % t.number, _pick_table.bind(int(t.number)), words, 20,
-			int(t.number) == bill.table)
-		b.disabled = t.printed
-		if t.printed:
-			b.modulate.a = 0.45
-	if not any:
-		_label(tables, 20, "Nobody is waiting to pay").modulate.a = 0.6
+		waiting.append("Table %d  ·  %d%s" % [t.number, t.size, "  ·  at the till" if t.till else ""])
+	if waiting.is_empty():
+		_label(_content, 20, "Nobody is waiting to pay").modulate.a = 0.6
+	else:
+		_label(_content, 20, "Waiting:  " + "     ".join(waiting))
 	_rule()
 	var cols := HBoxContainer.new()
 	cols.add_theme_constant_override("separation", 22)
@@ -117,7 +102,7 @@ func render() -> void:
 	var total := _label(foot, 22, "%d on the slip   ·   $%d" % [bill.total_count(), Bill.price(bill, game.menu)])
 	total.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var pr := _button(foot, "print", _print, "Print", 24, true)
-	pr.disabled = bill.table < 0 or bill.is_empty()
+	pr.disabled = bill.is_empty()
 	_keys_line()
 	_sel = 0
 	for i in _targets.size():
@@ -237,12 +222,6 @@ func select(key: String) -> bool:
 
 # ---------------------------------------------------------------- what the buttons do
 
-func _pick_table(number: int) -> void:
-	bill.table = number
-	game.audio.sfx("page")
-	render()
-
-
 func _add(id: int, n: int) -> void:
 	var before := bill.count(id)
 	bill.add(id, n)
@@ -277,7 +256,7 @@ func _rule() -> void:
 	_content.add_child(line)
 
 
-## A cream paper button; `on` gives it a coral border (the table picked, an item ticked).
+## A cream paper button; `on` gives it a coral border (an item ticked).
 func _button(parent: Node, key: String, on_press: Callable, text: String, px: int, on := false) -> Button:
 	var b := Button.new()
 	b.text = text
