@@ -202,6 +202,7 @@ var crew: Crew                         # the hired helpers at work in the room (
 var demos := GameDemos.new(self)   # the REGULARS_DEMO dispatcher and the kitchen, storage, cleaning and staff scenes
 var demo_scenes := GameDemoScenes.new(self)   # building, menu, paying, orders, prep and mood demo scenes
 var tables := GameTables.new(self)   # which pieces make one table, worked out again as the room changes
+var table_cards := GameTableCards.new(self)   # the seat-count card on each free table
 var world := GameWorld.new(self)   # the room: scenery, layout, stations, walls, the wall layer
 var audio := GameAudio.new(self)   # sound, music, shake, daylight and popups
 var tidy := GameTidy.new(self)   # nightfall: plates back to the rack, food into the bin
@@ -388,6 +389,7 @@ func step(delta: float) -> void:
 	for st: Station in stations.values():
 		st.dirty_age = Cleaning.aged(st.dirty_age, delta, st.messy(), phase == Phase.SERVICE)
 	seating._tick_floor(delta)
+	table_cards.tick()
 	day.update_door_glow()
 	if phase != Phase.SERVICE:
 		return
