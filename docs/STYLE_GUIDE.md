@@ -57,6 +57,7 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- **Shadows.** Floating effects (grime motes), labels (name tags, money popups) and gauges cast no shadow; only solid pieces do.
 - **Dish rack.** The four always-there coral trays are gone; the wooden rack stays and `BuildStations.rack_load` stands up to four clean plates (cups) on end in its slots, so how full it is can be counted at 20 px.
 
 The first art pass is in the game. This is where it follows the guide loosely or not at

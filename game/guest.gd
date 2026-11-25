@@ -98,6 +98,7 @@ func setup(game_, idx_: int, start: Vector2i) -> void:
 	# A paper name tag.
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_label.no_depth_test = true
 	_label.font = Hud.lettering()
 	_label.font_size = 36

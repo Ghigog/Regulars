@@ -527,6 +527,7 @@ static func cell_look(c: Vector2i, lvl: int, walked: Vector2i) -> Node3D:
 static func motes(lvl: int, seed_value := 0) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.name = "motes"
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if _mote_mesh == null:
 		var m := SphereMesh.new()
 		m.radius = 0.06

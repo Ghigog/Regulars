@@ -57,3 +57,12 @@ func test_a_carried_over_dirty_table_still_disgusts():
 	other.refresh()
 	_run(2.0)
 	assert_true(g.mood.thoughts.has("Nobody has cleared that table"))
+
+
+func test_grime_motes_cast_no_shadow():
+	var off := GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	assert_eq(FloorDirt.motes(3, 1).cast_shadow, off, "floor cell motes")
+	var sink: Station = game.world.find_station("sink")
+	sink.dirty = Station.SINK_PILED
+	sink.refresh()
+	assert_eq(_cloud(sink).cast_shadow, off, "station cloud")
