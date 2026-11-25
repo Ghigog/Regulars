@@ -49,8 +49,9 @@ sight, since a guest only waves at someone they can see.
    seated) stands up and **walks to the till**, queuing in front of the pass. The rest
    stay seated. A guest at the till shows the same bill bubble at all times.
 5. **Writing the bill.** A chef at the till presses E to open the **bill screen** (11.3).
-   They pick which waiting table it is for, then tick the menu items the table had, with
-   counts. Confirming prints the slip into the chef's hand.
+   The screen lists who is waiting as a line to read; there is no table to pick. They tick
+   the menu items the table had, with counts. Confirming prints the slip, which is for
+   whichever table it is handed to, into the chef's hand.
 6. **Handing it over.** The chef carries the slip to the table (or to the guest at the
    till) and **holds E for `HAND_TIME`** (*tunable*, 1 s), with a fill bar like helping
    someone up. When the bar fills, the bill is checked:
@@ -117,8 +118,10 @@ sight, since a guest only waves at someone they can see.
    (Q) throws it away. A slip for a table that has already gone is thrown away too.
 4. Handing over is a hold of `HAND_TIME` with a fill bar over the table, cancelled by
    walking off. Hints: "Hold E give the bill" (with pad and touch variants).
-5. In co-op either chef can write and hand a bill. Two chefs cannot write for the same
-   table at once: a table with a slip already printed is shown greyed on the screen.
+5. In co-op either chef can write and hand a bill. A chef's slip carries no table, so two
+   chefs may each write one; whichever is handed over first pays. At the till the slip
+   goes to the first guest queued whose order it matches, else the one at the front. A
+   slip is thrown away once nobody is waiting to pay.
 6. The receipt gets a line for parties who left without paying, beside walkouts, with
    its own stamp shape (an open purse), not a strike mark.
 
