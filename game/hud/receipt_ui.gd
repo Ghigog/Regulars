@@ -47,9 +47,11 @@ func paper_box(clip: Control, stack: VBoxContainer) -> VBoxContainer:
 	scroll.add_child(box)
 	paper_scroll = scroll
 	scroll.set_meta("clip", clip)
+	var ref: WeakRef = weakref(scroll)   # a captured node that is freed first logs an engine error
 	var refit := func() -> void:
-		if is_instance_valid(scroll) and scroll.is_inside_tree():
-			fit_paper(scroll)
+		var s: ScrollContainer = ref.get_ref()
+		if s and s.is_inside_tree():
+			fit_paper(s)
 	hud.center.resized.connect(refit)
 	scroll.tree_exited.connect(func() -> void:
 		if is_instance_valid(hud) and is_instance_valid(hud.center) and hud.center.resized.is_connected(refit):
@@ -111,9 +113,11 @@ func _ribbon(box: VBoxContainer, text: String, col: Color) -> void:
 ## Fit now, and again once the labels have their widths.
 func _fit_when_laid_out(scroll: ScrollContainer) -> void:
 	fit_paper(scroll)
+	var ref: WeakRef = weakref(scroll)   # the scene may be freed before the deferred call runs
 	var again := func() -> void:
-		if is_instance_valid(scroll) and scroll.is_inside_tree():
-			fit_paper(scroll)
+		var s: ScrollContainer = ref.get_ref()
+		if s and s.is_inside_tree():
+			fit_paper(s)
 	again.call_deferred()
 
 
