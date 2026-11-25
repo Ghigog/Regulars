@@ -159,7 +159,7 @@ static func hold(ch: Player, tool: String, used: int) -> void:
 
 ## What E does at a piece for cleaning tools, by name ("" for nothing). Holding a tool:
 ## put it back in a home with room for it, else rinse it at a bucket or sink. With empty
-## hands: take the tool kept here (a hook over another piece only when that piece has
+## hands: take the tool kept here (not off a hook at night, where E moves the hook; a hook over another piece only when that piece has
 ## nothing to do). With dry_run nothing changes.
 func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 	if st == null:
@@ -184,6 +184,8 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 		return ""
 	if ch.held != "" or home == null or home.kit_tool == "":
 		return ""
+	if game.phase == Game.Phase.BUILD and kind_of(home) == "hook":
+		return ""   # at night E lifts the hook to move it; the tool stays on it
 	if home != st and game.cooking._use_station(st, true, ch) != "":
 		return ""   # a hook over a working piece: the piece comes first
 	var what := CleanTools.name_of(home.kit_tool).to_lower()

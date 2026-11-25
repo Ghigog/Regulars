@@ -389,15 +389,12 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			Build.cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
 			Build.ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
 		"dish_rack":
-			# A worktop with a wooden rack of clean trays standing on end to dry.
+			# A worktop with a wooden rack; the dishes drying in it are `BuildStations.rack_load`.
 			BuildStations._counter(n, Build.CABINET, Build.WORKTOP)
 			Build.box(n, Vector3(0, 0.87, 0), Vector3(0.72, 0.03, 0.5), Build.WOOD_DARK, 0.0, Build.R_WOOD)
 			for i in 5:
 				Build.box(n, Vector3(-0.28 + i * 0.14, 0.9, 0.2), Vector3(0.03, 0.2, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
 				Build.box(n, Vector3(-0.28 + i * 0.14, 0.9, -0.2), Vector3(0.03, 0.3, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
-			for i in 4:
-				var tray := Build.box(n, Vector3(-0.21 + i * 0.14, 0.9, 0.0), Vector3(0.025, 0.36, 0.46), Build.CORAL if i % 2 == 0 else Build.PAPER, 0.0, Build.R_GLOSS)
-				tray.rotation.z = 0.12
 		"table":
 			# Two-seat table (sheet 1): a slab top with a small bevel on a slim pedestal and
 			# disc foot; coral chairs on dark wooden legs (`_chair`).
