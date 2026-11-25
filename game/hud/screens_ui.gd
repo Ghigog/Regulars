@@ -99,7 +99,7 @@ func show_town() -> void:
 			continue
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
-		cols.add_child(row)
+		cols.add_child(_pressable(row, i))
 		var name_label := hud._label(row, 18 if ncol == 2 else 15, town.people[i].name)
 		name_label.custom_minimum_size = Vector2(86 if ncol == 2 else 78, 0)
 		if hud.game.critic.known and i == hud.game.critic.critic_idx:   # after the first review only
@@ -110,6 +110,8 @@ func show_town() -> void:
 		var word := hud._label(row, 13 if ncol == 2 else 11, town.status_word(i, hud.game.ledger.day))
 		word.custom_minimum_size = Vector2(150 if ncol == 2 else 118, 0)
 		word.modulate.a = 0.7
+		for part in row.get_children():   # the wrapper takes the pointer, not the parts
+			(part as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.receipt_ui._rule(box)
 	var key := hud._label(box, 13, "Arrows show who changed their mind today. Friends talk to each other.")
 	key.modulate.a = 0.7
@@ -117,6 +119,89 @@ func show_town() -> void:
 		hud.receipt_ui._button(stack, "Last review: %d %s" % [int(hud.game.critic.last_review.stars),
 			"star" if int(hud.game.critic.last_review.stars) == 1 else "stars"], hud.receipt_ui.show_review)
 	hud.receipt_ui._button(stack, "Back   (T)", toggle_town)
+	hud.receipt_ui._fit_when_laid_out(hud.receipt_ui.paper_scroll)
+	hud.receipt_ui._pop_in(clip)
+
+
+## `row` in a control that opens person `i`'s page on a click or tap, with a faint ink band
+## behind it while the pointer is over it. Not focusable, so Enter still means carry on.
+func _pressable(row: Control, i: int) -> Control:
+	var hit := MarginContainer.new()
+	hit.mouse_filter = Control.MOUSE_FILTER_STOP
+	hit.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	hit.focus_mode = Control.FOCUS_NONE
+	var band := ColorRect.new()
+	band.color = Color(Hud.INK, 0.1)
+	band.visible = false
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hit.add_child(band)
+	hit.add_child(row)
+	hit.mouse_entered.connect(band.show)
+	hit.mouse_exited.connect(band.hide)
+	hit.gui_input.connect(func(event: InputEvent) -> void:
+		var released: bool = (event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT) \
+			or (event is InputEventScreenTouch and not event.pressed)
+		if released and hit.is_inside_tree() and not hit.has_meta("opened"):
+			hit.set_meta("opened", true)   # a tap can arrive as both a touch and a mouse event
+			show_person(i))
+	return hit
+
+
+## One townsperson's own page, on the same clipboard: who they are, how they feel about
+## the place and what they order. Never their tastes (DESIGN.md: only what they order).
+func show_person(i: int) -> void:
+	var game: Game = hud.game
+	var town: Town = game.town
+	hud.receipt_ui.hide_card()
+	hud._town_open = true   # T still closes the book back to the receipt
+	game.audio.sfx("tick")
+	var clip := HudWidgets.Sheet.new("clip").pad(26, 46, 26, 26)
+	hud.center.add_child(clip)
+	hud._summary_clip = clip
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 14)
+	clip.add_child(stack)
+	var page := HudWidgets.Sheet.new("note").pad(26, 24, 26, 20)
+	hud.receipt_ui.paper_box(clip, stack).add_child(page)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	page.add_child(box)
+	var who: String = town.people[i].name
+	hud.receipt_ui._ribbon(box, who, Hud.INK)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 14)
+	box.add_child(head)
+	var face := HudWidgets.ModelView.new(110, false)
+	head.add_child(face)
+	face.show_peg(who)
+	var words := VBoxContainer.new()
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	words.add_theme_constant_override("separation", 6)
+	head.add_child(words)
+	if game.critic.known and i == game.critic.critic_idx:
+		var sign := HBoxContainer.new()
+		sign.add_theme_constant_override("separation", 6)
+		words.add_child(sign)
+		sign.add_child(HudWidgets.Icon.new("quill", 22, false))
+		hud._label(sign, 19, "Critic")
+	var mood := HBoxContainer.new()
+	mood.add_theme_constant_override("separation", 10)
+	words.add_child(mood)
+	mood.add_child(HudWidgets.Pips.new(town.standing(i) + 1, town.trend(i)))
+	hud._label(mood, 17, town.status_word(i, game.ledger.day))
+	hud._label(words, 15, "Visits so far: %d" % int(town.people[i].visits)).modulate.a = 0.8
+	var lines: Array[String] = []
+	if town.friend_names(i) != "":
+		lines.append("Friends: " + town.friend_names(i))
+	if town.order_summary(i, game.menu) != "":
+		lines.append("Orders: " + town.order_summary(i, game.menu))
+	for line in lines:
+		var l := hud._label(box, 15, line)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(300, 0)
+	if town.expects_deal(i):
+		hud._label(box, 15, "Expects a deal").add_theme_color_override("font_color", Color(Build.CORAL_DARK))
+	hud.receipt_ui._button(stack, "Back", show_town)
 	hud.receipt_ui._fit_when_laid_out(hud.receipt_ui.paper_scroll)
 	hud.receipt_ui._pop_in(clip)
 
