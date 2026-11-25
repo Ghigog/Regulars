@@ -62,6 +62,7 @@ Implementers should follow these, not the individual drawings.
 The first art pass is in the game. This is where it follows the guide loosely or not at
 all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS_DEMO` variables.
 
+- *Counter foot*: the pass (`BuildStations._pass`) draws its toe-kick in `_shade(CABINET)`, the same dark teal as every plain and cabinet-bodied counter, not coral. A mix of pink and blue feet under one run read as a mistake.
 - *Messy pieces* (`Station._show_grime`): a table with plates, a piled sink and an overflowing bin show the floor's heaviest grime motes (`FloorDirt.motes`) rising over them. The bin's green wisps are gone, and the build phase has no "Still dirty" note.
 - *Shop and tree previews of counter-top pieces* (`HudWidgets.ModelView.show_piece`): the plate, cup and tray stacks and every tool that stands on a counter (slicer, board, grater, blender...) are shown as themselves, with no cabinet or worktop (the node carries meta `bare`, which `BuildStations._counter` reads; appliance bodies in steel stay). The stacks carry their full load of plates, cups or trays. The piece is dropped by the worktop height and scaled 1.7 to fill the card. Pieces placed in the room keep their counter.
 
@@ -282,7 +283,7 @@ or a later sheet, they win. What changed:
   `#f07a63`, warmer oak planks, greige backdrop `#d9cfc1`, grey paving.
 - Walls are 30 cm thick soft cream slabs with no dark trim cap. The knee-high cutaway is
   coral with a cream cap. This overrides "Resolved conflicts: dark cap, no coral face".
-- The pass is the anchor's teal counter with a coral foot (was a coral block). Tables are
+- The pass is the anchor's teal counter with the same dark-teal foot as every counter (was a coral block; its coral foot was dropped so a run of counters reads as one set). Tables are
   soft-cornered square tops on teal pedestals (were round); chairs are rounded coral.
 - Pegs follow the turnaround: turned wooden foot, darker hem with a yellow stripe, capped
   sleeves, cream mittens with cuffs, a head 12% larger, a tiny coral nose, a soft paint sheen.
