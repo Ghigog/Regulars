@@ -207,6 +207,22 @@ func _apply_demo(demo: String) -> void:
 			p.position = Vector3(13.2 - i * 0.3, 0, 7.2 - i * 0.95)
 			p.rotation.y = PI / 4
 			game.add_child(p)
+		# Every feeling and mix on a head (anger, disgust stage, delight, eating), the
+		# last on the darkest skin.
+		var feels := [
+			[0.4, 0, 0.0, false], [0.75, 0, 0.0, false], [1.0, 0, 0.0, false],
+			[0.0, 1, 0.0, false], [0.0, 2, 0.0, false], [0.0, 3, 0.0, false],
+			[0.6, 2, 0.0, false], [0.9, 3, 0.0, false], [0.0, 0, 1.0, false], [0.0, 2, 0.0, true],
+		]
+		for i in feels.size():
+			var p := Peg.guest(names[i % names.size()])
+			if i >= feels.size() - 4:
+				p = Peg.guest("Priya")   # the darkest skin, #6f4428
+			var fe: Array = feels[i]
+			p.set_feelings({"anger": fe[0], "disgust": fe[1], "delight": fe[2]}, fe[3])
+			p.position = Vector3(5.6 + i * 0.3, 0, 6.0 + i * 0.95)
+			p.rotation.y = PI / 4
+			game.add_child(p)
 		for i in 4:
 			var c := Peg.chef(i)
 			c.position = Vector3(15.0 - i * 0.6, 0, 3.4 - i)
