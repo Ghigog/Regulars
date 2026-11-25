@@ -87,6 +87,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
 - **Tools.** Each prep tool stands on a counter: stove (grill, $50), chopping board
   ($25), the fryer, stock pot and slicer reached in their trees (PRD 8.3). Pour happens
   at the drink's own dispenser. Every piece can be sold, the last stove included.
+- **Washing up.** Dirty dishes soak in the sink. With empty hands, holding Use at the sink (`WASH_HOLD`, 1.5 s, fill bar, scrubbing arm, bubbles) washes one dish into the hands; letting go or walking off loses the progress. A clean dish goes on a dish rack (four at most, 'The rack is full' otherwise), and is taken from it to return to its stack or be plated. Dirty dishes can be put down on a counter ('Put down') and picked up again. Hired washers rack one dish per step.
 - **Tickets, plates and cups** (`sim/tray.gd`, `sim/dish.gd`). Taking a table's order
   puts a ticket for each guest who ordered on the rail along the top of the screen
   (oldest on the left, five shown, more counted on a last tab; each in the guest's shirt
@@ -162,7 +163,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   the bag out"); cleaning comes before "Pick up". At nightfall the kitchen tidies itself
   (`game/main/tidy.gd`): clean plates, cups and trays, on stations or in hands, go back to
   their stack, and every piece of food, plated or carried, goes into the nearest bin as one
-  scrap (it may overflow); with no bin it is just cleared. Dirty plates stay as mess.
+  scrap (it may overflow); with no bin it is just cleared. Dirty plates stay as mess; clean dishes left on a dish rack go back to their stacks.
   The state changes in `_end_day`; opening the build phase plays it (plates slide to the
   rack 0.15 s apart, food hops into the bin and its lid bounces). There is no "Clear food". A messy piece cannot be picked up to
   move or sell ("Clean it first."); the mouse cannot clean ("Walk over and press Use").
@@ -301,7 +302,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     a little round table with one stool, so only a guest alone sits there (the smallest
     free table that fits is chosen, so a single takes a stool first). Kitchen: a bin
     ($30, level 2) and a sink ($70, level 3), which are now catalog pieces like any other
-    (every one can be sold; while there is none the shop sells one at any level), and a dish rack ($50, level 3): a sink with one
+    (every one can be sold; while there is none the shop sells one at any level), and a dish rack ($50, level 3, and now an essential, one stands in the kitchen at the start): washed dishes dry on it, four at most; a sink with one
     beside it piles at 10 dishes, not 6. Each sink and bin has its own mess and sightline,
     and the "still dirty" note counts them ("2 sinks").
 - **Keyboard, controller or touch** (`game/controls.gd`, `game/player_input.gd`). Each

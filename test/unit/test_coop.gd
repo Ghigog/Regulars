@@ -115,7 +115,7 @@ func test_two_build_hands_are_independent():
 	game.placing.rotate_hand(two)
 	assert_eq(int(two.hand.facing), 1)
 	assert_eq(int(one.hand.facing), 0, "turning one hand leaves the other")
-	var spot := Vector3i(2, 4, 0)
+	var spot := Vector3i(2, 5, 0)
 	assert_true(game.placing.can_place(spot, one))
 	assert_true(game.placing.place(spot, one), "the first to press Use gets the spot")
 	assert_false(game.placing.can_place(spot, two), "the other's ghost shows the cross")

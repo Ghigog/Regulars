@@ -244,6 +244,40 @@ func test_a_sponge_hangs_on_its_hook():
 	assert_eq(h.kit_used, 2, "a hook does not rinse")
 
 
+func test_at_night_e_on_a_hook_moves_the_hook_and_keeps_its_sponge():
+	var game = _game()
+	game.arrivals.clear()
+	game.step(0.1)
+	game.session.open_build()
+	game.step(0.01)
+	var w := _wall_cell(game)
+	var h: Station = game.world.add_high("hook", w)
+	game.clean_kit.on_built(h, "sponge")
+	h.kit_used = 1
+	var dir := Vector2i.ZERO
+	for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+		if not game.grid.is_blocked(w - d):
+			dir = d
+	assert_ne(dir, Vector2i.ZERO, "the test needs open floor beside the hook")
+	_stand(game, w - dir, dir)
+	assert_eq(game.room_edit.build_action(), "Pick up")
+	assert_ne(game.card.lift_name(), "")
+	assert_true(game.clean_kit.station_use(h, true, game.player) == "", "no Take sponge at night")
+	game.room_edit.build_interact()
+	assert_eq(CleanKit.held_tool(game.player), "", "the sponge stays on the hook")
+	assert_false(game.player.hand.is_empty(), "the hook is in hand")
+	assert_false(game.highs.has(w), "the old wall cell is empty")
+	var to := Vector2i(-99, -99)
+	for c: Vector2i in game.kitchen.wall_cells:
+		if c != w and not game.stations.has(c) and not game.highs.has(c) and game.kitchen.can_hang(c, "hook"):
+			to = c
+			break
+	assert_true(game.placing.place(Vector3i(to.x, to.y, 0)))
+	var moved: Station = game.highs[to]
+	assert_eq(moved.kit_tool, "sponge")
+	assert_eq(moved.kit_used, 1)
+
+
 
 func test_a_tool_put_down_elsewhere_lies_in_the_way():
 	var game = _game()

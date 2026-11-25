@@ -267,21 +267,14 @@ func test_the_door_refusing_for_money_offers_remedies():
 
 
 
-func test_one_wash_clears_the_whole_sink_onto_each_stack():
+func test_a_wash_takes_one_dish_into_the_hands():
 	_to_build()
 	var sink: Station = game.world.find_station("sink")
 	sink.dirty = 3
 	sink.dirty_cups = 1
-	var plates: int = game.world.find_station("plates").count
-	game.cooking.wash_one(sink)   # the old one-at-a-time, for the count below
-	sink.dirty = 3
-	sink.dirty_cups = 1
-	plates = game.world.find_station("plates").count
-	game.player.position = sink.position + Vector3(0, 0, 1)
-	game.player.look(Vector2i(0, -1))
-	game.cooking.use_station(sink, false)
-	assert_eq(sink.dirty, 0, "one press washes it all")
-	assert_eq(game.world.find_station("plates").count, plates + 2)
+	var d: Dish = game.cooking.wash_one(sink)
+	assert_eq(d.vessel, Dish.PLATE, "plates before cups")
+	assert_eq(sink.dirty, 2)
 
 
 

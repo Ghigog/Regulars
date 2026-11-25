@@ -48,10 +48,11 @@ func test_night_cleaning_clears_a_table_and_washes_up():
 	assert_eq(game.player.held, "")
 	assert_eq(sink.dirty, 2)
 	assert_eq(game.room_edit.build_action(), "Wash up")
-	game.room_edit.build_interact()
-	game.room_edit.build_interact()
-	assert_eq(sink.dirty, 0)
-	assert_eq(plates.count, stack + 2)
+	game.room_edit.build_interact()   # starts the hold: one clean dish a hold
+	game.cooking._tick_wash(game.player, true, game.cooking.WASH_HOLD + 0.1)
+	assert_eq(sink.dirty, 1)
+	assert_eq(game.player.held, "dishes", "the washed plate is in hand, for the rack")
+	assert_eq(plates.count, stack, "nothing goes straight onto the stack")
 
 
 
