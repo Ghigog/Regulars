@@ -288,6 +288,8 @@ func _free_surface(near: Vector2i, h: Helper, pass_first := false, for_plate := 
 	for st: Station in crew.game.stations.values():
 		if not st.type in ["counter", "pass"] or st.item != "" or st.prep_by >= 0:
 			continue
+		if for_plate and st.has_node("till"):
+			continue   # plates never go under the till
 		if Kitchen.has_node(st.base) and Kitchen.fit_of(st.base) == "tall":
 			continue   # a tall fridge or freezer has no worktop
 		if crew.game.kitchen.holds_cleaning(st.cell):
@@ -330,6 +332,7 @@ func _free_surfaces() -> int:
 	var n := 0
 	for st: Station in crew.game.stations.values():
 		if st.type in ["counter", "pass"] and st.item == "" and st.prep_by < 0 and not crew._claims.has(st.cell) \
+				and not st.has_node("till") \
 				and not (Kitchen.has_node(st.base) and Kitchen.fit_of(st.base) == "tall") \
 				and not crew.game.kitchen.holds_cleaning(st.cell):
 			n += 1

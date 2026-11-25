@@ -120,3 +120,52 @@ func test_a_refused_stack_keeps_the_plate_in_hand():
 	game.cooking.use_station(_the_pass())
 	assert_eq(game.player.dishes.size(), 1)
 	assert_eq(_the_pass().item, "prep:patty")
+
+
+## A plate in hand, empty, taken from the stack.
+func _hold_plate() -> Dish:
+	var plate := Dish.make(Dish.PLATE)
+	game.player.take_dish(plate)
+	return plate
+
+
+func test_a_plate_is_not_put_down_on_the_till_counter():
+	var till: Station = game.paying.till_station()
+	var plate := _hold_plate()
+	assert_eq(game.cooking.prompt_for(till), "Plates go on a clear counter")
+	assert_eq(game.cooking.use_station(till), "Plates go on a clear counter")
+	assert_eq(game.player.dishes, [plate] as Array[Dish])
+	assert_eq(till.item, "")
+
+
+func test_a_plate_is_not_put_down_on_a_tool():
+	var slicer := _tool("slicer", Vector2i(2, 5), "crate_cheese")
+	var plate := _hold_plate()
+	game.cooking.use_station(slicer)
+	assert_eq(game.player.dishes, [plate] as Array[Dish])
+	assert_eq(slicer.item, "")
+
+
+func test_a_plate_is_put_down_on_a_clear_counter_and_the_pass():
+	_hold_plate()
+	assert_eq(game.cooking.use_station(_the_pass()), "Put down")
+	assert_eq(_the_pass().dish.vessel, Dish.PLATE)
+
+
+func test_food_on_a_tool_goes_onto_the_plate_in_hand():
+	var slicer := _tool("slicer", Vector2i(2, 5), "crate_cheese")
+	slicer.set_item("prep:bun", 1.0)
+	var plate := _hold_plate()
+	assert_eq(game.cooking.use_station(slicer), "Plate it")
+	assert_eq(game.player.dishes, [plate] as Array[Dish])
+	assert_false(plate.is_empty())
+	assert_eq(slicer.item, "")
+
+
+func test_a_helper_never_sets_plates_out_under_the_till():
+	var till: Station = game.paying.till_station()
+	var rv: Variant = game.crew.room_view
+	var h: Helper = Helper.new()
+	var c: Variant = rv._free_surface(till.cell, h, false, true)
+	assert_ne(c, till.cell)
+	h.free()
