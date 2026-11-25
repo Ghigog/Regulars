@@ -220,8 +220,8 @@ func test_upgraded_piece_is_bought_from_the_catalog():
 	assert_false(game.placing.pick_catalog("plant", 2), "tier 2 needs level 2")
 	game.ledger.xp = 100
 	assert_true(game.placing.pick_catalog("plant", 2))
-	assert_true(game.placing.place(Vector3i(2, 4, 0)))
-	assert_eq(game.stations[Vector2i(2, 4)].tier, 2)
+	assert_true(game.placing.place(Vector3i(2, 5, 0)))
+	assert_eq(game.stations[Vector2i(2, 5)].tier, 2)
 	assert_eq(game.ledger.money, 60)
 	assert_eq(int(game.hand.tier), 2, "still in hand while there is money for another")
 	assert_true(game.placing.place(Vector3i(3, 4, 0)))
@@ -402,9 +402,9 @@ func test_catalog_piece_is_paid_for_when_placed_and_gated_by_level():
 	assert_eq(game.ledger.money, 150, "picking is free")
 	assert_false(game.placing.place(Vector3i(9, 4, 0)), "that would block the doorway")
 	assert_false(game.placing.place(Vector3i(0, 2, 0)), "a stove is already there")
-	assert_true(game.placing.place(Vector3i(2, 4, 0)))
+	assert_true(game.placing.place(Vector3i(2, 5, 0)))
 	assert_eq(game.ledger.money, 135)
-	assert_eq(game.stations[Vector2i(2, 4)].type, "counter")
+	assert_eq(game.stations[Vector2i(2, 5)].type, "counter")
 	game.day.start_day()
 	assert_eq(game.phase, game.Phase.SERVICE)
 	assert_true(game.hand.is_empty())
@@ -522,38 +522,74 @@ func test_new_table_seats_guests():
 	game.ledger.xp = 100
 	assert_true(game.placing.pick_catalog("table"))
 	assert_false(game.placing.place(Vector3i(9, 5, 0)), "no room for the right-hand seat")
-	assert_true(game.placing.place(Vector3i(2, 4, 0)))
-	assert_true(game.grid.reserved.has(Vector2i(1, 4)))
+	assert_true(game.placing.place(Vector3i(2, 5, 0)))
+	assert_true(game.grid.reserved.has(Vector2i(1, 5)))
 	assert_eq(game.ledger.money, 60)
 
 
 
-func test_washing_a_dirty_plate_returns_it_to_the_stack():
+func _hold_wash(secs: float) -> void:
+	var t := 0.0
+	while t < secs:
+		game.cooking._tick_wash(game.player, true, 0.1)
+		t += 0.1
+
+
+func _face_at(st: Station) -> void:
+	game.player.position = st.position + Vector3(0, 0, 1)
+	game.player.look(Vector2i(0, -1))
+
+
+func test_washing_a_dirty_plate_is_a_hold_then_a_rack():
 	var table: Station = game.stations[Vector2i(6, 1)]
 	table.dirty = 3
 	table.dirty_cups = 1
-	game.world.add_station("cups", Vector2i(2, 5))
-	game.world.find_station("cups").count = 0
 	assert_eq(game.cooking.use_station(table), "Clear plates")
-	assert_eq(game.player.held, "dirty_dishes")
-	assert_eq(game.player.dishes.size(), Player.HANDS, "two at a time")
-	assert_eq(table.dirty, 1, "the cup is left")
 	_use("sink")
-	assert_eq(game.player.held, "")
 	game.cooking.use_station(table)
 	_use("sink")
 	var sink: Station = game.world.find_station("sink")
 	assert_eq(sink.dirty, 3, "they soak until washed")
-	assert_eq(sink.dirty_cups, 1)
-	var plates: int = game.world.find_station("plates").count
-	_use("sink")
-	_use("sink")
-	assert_eq(game.world.find_station("plates").count, plates + 2)
-	_use("sink")
-	assert_eq(game.world.find_station("cups").count, 1, "the cup goes back on its own stack")
-	assert_eq(sink.dirty, 0)
-	assert_eq(game.cooking.use_station(sink, true), "", "nothing left to wash")
+	assert_eq(game.player.held, "")
+	_face_at(sink)
+	assert_eq(game.cooking.use_station(sink, true), "Wash")
+	game.cooking.use_station(sink)
+	_hold_wash(game.cooking.WASH_HOLD / 2.0)
+	game.cooking._tick_wash(game.player, false, 0.1)
+	assert_eq(sink.dirty, 3, "letting go cancels")
+	game.cooking.use_station(sink)
+	_hold_wash(game.cooking.WASH_HOLD + 0.2)
+	assert_eq(sink.dirty, 2, "one dish a hold")
+	assert_eq(game.player.held, "dishes")
+	assert_eq(game.player.dishes.size(), 1)
+	var rack: Station = game.world.find_station("dish_rack")
+	rack.count = 3
+	assert_eq(game.cooking.use_station(rack), "Put on rack")
+	assert_eq(rack.count, 4)
+	game.cooking.use_station(sink)
+	_hold_wash(game.cooking.WASH_HOLD + 0.2)
+	assert_eq(game.cooking.use_station(rack, true), "The rack is full")
+	game.cooking.use_station(rack)
+	assert_eq(rack.count, 4, "the fifth is refused")
+	assert_eq(game.player.held, "dishes", "the plate stays in hand")
+	game.player.dishes.clear()
+	game.player.set_held("", 1.0, [], false)
+	assert_eq(game.cooking.use_station(rack), "Take plate")
+	assert_eq(rack.count, 3)
+	assert_eq(game.player.held, "dishes")
 
+
+func test_dirty_dishes_can_be_put_down_on_a_counter():
+	var table: Station = game.stations[Vector2i(6, 1)]
+	table.dirty = 2
+	game.cooking.use_station(table)
+	assert_eq(game.player.dishes.size(), 2)
+	var counter := _the_pass()
+	assert_eq(game.cooking.use_station(counter), "Put down")
+	assert_eq(game.player.dishes.size(), 1)
+	assert_true(counter.item != "", "a dirty plate stands on the counter")
+	assert_eq(game.cooking.use_station(counter), "Pick up")
+	assert_eq(game.player.dishes.size(), 2)
 
 
 func test_bin_fills_overflows_and_is_emptied_out_the_front():
@@ -590,13 +626,14 @@ func test_bin_fills_overflows_and_is_emptied_out_the_front():
 func test_a_piled_sink_and_an_overflowing_bin_are_gross():
 	var sink: Station = game.world.find_station("sink")
 	var bin: Station = game.world.find_station("bin")
-	sink.dirty = Station.SINK_PILED - 1
+	var piled := Station.piled_at(sink.racked)
+	sink.dirty = piled - 1
 	bin.count = Station.BIN_HOLDS - 1
 	var kinds := _gross_kinds()
 	assert_false(kinds.has("sink"), "a plate or two soaking is fine")
 	assert_false(kinds.has("overflow"))
 	assert_true(kinds.has("bin"), "the bin is still a bin")
-	sink.dirty = Station.SINK_PILED
+	sink.dirty = piled
 	bin.count = Station.BIN_HOLDS
 	kinds = _gross_kinds()
 	assert_true(kinds.has("sink"))

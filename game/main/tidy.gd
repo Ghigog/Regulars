@@ -28,6 +28,12 @@ func tidy_up() -> void:
 		elif st.has_leftover_food():
 			_to_bin(st.global_position, st.item)
 			st.clear_food()
+		elif st.type == "dish_rack" and st.count > 0:
+			for i in st.count:
+				_tidy_dish(Dish.make(Dish.CUP if i >= st.count - st.rack_cups else Dish.PLATE), st.global_position)
+			st.count = 0
+			st.rack_cups = 0
+			st.refresh()
 	for ch: Player in game.chefs:
 		if ch.held == "dishes":
 			for d: Dish in ch.dishes:
@@ -50,6 +56,19 @@ func _tidy_dish(d: Dish, from: Vector3) -> void:
 		_to_stack("plates", from)
 	elif d.vessel == Dish.CUP:
 		_to_stack("cups", from)
+
+
+## A washer's put-away: every clean dish drying on `rack` goes back on its stack at once.
+func put_away(rack: Station) -> void:
+	for i in rack.count:
+		var cup := i >= rack.count - rack.rack_cups
+		var stack := _nearest("cups" if cup else "plates", rack.global_position)
+		if stack != null:
+			stack.count += 1
+			stack.refresh()
+	rack.count = 0
+	rack.rack_cups = 0
+	rack.refresh()
 
 
 func _nearest(type: String, from: Vector3) -> Station:
