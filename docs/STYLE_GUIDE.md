@@ -57,6 +57,7 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- **Split head (departure from the whole-head tint rule).** The "Mood tint" rule says the whole head takes one colour. The game instead gives each feeling its own colour (red anger, green disgust, rosy delight), and when a guest is both angry and disgusted the head splits: red from the forehead, green from the chin, with a soft line. The person approved the split. The face reads both feelings: anger on the brows and eyes, disgust on the mouth and nose.
 - **Dish rack.** The four always-there coral trays are gone; the wooden rack stays and `BuildStations.rack_load` stands up to four clean plates (cups) on end in its slots, so how full it is can be counted at 20 px.
 
 The first art pass is in the game. This is where it follows the guide loosely or not at
@@ -328,7 +329,7 @@ or a later sheet, they win. What changed:
 | Topic | What the game does | Why |
 | --- | --- | --- |
 | Faces | Built from small sculpted dots and strokes on the head, not textures. Nose dropped everywhere (the small-size rule). | Stays crisp at any zoom; no texture pipeline. |
-| Mood tint | Tints the whole head (orange about to snap, green disgust, red angry), not a gradient from the top. | Flat colour only; reads the same at 60 px. |
+| Mood tint | Each feeling has its own head colour: red for anger (deepening as patience runs out, replacing the old orange), green for disgust (by stage), a warm rosy glow for delight. When anger and disgust are both felt the head splits: red from the forehead, green from the chin, with a soft line between. See "As built". | Flat colour only; reads the same at 60 px. |
 | Patience | A chunky patience meter stays under the thought bubble. | The face and tint alone were too slow to read across six guests. |
 | Names | A small ink name tag stays over each guest. | "Named townsfolk" is the point of the game; prompts say "Serve Mabel". |
 | Thoughts | Bubbles show one icon (the ordered main's dish icon, Zzz, heart); disgust has its own smaller bubble beside it (below). A guest waiting to order shows a notepad: a cream pad with an ink rim, coral binding, three ink lines and a gold pencil (not on the sheets); once ordered, the bubble shows their main's icon. The written thoughts are still recorded in `sim/` but no longer shown. | Sheet 13. |
@@ -411,17 +412,17 @@ support.
 | Carrying | Items are held forward of the body and tilted up 20 to 30 degrees so the top faces the camera. | locked | Sheet 2 |
 | Proportions | Head is a little under half the total height and wider than the body. | observed | Sheet 2 |
 | Faces | Dot eyes, tiny nose dot, small mouth, round blush cheeks that never go away. Brows appear only for negative moods. | observed | Sheets 1, 2, 3 |
-| Mood colour | Strong moods tint the whole head from the top down: orange to full red for anger, green for disgust. | observed | Sheet 3 |
+| Mood colour | One colour per feeling: red for anger (deeper as patience runs out), green for disgust by stage, rosy glow for delight. Both anger and disgust split the head: red from the forehead, green from the chin, soft line. | observed | Sheet 3 |
 | Small-size faces | At game size the nose is dropped and lines are thicker; eyes, brows and mouth only. | observed | Sheet 3 |
 | Guest outfits | Cool, muted colours only: blues, teals, purples, browns, creams, charcoal. Never coral, green, yellow or red on guests. | locked | Sheet 4 |
 | Player chef | Only playable chefs wear the tall puffy toque (about 25% taller silhouette) and a bright white jacket and hat, so the player is always the lightest, tallest thing in a crowd. | locked | Sheet 5 |
 | Co-op colours | Four players differ by trim only (toque band, neck scarf, jacket trim, buttons): P1 coral, P2 teal, P3 yellow, P4 green. Jackets stay white. | locked | Sheet 5 |
 | Hired staff | Hires keep their own townsperson look and wear a white work apron with a coral tie (PRD 10.6). Sheet 5's teal-and-brown role uniforms are not used; see "Staff" under "As built". | as built | Sheet 5 (departed) |
 | Posing | Emotion and action are carried by tilting the whole body (lean 20-25 degrees into a run, slump when bored, pitch back in disgust), squash and stretch, and floating hands. | locked | Sheet 6 |
-| State tells | Negative states pair motion with a cue: steam or flame for panic, hand-blur arcs for tapping, full-head tint (red storming out, green disgust). | locked | Sheet 6 |
+| State tells | Negative states pair motion with a cue: steam or flame for panic, hand-blur arcs for tapping, head colour (red anger and storming out, green disgust, a split head for both). | locked | Sheet 6 |
 | Social | Friends at a table turn heads inward and wave with their outer hands. | locked | Sheet 6 |
 | Finish | Mostly matte. Roughness 0.85-0.95 for walls, fabric, skin, plastic; 0.55-0.65 for wood and metal; 0.35-0.45 for tile and food. No mirror chrome. | locked | Sheet 7 |
-| Gradients | Flat colour fills only. Allowed: a 10-15% darkening on the bottom 15 cm of walls, cabinets and character bases, and the mood tint on heads. | locked | Sheet 7 |
+| Gradients | Flat colour fills only. Allowed: a 10-15% darkening on the bottom 15 cm of walls, cabinets and character bases, and the mood colours on heads (including the red/green split). | locked | Sheet 7 |
 | Shadow colour | Warm plum-brown `#5a423a`, never black or cool grey. Darkens at most 35-45%, soft wide edges. | locked | Sheet 7 |
 | Bevel | Every structural edge and prop corner gets a uniform 3 cm bevel. | locked | Sheet 7 |
 | Stations | Each station owns a distinct top-plane silhouette. Fridge 1.7 m tall; stove, sink, counters and the pass all share a 0.9 m surface height so carried items sit flush. | locked | Sheet 8 |
@@ -649,9 +650,9 @@ here are by what each face looks like.
 | Content | Closed upward arcs | None | Gentle smile | Plain |
 | Delighted | Dots with a white sparkle | Short raised dashes | Open smile with tongue | Plain, pinker cheeks |
 | Impatient | Half-lidded dots | Flat lines pressed on the eyes | Straight line | Plain |
-| About to snap | Dots | Steep angled wedges | Wavy line | Orange flush from the top |
-| Disgusted | Squeezed shut, "> <" | Angled | Wavy line | Green flush from the top |
-| Angry | Narrowed | Heavy angled wedges | Downturned arc | Whole head red |
+| About to snap | Dots | Steep angled wedges | Wavy line | Red flush, deepening as patience runs out |
+| Disgusted | Squeezed shut, "> <" | Angled | Wavy line | Green, by stage; split with red from the chin when also angry |
+| Angry | Narrowed | Heavy angled wedges | Downturned arc | Red; split with green from the chin when also disgusted |
 | Chewing | One open, one winking | One raised | Puffed cheek to one side, with motion ticks | Plain |
 
 **Shared traits**
@@ -669,7 +670,7 @@ here are by what each face looks like.
 | Game size | Each must read at 20 px across | Small versions are shown, but not at a stated pixel size | Needs checking in engine |
 | Mood read | Game: floating patience bar | Face plus head colour | Bar could be dropped or kept as a backup once faces are in |
 | Face build | Game: two sphere eyes | Drawn features that swap per mood | Needs face textures (an atlas of eight) on the head |
-| Head colour | Game: fixed skin tone | Tints red or green with mood | A tint parameter on the head material |
+| Head colour | Game: fixed skin tone | Red for anger, green for disgust, rosy for delight; split when both | A tint parameter on the head material |
 
 
 ---
