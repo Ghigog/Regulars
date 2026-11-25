@@ -748,7 +748,7 @@ Where an older paragraph above disagrees, this list wins.
 - **Prep pays**: perfect trays in a row make a streak ("Perfect! xN"): +10% tip a step
   (to +50%), and from three in a row the guest and friends think better of the cooking
   and the meter rises. The receipt counts perfect plates. The minigames are unchanged.
-- **Cleaning**: a slip costs mood, never a strike. A dirty mop or sponge cleans at half
+- **Cleaning**: the sponge is a counter tool: it is never put on the floor (E there says "The sponge goes on a counter."), but sits on a counter, pass or sink, and a helper's wash at a sink with a sponge on it or on a counter beside it takes half as long (`CleanTools.SPONGE_WASH`). A chef's Wash already empties the sink in one press. Other hook tools still lie on the floor. A slip costs mood, never a strike. A dirty mop or sponge cleans at half
   pace with a red wear pip, never spreading dirt. Laying a floor treatment is free; its box is
   restocked each night for a flat fee like a food box, whatever the tiles (cleaner $2,
   strong cleaner $3, primer $3, sealing primer $5, finish $4, high gloss $6; switched

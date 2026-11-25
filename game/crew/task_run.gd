@@ -296,7 +296,7 @@ func _work(h: Helper, s: Dictionary) -> float:
 		"wash":
 			if st == null or st.dirty <= 0:
 				return -1.0
-			return HelperWork.task_seconds("wash", h.rating, sat)
+			return HelperWork.task_seconds("wash", h.rating, sat) * CleanTools.wash_factor(_sponge_near(st))
 		"empty_bin":
 			if st == null or st.count <= 0 or h.held != "":
 				return -1.0
@@ -333,3 +333,14 @@ func _poll(h: Helper, s: Dictionary) -> String:
 		"help":
 			return "wait" if crew.game.floor_dirt.helping(h) != null else ""
 	return ""
+
+
+## Whether a sponge sits on this sink, or on a counter or pass at its side.
+func _sponge_near(sink: Station) -> bool:
+	if sink.item == CleanKit.PREFIX + "sponge":
+		return true
+	for d: Vector2i in CleanTools.SIDES:
+		var n: Station = crew.game.stations.get(sink.cell + d)
+		if n != null and n.type in CleanKit.COUNTER_TYPES and n.item == CleanKit.PREFIX + "sponge":
+			return true
+	return false

@@ -21,7 +21,8 @@ const TOOLS := {
 	"cleaner_mop": {"name": "Mop with cleaner", "home": "bucket", "levels": FloorMess.MAX_LEVEL, "time": 0.6, "dirty_after": 4},
 	"strong_mop": {"name": "Mop with strong cleaner", "home": "bucket", "levels": FloorMess.MAX_LEVEL, "time": 0.6,
 		"dirty_after": 0},
-	"sponge": {"name": "Sponge", "home": "hook", "levels": 1, "time": 0.3, "dirty_after": 2},
+	"sponge": {"name": "Sponge", "home": "hook", "levels": 1, "time": 0.3, "dirty_after": 2,
+		"counter": true},
 	"scourer": {"name": "Scourer", "home": "hook", "levels": 1, "time": 0.3, "dirty_after": 4},
 	"grease_scraper": {"name": "Grease scraper", "home": "hook", "levels": FloorMess.MAX_LEVEL, "time": 0.3,
 		"dirty_after": 0, "grease": true},
@@ -32,6 +33,9 @@ const TOOLS := {
 ## Every tool is faster (a press is 0.3 to 0.6 s). (tunable)
 const HAND_TIME := 1.8
 const HAND_LEVELS := 1
+## A helper's wash takes this times the usual with a sponge on the sink or on a counter
+## beside it. (tunable)
+const SPONGE_WASH := 0.5
 
 ## The pieces that are homes, and the kind of home each is (a catalog type).
 const HOMES := {"mop_bucket": "bucket", "hook": "hook", "sponge": "hook"}
@@ -53,6 +57,16 @@ const SIDES: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1),
 
 static func is_tool(id: String) -> bool:
 	return TOOLS.has(id)
+
+
+## A tool that goes on a counter, never the floor (the sponge).
+static func counter_only(tool: String) -> bool:
+	return TOOLS.has(tool) and bool(TOOLS[tool].get("counter", false))
+
+
+## How long a wash takes, times the usual.
+static func wash_factor(sponge_at_sink: bool) -> float:
+	return SPONGE_WASH if sponge_at_sink else 1.0
 
 
 ## A tool kept in a bucket (any mop, the scrubber): drawn as a mop. Else a hand tool.

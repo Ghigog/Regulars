@@ -282,16 +282,16 @@ func test_at_night_e_on_a_hook_moves_the_hook_and_keeps_its_sponge():
 func test_a_tool_put_down_elsewhere_lies_in_the_way():
 	var game = _game()
 	var front := _stand(game, Vector2i(7, 2))
-	CleanKit.hold(game.player, "sponge", 1)
-	assert_eq(game.clean_kit.floor_action(game.player), "Put sponge down")
+	CleanKit.hold(game.player, "scourer", 1)
+	assert_eq(game.clean_kit.floor_action(game.player), "Put scourer down")
 	game.coop.act(0, "use")
 	assert_eq(game.player.held, "")
 	assert_true(game.clean_kit.lying.has(front))
 	game.step(0.01)
 	assert_almost_eq(game.seating.floor_speed(Grid.center(front)), FloorMess.speed_of(2), 0.001, "in the way")
-	assert_eq(game.clean_kit.floor_action(game.player), "Pick up sponge")
+	assert_eq(game.clean_kit.floor_action(game.player), "Pick up scourer")
 	game.coop.act(0, "use")
-	assert_eq(game.player.held, "tool:sponge")
+	assert_eq(game.player.held, "tool:scourer")
 	assert_eq(CleanKit.held_used(game.player), 1, "as dirty as it was")
 	assert_false(game.clean_kit.lying.has(front))
 
@@ -380,3 +380,11 @@ func test_bought_at_night_a_sponge_hangs_on_its_own_hook_and_a_bucket_holds_a_mo
 	assert_true(game.placing.place(Vector3i(spot.x, spot.y, 0)))
 	assert_eq((game.stations[spot] as Station).kit_tool, "mop")
 	assert_eq(game.ledger.money, 200 - 15 - 35)
+
+
+func test_only_the_sponge_is_counter_only_and_speeds_the_wash():
+	assert_true(CleanTools.counter_only("sponge"))
+	for t in ["scourer", "grease_scraper", "spill_kit", "mop"]:
+		assert_false(CleanTools.counter_only(t), t)
+	assert_eq(CleanTools.wash_factor(true), CleanTools.SPONGE_WASH)
+	assert_eq(CleanTools.wash_factor(false), 1.0)
