@@ -313,6 +313,30 @@ func face() -> String:
 	return "meh" if live > 0.3 else "mad"
 
 
+## How they feel, each feeling on its own so they can show together: anger 0-1 (a light
+## flush once impatient, 0.75 at the snap, 1.0 when stormed out), disgust as its stage 0-3,
+## delight 0-1 (only while neither angry nor disgusted).
+const ANGER_FLUSH := 0.35   # tunable: anger the moment they turn impatient
+const ANGER_SNAP := 0.75    # tunable: anger as patience reaches the snap point
+const ANGER_EMPTY := 0.95   # tunable: anger at no patience at all
+const DELIGHT_FROM := 0.75  # joy above which they glow
+
+
+func feelings(stormed := false) -> Dictionary:
+	var anger := 0.0
+	if stormed:
+		anger = 1.0
+	elif patience < 0.15:
+		anger = lerpf(ANGER_SNAP, ANGER_EMPTY, (0.15 - patience) / 0.15)
+	elif patience < 0.35:
+		anger = lerpf(ANGER_FLUSH, ANGER_SNAP, (0.35 - patience) / 0.2)
+	var stage := disgust_level()
+	var glow := 0.0
+	if joy > DELIGHT_FROM and anger == 0.0 and stage == 0:
+		glow = (joy - DELIGHT_FROM) / (1.0 - DELIGHT_FROM)
+	return {"anger": anger, "disgust": stage, "delight": glow}
+
+
 ## Which of the eight faces to wear (style guide, sheet 3).
 func expression(eating := false, stormed := false) -> String:
 	if stormed:
