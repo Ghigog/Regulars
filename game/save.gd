@@ -14,7 +14,7 @@ const STAFF := ["posts", "cvs", "employees", "extra_duties", "_next_post", "_nex
 const CRITIC := ["critic_idx", "next_visit", "known", "last_review", "_boost", "_boost_from", "_boost_to", "reviews"]
 const TOWN := ["people", "taste_seed"]
 ## What a station keeps from night to night, beside its place and look.
-const PIECE := ["tier", "facing", "base", "pass_look", "node", "stacked", "count", "dirty", "dirty_cups", "dirty_age", "tap", "kit_tool", "kit_used"]
+const PIECE := ["tier", "facing", "base", "pass_look", "node", "stacked", "count", "dirty", "dirty_cups", "rack_cups", "dirty_age", "tap", "kit_tool", "kit_used"]
 
 
 static func exists(path := PATH) -> bool:
@@ -185,6 +185,7 @@ static func _place(g: Node3D, p: Dictionary) -> void:
 	st.count = int(p.count)
 	st.dirty = int(p.dirty)
 	st.dirty_cups = int(p.get("dirty_cups", 0))
+	st.rack_cups = int(p.get("rack_cups", 0))
 	st.dirty_age = float(p.dirty_age)
 	st.tap = int(p.tap)
 	st.kit_tool = str(p.kit_tool)

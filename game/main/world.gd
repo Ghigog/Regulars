@@ -113,7 +113,7 @@ func _build_layout() -> void:
 		# The cell in front of the back doorway stays clear, so the patties can be reached.
 		# The kitchen starts empty but for the sink, the bin, the plate stack and the
 		# counters: the player buys the first stations and writes the menu on night zero.
-		["plates", 2, 2], ["sink", 3, 2], ["bin", 0, 5, 1],
+		["plates", 2, 2], ["sink", 3, 2], ["dish_rack", 2, 4], ["bin", 0, 5, 1],
 		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], [fern(), 9, 0],
 	]:
 		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
