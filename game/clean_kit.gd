@@ -9,6 +9,8 @@ extends Node3D
 ## service and at night alike; the rules live in CleanTools.
 
 const PREFIX := "tool:"
+## Pieces a counter-only tool (the sponge) can sit on.
+const COUNTER_TYPES: Array[String] = ["counter", "pass", "sink"]
 
 var game
 ## Tools lying on the floor: Vector2i -> {"tool": String, "used": int, "node": Node3D}.
@@ -181,7 +183,20 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 				_done(ch, st, "wash")
 				game.audio.burst(st.position + Vector3(0, 1.0, 0), "bubbles", 0.4)
 			return "Rinse %s" % nm
+		if CleanTools.counter_only(tool) and st.type in COUNTER_TYPES and st.item == "":
+			if not dry_run:
+				st.set_item(PREFIX + tool, CleanTools.cleanness(tool, used))
+				ch.set_held("")
+				_done(ch, st, "putdown")
+			return "Put %s down" % nm
 		return ""
+	if ch.held == "" and st.item.begins_with(PREFIX) and CleanTools.is_tool(st.item.trim_prefix(PREFIX)):
+		var kept := st.item.trim_prefix(PREFIX)
+		if not dry_run:
+			hold(ch, kept, CleanTools.used_from(kept, st.quality))
+			st.set_item("")
+			_done(ch, st, "pickup")
+		return "Take %s" % CleanTools.name_of(kept).to_lower()
 	if ch.held != "" or home == null or home.kit_tool == "":
 		return ""
 	if game.phase == Game.Phase.BUILD and kind_of(home) == "hook":
@@ -225,6 +240,13 @@ func floor_first(ch: Player) -> bool:
 
 ## Where a tool in hand would be put down: the free floor cell in front. Null for none.
 func drop_target(ch: Player) -> Variant:
+	if CleanTools.counter_only(held_tool(ch)):
+		return null   # the sponge goes on a counter, never the floor
+	return _free_floor(ch)
+
+
+## The free floor cell in front of the chef, else null.
+func _free_floor(ch: Player) -> Variant:
 	var c: Vector2i = ch.cell() + ch.facing
 	if game.plan.has_floor(c) and not game.grid.is_blocked(c) and not lying.has(c) \
 			and game.grid.edge_open(ch.cell(), c) and not _robot_cells().has(c):
@@ -290,6 +312,10 @@ func floor_use(ch: Player) -> bool:
 			return true
 		var at: Variant = drop_target(ch)
 		if at == null:
+			if CleanTools.counter_only(tool) and _free_floor(ch) != null:
+				game.hud.day_ui.say("The %s goes on a counter." % CleanTools.name_of(tool).to_lower())
+				game.audio.sfx("fail")
+				return true
 			return false
 		put_down(tool, held_used(ch), at)
 		ch.set_held("")
