@@ -307,10 +307,33 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 					ch.set_held("dirty_dishes", 1.0, [], ch.on_tray)
 					st.refresh()
 			elif held == "" and st.dirty > 0:
-				act = "Wash"
+				act = "Wash"   # a hold (`_tick_wash`): one dish a hold, into the hands
 				if not dry_run:
-					while st.dirty > 0:
-						wash_one(st)
+					_wash_hold[ch] = {"st": st, "t": 0.0, "punch": 0.0}
+		"dish_rack":
+			var clean := _clean_empty_in_hand(ch)
+			if clean != null:
+				if st.count >= Station.RACK_CAPACITY:
+					why = "The rack is full"
+				else:
+					act = "Put on rack"
+					if not dry_run:
+						ch.drop_dish(clean)
+						st.count += 1
+						if clean.vessel == Dish.CUP:
+							st.rack_cups += 1
+						st.refresh()
+			elif st.count > 0 and ch.has_room() and held in ["", "tray", "dishes"]:
+				var cup := st.rack_cups > 0
+				act = "Take cup" if cup else "Take plate"
+				if not dry_run:
+					st.count -= 1
+					if cup:
+						st.rack_cups -= 1
+					st.refresh()
+					ch.take_dish(Dish.make(Dish.CUP if cup else Dish.PLATE))
+			elif held == "dishes" and st.count > 0:
+				why = "Your hands are full"
 		"bin":
 			# Every scrap fills it; full, it overflows until the bag goes out the front.
 			var scraps := ch.dishes.filter(func(d: Dish) -> bool: return not d.is_empty()) if held == "dishes" else []
@@ -397,8 +420,7 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 		ch.punch()
 		st.used()
 		if act == "Wash":
-			game.audio.sfx("wash")
-			game.audio.burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
+			pass   # the hold makes the sound when the dish is clean
 		elif act == "Grill":
 			game.audio.sfx("grill_drop")
 		elif act == "Take off the heat":
@@ -553,6 +575,18 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 					ch.take_dish(here)
 			else:
 				why = "Your hands are full"
+	elif held == "dirty_dishes":
+		if st.item == "":
+			act = "Put down"
+			if not dry_run:
+				var d: Dish = ch.dishes.back()
+				ch.drop_dish(d)
+				st.set_dish(d)
+		elif here != null and here.dirty and ch.has_room(true):
+			act = "Pick up"
+			if not dry_run:
+				st.set_item("")
+				ch.take_dish(here)
 	elif held in ["", "tray"] and here != null:
 		act = "Pick up"
 		if not dry_run:
@@ -598,17 +632,57 @@ func _cup_in_hand(ch: Player, drink: String) -> Dish:
 	return null
 
 
-## Washes one dish in a sink back onto its stack: plates first.
-func wash_one(st: Station) -> void:
+## Washes one dish in a sink, plates first, into a clean empty dish.
+func wash_one(st: Station) -> Dish:
 	var cup := st.dirty_cups >= st.dirty
 	st.dirty -= 1
 	if cup:
 		st.dirty_cups -= 1
 	st.refresh()
-	var stack := game.world.find_station("cups" if cup else "plates")
-	if stack != null:
-		stack.count += 1
-		stack.refresh()
+	return Dish.make(Dish.CUP if cup else Dish.PLATE)
+
+
+## Washing at a sink: E starts a hold and one dish comes clean in the hands once E has been
+## held WASH_HOLD, with the same fill bar as every hold. Let go, or walk off, and the
+## progress is lost.
+const WASH_HOLD := 1.5   # tunable
+const WASH_BEAT := 0.45  # seconds between scrubs of the arm
+var _wash_hold := {}     # Player -> {st: Station, t: seconds held, punch: seconds to the next scrub}
+
+
+func _tick_wash(ch: Player, held: bool, delta: float) -> void:
+	if not _wash_hold.has(ch):
+		return
+	var w: Dictionary = _wash_hold[ch]
+	var st: Station = w.st
+	if not held or not is_instance_valid(st) or st.dirty <= 0 or ch.held != "" or game.world.station_at(ch.target_cell()) != st:
+		_wash_hold.erase(ch)
+		ch.stop_giving()
+		return
+	w.t = float(w.t) + delta
+	w.punch = float(w.punch) - delta
+	ch.show_hold(st.global_position, float(w.t) / WASH_HOLD, "dishes")
+	if float(w.punch) <= 0.0:
+		w.punch = WASH_BEAT
+		ch.punch()   # the scrubbing arm
+		game.audio.burst(st.global_position + Vector3(0, 1.0, 0), "bubbles", 0.15)
+	if float(w.t) >= WASH_HOLD:
+		_wash_hold.erase(ch)
+		ch.stop_giving()
+		ch.take_dish(wash_one(st))
+		game.audio.sfx("wash")
+		game.audio.burst(st.global_position + Vector3(0, 1.15, 0), "bubbles", 0.4)
+
+
+## A clean plate or cup in hand with nothing on it, last taken first; null for none.
+func _clean_empty_in_hand(ch: Player) -> Dish:
+	if ch.held != "dishes":
+		return null
+	for i in range(ch.dishes.size() - 1, -1, -1):
+		var d: Dish = ch.dishes[i]
+		if d.vessel != "" and d.is_empty() and not d.dirty:
+			return d
+	return null
 
 
 ## Who is working a tool another press found busy (review, item 11): "Chef 2 has it" in

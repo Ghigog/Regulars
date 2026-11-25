@@ -150,10 +150,21 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			if h.held == "dishes":
 				return [{"do": "restack"}]
 		"wash":
+			var rack := crew.room_view.rack_near(st.cell)
+			if rack == null:
+				return null   # nowhere to put a clean dish: the step ends
+			if rack.count >= Station.RACK_CAPACITY:
+				crew.game.tidy.put_away(rack)   # a full rack is emptied back onto the stacks
 			if JobBoard.roll_task(crew.game.staff, h.person).ok:
-				crew.game.cooking.wash_one(st)
+				var d: Dish = crew.game.cooking.wash_one(st)
+				rack.count += 1
+				if d.vessel == Dish.CUP:
+					rack.rack_cups += 1
+				rack.refresh()
 				crew.game.audio.sfx("wash")
 				crew.game.audio.burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
+				if st.dirty == 0:
+					crew.game.tidy.put_away(rack)   # the last dish: the washer puts the clean ones away
 			st.used()
 			if st.dirty > 0:
 				return [s.duplicate()]

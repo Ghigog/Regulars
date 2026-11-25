@@ -90,7 +90,7 @@ func test_a_tool_over_bare_floor_goes_on_a_counter():
 	_to_build()
 	game.ledger.money = 500
 	assert_true(game.placing.pick_catalog("board"))
-	assert_eq(game.placing.place_refusal(Vector3i(3, 1, 0)), "Tools go on a counter")
+	assert_eq(game.placing.place_refusal(Vector3i(2, 3, 0)), "Tools go on a counter")
 	game.hand = {}
 	assert_true(game.placing.pick_catalog("plant"))
 	assert_eq(game.placing.place_refusal(Vector3i(40, 40, 0)), "That's off the lot")

@@ -75,7 +75,7 @@ func world() -> Dictionary:
 		match st.type:
 			"sink":
 				has_sink = true
-				if stack != null:
+				if rack_near(c) != null:   # a washed dish needs a rack to go to
 					sinks.append({"cell": c, "dishes": st.dirty})
 			"bin":
 				bins.append({"cell": c, "full": st.count >= Crew.BIN_FULL})
@@ -351,6 +351,20 @@ func _made_at(kind: String, near: Vector2i, taken: Dictionary) -> Variant:
 		if d < best_d:
 			best_d = d
 			best = st.cell
+	return best
+
+
+## The nearest dish rack, or null.
+func rack_near(near: Vector2i) -> Station:
+	var best: Station = null
+	var best_d := INF
+	for st: Station in crew.game.stations.values():
+		if st.type != "dish_rack":
+			continue
+		var d := float(absi(st.cell.x - near.x) + absi(st.cell.y - near.y))
+		if d < best_d:
+			best_d = d
+			best = st
 	return best
 
 

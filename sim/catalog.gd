@@ -106,7 +106,7 @@ const ITEMS := {
 	"bin": {"name": "Bin", "price": 30, "level": 2, "category": "Kitchen", "tiers": 1,
 		"blurb": "Another bin. The chef uses the nearest"},
 	"dish_rack": {"name": "Dish rack", "price": 50, "level": 3, "category": "Kitchen", "tiers": 1,
-		"blurb": "Beside a sink: more dishes soak before it looks piled"},
+		"blurb": "Holds 4 washed dishes to dry. Beside a sink, more soak before it looks piled"},
 	"sink": {"name": "Sink", "price": 70, "level": 3, "category": "Kitchen", "tiers": 1,
 		"blurb": "Another place to wash up"},
 	"till": {"name": "Till", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1,
