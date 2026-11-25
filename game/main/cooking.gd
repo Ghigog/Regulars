@@ -399,7 +399,7 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 		var r := _use_storage(st, dry_run, ch)   # what the tool cannot do, storage below may
 		if r[0] != "":
 			return _finish_use(st, r, dry_run, ch)
-	if act == "" and held != "" and Kitchen.is_top(st.type) and not st.type in ["stove", "fryer", "pot"]:
+	if act == "" and held != "" and held != "dishes" and Kitchen.is_top(st.type) and not st.type in ["stove", "fryer", "pot"]:
 		var r := _use_surface(st, true, ch)   # a thing the tool cannot use goes down on its surface
 		if r[0] != "":
 			return _finish_use(st, _use_surface(st, dry_run, ch), dry_run, ch)
@@ -518,8 +518,11 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 			loose = Dish.new()
 			loose.add(st.item, st.current_quality())
 		if st.item == "":
-			act = "Put down"
-			if not dry_run:
+			if is_countertop_item(st):
+				why = "Plates go on a clear counter"
+			else:
+				act = "Put down"
+			if act != "" and not dry_run:
 				var d: Dish = ch.dishes.back()
 				ch.drop_dish(d)
 				st.set_dish(d)
@@ -545,7 +548,7 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 					"Add %s" % Pantry.name_of(loose.ings[0]).to_lower() if loose.ings.size() == 1 else "Add it")
 				if not dry_run:
 					target.take_all(loose)
-					if was_empty:
+					if was_empty and not is_countertop_item(st):
 						# The empty plate (or cup) slides under the food and stays on the worktop.
 						ch.drop_dish(target)
 						st.set_dish(target)
@@ -742,4 +745,10 @@ static func surface_first(st: Station, held: String) -> bool:
 		return false
 	if st.type in ["stove", "fryer", "pot"]:
 		return st.item == "dish" or (held == "dishes" and st.item == "")
-	return (held == "" and st.item != "") or held in ["dishes", "tray"] or st.item == "dish"
+	return (held == "" and st.item != "") or held == "tray" or (held == "dishes" and (st.item != "" or not is_countertop_item(st))) or st.item == "dish"
+
+
+## The till, or a tool standing on a counter: plates never go down on these, only on a
+## clear counter or the pass.
+static func is_countertop_item(st: Station) -> bool:
+	return st.has_node("till") or Kitchen.is_top(st.type)
