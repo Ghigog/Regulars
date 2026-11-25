@@ -51,12 +51,12 @@ static func for_party(table_: int, orders: Array) -> Bill:
 
 
 ## "ok" when `written` is exactly `right`, else the first difference:
-## {kind: "table"} for the wrong table, {kind: "missing", item: id} for something they
+## {kind: "table"} for the wrong table (not asked when `written` has no table, -1), {kind: "missing", item: id} for something they
 ## had that is not on it (or not enough of it), {kind: "extra", item: id} for something
 ## on it they never had (or too many). Items are compared in id order, so the order of
 ## ticking does not matter.
 static func check(written: Bill, right: Bill) -> Variant:
-	if written.table != right.table:
+	if written.table >= 0 and written.table != right.table:
 		return {"kind": "table", "item": -1}
 	var ids := {}
 	for id in right.items:
