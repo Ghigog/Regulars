@@ -11,7 +11,8 @@ func _init(game_: Game) -> void:
 
 
 ## EPIC 28: the room cleared of dining pieces, then a pair pushed together and a lone table
-## (cards 4 and 2) and a run of three (a pair and a leftover: cards 4 and 2 again).
+## (cards 4 and 2) and a run of three (a pair and a leftover: cards 4 and 2 again). From 5 s (after the 1 s start) one
+## of the pair is lifted and, at 7 s, put back (shoot at 4, 6.5 and 8.5).
 func _demo_seat_cards() -> void:
 	for st: Station in game.paying.dining_tables():
 		game.world._unregister(st)
@@ -19,6 +20,15 @@ func _demo_seat_cards() -> void:
 	for spot: Array in [[5, 5, 0], [5, 6, 0], [8, 5, 1], [5, 1, 1], [6, 1, 1], [7, 1, 1]]:   # pair, lone, run of three
 		game.world.add_station("table", Vector2i(spot[0], spot[1]), 1, spot[2])
 	game.player.position = Grid.center(Vector2i(3, 3))
+	# From 5 s a table of the pair is lifted (4 splits into 2 and 2), and put back at 7 s (clack).
+	game.get_tree().create_timer(5.0).timeout.connect(func() -> void:
+		var st: Station = game.stations.get(Vector2i(5, 6))
+		if st != null:
+			game.world._unregister(st)
+			st.visible = false
+			game.get_tree().create_timer(2.0).timeout.connect(func() -> void:
+				st.visible = true
+				game.world._register(st)))
 
 
 func _demo_build(demo: String) -> void:

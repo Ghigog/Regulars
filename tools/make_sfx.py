@@ -104,6 +104,13 @@ tone(b, 0, 190, 0.16, 1.0, SOFT, decay=24, bend=-2.5)
 noise(b, 0, 0.03, 0.5, 0.3, decay=120)
 save("putdown", b, 0.6)
 
+# Two tables pushed together: a soft wooden clack, a dull knock over a short woody ring.
+b = buf(0.22)
+tone(b, 0, 330, 0.18, 1.0, SOFT, decay=30, bend=-1.5)
+tone(b, 0, 660, 0.08, 0.35, SINE, decay=45)
+noise(b, 0, 0.02, 0.45, 0.35, decay=140)
+save("clack", b, 0.6)
+
 b = buf(1.1)
 tone(b, 0, midi(88), 1.1, 1.0, BELL, decay=4.5)
 tone(b, 0.09, midi(93), 1.0, 0.6, BELL, decay=5)
