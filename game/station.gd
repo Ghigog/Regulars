@@ -12,6 +12,7 @@ const TRAYS := 2           # trays in a tray stack
 const DIAL_SWEEP := 150.0  # degrees either side of straight up
 const SINK_PILED := 6      # this many dishes soaking and the washing-up shows (and bothers guests)
 const RACK_HOLDS := 4      # a dish rack beside a sink: this many more dishes before it looks piled
+const RACK_CAPACITY := 4   # clean dishes a dish rack holds to dry
 const BIN_HOLDS := 4       # scraps a bin takes before it overflows
 
 ## A heat tool's behaviour for each heat job: a stove that fries works as a fryer.
@@ -46,6 +47,7 @@ var dirty_age := 0.0  # seconds this piece has been messy (see `messy`)
 var seats: Array[Vector2i] = []
 var kit_tool := ""    # a home's cleaning tool kept here ("mop", "sponge"; PRD 9.4), drawn by CleanKit
 var kit_used := 0      # how many levels that tool has cleared since it was last rinsed
+var rack_cups := 0   # a dish rack: how many of its `count` clean dishes are cups
 var racked := false   # a sink: a dish rack stands beside it (see piled_at)
 var _item_node: Node3D
 var _stack: Node3D
@@ -553,6 +555,8 @@ func refresh() -> void:
 			var d := BuildFood.item("dirty_cup" if i >= dirty - dirty_cups else "dirty_plate")
 			d.position = Vector3(-0.25 + (i % 2) * 0.5, 0.74, 0.3 - ((i / 2) % 2) * 0.6) + Vector3(0, (i / 4) * 0.03, 0)
 			_stack.add_child(d)
+	elif type == "dish_rack":
+		BuildStations.rack_load(_stack, count, rack_cups)
 	elif type == "sink":
 		BuildStations.sink_load(_stack, dirty, messy())
 	elif type == "bin":
