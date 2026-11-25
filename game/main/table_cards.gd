@@ -105,4 +105,6 @@ func _set_shown(c: Dictionary, shown: bool) -> void:
 		tw.tween_property(fold, "scale", Vector3.ONE, 0.08)
 	else:
 		tw.tween_property(fold, "scale", Vector3(1, 0.02, 1), FOLD_TIME).set_ease(Tween.EASE_IN)
-		tw.tween_callback(func() -> void: node.visible = c.shown)
+		tw.tween_callback(func() -> void:
+			if is_instance_valid(node):
+				node.visible = c.shown)
