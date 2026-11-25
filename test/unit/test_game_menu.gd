@@ -401,6 +401,7 @@ func test_a_dish_rack_beside_the_sink_takes_more_dishes():
 	var sink: Station = game.world.find_station("sink")
 	sink.dirty = Station.SINK_PILED
 	assert_true(sink.messy())
+	assert_false(sink.racked, "the starting rack is not beside the sink")
 	var rack: Station = game.world.add_station("dish_rack", sink.cell + Vector2i(0, 1))
 	assert_true(sink.racked)
 	assert_eq(Station.piled_at(true), Station.SINK_PILED + Station.RACK_HOLDS)
@@ -410,6 +411,12 @@ func test_a_dish_rack_beside_the_sink_takes_more_dishes():
 	game.world._unregister(rack)
 	assert_false(sink.racked)
 
+
+
+func test_the_dish_rack_is_an_essential():
+	assert_true("dish_rack" in Game.ESSENTIALS)
+	game.world._unregister(game.world.find_station("dish_rack"))
+	assert_true(game.placing.missing("dish_rack"))
 
 
 func test_a_second_sink_and_bin_each_have_their_own_mess():

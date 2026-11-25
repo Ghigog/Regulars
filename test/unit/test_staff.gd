@@ -836,7 +836,7 @@ func _order_by_chef(g: Guest) -> void:
 	assert_eq(game.tickets.size(), 1)
 
 
-func test_a_washer_washes_up_into_the_plate_stack():
+func test_a_washer_washes_up_through_the_dish_rack():
 	_game()
 	var sink: Station = game.world.find_station("sink")
 	var stack: Station = game.world.find_station("plates")
@@ -844,8 +844,10 @@ func test_a_washer_washes_up_into_the_plate_stack():
 	var before := stack.count
 	_helper(3, ["wash_up"], Vector2i(3, 3))
 	_run(10.0)
+	var rack: Station = game.world.find_station("dish_rack")
 	assert_eq(sink.dirty, 0)
-	assert_eq(stack.count, before + 2)
+	assert_eq(rack.count, 0, "the last dish put the clean ones away")
+	assert_eq(stack.count, before + 2, "after passing through the rack")
 
 
 func test_a_full_bin_is_emptied_and_the_bag_goes_out_the_front():

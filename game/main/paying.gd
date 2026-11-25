@@ -205,7 +205,8 @@ func bill_tables() -> Array[Dictionary]:
 	return out
 
 
-## A slip for this table is already printed and in someone's hand.
+## A slip for this table is already printed and in someone's hand. A chef's slip has no
+## table yet, so only helper slips count.
 func slip_out(number: int) -> bool:
 	for h in game.serving.hands():
 		if h.held == "bill" and h.bill != null and h.bill.table == number:
@@ -248,10 +249,16 @@ func _tick_paying(delta: float) -> void:
 		var at_till := party_at(st).any(func(g: Guest) -> bool: return g.state == "to_till" or g.state == "at_till")
 		if not at_till and game.clock - float(pay_since[st]) >= TILL_AFTER and not slip_out(table_number(st)):
 			send_to_till(st)
-	# Slips for tables that have gone are thrown away.
+	# Slips for tables that have gone are thrown away; a slip with no table, once nobody
+	# is waiting to pay.
+	var anyone := not bill_tables().is_empty()
 	for h in game.serving.hands():
-		if h.held == "bill" and h.bill != null and not ready_to_pay(table_by_number(h.bill.table)) \
-				and payers(table_by_number(h.bill.table)).is_empty():
+		if h.held != "bill" or h.bill == null:
+			continue
+		if h.bill.table < 0:
+			if not anyone:
+				h.set_held("")
+		elif not ready_to_pay(table_by_number(h.bill.table)) and payers(table_by_number(h.bill.table)).is_empty():
 			h.set_held("")
 
 
@@ -310,21 +317,25 @@ func bill_target(ch: Player) -> Station:
 func bill_place(st: Station) -> bool:
 	if st == null:
 		return false
-	if not st.seats.is_empty() and ready_to_pay(st):
+	if not st.seats.is_empty() and ready_to_pay(game.tables.lead(st)):
 		return true
 	return st == till_station() and till_line().any(func(g: Guest) -> bool: return g.state == "at_till")
 
 
 ## The table a bill handed over at `at` is checked against: that table, or at the till
-## the table of the guest there it is written for (else the guest at the front).
+## the table of the first guest there whose order the slip matches exactly (else the guest
+## at the front).
 func _bill_table_at(at: Station, bill: Bill) -> Station:
 	if at != till_station():
-		return at
+		return game.tables.lead(at)   # a bill handed at either half is for the one table
 	var front: Station = null
 	for g in till_line():
 		if g.state != "at_till":
 			continue
-		if table_number(g.table) == bill.table:
+		if bill.table >= 0:
+			if table_number(g.table) == bill.table:
+				return g.table
+		elif Bill.check(bill, right_bill(g.table)) is String:
 			return g.table
 		if front == null:
 			front = g.table
@@ -367,7 +378,7 @@ func close_bill() -> void:
 
 ## "Print": the slip goes into the chef's hand, and the screen closes.
 func print_bill(ch: Player, bill: Bill) -> void:
-	if bill.table < 0 or bill.is_empty() or slip_out(bill.table) or ch.held != "":
+	if bill.is_empty() or (bill.table >= 0 and slip_out(bill.table)) or ch.held != "":
 		game.audio.sfx("fail")
 		return
 	var slip := Bill.new(bill.table, bill.items)

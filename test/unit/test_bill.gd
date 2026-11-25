@@ -44,6 +44,13 @@ func test_check_names_each_kind_of_mistake():
 	assert_eq(Bill.check(Bill.new(2, {1: 1, 3: 1}), right).kind, "table")
 
 
+func test_a_slip_with_no_table_is_checked_on_its_items_alone():
+	var right := Bill.new(2, {1: 1, 3: 1})
+	assert_eq(Bill.check(Bill.new(-1, {3: 1, 1: 1}), right), "ok")
+	assert_eq(Bill.check(Bill.new(-1, {1: 1}), right).kind, "missing")
+	assert_eq(Bill.check(Bill.new(-1, {1: 1, 3: 1, 2: 1}), right).kind, "extra")
+
+
 func test_refusals_are_written_lines():
 	var m := _menu()
 	assert_eq(Bill.refusal({"kind": "extra", "item": 2}, m), "We never had the fries")

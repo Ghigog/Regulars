@@ -141,7 +141,7 @@ var menu_board: MenuBoard               # the chalkboard by the door: tonight's 
 const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "plates": "Plate stack", "cups": "Cup stack", "pass": "Pass counter"}
 ## What a kitchen cannot open without. Every piece can be sold, these too; while there is
 ## none of one, the shop sells it at any level and the door card stays shut.
-const ESSENTIALS: Array[String] = ["sink", "bin", "plates", "till"]
+const ESSENTIALS: Array[String] = ["sink", "bin", "plates", "till", "dish_rack"]
 const LIFT := 0.3   # how high a piece rises while its storage card is open on it
 var _demo_hover: Vector3:            # chef 1's held spot, for tests and demos
 	get: return player.demo_hover
@@ -441,6 +441,8 @@ func _process(delta: float) -> void:
 		if phase == Phase.SERVICE and not (hud.bill_open() and hud.bill.chef == ch):
 			paying._tick_giving(ch, controls.holding(p, "use"), delta)   # held E hands a bill over (PRD 11)
 			serving._tick_deal(ch, controls.holding(p, "use"), delta)     # held E gives a deal (review, item 11)
+		if phase in [Phase.SERVICE, Phase.BUILD]:
+			cooking._tick_wash(ch, controls.holding(p, "use"), delta)     # held E washes a dish at the sink
 	if phase == Phase.BUILD:
 		world._refresh_openings()
 	step(delta)

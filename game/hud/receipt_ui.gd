@@ -47,9 +47,11 @@ func paper_box(clip: Control, stack: VBoxContainer) -> VBoxContainer:
 	scroll.add_child(box)
 	paper_scroll = scroll
 	scroll.set_meta("clip", clip)
+	var ref: WeakRef = weakref(scroll)   # a captured node that is freed first logs an engine error
 	var refit := func() -> void:
-		if is_instance_valid(scroll) and scroll.is_inside_tree():
-			fit_paper(scroll)
+		var s: ScrollContainer = ref.get_ref()
+		if s and s.is_inside_tree():
+			fit_paper(s)
 	hud.center.resized.connect(refit)
 	scroll.tree_exited.connect(func() -> void:
 		if is_instance_valid(hud) and is_instance_valid(hud.center) and hud.center.resized.is_connected(refit):
@@ -111,9 +113,11 @@ func _ribbon(box: VBoxContainer, text: String, col: Color) -> void:
 ## Fit now, and again once the labels have their widths.
 func _fit_when_laid_out(scroll: ScrollContainer) -> void:
 	fit_paper(scroll)
+	var ref: WeakRef = weakref(scroll)   # the scene may be freed before the deferred call runs
 	var again := func() -> void:
-		if is_instance_valid(scroll) and scroll.is_inside_tree():
-			fit_paper(scroll)
+		var s: ScrollContainer = ref.get_ref()
+		if s and s.is_inside_tree():
+			fit_paper(s)
 	again.call_deferred()
 
 
@@ -227,6 +231,10 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	if nothing > 0:
 		var nl := hud._label(box, 15, "%d %s nothing they liked." % [nothing, "person found" if nothing == 1 else "people found"])
 		nl.modulate.a = 0.75
+	var no_table := int(rec.get("no_table", 0))
+	if no_table > 0:
+		var tl := hud._label(box, 15, "%d %s no table." % [no_table, "group found" if no_table == 1 else "groups found"])
+		tl.modulate.a = 0.75
 	_rule(box)
 	var earned: int = rec.sales + rec.tips
 	var total := _row(box, "", "TOTAL EARNED:", "$%d" % earned, 32)

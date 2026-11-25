@@ -43,7 +43,10 @@ func spawn_group(ids: Array, as_critic := false) -> Array[Guest]:
 		game.queue.append(g)
 	if as_critic:
 		game.critic_guest = party[0]
-	var plan := _plan_orders(party)
+	var no_table := not TableJoins.fits_ever(party.size(), game.tables.list)   # before the menu is read
+	var plan := {"walk": true} if no_table else _plan_orders(party)
+	for g in party:
+		g.no_table = no_table
 	if plan.walk:   # nobody has a main: they read the menu at the door and walk on
 		for k in party.size():
 			var g := party[k]
@@ -86,10 +89,21 @@ func _plan_orders(party: Array[Guest]) -> Dictionary:
 	return plan
 
 
+const _COUNT_WORDS := ["", "one", "two", "three", "four"]
+
+
 ## A guest who found no main stops at the menu, says so and walks on. Not a walkout
 ## and not a strike, but they think a little less of the place, friends hear it, and
 ## the receipt counts them.
 func read_board(g: Guest) -> void:
+	if g.no_table:   # no walkout, no grudge, no opinion: the room just has nothing for them
+		var line := "No table for the %s of us" % _COUNT_WORDS[mini(g.party.size(), _COUNT_WORDS.size() - 1)] if g.party.size() > 1 \
+			else "No table for me"
+		g.mood.think(line)
+		game.audio.popup(line, g.position + Vector3(0, 2.3, 0), Color(Build.CABINET))
+		if g == g.party[0]:
+			game.ledger.record_no_table()
+		return
 	g.mood.think(Menu.NOTHING_THOUGHT)
 	game.audio.popup("Nothing I liked", g.position + Vector3(0, 2.3, 0), Color(Build.CABINET))
 	game.ledger.record_found_nothing()

@@ -68,14 +68,14 @@ func world() -> Dictionary:
 		if Station.is_table(st.type):
 			var tid := "%d,%d" % [c.x, c.y]
 			var waiting: Array = crew.game.seating._guests_to_order(st)
-			if not waiting.is_empty():
+			if not waiting.is_empty() and crew.game.tables.lead(st) == st:   # one order for the whole table
 				tables.append({"id": tid, "cell": c, "state": "order", "wait": _wait_of(waiting[0])})
 			if st.dirty > 0:
 				tables.append({"id": tid, "cell": c, "state": "clear", "wait": st.dirty_age})
 		match st.type:
 			"sink":
 				has_sink = true
-				if stack != null:
+				if rack_near(c) != null:   # a washed dish needs a rack to go to
 					sinks.append({"cell": c, "dishes": st.dirty})
 			"bin":
 				bins.append({"cell": c, "full": st.count >= Crew.BIN_FULL})
@@ -288,6 +288,8 @@ func _free_surface(near: Vector2i, h: Helper, pass_first := false, for_plate := 
 	for st: Station in crew.game.stations.values():
 		if not st.type in ["counter", "pass"] or st.item != "" or st.prep_by >= 0:
 			continue
+		if for_plate and st.has_node("till"):
+			continue   # plates never go under the till
 		if Kitchen.has_node(st.base) and Kitchen.fit_of(st.base) == "tall":
 			continue   # a tall fridge or freezer has no worktop
 		if crew.game.kitchen.holds_cleaning(st.cell):
@@ -330,6 +332,7 @@ func _free_surfaces() -> int:
 	var n := 0
 	for st: Station in crew.game.stations.values():
 		if st.type in ["counter", "pass"] and st.item == "" and st.prep_by < 0 and not crew._claims.has(st.cell) \
+				and not st.has_node("till") \
 				and not (Kitchen.has_node(st.base) and Kitchen.fit_of(st.base) == "tall") \
 				and not crew.game.kitchen.holds_cleaning(st.cell):
 			n += 1
@@ -348,6 +351,20 @@ func _made_at(kind: String, near: Vector2i, taken: Dictionary) -> Variant:
 		if d < best_d:
 			best_d = d
 			best = st.cell
+	return best
+
+
+## The nearest dish rack, or null.
+func rack_near(near: Vector2i) -> Station:
+	var best: Station = null
+	var best_d := INF
+	for st: Station in crew.game.stations.values():
+		if st.type != "dish_rack":
+			continue
+		var d := float(absi(st.cell.x - near.x) + absi(st.cell.y - near.y))
+		if d < best_d:
+			best_d = d
+			best = st
 	return best
 
 

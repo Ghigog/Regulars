@@ -23,6 +23,18 @@ static func sink_load(n: Node3D, plates: int, piled: bool) -> void:
 		Build.ball(n, Vector3(b[0], b[1], 0.04), b[2], "#9fd3de", 0.0, Build.R_GLOSS)
 
 
+## The clean dishes drying in a rack: up to four plates (and cups) standing on end, one
+## to a slot, so how full it is can be counted at a glance.
+static func rack_load(n: Node3D, dishes: int, cups: int) -> void:
+	for i in mini(dishes, 4):
+		var cup := i >= dishes - cups
+		var p := BuildFood.item("cup" if cup else "plate")
+		p.position = Vector3(-0.21 + i * 0.14, 0.99 if not cup else 0.96, 0.0)
+		p.rotation = Vector3(0.0, 0.0, -1.45 if not cup else 0.0)
+		p.scale = Vector3.ONE * (1.0 if not cup else 0.9)
+		n.add_child(p)
+
+
 ## What is in a bin: a mound of scraps that rises with each one thrown away, then,
 ## full, a bulging bag over the rim, rubbish spilt on the floor in front.
 static func bin_load(n: Node3D, fill: int, holds: int) -> void:
@@ -294,7 +306,7 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 ## way it faces (the body alone is the same on every side). Inside a run the marks sit
 ## in the next piece's body, so only an end of the run, or a turned piece, shows them.
 static func _pass(n: Node3D, front := false) -> void:
-	Build.box(n, Vector3.ZERO, Vector3(0.9, 0.15, 1.04), Build.CORAL)
+	Build.box(n, Vector3.ZERO, Vector3(0.9, 0.15, 1.04), _shade(Build.CABINET))
 	if front:
 		Build.box(n, Vector3(0, 0.2, 0.545), Vector3(0.7, 0.5, 0.03), _tint(Build.CABINET, 0.07))
 		Build.box(n, Vector3(0, 0.5, 0.565), Vector3(0.3, 0.035, 0.03), "#d9a441", 0.0, Build.R_WOOD)

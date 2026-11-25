@@ -60,11 +60,12 @@ func test_an_exact_bill_pays_as_before_and_a_wrong_one_is_refused():
 	assert_eq(g.state, "to_pay", "still waiting")
 	assert_eq(int(game.ledger.today.sales), 0)
 	# The right one, written at the till.
-	var slip := Bill.new(n)
+	var slip := Bill.new()
 	slip.add(int(g.order.main.id))
 	game.paying.print_bill(game.player, slip)
 	assert_eq(game.player.held, "bill")
-	assert_true(game.paying.slip_out(n))
+	assert_eq(game.player.bill.table, -1, "a chef's slip carries no table")
+	assert_false(game.paying.slip_out(n), "only helper slips count as out")
 	var bill := g.mood.bill_for(g.bill_base)
 	var tip := maxi(0, g.mood.tip_for(bill, game.town.tip_bonus(g.idx)) + g.mood.pay_for(g.bill_base) - bill)
 	assert_true(game.paying.give_bill(game.player, g.table))
@@ -110,7 +111,10 @@ func test_the_till_writes_a_bill_for_a_table_waiting_to_pay():
 	assert_eq(game.cooking.prompt_for(till), "Write the bill")
 	game.cooking.use_station(till)
 	assert_true(game.hud.bill_open())
-	assert_eq(game.hud.bill.bill.table, game.paying.table_number(g.table), "the waiting table is picked")
+	assert_eq(game.hud.bill.bill.table, -1, "no table is picked")
+	for t in game.hud.bill._targets:
+		assert_false(str(t.get_meta("key")).begins_with("table:"), "no table buttons")
+	assert_true((game.hud.bill._targets.back() as Button).disabled, "Print waits for an item")
 	game.hud.bill.select("item:%d" % int(g.order.main.id))
 	game.hud.bill.action("use")
 	game.hud.bill.action("use")
@@ -120,6 +124,49 @@ func test_the_till_writes_a_bill_for_a_table_waiting_to_pay():
 	assert_false(game.hud.bill_open())
 	assert_eq(game.player.held, "bill")
 	assert_eq(Bill.check(game.player.bill, game.paying.right_bill(g.table)), "ok")
+	assert_eq(game.player.bill.table, -1)
+
+
+func test_a_slip_with_no_table_is_checked_against_the_table_it_is_handed_to():
+	var g := _ready_to_pay()
+	game.player.set_held("bill")
+	game.player.bill = Bill.new(-1, {int(g.order.main.id): 2})
+	assert_false(game.paying.give_bill(game.player, g.table))
+	assert_ne(g.mood.latest_thought(), "That's not our table")
+	assert_eq(g.state, "to_pay")
+	game.player.set_held("bill")
+	game.player.bill = Bill.new(-1, {int(g.order.main.id): 1})
+	assert_true(game.paying.give_bill(game.player, g.table))
+	assert_eq(g.state, "leaving")
+
+
+func test_at_the_till_a_slip_with_no_table_pays_the_guest_it_matches():
+	var a := _ready_to_pay(0)
+	var b := _ready_to_pay(1)
+	assert_ne(a.table, b.table)
+	game.paying.send_to_till(a.table)
+	game.paying.send_to_till(b.table)
+	_run(8.0)
+	assert_eq(game.paying.till_line()[0], a)
+	var slip := game.paying.right_bill(b.table)
+	slip.table = -1
+	game.player.set_held("bill")
+	game.player.bill = slip
+	assert_eq(game.paying._bill_table_at(game.paying.till_station(), slip), b.table)
+	assert_true(game.paying.give_bill(game.player, game.paying.till_station()))
+	assert_eq(b.state, "leaving")
+	assert_ne(a.state, "leaving", "the front guest keeps waiting")
+
+
+func test_a_slip_with_no_table_is_thrown_away_once_nobody_waits_to_pay():
+	var g := _ready_to_pay()
+	game.player.set_held("bill")
+	game.player.bill = Bill.new(-1, {int(g.order.main.id): 1})
+	game.paying._tick_paying(0.1)
+	assert_eq(game.player.held, "bill", "someone is still waiting")
+	game.paying.pay_bill(g.table)
+	game.paying._tick_paying(0.1)
+	assert_eq(game.player.held, "")
 
 
 
@@ -220,21 +267,14 @@ func test_the_door_refusing_for_money_offers_remedies():
 
 
 
-func test_one_wash_clears_the_whole_sink_onto_each_stack():
+func test_a_wash_takes_one_dish_into_the_hands():
 	_to_build()
 	var sink: Station = game.world.find_station("sink")
 	sink.dirty = 3
 	sink.dirty_cups = 1
-	var plates: int = game.world.find_station("plates").count
-	game.cooking.wash_one(sink)   # the old one-at-a-time, for the count below
-	sink.dirty = 3
-	sink.dirty_cups = 1
-	plates = game.world.find_station("plates").count
-	game.player.position = sink.position + Vector3(0, 0, 1)
-	game.player.look(Vector2i(0, -1))
-	game.cooking.use_station(sink, false)
-	assert_eq(sink.dirty, 0, "one press washes it all")
-	assert_eq(game.world.find_station("plates").count, plates + 2)
+	var d: Dish = game.cooking.wash_one(sink)
+	assert_eq(d.vessel, Dish.PLATE, "plates before cups")
+	assert_eq(sink.dirty, 2)
 
 
 
