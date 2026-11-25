@@ -24,7 +24,7 @@ func test_the_sponge_is_never_put_on_the_floor():
 
 
 func test_the_sponge_sits_on_a_counter_and_comes_back_with_its_wear():
-	var st := _counter()
+	var st: Station = _counter()
 	_chef_facing(st)
 	CleanKit.hold(game.player, "sponge", 1)
 	assert_eq(game.cooking.use_station(st, true), "Put sponge down")
@@ -39,7 +39,7 @@ func test_the_sponge_sits_on_a_counter_and_comes_back_with_its_wear():
 
 
 func test_a_sponge_on_a_counter_is_not_food():
-	var st := _counter()
+	var st: Station = _counter()
 	st.set_item("tool:sponge", 1.0)
 	assert_false(st.has_leftover_food())
 
@@ -51,6 +51,16 @@ func test_a_helper_washes_faster_with_a_sponge_beside_the_sink():
 	sink.set_item("tool:sponge", 1.0)
 	assert_true(tr._sponge_near(sink))
 	sink.set_item("")
-	var side := game.world.add_station("counter", sink.cell + Vector2i(1, 0))
+	var side: Station = game.world.add_station("counter", sink.cell + Vector2i(1, 0))
 	side.set_item("tool:sponge", 1.0)
 	assert_true(tr._sponge_near(sink))
+
+
+func test_a_sponge_on_a_dirty_sink_does_not_block_the_chefs_wash():
+	var sink: Station = game.world.find_station("sink")
+	sink.set_item("tool:sponge", 1.0)
+	sink.dirty = 2
+	_chef_facing(sink)
+	assert_eq(game.cooking.use_station(sink, true), "Wash")
+	sink.dirty = 0
+	assert_eq(game.cooking.use_station(sink, true), "Take sponge")

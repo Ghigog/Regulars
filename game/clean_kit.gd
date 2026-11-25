@@ -190,7 +190,9 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 				_done(ch, st, "putdown")
 			return "Put %s down" % nm
 		return ""
-	if ch.held == "" and st.item.begins_with(PREFIX) and CleanTools.is_tool(st.item.trim_prefix(PREFIX)):
+	# A sink with dishes in it is for washing: the sponge stays put so Wash is reachable.
+	if ch.held == "" and st.item.begins_with(PREFIX) and not (st.type == "sink" and st.dirty > 0) \
+			and CleanTools.TOOLS.has(st.item.trim_prefix(PREFIX)):
 		var kept := st.item.trim_prefix(PREFIX)
 		if not dry_run:
 			hold(ch, kept, CleanTools.used_from(kept, st.quality))
