@@ -63,7 +63,8 @@ func _demo_mop(demo: String) -> void:
 			game.player.look(Vector2i(0, 1))
 			game.clean_kit.keep(bucket, "", 0)   # the mop is out, in the chef's hands
 			CleanKit.hold(game.player, "mop", CleanTools.dirty_after("mop"))
-			game.clean_kit.put_down("sponge", 1, Vector2i(6, 3))   # left lying about, in the way
+			var top: Station = game.stations.values().filter(func(x: Station) -> bool: return x.type == "counter" and x.item == "")[0]
+			top.set_item(CleanKit.PREFIX + "sponge", CleanTools.cleanness("sponge", 1))   # set on a counter, not the floor
 		"robot":
 			game.world.add_station("robot_dock", Vector2i(5, 6))
 			for i in 3:
