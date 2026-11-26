@@ -75,7 +75,7 @@ func world() -> Dictionary:
 		match st.type:
 			"sink":
 				has_sink = true
-				if rack_near(c) != null:   # a washed dish needs a rack to go to
+				if rack_near(c, true) != null or _nearest("cups", c) != null:   # a washed dish needs a place to go
 					sinks.append({"cell": c, "dishes": st.dirty})
 			"bin":
 				bins.append({"cell": c, "full": st.count >= Crew.BIN_FULL})
@@ -235,9 +235,9 @@ static func _wait_of(g: Guest) -> float:
 	return (1.0 - g.mood.patience) * 30.0 if g != null else 0.0
 
 
-## Where plates for a ticket are built: the pass nearest the plate stack, else the stack.
+## Where plates for a ticket are built: the pass nearest the dish rack, else the rack.
 func _assembly_cell() -> Vector2i:
-	var stack: Station = crew.game.world.find_station("plates")
+	var stack: Station = crew.game.world.find_station("dish_rack")
 	var from: Vector2i = stack.cell if stack != null else Vector2i.ZERO
 	var best := from
 	var best_d := INF
@@ -310,16 +310,15 @@ func _free_surface(near: Vector2i, h: Helper, pass_first := false, for_plate := 
 ## Whether the stacks hold a plate or cup for any of these lines of a ticket.
 func _plates_left(tk: Dictionary, lines: Array) -> bool:
 	for li: int in lines:
-		var stack: Station = crew.game.world.find_station("cups" if tk.order.lines[li].item.course == "drink" else "plates")
+		var stack: Station = crew.game.world.find_station("cups") if tk.order.lines[li].item.course == "drink" else rack_with_plates()
 		if stack != null and stack.count > 0:
 			return true
 	return false
 
 
-## Whether a ticket has an item with no plate set out and the stack has one for it.
+## Whether a ticket has an item with no plate set out and a rack has one for it.
 func _plates_wanted() -> bool:
-	var stack: Station = crew.game.world.find_station("plates")
-	if stack == null or stack.count <= 0:
+	if rack_with_plates() == null:
 		return false
 	for tk: Dictionary in crew.game.tickets:
 		if not crew.task_end._unplated(tk).is_empty():
@@ -354,18 +353,26 @@ func _made_at(kind: String, near: Vector2i, taken: Dictionary) -> Variant:
 	return best
 
 
-## The nearest dish rack, or null.
-func rack_near(near: Vector2i) -> Station:
+## The nearest dish rack (with room for a plate, when `with_room`), or null.
+func rack_near(near: Vector2i, with_room := false) -> Station:
 	var best: Station = null
 	var best_d := INF
 	for st: Station in crew.game.stations.values():
-		if st.type != "dish_rack":
+		if st.type != "dish_rack" or (with_room and st.count >= Station.RACK_CAPACITY):
 			continue
 		var d := float(absi(st.cell.x - near.x) + absi(st.cell.y - near.y))
 		if d < best_d:
 			best_d = d
 			best = st
 	return best
+
+
+## The first dish rack with a clean plate on it, or null.
+func rack_with_plates() -> Station:
+	for st: Station in crew.game.stations.values():
+		if st.type == "dish_rack" and st.count > 0:
+			return st
+	return null
 
 
 func _nearest(type: String, near: Vector2i) -> Station:

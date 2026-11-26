@@ -612,13 +612,13 @@ class ModelView extends TextureRect:
 			Build.box(n, Vector3(0, 0.25, -0.14), Vector3(0.44, 0.014, 0.34), Build.CORAL).rotation.y = -0.04
 			Build.box(n, Vector3(0, 0.25, 0.2), Vector3(0.44, 0.014, 0.1), Build.TILE_TEAL).rotation.y = -0.04
 		else:
-			var stack := str(bp.id) in ["plates", "cups", "tray_stack"]
+			var stack := str(bp.id) in ["cups", "tray_stack"]
 			var bare := stack or (Kitchen.is_top(str(bp.id)) and not Catalog.is_box(bp.id))   # a counter-top piece is shown as itself, off its counter
 			if bare:
 				n.set_meta("bare", true)
 			BuildStations.station(n, bp.id, int(bp.tier), "" if bare else ("counter" if bp.get("counter", false) else str(bp.get("base", ""))), false, str(bp.get("node", "")))
 			if stack:
-				BuildFood.stack_load(n, bp.id, {"plates": Station.PLATES, "cups": Station.CUPS}.get(bp.id, Station.TRAYS))
+				BuildFood.stack_load(n, bp.id, {"cups": Station.CUPS}.get(bp.id, Station.TRAYS))
 			var tool := CleanTools.comes_with(str(bp.get("node", bp.id)))
 			if CleanTools.is_mop(tool):   # a bucket up its tree shows the mop it keeps (PRD 9.5)
 				BuildClean.bucket_mop(n, 1.0, tool)

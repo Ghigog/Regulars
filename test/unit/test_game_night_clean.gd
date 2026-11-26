@@ -5,7 +5,7 @@ func test_mess_carries_over_from_one_day_to_the_next():
 	var t := _dirty_table()
 	var sink: Station = game.world.find_station("sink")
 	var bin: Station = game.world.find_station("bin")
-	sink.dirty = Station.SINK_PILED
+	sink.dirty = Station.piled_at(sink.racked)
 	bin.count = Station.BIN_HOLDS
 	_run(1.0)
 	game.arrivals.clear()
@@ -17,7 +17,7 @@ func test_mess_carries_over_from_one_day_to_the_next():
 	_run(1.0)
 	game.day.start_day()
 	assert_eq(t.dirty, 1)
-	assert_eq(sink.dirty, Station.SINK_PILED)
+	assert_eq(sink.dirty, Station.piled_at(sink.racked))
 	assert_eq(bin.count, Station.BIN_HOLDS)
 	assert_eq([t.dirty_age, sink.dirty_age, bin.dirty_age], ages, "yesterday's mess is already old")
 	game.step(0.01)
@@ -34,7 +34,7 @@ func test_night_cleaning_clears_a_table_and_washes_up():
 	_to_build()
 	var t := _dirty_table(2)
 	var sink: Station = game.world.find_station("sink")
-	var plates: Station = game.world.find_station("plates")
+	var plates: Station = game.world.find_station("dish_rack")
 	var stack := plates.count
 	_face_table()
 	assert_eq(game.room_edit.build_action(), "Clear table", "cleaning comes before picking up")
@@ -100,7 +100,7 @@ func test_the_shop_stays_shut_while_carrying_a_dirty_plate():
 func test_mess_does_not_age_at_night_and_a_carried_plate_goes_into_service():
 	_to_build()
 	var sink: Station = game.world.find_station("sink")
-	sink.dirty = Station.SINK_PILED
+	sink.dirty = Station.piled_at(sink.racked)
 	sink.dirty_age = 5.0
 	_dirty_table()
 	_run(2.0)

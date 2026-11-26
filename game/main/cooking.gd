@@ -236,17 +236,22 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 					r = r2
 			act = r[0]
 			why = r[1]
-		"plates", "cups":
+		"dish_rack", "cups":
 			# One plate or cup a press; two in the hands, four on a tray. An empty one in
-			# hand goes back.
-			var v := Dish.PLATE if st.type == "plates" else Dish.CUP
+			# hand goes back. The rack keeps plates, the cup stack cups.
+			var v := Dish.PLATE if st.type == "dish_rack" else Dish.CUP
 			var noun := "plate" if v == Dish.PLATE else "cup"
 			var spare := _empty_in_hand(ch, v)
 			if spare != null:
-				act = "Put back"
-				if not dry_run:
-					st.count += 1
-					ch.drop_dish(spare)
+				if st.type == "dish_rack" and st.count >= Station.RACK_CAPACITY:
+					why = "The rack is full"
+				else:
+					act = "Put back"
+					if not dry_run:
+						st.count += 1
+						ch.drop_dish(spare)
+			elif st.type == "dish_rack" and _empty_in_hand(ch, Dish.CUP) != null:
+				why = "Cups go on the cup stack"
 			elif st.count > 0 and _loose_in_hand(ch, v) != null:
 				# A loose stack in hand is plated in place: no extra hand slot.
 				act = "Plate it" if v == Dish.PLATE else "Pour into cup"
@@ -310,30 +315,6 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				act = "Wash"   # a hold (`_tick_wash`): one dish a hold, into the hands
 				if not dry_run:
 					_wash_hold[ch] = {"st": st, "t": 0.0, "punch": 0.0}
-		"dish_rack":
-			var clean := _clean_empty_in_hand(ch)
-			if clean != null:
-				if st.count >= Station.RACK_CAPACITY:
-					why = "The rack is full"
-				else:
-					act = "Put on rack"
-					if not dry_run:
-						ch.drop_dish(clean)
-						st.count += 1
-						if clean.vessel == Dish.CUP:
-							st.rack_cups += 1
-						st.refresh()
-			elif st.count > 0 and ch.has_room() and held in ["", "tray", "dishes"]:
-				var cup := st.rack_cups > 0
-				act = "Take cup" if cup else "Take plate"
-				if not dry_run:
-					st.count -= 1
-					if cup:
-						st.rack_cups -= 1
-					st.refresh()
-					ch.take_dish(Dish.make(Dish.CUP if cup else Dish.PLATE))
-			elif held == "dishes" and st.count > 0:
-				why = "Your hands are full"
 		"bin":
 			# Every scrap fills it; full, it overflows until the bag goes out the front.
 			var scraps := ch.dishes.filter(func(d: Dish) -> bool: return not d.is_empty()) if held == "dishes" else []

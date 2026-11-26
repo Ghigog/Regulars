@@ -181,8 +181,8 @@ func _apply_demo(demo: String) -> void:
 		var sink := game.world.find_station("sink")
 		sink.dirty = 4
 		sink.refresh()
-		game.world.find_station("plates").count = 0
-		game.world.find_station("plates").refresh()
+		game.world.find_station("dish_rack").count = 0
+		game.world.find_station("dish_rack").refresh()
 		var bin := game.world.find_station("bin")
 		bin.count = Station.BIN_HOLDS
 		bin.refresh()

@@ -19,7 +19,7 @@ func _slabs(root: Node) -> int:
 
 
 func test_stack_previews_hold_their_items() -> void:
-	var want := {"plates": Station.PLATES, "cups": Station.CUPS, "tray_stack": Station.TRAYS}
+	var want := {"cups": Station.CUPS, "tray_stack": Station.TRAYS}
 	for id: String in want:
 		var base := Node3D.new()   # the same piece, bare, without its load
 		add_child_autofree(base)
@@ -29,12 +29,12 @@ func test_stack_previews_hold_their_items() -> void:
 
 
 func test_counter_top_previews_have_no_counter() -> void:
-	for id in ["slicer", "plates", "cups", "tray_stack"]:
+	for id in ["slicer", "cups", "tray_stack"]:
 		assert_eq(_slabs(_preview(id)), 0, "%s has no worktop" % id)
 
 
 func test_placed_stack_keeps_its_counter() -> void:
 	var probe := Node3D.new()
 	add_child_autofree(probe)
-	BuildStations.station(probe, "plates", 1)
+	BuildStations.station(probe, "cups", 1)
 	assert_gt(_slabs(probe), 0)

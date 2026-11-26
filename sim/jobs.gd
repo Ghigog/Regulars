@@ -200,11 +200,12 @@ func _ingredient_tasks(world: Dictionary) -> void:
 ## The item that covers a lack of `kind`: one being made into it, else (for a kind made
 ## from another's stock) its source lying loose, away from any tool.
 func _take_item(items: Array, kind: String) -> Dictionary:
-	for i in items.size():
-		if items[i].kind == kind:
-			var it: Dictionary = items[i]
-			items.remove_at(i)
-			return it
+	for on_tool: bool in [true, false]:   # one already on its tool first, or it blocks the tool for the loose one
+		for i in items.size():
+			if items[i].kind == kind and items[i].has("station") == on_tool:
+				var it: Dictionary = items[i]
+				items.remove_at(i)
+				return it
 	if Pantry.is_derived(kind):
 		var src := Pantry.source_of(kind)
 		for i in items.size():
