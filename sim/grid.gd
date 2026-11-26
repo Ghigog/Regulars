@@ -37,20 +37,19 @@ func in_bounds(c: Vector2i) -> bool:
 	return c.x >= origin.x and c.y >= origin.y and c.x < origin.x + size.x and c.y < origin.y + size.y
 
 
-## Cells outside the room a chef may stand on: the doorway and the pavement as
-## far as the bin. Nothing else outside, from `pavement_from` on, is theirs to
-## walk. Guests are not held to this; they use `is_blocked` alone.
-var pavement_from := 1 << 30   # the first column of pavement (a chef cannot stand there unless listed)
-var chef_pavement := {}        # Vector2i -> true
+## Cells outside the room a chef may stand on: the doorway and the open pavement rows.
+## From `pavement_from` on (the kerb tile and the road) a chef cannot stand. Guests
+## are not held to this; they use `is_blocked` alone.
+var pavement_from := 1 << 30   # the first column a chef cannot stand in
 
 
 func is_blocked(c: Vector2i) -> bool:
 	return not in_bounds(c) or blocked.has(c) or outside.has(c)
 
 
-## Like `is_blocked`, for a chef: also the pavement beyond their short walk.
+## Like `is_blocked`, for a chef: also the kerb tile and beyond.
 func chef_blocked(c: Vector2i) -> bool:
-	return is_blocked(c) or (c.x >= pavement_from and not chef_pavement.has(c))
+	return is_blocked(c) or c.x >= pavement_from
 
 
 func edge_open(a: Vector2i, b: Vector2i) -> bool:
