@@ -203,6 +203,11 @@ func open_line(item_id: int) -> int:
 	return -1
 
 
+## Whether line `li` has been served (false for a line that does not exist).
+func line_served(li: int) -> bool:
+	return li >= 0 and li < lines.size() and _served(lines[li])
+
+
 func _served(l: Dictionary) -> bool:
 	for q: float in l.have:
 		if q >= 0.0:
