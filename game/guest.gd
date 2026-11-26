@@ -48,6 +48,9 @@ var table: Station
 var timer := 0.0
 var _body: Peg
 var stormed := false
+var disgust_from := {}   # what last disgusted them at a mess anyone would notice: {cell, kind}
+var _glance_time := 0.0  # seconds left looking toward `disgust_from`
+var _glance_back := 0.0  # the way they were facing before the glance
 var _bar: Node3D
 var _fill: MeshInstance3D
 var _order: Node3D
@@ -423,6 +426,24 @@ func tick(delta: float) -> void:
 	_refresh(delta)
 
 
+## Remember what disgusted them (a source at or above GuestMood.NOTICE).
+func note_disgust(cell: Vector2i, kind: String) -> void:
+	disgust_from = {"cell": cell, "kind": kind}
+
+
+## Turn toward the recorded cause for a moment, then back. Runs on the guest's own clock.
+func _glance(delta: float) -> void:
+	if _glance_time <= 0.0:
+		return
+	_glance_time -= delta
+	var yaw := _glance_back
+	if _glance_time > 0.0 and not disgust_from.is_empty():
+		var d := Grid.center(disgust_from.cell) - position
+		if d.length() > 0.01:
+			yaw = atan2(d.x, d.z)
+	_body.rotation.y = lerp_angle(_body.rotation.y, yaw, 1.0 - exp(-10.0 * delta))
+
+
 func _refresh(delta: float) -> void:
 	var p := mood.patience
 	var on_bill: bool = paying() and game.paying.ready_to_pay(table)
@@ -454,7 +475,11 @@ func _refresh(delta: float) -> void:
 	var stage := mood.disgust_level()
 	if stage > _last_stage:
 		_gross_time = 3.0
+		if seated_waiting() and not disgust_from.is_empty():
+			_glance_time = 1.0
+			_glance_back = _body.rotation.y
 	_last_stage = stage
+	_glance(delta)
 	_gross_time -= delta
 	_heart_time -= delta
 	var want := ""
@@ -479,6 +504,8 @@ func _refresh(delta: float) -> void:
 	var gross := ""
 	if stage > 0 and (seated_waiting() or state == "eating") and (_gross_time > 0.0 or fmod(_age, 7.0) < 2.0):
 		gross = GuestMood.DISGUST_ICONS[stage]
+	if disgust_from.get("kind", "") == "smell" and stage > 0 and (seated_waiting() or state == "eating"):
+		gross = "stink"   # the smell is named whatever the stage
 	Fx.set_bubble(_gross_bubble, gross, 0.3 if want == "" else 0.2)
 	# Beside the main bubble (up and to the camera's right), or in its place when that is empty.
 	_gross_bubble.position = _order.position + (Build.CAM_BASIS.x * 0.62 + Build.CAM_BASIS.y * 0.3 if want != "" else Vector3.ZERO)
