@@ -201,32 +201,7 @@ func _page() -> void:
 		var off := _label(left, 20, "Off tonight: " + why)
 		off.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		off.add_theme_color_override("font_color", Hud.CORAL.darkened(0.25))
-	# What is in it, top first, as it stacks in the picture.
-	var mid := VBoxContainer.new()
-	mid.custom_minimum_size = Vector2(340, 0)
-	mid.add_theme_constant_override("separation", 6)
-	body.add_child(mid)
-	_label(mid, 24, "In it, top first (%d of %d)" % [it.ingredients.size(), Menu.MAX_INGREDIENTS])
-	var n: int = it.ingredients.size()
-	for k in range(n - 1, -1, -1):
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		mid.add_child(row)
-		var l := _label(row, 22, Pantry.name_of(it.ingredients[k]))
-		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if k < n - 1:
-			_small(row, "Up", "up:%d" % k, _shift.bind(k, 1))
-		else:
-			_spacer(row)
-		if k > 0:
-			_small(row, "Down", "down:%d" % k, _shift.bind(k, -1))
-		else:
-			_spacer(row)
-		_small(row, "Out", "out:%d" % k, _take_out.bind(k))
-	if n == 0:
-		var hint := _label(mid, 20, "Pick from the kitchen, on the right.")
-		hint.modulate.a = 0.6
-	# What can go in: the kitchen's ingredients for this course.
+	# What is in it, ticked, among what the kitchen has for this course.
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 6)
@@ -236,13 +211,22 @@ func _page() -> void:
 	flow.add_theme_constant_override("h_separation", 8)
 	flow.add_theme_constant_override("v_separation", 8)
 	right.add_child(flow)
+	var n: int = it.ingredients.size()
 	var any := false
-	for ing in kitchen_ingredients():
-		if Pantry.is_drink(ing) != (it.course == "drink"):
-			continue
+	for ing in _chips(it):
 		any = true
-		var b := _paper_button(flow, "add:" + ing, _put_in.bind(ing), "+ " + Pantry.name_of(ing), 20)
-		if n >= Menu.MAX_INGREDIENTS:
+		var on: bool = it.ingredients.has(ing)
+		var b := _paper_button(flow, "add:" + ing, _toggle.bind(ing), "" if on else "+ " + Pantry.name_of(ing), 20)
+		if on:
+			var inner := HBoxContainer.new()
+			inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			inner.add_theme_constant_override("separation", 6)
+			inner.add_child(_Tick.new())
+			var l := _label(inner, 20, Pantry.name_of(ing))
+			l.add_theme_color_override("font_color", Hud.INK)
+			_fill(b, inner)
+			_mark(b)
+		elif n >= Menu.MAX_INGREDIENTS:
 			b.disabled = true
 			b.modulate.a = 0.45
 			_targets.erase(b)
@@ -518,38 +502,27 @@ func _set_ingredients(ings: Array) -> void:
 	_changed()
 
 
-func _put_in(ing: String) -> void:
-	var ings: Array = _edit.ingredients.duplicate()
-	ings.append(ing)
-	if Menu.refusal(_edit.course, ings) != "":
+## Ticks an ingredient on or off; the highlight stays on its chip.
+func _toggle(ing: String) -> void:
+	var was: bool = _edit.ingredients.has(ing)
+	var ings := Menu.toggled(_edit.ingredients, ing)
+	if not ings.is_empty() and Menu.refusal(_edit.course, ings) != "":
 		game.audio.sfx("fail")
 		return
-	game.audio.sfx("pickup")
+	game.audio.sfx("putdown" if was else "pickup")
 	_set_ingredients(ings)
+	select("add:" + ing)
 
 
-func _take_out(k: int) -> void:
-	var ings: Array = _edit.ingredients.duplicate()
-	ings.remove_at(k)
-	game.audio.sfx("putdown")
-	_set_ingredients(ings)
-	if not select("out:%d" % mini(k, ings.size() - 1)):
-		select("done")
-
-
-## Moves ingredient k up (+1, toward the top) or down (-1) the stack.
-func _shift(k: int, by: int) -> void:
-	var ings: Array = _edit.ingredients.duplicate()
-	var j := k + by
-	if j < 0 or j >= ings.size():
-		return
-	var tmp = ings[k]
-	ings[k] = ings[j]
-	ings[j] = tmp
-	game.audio.sfx("tick")
-	_set_ingredients(ings)
-	if not select("%s:%d" % ["up" if by > 0 else "down", j]):
-		select("out:%d" % j)
+## The chips for a course: what the kitchen has plus what the item holds already,
+## so an ingredient whose box has gone still shows ticked, in pantry order.
+func _chips(it: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	var kitchen := kitchen_ingredients()
+	for id: String in Pantry.ITEMS:
+		if (kitchen.has(id) or it.ingredients.has(id)) and Pantry.is_drink(id) == (it.course == "drink"):
+			out.append(id)
+	return out
 
 
 func _set_level(lvl: String) -> void:
@@ -638,8 +611,8 @@ func new_item(course: String) -> void:
 	_new(course)
 
 
-func put_in(ing: String) -> void:
-	_put_in(ing)
+func toggle(ing: String) -> void:
+	_toggle(ing)
 
 
 func start_naming(mode := "") -> void:
@@ -730,17 +703,6 @@ func _mark(b: Button) -> void:
 		st.set_border_width_all(4)
 		st.bg_color = Color("#fff0dc")
 		b.add_theme_stylebox_override(s, st)
-
-
-func _small(row: HBoxContainer, text: String, key: String, on_press: Callable) -> void:
-	var b := _paper_button(row, key, on_press, text, 18)
-	b.custom_minimum_size = Vector2(66, 0)
-
-
-func _spacer(row: HBoxContainer) -> void:
-	var c := Control.new()
-	c.custom_minimum_size = Vector2(66, 0)
-	row.add_child(c)
 
 
 ## One, two or three coin marks for a price level, the rest faint, so the level
@@ -852,3 +814,14 @@ class BuildNotes extends HBoxContainer:
 			var warn: Label = hud._label(_box, 18, "You can't pay it: the door won't open.")
 			warn.add_theme_color_override("font_color", Hud.CORAL.darkened(0.25))
 		_restock.modulate = Color(1, 0.86, 0.82) if short else Color.WHITE
+
+
+## A small drawn tick (the HUD font has no ✓ glyph).
+class _Tick extends Control:
+	func _init() -> void:
+		custom_minimum_size = Vector2(18, 18)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	func _draw() -> void:
+		draw_polyline(PackedVector2Array([Vector2(2, 9), Vector2(7, 14), Vector2(16, 3)]), Hud.CORAL.darkened(0.2), 3.0, true)
