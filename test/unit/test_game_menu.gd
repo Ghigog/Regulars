@@ -199,7 +199,7 @@ func test_night_zero_hints_come_one_at_a_time():
 	game.menu_stock.stock_box("bun", Vector2i(0, 6), 1, 1)
 	assert_eq(game.menu_stock.night_hint(), game.NIGHT_HINTS[0], "a tool too")
 	game.world.add_station("board", Vector2i(0, 3), 1, 1)
-	assert_eq(game.menu_stock.night_hint(), game.NIGHT_HINTS[1])
+	assert_eq(game.menu_stock.night_hint(), "", "no menu note: the key over the board says it")
 	game.menu.add("main", ["bun"], "Bread")
 	assert_eq(game.menu_stock.night_hint(), game.NIGHT_HINTS[2])
 	game.ledger.history.append({})
