@@ -4,14 +4,6 @@ extends "res://test/helpers/game_case.gd"
 const LINE := "Plates and food wait for the morning"
 
 
-func _face_station(st: Station) -> void:
-	var c := game.stations.find_key(st) as Vector2i
-	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
-		_face(c + d, -d)
-		if game.world.station_at(game.player.target_cell()) == st:
-			return
-
-
 func test_the_plate_stack_hands_out_nothing_at_night():
 	_to_build()
 	var plates: Station = game.world.find_station("dish_rack")
