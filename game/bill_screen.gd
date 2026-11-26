@@ -25,6 +25,8 @@ func setup(game_, hud_, chef_: Player) -> void:
 	game = game_
 	hud = hud_
 	chef = chef_
+	if chef.held == "bill":
+		bill = Bill.new(-1, chef.bill.items.duplicate())   # fix the wrong lines, not start over
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var dim := ColorRect.new()

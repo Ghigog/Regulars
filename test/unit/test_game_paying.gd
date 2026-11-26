@@ -144,11 +144,12 @@ func test_at_the_till_a_slip_with_no_table_pays_the_guest_it_matches():
 	var a := _ready_to_pay(0)
 	var b := _ready_to_pay(1)
 	assert_ne(a.table, b.table)
+	a.order["side"] = {"id": 999}   # the two parties ordered the same main; give the front one a side
 	game.paying.send_to_till(a.table)
 	game.paying.send_to_till(b.table)
 	_run(8.0)
 	assert_eq(game.paying.till_line()[0], a)
-	var slip := game.paying.right_bill(b.table)
+	var slip: Bill = game.paying.right_bill(b.table)
 	slip.table = -1
 	game.player.set_held("bill")
 	game.player.bill = slip
@@ -284,3 +285,43 @@ func test_the_receipt_names_a_side_nobody_ordered():
 	var nudges: Array[String] = game.menu_stock.unordered_nudges()
 	assert_eq(nudges.size(), 1)
 	assert_string_contains(nudges[0], "Plain Roll: no orders.")
+
+
+func test_the_till_rewrites_a_held_slip():
+	var g := _ready_to_pay()
+	var till: Station = game.paying.till_station()
+	var id := int(g.order.main.id)
+	game.player.set_held("bill")
+	game.player.bill = Bill.new(-1, {id: 2})
+	assert_eq(game.cooking.prompt_for(till), "Write a new bill")
+	game.cooking.use_station(till)
+	assert_true(game.hud.bill_open())
+	assert_eq(game.hud.bill.bill.count(id), 2, "opens filled in from the slip")
+	game.hud.bill.select("item:%d" % id)
+	game.hud.bill.action("sell")
+	game.hud.bill._print()
+	assert_false(game.hud.bill_open())
+	assert_eq(game.player.held, "bill")
+	assert_eq(game.player.bill.count(id), 1, "the corrected slip replaced the old one")
+	assert_true(game.paying.give_bill(game.player, g.table))
+
+
+func test_closing_the_rewrite_keeps_the_old_slip():
+	_ready_to_pay()
+	var till: Station = game.paying.till_station()
+	game.player.set_held("bill")
+	game.player.bill = Bill.new(-1, {1: 2})
+	game.cooking.use_station(till)
+	game.hud.bill.action("back")
+	assert_false(game.hud.bill_open())
+	assert_eq(game.player.held, "bill")
+	assert_eq(game.player.bill.count(1), 2)
+
+
+func test_a_guest_queued_at_the_till_still_gets_the_slip_handed_over():
+	var g := _ready_to_pay()
+	g.state = "at_till"
+	g.line_place = 0
+	game.player.set_held("bill")
+	game.player.bill = Bill.new(-1, {1: 2})
+	assert_eq(game.cooking.prompt_for(game.paying.till_station()), "Hold to give the bill")
