@@ -163,9 +163,9 @@ func pick(i: int) -> void:
 ## sends these too (d-pad, A). Returns whether the key was used.
 func key(k: int, echo := false) -> bool:
 	if k in [KEY_UP, KEY_W]:
-		pick(sel - 1)
+		pick(posmod(sel - 1, buttons.size()))
 	elif k in [KEY_DOWN, KEY_S]:
-		pick(sel + 1)
+		pick(posmod(sel + 1, buttons.size()))
 	elif echo:
 		return false
 	elif k in [KEY_E, KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]:
@@ -182,9 +182,9 @@ func key(k: int, echo := false) -> bool:
 func action(a: String, echo := false) -> bool:
 	match a:
 		"up":
-			pick(sel - 1)
+			pick(posmod(sel - 1, buttons.size()))
 		"down":
-			pick(sel + 1)
+			pick(posmod(sel + 1, buttons.size()))
 		"use", "confirm":
 			if echo:
 				return false
