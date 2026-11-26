@@ -193,3 +193,12 @@ func test_a_full_rack_refuses_the_plate_at_night():
 	_face_station(rack)
 	assert_ne(game.room_edit.build_action(), "Put back")
 	assert_eq(game.cooking.use_station(rack, true), "The rack is full")
+
+
+func test_use_at_a_counter_with_a_washed_plate_says_why():
+	_to_build()
+	_hold_washed_plate()
+	_face_station(game.world.find_station("counter"))
+	game.room_edit.build_interact()
+	assert_eq(game.player.held, "dishes")
+	assert_true(game.stations.find_key(game.world.find_station("counter")) != null)

@@ -448,6 +448,9 @@ func build_interact(ch: Player = null) -> void:
 		game.cooking.use_station(game.world.station_at(ch.target_cell()), false, ch)
 		game.hud.hints_ui.show_build()   # the dirty note counts down
 		return
+	if action == "" and ch.hand.is_empty() and ch.held == "dishes" and _piece_in_front(ch) != Vector3.INF:
+		game.placing.pick_up(_piece_in_front(ch), ch)   # refuses: the plate goes on the rack first
+		return
 	match action:
 		"Put down":
 			ch.last_paint = game.placing.snap(_hover_point(ch), ch)
