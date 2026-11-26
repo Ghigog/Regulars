@@ -180,9 +180,17 @@ func serve_dish(d: Dish, items: Array) -> int:
 ## The names of the items with nothing served yet, in course order: ["Soda"].
 func waiting_for() -> Array[String]:
 	var out: Array[String] = []
+	for it in waiting_items():
+		out.append(str(it.name))
+	return out
+
+
+## The menu items with nothing served yet, in line order.
+func waiting_items() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
 	for l in lines:
 		if not _served(l):
-			out.append(str(l.item.name))
+			out.append(l.item)
 	return out
 
 
