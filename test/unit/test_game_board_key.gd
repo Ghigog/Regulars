@@ -84,3 +84,17 @@ func test_board_glows_in_build_only_and_key_is_prompt_sized():
 	_frame()
 	await wait_seconds(0.6)
 	assert_false(game.menu_board.glow.visible, "halo gone in service")
+
+
+func test_key_draws_beneath_every_hud_control():
+	_to_build()
+	_frame()
+	var cap: Control = game.hud.board_key_ui.cap
+	var root: Node = game.hud.root
+	assert_eq(cap.get_parent(), root, "set-up")
+	assert_eq(cap.get_index(), 0, "first child, drawn first")
+	var late := Control.new()
+	root.add_child(late)
+	_frame()
+	assert_eq(cap.get_index(), 0, "later controls still draw over it")
+	assert_gt(late.get_index(), cap.get_index())

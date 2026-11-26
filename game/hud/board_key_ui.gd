@@ -28,6 +28,7 @@ func _build() -> void:
 	cap = HudWidgets.Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
 	cap.visible = false
 	hud.root.add_child(cap)
+	hud.root.move_child(cap, 0)   # world marker: every panel and screen draws over it
 	label = hud._label(cap, 24, "N")
 
 
