@@ -15,7 +15,7 @@ func _hold_loose_burger() -> void:
 func test_a_loose_stack_in_hand_is_plated_at_the_plate_stack():
 	_ordered_guest()
 	_hold_loose_burger()
-	var plates: Station = game.world.find_station("plates")
+	var plates: Station = game.world.find_station("dish_rack")
 	var n := plates.count
 	assert_eq(game.cooking.prompt_for(plates), "Plate it")
 	assert_eq(game.cooking.use_station(plates), "Plate it")
@@ -32,7 +32,7 @@ func test_a_loose_stack_is_plated_with_full_hands():
 	full.add("prep:bun", 1.0)
 	game.player.take_dish(full)
 	assert_false(game.player.has_room(), "hands full")
-	_use("plates")
+	_use("dish_rack")
 	assert_eq(game.player.dishes.size(), 2, "still two dishes")
 	assert_eq(game.player.dishes.filter(func(d: Dish) -> bool: return d.vessel == "").size(), 0)
 
@@ -40,7 +40,7 @@ func test_a_loose_stack_is_plated_with_full_hands():
 func test_the_plated_burger_is_served():
 	var g := _ordered_guest()
 	_hold_loose_burger()
-	_use("plates")
+	_use("dish_rack")
 	game.cooking.use_station(_the_pass())
 	assert_eq(game.cooking.prompt_for(_the_pass()), "Pick up")
 	game.cooking.use_station(_the_pass())
@@ -53,7 +53,7 @@ func test_a_refused_stack_falls_through():
 	d.ings = ["patty", "cola"]
 	d.qs = [1.0, 1.0]
 	game.player.set_held("dishes", 1.0, [d] as Array[Dish])
-	var plates: Station = game.world.find_station("plates")
+	var plates: Station = game.world.find_station("dish_rack")
 	assert_ne(game.cooking.prompt_for(plates), "Plate it")
 	assert_eq(d.vessel, "")
 
@@ -65,7 +65,7 @@ func test_a_plate_in_hand_goes_under_a_loose_burger_on_the_pass():
 	game.player.set_held("prep:bun", 1.0)
 	game.cooking.use_station(_the_pass())
 	game.player.set_held("")
-	_use("plates")
+	_use("dish_rack")
 	assert_eq(game.cooking.prompt_for(_the_pass()), "Plate it")
 	assert_eq(game.cooking.use_station(_the_pass()), "Plate it")
 	assert_eq(game.player.dishes.size(), 0)
@@ -78,7 +78,7 @@ func test_a_plate_in_hand_goes_under_a_loose_burger_on_the_pass():
 func test_a_plate_goes_under_a_single_prepped_item():
 	game.player.set_held("prep:bun", 1.0)
 	game.cooking.use_station(_the_pass())
-	_use("plates")
+	_use("dish_rack")
 	assert_eq(game.cooking.use_station(_the_pass()), "Plate it")
 	assert_eq(game.player.dishes.size(), 0)
 	assert_eq(_the_pass().dish.vessel, Dish.PLATE)

@@ -24,7 +24,8 @@ func _plate_on(st: Station, food := false) -> void:
 
 
 func test_clean_plates_on_a_counter_and_in_hand_go_back_to_the_rack():
-	var plates: Station = game.world.find_station("plates")
+	var plates: Station = game.world.find_station("dish_rack")
+	plates.count = 4   # room on the rack for the plates that come back
 	var before := plates.count
 	_plate_on(_counters(1)[0])
 	game.player.set_held("dishes", 1.0, [Dish.make(Dish.PLATE)])
@@ -36,7 +37,8 @@ func test_clean_plates_on_a_counter_and_in_hand_go_back_to_the_rack():
 
 
 func test_food_and_plated_food_go_into_the_bin():
-	var plates: Station = game.world.find_station("plates")
+	var plates: Station = game.world.find_station("dish_rack")
+	plates.count = 4   # room on the rack for the plates that come back
 	var bin: Station = game.world.find_station("bin")
 	var cs := _counters(2)
 	cs[0].item = "raw:patty"
@@ -72,6 +74,7 @@ func test_dirty_plates_stay_and_no_clear_food_prompt_exists():
 
 
 func test_the_tidy_plays_and_clears_its_moves():
+	game.world.find_station("dish_rack").count = 4
 	_plate_on(_counters(1)[0])
 	_end_day_now()
 	game.session.open_build()

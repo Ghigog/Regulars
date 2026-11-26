@@ -13,7 +13,7 @@ func test_a_bun_on_a_cooked_patty_is_plated():
 	assert_eq(game.cooking.use_station(_the_pass()), "Add bun", "a bun goes on a cooked patty")
 	assert_eq(_the_pass().item, "dish")
 	assert_eq(_the_pass().dish.vessel, "", "a loose stack, not yet plated")
-	_use("plates")
+	_use("dish_rack")
 	assert_eq(game.player.held, "dishes")
 	assert_eq(game.cooking.use_station(_the_pass(), true), "Plate it")
 	game.cooking.use_station(_the_pass())
@@ -22,13 +22,13 @@ func test_a_bun_on_a_cooked_patty_is_plated():
 	assert_true(_the_pass().dish.is_ready(game.menu.items))
 	assert_eq(game.cooking.use_station(_the_pass()), "Pick up")
 	assert_eq(game.player.dishes.size(), 1)
-	assert_eq(game.world.find_station("plates").count, Station.PLATES - 1)
+	assert_eq(game.world.find_station("dish_rack").count, Station.PLATES - 1)
 
 
 
 func test_a_plate_on_the_pass_takes_food_in_any_order():
 	_ordered_guest()
-	_use("plates")
+	_use("dish_rack")
 	assert_eq(game.cooking.use_station(_the_pass()), "Put down")
 	game.cooking.use_station(game.menu_stock.storage_of("bun"))
 	assert_eq(game.cooking.use_station(_the_pass()), "Add bun")
@@ -57,25 +57,25 @@ func test_an_unplated_burger_is_not_served():
 
 
 func test_two_plates_in_the_hands_four_on_a_tray():
-	assert_eq(_use_says("plates"), "Take plate")
-	assert_eq(_use_says("plates"), "Put back", "an empty plate in hand goes back")
+	assert_eq(_use_says("dish_rack"), "Take plate")
+	assert_eq(_use_says("dish_rack"), "Put back", "an empty plate in hand goes back")
 	var full := func() -> Dish:
 		var d := Dish.make(Dish.PLATE)
 		d.add("prep:bun", 1.0)
 		d.add("prep:patty", 1.0)
 		return d
 	game.player.set_held("dishes", 1.0, [full.call()])
-	assert_eq(_use_says("plates"), "Take plate", "a second plate beside a full one")
+	assert_eq(_use_says("dish_rack"), "Take plate", "a second plate beside a full one")
 	game.player.set_held("dishes", 1.0, [full.call(), full.call()])
-	assert_eq(_use_says("plates"), "Your hands are full")
+	assert_eq(_use_says("dish_rack"), "Your hands are full")
 	var trays: Station = game.world.add_station("tray_stack", Vector2i(2, 5))
 	assert_eq(game.cooking.use_station(trays), "Take tray")
 	assert_true(game.player.on_tray)
 	assert_eq(game.player.dishes.size(), 2, "the plates in hand go on the tray")
 	game.player.set_held("dishes", 1.0, [full.call(), full.call(), full.call()], true)
-	assert_eq(_use_says("plates"), "Take plate")
+	assert_eq(_use_says("dish_rack"), "Take plate")
 	assert_eq(game.player.dishes.size(), 4)
-	assert_eq(_use_says("plates"), "Put back")
+	assert_eq(_use_says("dish_rack"), "Put back")
 	assert_eq(game.cooking.use_station(trays, true), "Too much to hold without the tray")
 	game.player.set_held("dishes", 1.0, [full.call(), full.call()], true)
 	assert_eq(game.cooking.use_station(trays), "Put tray back")
@@ -482,7 +482,7 @@ func test_selling_refunds_half_of_anything_the_last_stove_and_the_fixtures_too()
 	assert_false(game.stations.has(Vector2i(9, 0)))
 	assert_true(game.placing.pick_up(Vector3(2.5, 0, 2.5)))        # the tray stack
 	assert_true(game.placing.sell_hand(), "the start's pieces sell too")
-	assert_eq(game.ledger.money, 160 + Catalog.price_of("plates") / 2)
+	assert_eq(game.ledger.money, 160 + Catalog.price_of("dish_rack") / 2)
 	var stoves: Array = game.stations.values().filter(func(st: Station) -> bool: return st.type == "stove")
 	assert_eq(stoves.size(), 2)
 	var at: Vector3 = Grid.center(stoves[0].cell)
@@ -563,20 +563,38 @@ func test_washing_a_dirty_plate_is_a_hold_then_a_rack():
 	assert_eq(game.player.held, "dishes")
 	assert_eq(game.player.dishes.size(), 1)
 	var rack: Station = game.world.find_station("dish_rack")
-	rack.count = 3
-	assert_eq(game.cooking.use_station(rack), "Put on rack")
-	assert_eq(rack.count, 4)
+	rack.count = Station.RACK_CAPACITY - 1
+	assert_eq(game.cooking.use_station(rack), "Put back")
+	assert_eq(rack.count, Station.RACK_CAPACITY)
 	game.cooking.use_station(sink)
 	_hold_wash(game.cooking.WASH_HOLD + 0.2)
 	assert_eq(game.cooking.use_station(rack, true), "The rack is full")
 	game.cooking.use_station(rack)
-	assert_eq(rack.count, 4, "the fifth is refused")
+	assert_eq(rack.count, Station.RACK_CAPACITY, "a ninth is refused")
 	assert_eq(game.player.held, "dishes", "the plate stays in hand")
 	game.player.dishes.clear()
 	game.player.set_held("", 1.0, [], false)
 	assert_eq(game.cooking.use_station(rack), "Take plate")
-	assert_eq(rack.count, 3)
+	assert_eq(rack.count, Station.RACK_CAPACITY - 1)
 	assert_eq(game.player.held, "dishes")
+
+
+func test_a_new_kitchen_has_a_dish_rack_with_plates_and_no_plate_stack():
+	var rack: Station = game.world.find_station("dish_rack")
+	assert_eq(rack.cell, Vector2i(2, 2))
+	assert_eq(rack.count, Station.PLATES)
+	assert_true(game.world.find_station("sink").racked, "the sink counts as racked")
+	assert_false(Catalog.ITEMS.has("plates"), "no plate stack to buy")
+	assert_false("plates" in Catalog.TOOLS_TAB)
+
+
+func test_the_rack_refuses_a_cup_and_an_empty_rack_says_to_wash_up():
+	var rack: Station = game.world.find_station("dish_rack")
+	game.player.set_held("dishes", 1.0, [Dish.make(Dish.CUP)])
+	assert_eq(game.cooking.use_station(rack, true), "Cups go on the cup stack")
+	game.player.set_held("")
+	rack.count = 0
+	assert_eq(game.cooking.use_station(rack, true), "No clean plates. Wash some up")
 
 
 func test_dirty_dishes_can_be_put_down_on_a_counter():
@@ -721,7 +739,7 @@ func test_one_who_wants_nothing_shows_no_notepad_and_orders_nothing():
 
 
 func test_food_in_hand_is_plated_at_the_plate_stack():
-	var plates: Station = game.world.find_station("plates")
+	var plates: Station = game.world.find_station("dish_rack")
 	var n := plates.count
 	var food := Tray.kind("prep", "bun")
 	game.player.set_held(food)

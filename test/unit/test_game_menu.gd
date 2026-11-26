@@ -230,7 +230,7 @@ func test_seaside_fish_roll_from_ticket_to_bill():
 	game.cooking.use_station(_the_pass())
 	game.cooking.use_station(game.menu_stock.storage_of("roll"))
 	game.cooking.use_station(_the_pass())
-	_use("plates")
+	_use("dish_rack")
 	game.cooking.use_station(_the_pass())
 	game.cooking.use_station(_the_pass())
 	assert_true(game.player.dishes[0].is_ready(game.menu.items))
@@ -399,9 +399,12 @@ func test_a_counter_stool_seats_one_guest_and_never_a_pair():
 
 func test_a_dish_rack_beside_the_sink_takes_more_dishes():
 	var sink: Station = game.world.find_station("sink")
+	assert_true(sink.racked, "the starting rack is beside the sink")
+	var start: Station = game.world.find_station("dish_rack")
+	game.world._unregister(start)
+	assert_false(sink.racked)
 	sink.dirty = Station.SINK_PILED
 	assert_true(sink.messy())
-	assert_false(sink.racked, "the starting rack is not beside the sink")
 	var rack: Station = game.world.add_station("dish_rack", sink.cell + Vector2i(0, 1))
 	assert_true(sink.racked)
 	assert_eq(Station.piled_at(true), Station.SINK_PILED + Station.RACK_HOLDS)

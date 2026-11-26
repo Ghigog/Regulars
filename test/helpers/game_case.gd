@@ -81,7 +81,7 @@ func _cook_burger(grill := Station.COOK_TIME + 0.5) -> void:
 	game.cooking.use_station(_the_pass())        # the patty down
 	game.cooking.use_station(game.menu_stock.storage_of("bun"))
 	game.cooking.use_station(_the_pass())        # the bun on it
-	_use("plates")                       # a plate in hand
+	_use("dish_rack")                       # a plate in hand
 	game.cooking.use_station(_the_pass())        # plated, the plate under it
 	game.cooking.use_station(_the_pass())        # picked up
 

@@ -74,7 +74,7 @@ func buy_level(id: String) -> int:
 	return 999 if missing(id) else game.ledger.level()
 
 
-## Whether the kitchen is without one of its essentials (a sink, a bin, a plate stack).
+## Whether the kitchen is without one of its essentials (a sink, a bin, a dish rack).
 func missing(id: String) -> bool:
 	if id == "till":
 		return game.paying.till_station() == null

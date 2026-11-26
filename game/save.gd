@@ -14,7 +14,7 @@ const STAFF := ["posts", "cvs", "employees", "extra_duties", "_next_post", "_nex
 const CRITIC := ["critic_idx", "next_visit", "known", "last_review", "_boost", "_boost_from", "_boost_to", "reviews"]
 const TOWN := ["people", "taste_seed"]
 ## What a station keeps from night to night, beside its place and look.
-const PIECE := ["tier", "facing", "base", "pass_look", "node", "stacked", "count", "dirty", "dirty_cups", "rack_cups", "dirty_age", "tap", "kit_tool", "kit_used"]
+const PIECE := ["tier", "facing", "base", "pass_look", "node", "stacked", "count", "dirty", "dirty_cups", "dirty_age", "tap", "kit_tool", "kit_used"]
 
 
 static func exists(path := PATH) -> bool:
@@ -146,8 +146,13 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 	# Floor pieces first, then what hangs above them.
 	var ordered: Array = (d.pieces as Array).filter(func(p: Dictionary) -> bool: return not p.high)
 	ordered.append_array((d.pieces as Array).filter(func(p: Dictionary) -> bool: return p.high))
+	var strays: Array[Dictionary] = []   # cups an old rack held: {cell, n}
 	for p: Dictionary in ordered:
-		_place(g, p)
+		var cups := _place(g, p)
+		if cups > 0:
+			strays.append({"cell": p.cell, "n": cups})
+	for s: Dictionary in strays:
+		_to_cup_stack(g, s.cell, s.n)
 	for p: Dictionary in ordered:
 		if p.till:
 			var host: Station = g.paying._till_host(p.cell)
@@ -173,10 +178,11 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 	g.flyers_out = bool(d.flyers_out)
 
 
-static func _place(g: Node3D, p: Dictionary) -> void:
+## Puts one saved piece back and returns how many cups it held that have no place there now.
+static func _place(g: Node3D, p: Dictionary) -> int:
 	var st: Station
-	if p.type == "trays":
-		p.type = "plates"   # saved before the plate stack was the tray stack
+	if p.type in ["trays", "plates"]:
+		p.type = "dish_rack"   # a plate stack (once the tray stack) is the dish rack now
 	if p.high:
 		st = g.world.add_high(p.node if p.node != "" else p.type, p.cell)
 	else:
@@ -185,12 +191,26 @@ static func _place(g: Node3D, p: Dictionary) -> void:
 	st.count = int(p.count)
 	st.dirty = int(p.dirty)
 	st.dirty_cups = int(p.get("dirty_cups", 0))
-	st.rack_cups = int(p.get("rack_cups", 0))
+	var cups := int(p.get("rack_cups", 0))   # an old rack held cups among its dishes
+	if st.type == "dish_rack":
+		st.count = clampi(st.count - cups, 0, Station.RACK_CAPACITY)
 	st.dirty_age = float(p.dirty_age)
 	st.tap = int(p.tap)
 	st.kit_tool = str(p.kit_tool)
 	st.kit_used = int(p.kit_used)
 	st.refresh()
+	return cups if st.type == "dish_rack" else 0
+
+
+## Cups from an old rack go to the cup stack nearest `cell`.
+static func _to_cup_stack(g: Node3D, cell: Vector2i, n: int) -> void:
+	var best: Station = null
+	for st: Station in g.stations.values():
+		if st.type == "cups" and (best == null or Decor.dist(st.cell, cell) < Decor.dist(best.cell, cell)):
+			best = st
+	if best != null:
+		best.count += n
+		best.refresh()
 
 
 ## What needs the helpers: the cleaning tools back in their homes, the floor's dirt.

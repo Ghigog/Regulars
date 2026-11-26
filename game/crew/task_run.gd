@@ -130,7 +130,7 @@ func _start(h: Helper, s: Dictionary) -> bool:
 		"restack":
 			if h.held != "dishes":
 				return false
-			var stack := crew.room_view._nearest("cups" if h.dishes[0].vessel == Dish.CUP else "plates", h.cell())
+			var stack: Station = crew.room_view._nearest("cups", h.cell()) if h.dishes[0].vessel == Dish.CUP else crew.room_view.rack_near(h.cell(), true)
 			if stack == null:
 				return false
 			s.at = stack.cell
