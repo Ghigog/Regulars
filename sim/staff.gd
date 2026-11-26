@@ -160,7 +160,7 @@ static func stars(skill: float) -> int:
 # ---------- Posts ----------
 
 ## Opens a post (one opening). Refused (-1) when open posts plus hires already fill the desks.
-func add_post(post_name: String, duties: Array, breaks: int, days_off: int, desks: int) -> int:
+func add_post(post_name: String, duties: Array, breaks: int, days_off: int, desks: int, opened := 0) -> int:
 	if not can_post(desks):
 		return -1
 	var id := _next_post
@@ -170,7 +170,7 @@ func add_post(post_name: String, duties: Array, breaks: int, days_off: int, desk
 		if not d.has(String(x)):
 			d.append(String(x))
 	posts[id] = {"id": id, "name": post_name, "duties": d,
-		"breaks": clampi(breaks, 0, MAX_BREAKS), "days_off": clampi(days_off, 0, MAX_DAYS_OFF)}
+		"breaks": clampi(breaks, 0, MAX_BREAKS), "days_off": clampi(days_off, 0, MAX_DAYS_OFF), "opened": opened}
 	return id
 
 
@@ -237,7 +237,8 @@ func has_cv(person: int) -> bool:
 ## rating, like (0 to 1), away (staying away: a grudge)}. Anyone employed, staying away
 ## or already in the pile does not apply. Each person tries the open posts in order and
 ## sends at most one CV; at most `MAX_NEW_CVS` arrive. Returns the new CVs.
-func roll_applicants(candidates: Array) -> Array[Dictionary]:
+## Only posts put up before `day` draw applicants; the default `day` counts every post.
+func roll_applicants(candidates: Array, day := 1 << 30) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if posts.is_empty():
 		return out
@@ -247,8 +248,10 @@ func roll_applicants(candidates: Array) -> Array[Dictionary]:
 		var t = order[i]
 		order[i] = order[j]
 		order[j] = t
-	var post_ids := posts.keys()
+	var post_ids := posts.keys().filter(func(id): return int(posts[id].get("opened", 0)) < day)
 	post_ids.sort()
+	if post_ids.is_empty():
+		return out
 	for c in order:
 		if out.size() >= MAX_NEW_CVS:
 			break
