@@ -74,7 +74,7 @@ func _init(seed_value := 1, theme_id := "diner") -> void:
 	for i in names.size():
 		people.append({
 			"name": names[i], "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
-			"streak": 0, "away_until": 0, "sore": false, "grudges": 0, "gone": false, "deals": 0,
+			"streak": 0, "away_until": 0, "sore": false, "warning": false, "grudges": 0, "gone": false, "deals": 0,
 			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
 			"likes": [], "dislikes": [], "liked_tags": [], "orders": {},
 			"opinion": {"speed": 0.0, "clean": 0.0, "quality": 0.0, "variety": 0.0, "other": 0.0},
@@ -269,11 +269,9 @@ func order_summary(i: int, menu: Menu) -> String:
 
 
 ## Guest `i` read the menu and found no main they would eat. Not a walkout and no
-## strike, but they think a little less of the place and their friends hear it.
+## strike, but they think a little less of the place. Friends don't hear: only really bad visits spread.
 func record_found_nothing(i: int) -> float:
 	_nudge(i, -NOTHING_LIKED_DROP, {"variety": 1.0})
-	for f: int in people[i].friends:
-		_nudge(f, -NOTHING_LIKED_DROP * FRIEND_SHARE, {"variety": 1.0})
 	return -NOTHING_LIKED_DROP
 
 
@@ -282,6 +280,7 @@ func record_found_nothing(i: int) -> float:
 ## friends hear it. Returns the gossip line.
 func left_unpaid(i: int) -> String:
 	_nudge(i, -UNPAID_OPINION, {"speed": 1.0})
+	people[i].warning = true
 	for f: int in people[i].friends:
 		_nudge(f, -UNPAID_OPINION * FRIEND_SHARE, {"speed": 1.0})
 	var friends := friend_names(i)
@@ -517,13 +516,16 @@ func friend_names(i: int) -> String:
 
 ## What a visit that moved their opinion by `delta` sets going. Empty when nothing much.
 ## `about` is what they will tell, if anything ("it was just how they like it").
-func gossip_line(i: int, delta: float, about := "") -> String:
+## A drop only makes a line when `bad` (a really bad visit: a walkout).
+func gossip_line(i: int, delta: float, about := "", bad := false) -> String:
 	var friends := friend_names(i)
 	if friends == "" or absf(delta) < 0.05 - 0.0001:
 		return ""
 	var tail := "." if about == "" else " " + about + "."
 	if delta > 0.0:
 		return "%s will tell %s%s" % [people[i].name, friends, tail]
+	if not bad:
+		return ""
 	return "%s will warn %s%s" % [people[i].name, friends, tail]
 
 
@@ -566,21 +568,24 @@ func greeting(i: int) -> Dictionary:
 func record_walkout(i: int, day: int) -> float:
 	people[i].grudges += 1
 	people[i].away_until = day + 1 + GRUDGE_DAYS * int(people[i].grudges)
-	var delta := record_visit(i, -0.5)
+	var delta := record_visit(i, -0.5, {}, true)
 	people[i].sore = true
+	people[i].warning = true
 	return delta
 
 
-## Records how a visit went. The guest's friends hear about it too. A good visit
+## Records how a visit went. Friends hear good news, and bad news only when
+## `spread_bad` (a walkout); a so-so visit lowers only the guest's own opinion. A good visit
 ## builds their streak and forgives a grudge; a poor one breaks the streak.
 ## `terms` (GuestMood.satisfaction_terms) say which topics the change is filed under;
 ## without them it all goes to `other`.
-func record_visit(i: int, satisfaction: float, terms := {}) -> float:
+func record_visit(i: int, satisfaction: float, terms := {}, spread_bad := false) -> float:
 	var delta := (satisfaction - 0.3) * 0.5
 	var split := visit_split(terms, satisfaction)
 	var sore_bonus := 0.0
 	if satisfaction > GOOD_VISIT:
 		people[i].streak += 1
+		people[i].warning = false
 		if people[i].sore:
 			people[i].sore = false
 			sore_bonus = 0.1
@@ -594,8 +599,9 @@ func record_visit(i: int, satisfaction: float, terms := {}) -> float:
 		delta = whole
 	_nudge(i, delta, split)
 	people[i].visits += 1
-	for f: int in people[i].friends:
-		_nudge(f, delta * FRIEND_SHARE, split)
+	if delta > 0.0 or spread_bad:
+		for f: int in people[i].friends:
+			_nudge(f, delta * FRIEND_SHARE, split)
 	return delta
 
 
@@ -606,6 +612,7 @@ func record_disgust(i: int, level: int) -> String:
 	if level < 2:
 		return ""
 	var revolted := level >= 3
+	people[i].warning = true
 	_nudge(i, -0.3 if revolted else -0.1, {"clean": 1.0})
 	for f: int in people[i].friends:
 		_nudge(f, -0.15 if revolted else -0.08, {"clean": 1.0})
@@ -647,15 +654,15 @@ func paid_full_price(i: int) -> float:
 ## One line of gossip for the end-of-day report.
 func headline() -> String:
 	var best := 0
-	var worst := 0
+	var worst := -1
 	for i in people.size():
 		if people[i].affinity > people[best].affinity:
 			best = i
-		if people[i].affinity < people[worst].affinity:
+		if people[i].warning and (worst < 0 or people[i].affinity < people[worst].affinity):
 			worst = i
 	var parts: Array[String] = []
 	if people[best].affinity > 0.05:
 		parts.append("%s is telling friends about you." % people[best].name)
-	if people[worst].affinity < -0.05:
+	if worst >= 0 and people[worst].affinity < -0.05:
 		parts.append("%s is warning people off." % people[worst].name)
 	return "The town hasn't made up its mind yet." if parts.is_empty() else " ".join(parts)

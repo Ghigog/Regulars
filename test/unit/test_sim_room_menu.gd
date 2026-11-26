@@ -577,16 +577,17 @@ func test_taste_hints_never_name_an_ingredient():
 	var t := Town.new(1)
 	var line := t.gossip_line(0, 0.2, Town.praise_about(true, ""))
 	assert_true(line.ends_with("it was just how they like it."), line)
-	assert_true(t.gossip_line(0, t.record_found_nothing(0), "x") != "", "walking on is news")
+	assert_eq(t.gossip_line(0, t.record_found_nothing(0), "x"), "", "walking on is not news")
 
 
 
-func test_finding_nothing_costs_a_little_and_friends_hear():
+func test_finding_nothing_costs_a_little_and_friends_do_not_hear():
 	var t := Town.new(1)
 	var f: int = t.people[0].friends[0]
 	t.record_found_nothing(0)
 	assert_almost_eq(float(t.people[0].affinity), -Town.NOTHING_LIKED_DROP, 0.001)
-	assert_lt(float(t.people[f].affinity), 0.0)
+	assert_eq(float(t.people[f].affinity), 0.0)
+	assert_false(t.people[0].warning)
 	assert_eq(t.people[0].grudges, 0, "not a walkout")
 
 
