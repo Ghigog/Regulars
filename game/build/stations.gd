@@ -29,7 +29,7 @@ static func rack_load(n: Node3D, dishes: int, cups: int) -> void:
 	for i in mini(dishes, 4):
 		var cup := i >= dishes - cups
 		var p := BuildFood.item("cup" if cup else "plate")
-		p.position = Vector3(-0.21 + i * 0.14, 0.99 if not cup else 0.96, 0.0)
+		p.position = Vector3(-0.21 + i * 0.14, 1.02 if not cup else 0.99, 0.0)
 		p.rotation = Vector3(0.0, 0.0, -1.45 if not cup else 0.0)
 		p.scale = Vector3.ONE * (1.0 if not cup else 0.9)
 		n.add_child(p)
