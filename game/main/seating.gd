@@ -241,6 +241,8 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 				g.mood.think(Critic.thought("gross"))
 			saw_gross = saw_gross or rate >= GuestMood.NOTICE
 	saw_gross = game.floor_dirt.disgust(g, delta, Game.SIGHT_RANGE) or saw_gross
+	if not saw_gross:
+		g.mood.fade(delta)   # before the stove show below, which also sets saw_gross
 	for st: Station in game.stations.values():
 		if st.type == "stove" and not saw_gross and st.is_cooking() \
 				and GameDecor._near(g.cell, st.cell, Game.SIGHT_RANGE) and game.grid.has_los(g.cell, st.cell):
