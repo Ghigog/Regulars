@@ -245,6 +245,15 @@ func _tick_stoves(delta: float) -> void:
 	_fade_loops(loops, delta)
 
 
+## Cuts every cooking loop at once (nightfall, closing down), when nothing is cooking any more.
+func stop_loops() -> void:
+	for id: String in Game.LOOPING:
+		if game._sfx.has(id):
+			var p: AudioStreamPlayer = game._sfx[id]
+			p.stop()
+			p.volume_db = Game.LOOP_OFF
+
+
 ## Fades each looping sound toward on (wanted) or off, so a patty's sizzle changes
 ## smoothly as it cooks; one that has faded out stops.
 func _fade_loops(want: Dictionary, delta: float) -> void:

@@ -294,6 +294,7 @@ func close_early() -> void:
 
 func _end_day() -> void:
 	game.prep_games._cancel_all_preps()
+	game.prep_games.stop_loops()
 	game.crew.clear()   # the staff go home
 	game.floor_dirt.clear_slips()   # a chef still down gets up for the night
 	game.clean_kit.end_day()   # robot sweepers go back to their docks
@@ -325,6 +326,7 @@ func _end_day() -> void:
 
 func _close_down() -> void:
 	game.prep_games._cancel_all_preps()
+	game.prep_games.stop_loops()
 	game.crew.clear()
 	game.audio.play_music("closed")
 	game.phase = Game.Phase.CLOSED
