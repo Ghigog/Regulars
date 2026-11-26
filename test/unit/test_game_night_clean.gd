@@ -140,3 +140,65 @@ func test_food_in_hand_is_gone_when_the_door_opens():
 	game.player.set_held("raw:patty")
 	game.day.start_day()
 	assert_eq(game.player.held, "")
+
+
+
+func _hold_washed_plate() -> void:
+	game.player.take_dish(Dish.make(Dish.PLATE))
+	assert_eq(game.player.held, "dishes")
+
+
+func test_a_washed_plate_in_hand_blocks_lifting_the_sink_rack_or_a_counter():
+	_to_build()
+	var sink: Station = game.world.find_station("sink")
+	sink.dirty = 2
+	_hold_washed_plate()
+	var spots := {"sink": null, "dish_rack": null, "counter": null}
+	for type in spots:
+		var st: Station = game.world.find_station(type)
+		_face_station(st)
+		assert_ne(game.room_edit.build_action(), "Pick up", type)
+		assert_false(game.placing.pick_up(Grid.center(game.stations.find_key(st))), type)
+		assert_eq(game.player.held, "dishes", type)
+		assert_true(game.stations.find_key(st) != null, "%s stays put" % type)
+
+
+func test_the_sink_will_not_move_while_dishes_soak_even_empty_handed():
+	_to_build()
+	var sink: Station = game.world.find_station("sink")
+	sink.dirty = 1
+	_face_sink()
+	assert_ne(game.room_edit.build_action(), "Pick up")
+	assert_false(game.placing.pick_up(Grid.center(game.stations.find_key(sink))))
+
+
+func test_a_washed_plate_goes_back_on_the_rack_at_night():
+	_to_build()
+	var rack: Station = game.world.find_station("dish_rack")
+	rack.count = 0
+	_hold_washed_plate()
+	_face_station(rack)
+	assert_eq(game.room_edit.build_action(), "Put back")
+	game.room_edit.build_interact()
+	assert_eq(rack.count, 1)
+	assert_eq(game.player.held, "")
+	assert_eq(game.room_edit.build_action(), "Pick up", "empty hands: the rack lifts as before")
+
+
+func test_a_full_rack_refuses_the_plate_at_night():
+	_to_build()
+	var rack: Station = game.world.find_station("dish_rack")
+	rack.count = Station.RACK_CAPACITY
+	_hold_washed_plate()
+	_face_station(rack)
+	assert_ne(game.room_edit.build_action(), "Put back")
+	assert_eq(game.cooking.use_station(rack, true), "The rack is full")
+
+
+func test_use_at_a_counter_with_a_washed_plate_says_why():
+	_to_build()
+	_hold_washed_plate()
+	_face_station(game.world.find_station("counter"))
+	game.room_edit.build_interact()
+	assert_eq(game.player.held, "dishes")
+	assert_true(game.stations.find_key(game.world.find_station("counter")) != null)

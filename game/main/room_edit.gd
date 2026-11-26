@@ -353,7 +353,7 @@ func build_action(ch: Player = null) -> String:
 		return clean
 	if game.desk.desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
 		return "Use desk"
-	if not Cleaning.carrying_mess(ch.held) and not CleanKit.holding(ch):
+	if not Cleaning.hands_busy(ch.held) and not CleanKit.holding(ch):
 		var spot := _piece_in_front(ch)
 		if spot != Vector3.INF:
 			var door := game.day.door_action(ch)
@@ -420,7 +420,10 @@ func night_clean_action(st: Station, ch: Player = null) -> String:
 	ch = game._me(ch)
 	if st == null or game.phase != Game.Phase.BUILD or game.shopper == ch or not ch.hand.is_empty():
 		return ""
-	return Cleaning.night_action(game.cooking.use_station(st, true, ch))
+	var service := game.cooking.use_station(st, true, ch)
+	if service == "Put back" and st.type in ["dish_rack", "cups"]:
+		return service   # a washed plate or cup goes back; on a counter "Put back" is food, off at night
+	return Cleaning.night_action(service)
 
 
 func needs_cleaning(st: Station) -> bool:
@@ -441,9 +444,12 @@ func build_interact(ch: Player = null) -> void:
 	var action := build_action(ch)
 	if not ch.hand.is_empty():
 		action = "Put down"   # hung or stood, place() decides
-	if action in Cleaning.NIGHT_ACTIONS.values():
+	if action in Cleaning.NIGHT_ACTIONS.values() or action == "Put back":
 		game.cooking.use_station(game.world.station_at(ch.target_cell()), false, ch)
 		game.hud.hints_ui.show_build()   # the dirty note counts down
+		return
+	if action == "" and ch.hand.is_empty() and ch.held == "dishes" and _piece_in_front(ch) != Vector3.INF:
+		game.placing.pick_up(_piece_in_front(ch), ch)   # refuses: the plate goes on the rack first
 		return
 	match action:
 		"Put down":
