@@ -706,7 +706,7 @@ func test_overflowing_bin_disgusts_guests_across_the_room_unless_a_wall_hides_it
 	game.grid.walls[Vector3i(0, 6, 0)] = true
 	g.mood.patience = 1.0
 	_run(2.0)
-	assert_eq(g.mood.disgust, seen, "walled off: out of sight")
+	assert_lte(g.mood.disgust, seen, "walled off: out of sight, it does not rise")
 
 
 
@@ -800,7 +800,7 @@ func test_dirty_table_disgusts_guests_unless_a_wall_hides_it():
 		game.grid.walls[Vector3i(c.x, c.y, 0)] = true
 		game.grid.walls[Vector3i(c.x, c.y, 1)] = true
 	_run(2.0)
-	assert_eq(g.mood.disgust, seen, "boxed in: nothing gross in view")
+	assert_lte(g.mood.disgust, seen, "boxed in: nothing gross in view, it does not rise")
 
 
 
@@ -825,7 +825,7 @@ func test_bin_bothers_only_nearby_guests_until_a_partition_hides_it():
 	game.grid.walls[Vector3i(0, 6, 0)] = true
 	near.mood.patience = 1.0
 	_run(2.0)
-	assert_eq(near.mood.disgust, before)
+	assert_lte(near.mood.disgust, before, "out of sight: it does not rise")
 
 
 
@@ -845,6 +845,31 @@ func test_guests_enjoy_watching_the_stove_unless_it_is_burning():
 	_run(Station.BURN_TIME)
 	assert_true(g.mood.thoughts.has("Something is burning in there"))
 
+
+
+func test_disgust_fades_while_watching_the_chef_with_nothing_gross_in_view():
+	var g := _seat_at(Vector2i(6, 1), false)
+	assert_not_null(g)
+	if g == null:
+		return
+	game.cooking.use_station(game.menu_stock.storage_of("patty"))
+	_use("stove")
+	g.mood.disgust = 0.1
+	_run(2.0)
+	assert_lt(g.mood.disgust, 0.1, "the show does not block the fade")
+
+
+func test_disgust_does_not_fade_while_something_gross_is_in_view():
+	var g := _seat_at(Vector2i(6, 1), false)
+	assert_not_null(g)
+	if g == null:
+		return
+	var bin: Station = game.world.find_station("bin")
+	bin.count = Station.BIN_HOLDS
+	bin.dirty_age = 30.0
+	g.mood.disgust = 0.1
+	_run(2.0)
+	assert_gt(g.mood.disgust, 0.1)
 
 
 func test_guest_card_opens_on_the_nearest_guest_and_closes_when_they_go():

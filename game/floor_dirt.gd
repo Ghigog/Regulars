@@ -152,8 +152,9 @@ func disgust(g: Guest, delta: float, reach: int) -> bool:
 	if mess.dirt.is_empty():
 		return false
 	var noticed := false
-	var sight := mess.sight_disgust(seen_from(g.cell, reach))
-	var smell := mess.smell_disgust(g.cell)
+	var capped := mess.capped_disgust(g.cell, seen_from(g.cell, reach))
+	var sight: float = capped.sight
+	var smell: float = capped.smell
 	if sight > 0.0:
 		g.mood.see_gross(sight, delta, "Look at the state of the floor")
 		noticed = sight >= GuestMood.NOTICE

@@ -329,9 +329,49 @@ func _watch(level: int, cells: int, seconds: float) -> GuestMood:
 	return mood
 
 
-func test_one_level_3_patch_disgusts_a_normal_guest_in_about_five_seconds():
-	assert_lt(_watch(3, 1, 4.0).disgust_level(), 2)
-	assert_gte(_watch(3, 1, 6.0).disgust_level(), 2)
+func _time_to(strength: float, stage: int) -> float:
+	var mood := GuestMood.new()
+	var t := 0.0
+	while mood.disgust < GuestMood.DISGUST_STAGES[stage] and t < 200.0:
+		mood.see_gross(strength, 0.1, "x")
+		t += 0.1
+	return t
+
+
+func test_one_level_3_cell_out_of_smell_gives_ick_in_13_s_and_revolted_in_50_s():
+	var s := FloorMess.sight_disgust_of(3)
+	assert_almost_eq(_time_to(s, 0), 13.0, 1.0)
+	assert_almost_eq(_time_to(s, 2), 50.0, 2.0)
+
+
+func test_the_worst_floor_gives_ick_in_8_s_and_revolted_in_30_s():
+	var m := _room(9, 9, 1)
+	var cells := []
+	for x in 6:
+		for y in 6:
+			var c := Vector2i(x, y)
+			for i in 4:
+				m.add_dirt(c)
+			cells.append(c)
+	var total := m.disgust_at(Vector2i(2, 2), cells)
+	assert_almost_eq(total, FloorMess.FLOOR_DISGUST_CAP, 0.00001)
+	assert_almost_eq(_time_to(total, 0), 8.0, 0.5)
+	assert_almost_eq(_time_to(total, 2), 30.0, 1.0)
+
+
+func test_capped_disgust_splits_the_cap_between_sight_and_smell():
+	var m := _room(9, 9, 1)
+	var cells := []
+	for x in 6:
+		for y in 6:
+			var c := Vector2i(x, y)
+			for i in 4:
+				m.add_dirt(c)
+			cells.append(c)
+	var d := m.capped_disgust(Vector2i(2, 2), cells)
+	assert_gt(d.sight, 0.0)
+	assert_gt(d.smell, 0.0)
+	assert_almost_eq(d.sight + d.smell, FloorMess.FLOOR_DISGUST_CAP, 0.00001)
 
 
 func test_light_dirt_never_puts_a_guest_off():
