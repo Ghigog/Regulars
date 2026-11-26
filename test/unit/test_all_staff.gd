@@ -93,7 +93,7 @@ func _chores() -> Dictionary:
 	var out := {}
 	var mess: FloorMess = game.floor_dirt.mess
 	for c: Vector2i in mess.dirt:
-		if mess.level(c) >= JobBoard.DIRT_FROM and mess.can_clean(c) and game.grid.in_bounds(c):
+		if mess.level(c) >= 1 and mess.can_clean(c) and game.grid.in_bounds(c):
 			out["dirt at %s" % str(c)] = true
 	for st: Station in game.stations.values():
 		if Station.is_table(st.type) and st.dirty > 0:
