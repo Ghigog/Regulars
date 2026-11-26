@@ -278,12 +278,14 @@ func _tick_deal(ch: Player, held: bool, delta: float) -> void:
 		return
 	var d: Dictionary = _deal_hold[ch]
 	var g: Guest = d.g
-	if not held or not is_instance_valid(g) or g.table == null or game.world.station_at(ch.target_cell()) != g.table:
+	var faced := game.world.station_at(ch.target_cell()) if held and is_instance_valid(g) else null
+	# A joined table is one table: either half counts, and the bar shows over the half faced.
+	if faced == null or g.table == null or game.tables.lead(faced) != g.table:
 		_deal_hold.erase(ch)
 		ch.stop_giving()
 		return
 	d.t = float(d.t) + delta
-	ch.show_hold(g.table.global_position, float(d.t) / DEAL_HOLD, "coin")
+	ch.show_hold(faced.global_position, float(d.t) / DEAL_HOLD, "coin")
 	if float(d.t) >= DEAL_HOLD:
 		_deal_hold.erase(ch)
 		ch.stop_giving()
