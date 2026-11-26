@@ -15,6 +15,8 @@ func _open_with_three() -> void:
 	game.desk.desk_post("Grill cook", ["grill"], 1, 1)
 	for p in game.town.people:
 		p.affinity = 0.5
+	for id in game.staff.posts:
+		game.staff.posts[id].opened = 0  # as if put up on an earlier night
 	for tries in 10:
 		if not game.desk.roll_applicants().is_empty():
 			break
