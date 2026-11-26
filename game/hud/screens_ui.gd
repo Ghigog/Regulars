@@ -60,6 +60,18 @@ func tree_buy() -> void:
 		hud.game.audio.sfx("fail")
 
 
+## True while a person's page (not the book's list) is showing.
+var person_open := false
+
+
+## B and Esc while the book is open: one level up, person page to book, book to receipt.
+func back_from_town() -> void:
+	if person_open:
+		show_town()
+	else:
+		toggle_town()
+
+
 func toggle_town() -> void:
 	if hud._town_open:
 		hud.receipt_ui.show_summary(hud.game.last_day)
@@ -71,6 +83,7 @@ func toggle_town() -> void:
 func show_town() -> void:
 	hud.receipt_ui.hide_card()
 	hud._town_open = true
+	person_open = false
 	var clip := HudWidgets.Sheet.new("clip").pad(26, 46, 26, 26)
 	hud.center.add_child(clip)
 	hud._summary_clip = clip
@@ -118,7 +131,7 @@ func show_town() -> void:
 	if not hud.game.critic.last_review.is_empty():
 		hud.receipt_ui._button(stack, "Last review: %d %s" % [int(hud.game.critic.last_review.stars),
 			"star" if int(hud.game.critic.last_review.stars) == 1 else "stars"], hud.receipt_ui.show_review)
-	hud.receipt_ui._button(stack, "Back   (T)", toggle_town)
+	hud.receipt_ui._button(stack, "Back" + hud.hints_ui._key_note("back"), toggle_town)
 	hud.receipt_ui._fit_when_laid_out(hud.receipt_ui.paper_scroll)
 	hud.receipt_ui._pop_in(clip)
 
@@ -153,6 +166,7 @@ func show_person(i: int) -> void:
 	var game: Game = hud.game
 	var town: Town = game.town
 	hud.receipt_ui.hide_card()
+	person_open = true
 	hud._town_open = true   # T still closes the book back to the receipt
 	game.audio.sfx("tick")
 	var clip := HudWidgets.Sheet.new("clip").pad(26, 46, 26, 26)
