@@ -254,7 +254,8 @@ func test_gossip_line_names_the_friends():
 	var friend: String = t.people[int(t.people[2].friends[0])].name
 	assert_string_contains(t.gossip_line(2, 0.2), "will tell")
 	assert_string_contains(t.gossip_line(2, 0.2), friend)
-	assert_string_contains(t.gossip_line(2, -0.2), "will warn")
+	assert_eq(t.gossip_line(2, -0.2), "", "a small dip is not news")
+	assert_string_contains(t.gossip_line(2, -0.2, "", true), "will warn")
 	assert_eq(t.gossip_line(2, 0.01), "", "a so-so visit starts no talk")
 
 
@@ -620,3 +621,27 @@ func test_disgusted_guests_tell_friends_and_revolted_ones_never_return():
 	for day in range(1, 6):
 		assert_false(t.roll_guests(day).has(0), "never comes back")
 	assert_eq(t.status_word(0, 1), "Never coming back")
+
+
+func test_only_really_bad_visits_reach_friends_and_the_headline():
+	var t := Town.new(7)
+	var f: int = t.people[2].friends[0]
+	t.record_visit(2, 0.0)
+	assert_lt(float(t.people[2].affinity), -0.05)
+	assert_eq(float(t.people[f].affinity), 0.0, "a poor visit stays with the guest")
+	assert_false(t.headline().contains("warning people off"))
+	t.record_walkout(2, 1)
+	assert_lt(float(t.people[f].affinity), 0.0, "a walkout reaches friends")
+	assert_string_contains(t.headline(), "%s is warning people off." % t.people[2].name)
+	t.record_visit(2, 1.0)
+	assert_false(t.headline().contains("warning people off"), "a good visit clears it")
+
+
+func test_disgust_and_unpaid_flag_a_guest_but_mild_disgust_does_not():
+	var t := Town.new(7)
+	t.record_disgust(1, 1)
+	assert_false(t.people[1].warning)
+	t.record_disgust(1, 2)
+	assert_true(t.people[1].warning)
+	t.left_unpaid(3)
+	assert_true(t.people[3].warning)
