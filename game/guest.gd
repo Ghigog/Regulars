@@ -457,7 +457,7 @@ func _refresh(delta: float) -> void:
 	_fill.material_override = Build.overlay_mat(col, 6)
 	# Impatient guests shake a little.
 	_body.position.x = sin(_age * 40.0) * 0.02 if (_bar.visible and p < 0.25) else 0.0
-	_body.set_face(mood.expression(state == "eating", stormed))
+	_body.set_feelings(mood.feelings(stormed), state == "eating")
 	_body.pose = "eat" if state == "eating" else ("tap" if seated_waiting() and p < 0.35 else \
 		("wave" if (calling and state == "to_pay") else "idle"))
 	# Bored guests slump; guests about to snap lean in; disgust pitches them back.
