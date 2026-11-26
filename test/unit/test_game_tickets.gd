@@ -301,3 +301,17 @@ func test_a_partly_served_guest_s_bubble_shows_the_missing_item():
 	_cook_burger()
 	game.cooking.use_station(g.table)
 	assert_eq(g.want_icon(), Icons.dish_id(g.order.drink), "the drink once the main is down")
+
+
+func test_a_partly_served_guest_s_rail_card_fades_the_served_item():
+	game.world.add_station("fountain", Vector2i(2, 5))
+	game.world.add_station("cups", Vector2i(1, 6))
+	game.menu.add("drink", ["soda"], "Soda")
+	game.town.people[0].likes = ["soda"]
+	var g := _ordered_guest()
+	_cook_burger()
+	game.cooking.use_station(g.table)
+	var card: Node = game.hud.ticket_rail.get_child(game.hud.ticket_rail.get_child_count() - 1)
+	var rows := card.get_child(0).get_children().filter(func(n): return n is HBoxContainer)
+	assert_lt(rows[1].modulate.a, 1.0, "the served main fades")
+	assert_eq(rows[2].modulate.a, 1.0, "the missing drink stays bright")
