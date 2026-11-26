@@ -135,3 +135,54 @@ func test_a_day_can_end_with_a_joined_table_occupied():
 	game.day._end_day()
 	assert_eq(game.phase, game.Phase.SUMMARY)
 	assert_true(is_instance_valid(t[1]))
+
+
+## Faces the non-lead half of a joined table and seats an impatient party of three.
+func _impatient_party_at_far_half() -> Array:
+	var t := _joined()
+	var party: Array[Guest] = game.seating.spawn_group([0, 1, 2])
+	_run(16.0)
+	game.cooking.use_station(t[0])
+	var g: Guest = party[0]
+	g.mood.patience = Game.DISCOUNT_BELOW * 0.5
+	game.player.position = Grid.center(t[1].cell + Vector2i(-1, 0))
+	game.player.facing = Vector2i(1, 0)
+	assert_eq(game.world.station_at(game.player.target_cell()), t[1], "facing the non-lead half")
+	return [t, g]
+
+
+func test_half_price_hold_works_at_the_non_lead_half():
+	var r := _impatient_party_at_far_half()
+	var g: Guest = r[1]
+	game.cooking.use_station(r[0][1])
+	assert_true(game.serving._deal_hold.has(game.player), "a hold started")
+	game.serving._tick_deal(game.player, true, game.serving.DEAL_HOLD * 0.5)
+	assert_true(game.serving._deal_hold.has(game.player), "still holding")
+	game.serving._tick_deal(game.player, true, game.serving.DEAL_HOLD * 0.6)
+	assert_true(g.mood.discounted, "half price given")
+
+
+func test_free_meal_hold_works_at_the_non_lead_half():
+	var r := _impatient_party_at_far_half()
+	var g: Guest = r[1]
+	game.serving.offer_discount(g)
+	g.mood.patience = 0.0
+	g.mood.delight(-100.0, "")
+	game.cooking.use_station(r[0][1])
+	assert_eq(game.serving._deal_hold.get(game.player, {}).get("kind"), "comp")
+	game.serving._tick_deal(game.player, true, game.serving.DEAL_HOLD + 0.01)
+	assert_true(g.mood.comped, "free meal given")
+
+
+func test_deal_hold_at_the_far_half_cancels_on_letting_go_or_walking_off():
+	var r := _impatient_party_at_far_half()
+	var g: Guest = r[1]
+	game.cooking.use_station(r[0][1])
+	game.serving._tick_deal(game.player, false, game.serving.DEAL_HOLD + 0.01)
+	assert_false(g.mood.discounted, "let go early")
+	game.cooking.use_station(r[0][1])
+	game.player.position = Grid.center(Vector2i(1, 1))
+	game.player.facing = Vector2i(-1, 0)
+	game.serving._tick_deal(game.player, true, game.serving.DEAL_HOLD + 0.01)
+	assert_false(g.mood.discounted, "walked away")
+	assert_false(game.serving._deal_hold.has(game.player))
