@@ -50,6 +50,7 @@ const DOOR_REACH := 1.25
 const PAVEMENT := Rect2i(W, LOT.position.y, 2, LOT.size.y)   # the two open pavement rows, which chefs walk
 const KERB_X := W + 2   # the back tile by the road: street furniture stands on it, nobody walks it
 const BOARD_CELL := Vector2i(W, 5)   # the menu board's cell, by the door; closed to walking
+const BOARD_REACH := 1.3   # how near the menu board the chef must stand to write the menu
 const BIN_REACH := 1.3   # how near the outside bin the chef must stand to put the bag in
 const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
 const FLYERS := {"id": "flyers", "tier": 1}   # sold in the shop's Extras, never placed
@@ -135,11 +136,10 @@ var _room_lights: Array[OmniLight3D] = []
 var _openings := {}                    # Vector3i edge -> Scenery opening info
 var _opening_ok := {}                  # Vector3i edge -> whether it was last drawn usable
 var _frame := [WIDE_FOCUS, WIDE_SIZE, CLOSE_FOCUS, CLOSE_SIZE]   # the camera, fitted to the floor
-const NIGHT_ZERO_BLOCK := "Write a menu first: a main the kitchen can make (N, or the board by the door)."
 ## Night zero starts with a stove, a fridge and the starting main's boxes (review, item 7),
 ## so the first hint is the menu; the first is only seen if the starter kitchen is sold.
 const NIGHT_HINTS: Array[String] = ["The first main needs a stove and a fridge (both are a counter upgraded: E on a counter), each with its box.",
-	"Write a menu: N, or the board by the door.", "Flip the door card to open."]
+	"", "Flip the door card to open."]
 var menu_board: MenuBoard               # the chalkboard by the door: tonight's names
 const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "cups": "Cup stack", "pass": "Pass counter"}
 ## What a kitchen cannot open without. Every piece can be sold, these too; while there is
@@ -455,6 +455,7 @@ func _process(delta: float) -> void:
 		decor._update_range(ch)
 	audio._update_daylight()
 	hud.update_status()
+	hud.board_key_ui.update()
 	hud.hints_ui.place_door_ready(cam.unproject_position(DOORWAY + Vector3(0.3, 1.3, 0)))   # just under the card
 	if _shot_path != "":
 		_shot_time += delta
@@ -515,6 +516,8 @@ func _update_cursor(ch: Player = null) -> void:
 		if action in ["Open up", "Close early"] and ready_chefs.has(ch):
 			action = "Not ready"   # co-op: using the card again takes their ready back
 		var p := DOORWAY + Vector3(0, 2.9, 0)
+		if action == "Write menu":
+			p = menu_board.global_position + Vector3(0, 1.0, 0)
 		if not ch.hand.is_empty() and room_edit._hover_point(ch) != Vector3.INF:
 			p = room_edit._hover_point(ch) + Vector3(0, 2.9 if world.hand_layer(ch) == "high" else 2.0, 0)
 		elif action == "Pick up":

@@ -245,6 +245,11 @@ func menu_changed() -> void:
 		game.hud.hints_ui.show_build()
 
 
+## The door card's reason on night zero with no main. use_door keeps quiet about it:
+## the glowing key over the board is the hint.
+const NO_MAIN_YET := "No main on the menu yet."
+
+
 ## Why the door card will not flip to open, or "" if it will.
 func open_block() -> String:
 	for id in Game.ESSENTIALS:
@@ -254,7 +259,7 @@ func open_block() -> String:
 		return "Drinks go out in cups: the kitchen needs a cup stack. Buy one in the shop (%s)." % game.controls.glyph("shop")
 	if not Menu.has_main(tonight_menu()):
 		if game.ledger.history.is_empty():
-			return Game.NIGHT_ZERO_BLOCK
+			return NO_MAIN_YET   # never shown: the key over the board says it
 		return "No main on the menu can be made. Check the menu (%s)." % game.controls.glyph("menu")
 	if night_cost() > game.ledger.money:
 		return "Tomorrow's stock costs $%d. You have $%d. %s" % [night_cost(), game.ledger.money, money_remedy()]

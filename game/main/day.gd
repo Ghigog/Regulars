@@ -243,10 +243,18 @@ func at_outside_bin(ch: Player = null) -> bool:
 ## What the chef can do with the door card from here: "Open up" at the end of the
 ## build phase, "Close early" from the middle of the day on, or nothing. With the
 ## rubbish bag, "Take out rubbish" beside the outside bin, and nothing at the door.
+func at_board(ch: Player = null) -> bool:
+	ch = game._me(ch)
+	var d := ch.position - game.menu_board.global_position
+	return Vector2(d.x, d.z).length() < Game.BOARD_REACH
+
+
 func door_action(ch: Player = null) -> String:
 	ch = game._me(ch)
 	if ch.held == "rubbish_bag":
 		return "Take out rubbish" if at_outside_bin(ch) else ""
+	if game.phase == Game.Phase.BUILD and ch.hand.is_empty() and game.shopper != ch and at_board(ch) and not at_door(ch):
+		return "Write menu"
 	if not at_door(ch):
 		return ""
 	if game.phase == Game.Phase.BUILD and ch.hand.is_empty() and game.shopper != ch:
@@ -259,11 +267,16 @@ func door_action(ch: Player = null) -> String:
 func use_door(ch: Player = null) -> bool:
 	ch = game._me(ch)
 	match door_action(ch):
+		"Write menu":
+			game.menu_stock.open_menu(ch)
 		"Open up":
 			var why := game.menu_stock.open_block()
 			if why != "":
 				game.audio.sfx("fail")
-				game.hud.day_ui.say(why)
+				if why == GameMenuStock.NO_MAIN_YET:
+					game.hud.board_key_ui.pulse()   # the key over the board swells, no words
+				else:
+					game.hud.day_ui.say(why)
 				game.hud.hints_ui.show_build()
 				return false
 			if game.coop._agree_at_door(ch):
