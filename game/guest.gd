@@ -230,9 +230,14 @@ func ordered_items() -> Array[Dictionary]:
 	return out
 
 
-## What the bubble shows while they wait: the main, or the drink if that is all.
+## What the bubble shows while they wait: the main, or the drink if that is all. Once part
+## of the order is on the table, the first item still missing.
 func want_icon() -> String:
 	var items := ordered_items()
+	if _meal_tray != null:
+		var missing := _meal_tray.waiting_items()
+		if not missing.is_empty() and missing.size() < items.size():
+			items = missing
 	return "food" if items.is_empty() else Icons.dish_id(items[0])
 
 

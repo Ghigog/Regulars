@@ -289,3 +289,15 @@ func test_a_partial_serve_says_what_the_guest_still_waits_for():
 	game.cooking.use_station(g.table)
 	assert_eq(g.state, "waiting")
 	assert_eq(game.hud.toast.text, "%s is still waiting for the %s." % [g.info.name, str(g.order.drink.name).to_lower()])
+
+
+func test_a_partly_served_guest_s_bubble_shows_the_missing_item():
+	game.world.add_station("fountain", Vector2i(2, 5))
+	game.world.add_station("cups", Vector2i(1, 6))
+	game.menu.add("drink", ["soda"], "Soda")
+	game.town.people[0].likes = ["soda"]
+	var g := _ordered_guest()
+	assert_eq(g.want_icon(), Icons.dish_id(g.ordered_items()[0]), "the main while nothing is served")
+	_cook_burger()
+	game.cooking.use_station(g.table)
+	assert_eq(g.want_icon(), Icons.dish_id(g.order.drink), "the drink once the main is down")
