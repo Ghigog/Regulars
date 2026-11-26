@@ -182,6 +182,8 @@ func _night(desks := 1) -> void:
 func _applicants() -> Array[Dictionary]:
 	for p in game.town.people:
 		p.affinity = 0.5
+	for id in game.staff.posts:
+		game.staff.posts[id].opened = 0  # as if put up on an earlier night
 	var fresh: Array[Dictionary] = []
 	for tries in 10:
 		fresh = game.desk.roll_applicants()
@@ -973,3 +975,4 @@ func test_a_server_with_take_payment_brings_the_bill_and_the_table_pays():
 	assert_true(paid, "the helper wrote the bill and handed it over")
 	assert_gt(int(game.ledger.today.sales), 0)
 	assert_eq(h.held, "")
+

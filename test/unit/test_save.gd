@@ -218,3 +218,21 @@ func test_pause_quit_label_differs_by_phase():
 	game.hud.options_ui.toggle_pause()
 	assert_eq(game.hud.options_ui.pause.buttons[2].text, "Quit to title")
 	game.hud.options_ui.toggle_pause()
+
+
+func test_a_post_put_up_tonight_has_no_applicants_after_continue():
+	for p in game.town.people:
+		p.affinity = 0.5
+	game.world.add_station("desk", Vector2i(8, 6))
+	game.desk.desk_post("Grill cook", ["grill"], 0, 0)
+	var data := SaveGame.capture(game)
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = data
+	add_child_autofree(other)
+	other.set_process(false)
+	var opened := int(other.staff.posts.values()[0].opened)
+	assert_eq(opened, game.ledger.day, "the posting day round-trips")
+	for i in 20:
+		other.session._open_night()
+	assert_true(other.applicants.is_empty())
+	assert_true(other.staff.cvs.is_empty())

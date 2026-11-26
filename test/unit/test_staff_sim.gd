@@ -1035,3 +1035,16 @@ func test_mistakes_are_never_on_purpose_and_chat_moves_nothing():
 	for i in 200:
 		assert_true(s.roll_mistake(1) in ["", "slip"])
 	assert_false(s.has_method("chat"), "chat no longer pulls satisfaction together")
+
+
+func test_a_post_draws_applicants_only_after_the_day_it_went_up():
+	var s := Staff.new()
+	s.add_post("Cook", ["grill"], 0, 0, 5, 3)
+	var keen := {"food": 1, "service": 1, "clean": 1}
+	var cands := [{"id": 1, "tolerance": keen, "rating": 3, "like": 1.0}]
+	for i in 40:
+		s.roll_applicants(cands, 3)
+	assert_eq(s.cvs.size(), 0, "none the day it went up")
+	for i in 40:
+		s.roll_applicants(cands, 4)
+	assert_eq(s.cvs.size(), 1, "some the day after")
