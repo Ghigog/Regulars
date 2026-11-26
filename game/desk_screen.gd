@@ -111,6 +111,8 @@ func action(a: String, echo := false) -> void:
 func move(dir: Vector2) -> void:
 	if _targets.is_empty():
 		return
+	if tab == "cvs" and _offer < 0 and _draft.is_empty() and (dir == Vector2.UP or dir == Vector2.DOWN) and _move_in_pile(dir == Vector2.DOWN):
+		return
 	var here := _targets[_sel].get_global_rect().get_center()
 	var best := -1
 	var best_score := INF
@@ -131,8 +133,64 @@ func move(dir: Vector2) -> void:
 		game.audio.sfx("tick")
 
 
+## Up and down on the CV tab walk the pile in order: tabs, each CV, then the buttons.
+## True when handled.
+func _move_in_pile(down: bool) -> bool:
+	var n: int = game.staff.cvs.size()
+	if n == 0 or _no_key():
+		return false
+	var key := _sel_key
+	if key.begins_with("cv:"):
+		var i := int(key.substr(3))
+		if down:
+			if i + 1 < n:
+				_land_on_cv(i + 1)
+			else:
+				_go("hire")
+		elif i > 0:
+			_land_on_cv(i - 1)
+		else:
+			_go("tab:cvs")
+		return true
+	if down and key.begins_with("tab:"):
+		_land_on_cv(_pick)
+		return true
+	if not down and key in ["dismiss", "haggle", "hire"]:
+		_land_on_cv(_pick)
+		return true
+	return false
+
+
+func _no_key() -> bool:
+	return _sel_key == ""
+
+
+func _go(key: String) -> void:
+	if select(key):
+		game.audio.sfx("tick")
+
+
+## The highlight lands on CV `i`: it becomes the chosen one, and the card scrolls into view.
+func _land_on_cv(i: int) -> void:
+	if i != _pick:
+		_offer = -1
+	_pick = i
+	_sel_key = "cv:%d" % i
+	pages.render()
+	if _scroll != null and select(_sel_key):
+		_scroll.ensure_control_visible(_targets[_sel])
+	game.audio.sfx("tick")
+
+
 func press() -> void:
 	if _targets.is_empty():
+		return
+	var t := _targets[_sel]
+	if t.get_meta("key").begins_with("cv:"):   # A on a CV chooses it and goes to its Hire button
+		_pick = int(str(t.get_meta("key")).substr(3))
+		_offer = -1
+		_sel_key = "hire"
+		pages.render()
 		return
 	var b := _targets[_sel] as Button
 	if b != null and not b.disabled:

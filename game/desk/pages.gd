@@ -234,6 +234,8 @@ func _cvs() -> void:
 		none.modulate.a = 0.6
 		return
 	screen._pick = clampi(screen._pick, 0, staff.cvs.size() - 1)
+	if screen._sel_key.begins_with("cv:"):
+		screen._sel_key = "cv:%d" % screen._pick
 	screen._scroll = ScrollContainer.new()
 	screen._scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	screen._scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -258,6 +260,7 @@ func _cvs() -> void:
 			picked = sheet
 			screen._cv_card = sheet
 		slot.add_child(sheet)
+		screen._target(sheet, "cv:%d" % i)
 	if picked != null:
 		screen._scroll.ensure_control_visible.call_deferred(picked)
 	var cv: Dictionary = _cv()
@@ -276,14 +279,12 @@ func _cvs() -> void:
 		screen._target(offer, "offer")
 		screen._paper_button(buttons, "unhaggle", screen.posting._stop_haggle, "Back", 22)
 	else:
-		screen._paper_button(buttons, "prev", _pick_by.bind(-1), "^", 24).custom_minimum_size = Vector2(56, 0)
 		screen._paper_button(buttons, "dismiss", screen.posting.dismiss_top, "<  Dismiss", 24).custom_minimum_size = Vector2(200, 0)
 		screen._paper_button(buttons, "haggle", screen.posting._start_haggle, "Haggle", 24).custom_minimum_size = Vector2(160, 0)
 		var hire: Button = screen.hud.receipt_ui._button(buttons, "Hire at $%d  >" % cv.ask, screen.posting.hire_top)
 		hire.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		hire.custom_minimum_size = Vector2(220, 0)
 		screen._target(hire, "hire")
-		screen._paper_button(buttons, "next", _pick_by.bind(1), "v", 24).custom_minimum_size = Vector2(56, 0)
 	var foot := screen._label(screen._content, 18, screen.note if screen.note != "" else "Scroll the pile. Drag a CV right to hire, left to send them home.  %s in the pile." % screen._count_word(staff.cvs.size(), "CV"))
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if screen.note != "":
@@ -294,16 +295,6 @@ func _cvs() -> void:
 func _cv() -> Dictionary:
 	var cvs: Array = screen.game.staff.cvs
 	return cvs[clampi(screen._pick, 0, cvs.size() - 1)]
-
-
-func _pick_by(by: int) -> void:
-	var n: int = screen.game.staff.cvs.size()
-	if n == 0:
-		return
-	screen._pick = clampi(screen._pick + by, 0, n - 1)
-	screen._offer = -1
-	screen.game.audio.sfx("tick")
-	render()
 
 
 ## One CV: the face on the left; the name, post, skills, rating and ask on the right.
@@ -385,7 +376,7 @@ func _keys_line() -> void:
 		"keys":
 			text = "Arrows choose     E select     Esc back" if screen._naming != "type" else "Type a name     Enter keep it     Esc keep it"
 		"pad":
-			text = "D-pad choose     A select     B keep the name" if screen._naming == "grid" else "D-pad choose     A select     B back"
+			text = "D-pad choose     A select     B keep the name" if screen._naming == "grid" else "D-pad or right stick choose     A select     B back"
 	if text != "":
 		var l := screen._label(screen._content, 16, text)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

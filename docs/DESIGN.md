@@ -313,7 +313,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   prompt's keycap, the build slip, the shop's key line, the receipt buttons) is reworded
   for it. Controller: left stick or d-pad walk, A use (and confirm the receipt and the end
   screen), B back, X sell or remove, Y shop (town book on the receipt), LB/RB turn,
-  Start options; in the shop the stick and d-pad browse. Touch: a joystick bottom left;
+  Start options; in the shop the stick and d-pad browse; on the desk the d-pad or right stick steps the highlight (a flick once, held repeats). Touch: a joystick bottom left;
   down the right a big Use button that names the action, and above it, by night, Shop,
   Drop or Done, Turn, Sell, or Erase (with a build tool, Erase makes drags take things
   away); a small Menu button for options. **Aiming** (asked for after the first
@@ -493,7 +493,9 @@ Survive as many days as you can; three walkouts in one day ends the run.
     is their skill over the post's kinds, less a penalty per duty in a kind they are
     weak at (1 or 2 stars). Applicants wait in a line outside the door; their CVs (face,
     three skills, overall rating, ask, post) go on the desk as a list to scroll, every
-    CV at once (owner's review). Swipe any one right (or Hire the chosen one) at the ask,
+    CV at once (owner's review). On a pad the d-pad or right stick walks the pile
+    CV by CV and reaches Dismiss, Haggle and Hire only after the last; A on a CV
+    chooses it and jumps to its Hire button. Swipe any one right (or Hire the chosen one) at the ask,
     left to dismiss; an unread CV waits. Haggle offers less: the
     chance they accept falls 0.3 for every 10% under the ask, less with low
     satisfaction; after two refused counters they take the last offer (satisfaction 0.5
