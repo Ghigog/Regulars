@@ -427,8 +427,17 @@ func _process(delta: float) -> void:
 		var turn: Node3D = _views[j].spin
 		if j == _shop_index:
 			turn.rotate_y(delta * 0.45)
+			_views[j].animate(true)
 		else:
-			turn.rotation.y = lerp_angle(turn.rotation.y, 0.0, 1.0 - exp(-6.0 * delta))
+			var off := absf(wrapf(turn.rotation.y, -PI, PI))
+			if off > 0.004:   # still settling face-on: render until it is
+				turn.rotation.y = lerp_angle(turn.rotation.y, 0.0, 1.0 - exp(-6.0 * delta))
+				if off <= 0.01:
+					turn.rotation.y = 0.0
+				_views[j].animate(true)
+			else:
+				turn.rotation.y = 0.0
+				_views[j].animate(false)
 	if _tag_state == "receipt":
 		money_tag.visible = is_instance_valid(_summary_clip)
 		if money_tag.visible:

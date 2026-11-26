@@ -451,7 +451,7 @@ func _leave(g: Guest) -> void:
 		g.line_place = -1
 		# Out of the line onto the outer half of the pavement first, not down
 		# through the people still waiting.
-		var out := Vector2i(Game.W + 1, g.cell.y)
+		var out := game.seating.outer_lane(g.cell.y)
 		g.path.assign(game.grid.find_path(g.cell, out) + game.grid.find_path(out, Game.EXIT))
 
 

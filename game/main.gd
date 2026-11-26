@@ -236,7 +236,22 @@ var _shot_path := ""
 var _shot_time := 0.0
 
 
+const BASE_3D_PIXELS := 1440 * 900   # the room's 3D is drawn at no more than this many pixels
+
+
+## Scale for the main viewport's 3D so a large window does not pay for 3D at full size.
+static func scale_3d_for(window: Vector2i) -> float:
+	var px := float(maxi(window.x * window.y, 1))
+	return clampf(sqrt(BASE_3D_PIXELS / px), 0.25, 1.0)
+
+
+func _fit_3d() -> void:
+	get_viewport().scaling_3d_scale = scale_3d_for(get_window().size)
+
+
 func _ready() -> void:
+	get_window().size_changed.connect(_fit_3d)
+	_fit_3d()
 	var seed_value := int(Time.get_unix_time_from_system())
 	grid = Grid.new(W + 3 - LOT.position.x, LOT.size.y, LOT.position)   # columns W, W + 1, W + 2 are the pavement outside
 	grid.pavement_from = KERB_X   # a chef walks the two open rows, never the kerb tile
