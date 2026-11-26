@@ -84,7 +84,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			loop.scale = Vector3.ONE * 0.7
 		"coffee_machine":
 			# A cream espresso machine: a group head, a mug beneath, a gauge and cups on top.
-			BuildStations._counter(n, Build.CORAL, Build.WORKTOP)
+			BuildStations._counter(n, Build.CABINET, Build.WORKTOP)
 			Build._add(n, Build.bevel_mesh(Vector3(0.64, 0.5, 0.44), 0.06), Vector3(0, 0.9, -0.12), Color("#f3ecdc"), 0.0)
 			Build.box(n, Vector3(0, 1.1, 0.12), Vector3(0.5, 0.06, 0.08), "#2b2f31")
 			Build.cyl(n, Vector3(0, 1.04, 0.14), 0.06, 0.06, "#c9d0d1", 0.0, Build.R_WOOD)
@@ -102,7 +102,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 		"beer_tap":
 			# A tap tower on a wooden bar: a brass pillar, two tall wooden handles, a drip
 			# tray and a pint.
-			BuildStations._counter(n, Build.WOOD, Build.WORKTOP)
+			BuildStations._counter(n, Build.CABINET, Build.WORKTOP)
 			Build.box(n, Vector3(0, 0.9, 0.14), Vector3(0.5, 0.03, 0.2), Build.STEEL_DARK)
 			Build.cyl(n, Vector3(0, 0.9, -0.12), 0.06, 0.38, "#d9a441", 0.0, Build.R_WOOD)
 			Build.box(n, Vector3(0, 1.27, -0.12), Vector3(0.44, 0.07, 0.07), "#d9a441", 0.0, Build.R_WOOD)

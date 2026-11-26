@@ -256,7 +256,7 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 				BuildFood.ingredient(at, id, "raw", "raw")
 		"drink":
 			if not as_box:
-				_counter(n, Build.CORAL, Build.WORKTOP)
+				_counter(n, Build.CABINET, Build.WORKTOP)
 			if id == "wine":
 				var barrel := Build.cyl(n, Vector3(0, 1.18, 0), 0.3, 0.6, Build.WOOD, 0.0, Build.R_WOOD)
 				barrel.rotation.x = PI / 2
