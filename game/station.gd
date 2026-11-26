@@ -557,7 +557,7 @@ func refresh() -> void:
 	elif type == "dish_rack":
 		BuildStations.rack_load(_stack, count)
 	elif type == "sink":
-		BuildStations.sink_load(_stack, dirty, messy())
+		BuildStations.sink_load(_stack, dirty - dirty_cups, dirty_cups, messy())
 	elif type == "bin":
 		BuildStations.bin_load(_stack, count, BIN_HOLDS)
 	_show_grime(messy())
