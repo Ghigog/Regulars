@@ -3,8 +3,8 @@ extends Control
 ## The pause menu: Resume, Options and Quit to title on a paper card over the room,
 ## which stands still behind it. Keys and the controller move a framed pointer (as on
 ## the title); touch taps. Quit asks first. In the build phase it reads "Save and quit"
-## and keeps the night's work; in service the day in play is not kept (the game is saved
-## at the start of each night and when quitting from the build phase).
+## and keeps the night's work; in service the day in play is not kept (the game was saved
+## when the restaurant opened, and when quitting from the build phase).
 
 var hud: Hud
 var buttons: Array[Button] = []
@@ -85,7 +85,7 @@ func show_confirm() -> void:
 	_clear()
 	confirming = true
 	var msg := "Save and leave for the title?\nTonight's work is saved; Continue picks up here." if saving() \
-			else "Leave for the title?\nThe game is saved at the start of each night; today's progress is lost."
+			else "Leave for the title?\nThe game was saved when you opened; today's service is lost."
 	var l := hud._label(_box, 22, msg)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

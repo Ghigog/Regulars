@@ -175,6 +175,30 @@ func test_build_quit_puts_a_lifted_piece_back():
 	assert_true(_saved_cells().has(c))
 
 
+func test_opening_the_door_saves_the_night_as_built():
+	game.phase = Game.Phase.BUILD
+	game.flyers_out = true
+	var fryer := Vector2i(2, 5)
+	game.world.add_station("fryer", fryer)
+	var moved := Vector2i(7, 4)
+	game.world.add_station("table", moved, 1, 0)
+	game.placing.pick_up(Grid.center(fryer), game.player)
+	var money: int = game.ledger.money
+	game.day.start_day()
+	assert_eq(game.phase, Game.Phase.SERVICE)
+	var d := SaveGame.read(SAVE_TEST_PATH)
+	assert_true(_saved_cells().has(moved), "the new table is saved")
+	assert_true(_saved_cells().has(fryer), "the lifted fryer is back in its cell")
+	assert_eq(int(d.ledger.money), money, "money is from before the stock was paid")
+	assert_true(bool(d.flyers_out))
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = d
+	add_child_autofree(other)
+	other.set_process(false)
+	assert_eq(other.phase, other.Phase.BUILD)
+	assert_true(other.stations.has(moved))
+
+
 func test_service_quit_leaves_the_save_alone():
 	game.phase = Game.Phase.BUILD
 	game.session.autosave()
