@@ -77,6 +77,9 @@ var used_any := false           # a device has been used: it is player one's, an
 const LEAVE_HOLD := 1.0          # seconds Start is held to leave
 var _start_held := {}           # pad source -> seconds Start has been held (-1 once it left)
 var _fingers := {}              # touch index -> what it holds: "stick" or [button id, action]
+var _right_y := {}   # source -> right stick's vertical axis, kept apart from the walking stick
+var _desk_dir := 0
+var _desk_wait := 0.0
 var _stick_at := Vector2.ZERO   # where the joystick's base sits
 var _mouse_held := false        # the emulated mouse press landed on a control
 var _view: Control
@@ -352,6 +355,9 @@ func _pad_axis(e: InputEventJoypadMotion) -> void:
 	if e.axis in [JOY_AXIS_LEFT_Y, JOY_AXIS_RIGHT_Y] and game.phase == game.Phase.SUMMARY and absf(e.axis_value) > 0.2:
 		if game.hud.receipt_ui.scroll_paper(e.axis_value * 30.0):   # a long receipt: the stick reads it
 			return
+	if e.axis == JOY_AXIS_RIGHT_Y and game.hud.desk_open():   # the desk's lists: read in _desk_stick, never walks the chef
+		_right_y[source] = e.axis_value
+		return
 	if e.axis == JOY_AXIS_LEFT_X:
 		v.x = e.axis_value
 	elif e.axis == JOY_AXIS_LEFT_Y:
@@ -366,6 +372,7 @@ func _pad_axis(e: InputEventJoypadMotion) -> void:
 func _process(delta: float) -> void:
 	if game == null:
 		return
+	_desk_stick(delta)
 	for who: PlayerInput in players:
 		_browse(who, delta)
 	for source: String in _start_held.keys():
@@ -377,6 +384,26 @@ func _process(delta: float) -> void:
 			game.coop.leave(owner_of(source))
 	if _touch_who().mode == "touch":
 		_view.queue_redraw()
+
+
+## On the desk the right stick steps the highlight up and down: a flick once, held it repeats.
+func _desk_stick(delta: float) -> void:
+	var dir := 0
+	var source := ""
+	if game.hud.desk_open():
+		for src: String in _right_y:
+			if absf(_right_y[src]) > 0.6:
+				dir = signi(roundi(_right_y[src]))
+				source = src
+	if dir != _desk_dir:
+		_desk_dir = dir
+		_desk_wait = 0.0
+	if dir == 0:
+		return
+	_desk_wait -= delta
+	if _desk_wait <= 0.0:
+		_desk_wait = 0.28
+		game.coop.act(owner_of(source), "down" if dir > 0 else "up")
 
 
 ## In the shop, on the options screen and on the title the stick browses: a flick steps once,
