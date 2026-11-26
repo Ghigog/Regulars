@@ -36,7 +36,8 @@ const Z0 := -1.2
 const PAPER_Y := -0.2
 const BASE_M := 0.5   # how far the street runs past the floor on the right: flush with the wall
 const Z1 := 12.5
-const PAVE_Z := 9.9  # where the pavement (or pier) meets the road (or sea)
+const KERB_Z := PAVE_Z - 0.5   # the middle of the back tile, where every street prop stands
+const PAVE_Z := 10.0  # where the pavement (or pier) meets the road (or sea)
 
 static var theme_id := "diner"
 
@@ -653,10 +654,10 @@ static func _finish_panel(holder: Node3D, f: String, x0: float, x1: float, y0: f
 ## A planter and the menu board outside, on the near side of the door.
 static func _outside(root: Node3D, w: int, h: int) -> void:
 	root = _turned(root, Vector3(w - h, 0, 9.5))
-	for px: float in [3.2]:
-		Build.box(root, Vector3(px, 0, h + 0.3), Vector3(1.2, 0.55, 0.34), Build.WOOD, 0.0, Build.R_WOOD)
-		for i in 3:
-			Build.ball(root, Vector3(px - 0.38 + i * 0.38, 0.6, h + 0.3), 0.2, Build.LEAF if i % 2 else Build.LEAF_2)
+	var pz := h + (Game.KERB_X - Game.W) + 0.5   # the planter stands on the back tile
+	Build.box(root, Vector3(3.2, 0, pz), Vector3(1.2, 0.55, 0.34), Build.WOOD, 0.0, Build.R_WOOD)
+	for i in 3:
+		Build.ball(root, Vector3(3.2 - 0.38 + i * 0.38, 0.6, pz), 0.2, Build.LEAF if i % 2 else Build.LEAF_2)
 	for lean: float in [-1.0, 1.0]:
 		var board := Build.box(root, Vector3(4.2, 0, h + 0.34 + lean * 0.09), Vector3(0.5, 0.78, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
 		board.rotation.x = -lean * 0.22
@@ -726,9 +727,9 @@ static func _street(root: Node3D, w: int, x1: float, lights: Array[OmniLight3D])
 	var col_i := 0
 	while x < x1 - 0.01:
 		var wd := minf(1.5, x1 - x)  # big slabs; the last is cut to the street's end
-		for row in 2:
-			var depth := (PAVE_Z - 7.0) / 2
-			Build.box(root, Vector3(x + wd / 2, PAPER_Y, 7.0 + row * depth + depth / 2), Vector3(wd - 0.02, -PAPER_Y, depth - 0.02), Build.PAVING if (col_i + row) % 2 else "#c4bcb4")
+		for row in 3:   # one slab row per tile; the back tile is the paler kerb row
+			var tone := "#d6cec2" if row == 2 else (Build.PAVING if (col_i + row) % 2 else "#c4bcb4")
+			Build.box(root, Vector3(x + wd / 2, PAPER_Y, 7.0 + row + 0.5), Vector3(wd - 0.02, -PAPER_Y, 0.98), tone)
 		x += 1.5
 		col_i += 1
 	# A two-lane road with white dashes, cut clean at the slab edge.
@@ -738,9 +739,9 @@ static func _street(root: Node3D, w: int, x1: float, lights: Array[OmniLight3D])
 		Build.box(root, Vector3(x + 0.5, -0.085, (PAVE_Z + Z1) / 2), Vector3(1.0, 0.012, 0.13), "#f6efe2")
 		x += 2.2
 	# Street furniture sits on the kerb side only, never over the queue line.
-	var kerb := PAVE_Z - 0.45
+	var kerb := KERB_Z
 	# Tall things stand at the far end, where they hide nothing; low ones near.
-	_tree(root, Vector3(x1 - 0.65, 0, kerb - 0.05))
+	_tree(root, Vector3(x1 - 0.65, 0, kerb))
 	_lamp_post(root, Vector3(x1 - 2.4, 0, kerb), lights)
 	_bench(root, Vector3(X0 + 0.6, 0, kerb))
 	_street_bin(root, _bin_spot())
@@ -791,11 +792,11 @@ static func _bench(root: Node3D, at: Vector3) -> void:
 ## the doorway and well clear of the queue, which runs the other way. Both
 ## themes put it at the same place, so the chef's walk to it is the same.
 static func outside_bin_at() -> Vector3:
-	return Vector3(Game.W + 2.3, 0, Game.DOOR.y + 0.7)
+	return Vector3(Game.KERB_X + 0.5, 0, Game.DOOR.y + 0.5)
 
 
-## The cell the bin stands in: past the walkable pavement, so it is out of reach
-## of the queue and the chef steps up beside it.
+## The cell the bin stands in: the back tile, so the chef steps up beside it
+## from the open row.
 static func outside_bin_cell() -> Vector2i:
 	return Grid.to_cell(outside_bin_at())
 
@@ -901,10 +902,10 @@ static func _street_dressing(root: Node3D, x1: float) -> void:
 	var zx := x1 - 2.85
 	for k in 5:
 		Build.box(root, Vector3(zx, -0.085, PAVE_Z + 0.45 + k * 0.48), Vector3(0.95, 0.012, 0.26), "#f6efe2")
-	_pillar_box(root, Vector3(x1 - 3.65, 0, PAVE_Z - 0.4))
-	_hydrant(root, Vector3(X0 + 4.95, 0, PAVE_Z - 0.35))
+	_pillar_box(root, Vector3(x1 - 3.65, 0, KERB_Z))
+	_hydrant(root, Vector3(X0 + 4.95, 0, KERB_Z))
 	# Flowers in the tree's grass square.
-	var tree := Vector3(x1 - 0.65, 0, PAVE_Z - 0.5)
+	var tree := Vector3(x1 - 0.65, 0, KERB_Z)
 	for k in 6:
 		var a := TAU * k / 6.0 + 0.3
 		var at := tree + Vector3(cos(a) * 0.3, 0.23, sin(a) * 0.3)
@@ -934,7 +935,7 @@ static func _hydrant(root: Node3D, at: Vector3) -> void:
 ## Seaside: what stands on the boardwalk by the rail, and a rowing boat and a buoy
 ## on the water. All on the rail side, clear of the queue line.
 static func _pier_dressing(root: Node3D, x1: float) -> void:
-	var near := PAVE_Z - 0.6
+	var near := KERB_Z
 	# A stack of fish crates and a lobster pot.
 	_rb(root, Vector3(X0 + 1.1, 0.16, near), Vector3(0.6, 0.32, 0.46), "#a98d6c", 0.03, Build.R_WOOD)
 	_rb(root, Vector3(X0 + 1.05, 0.46, near), Vector3(0.56, 0.28, 0.44), "#c2a684", 0.03, Build.R_WOOD)

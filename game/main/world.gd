@@ -161,6 +161,9 @@ func _sync_grid() -> void:
 		for y in range(Game.LOT.position.y, Game.LOT.end.y):
 			if not game.plan.has_floor(Vector2i(x, y)):
 				game.grid.outside[Vector2i(x, y)] = true
+	for y in range(Game.LOT.position.y, Game.LOT.end.y):
+		game.grid.outside[Vector2i(Game.KERB_X, y)] = true   # the kerb tile: props, no walking
+	game.grid.outside[Game.BOARD_CELL] = true   # the menu board stands here; people go round it
 
 
 ## Redraws the room from the plan and fits the camera round it.

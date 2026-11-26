@@ -47,6 +47,9 @@ const LOT := Rect2i(-5, -2, W + 5, H + 2)
 const ENTRANCE_CELL := Vector2i(W - 1, DOOR.y)   # the floor just inside the front door; never lifted
 const DOORWAY := Vector3(W, 0, DOOR.y + 0.5)   # the middle of the doorway, on the floor
 const DOOR_REACH := 1.25
+const PAVEMENT := Rect2i(W, LOT.position.y, 2, LOT.size.y)   # the two open pavement rows, which chefs walk
+const KERB_X := W + 2   # the back tile by the road: street furniture stands on it, nobody walks it
+const BOARD_CELL := Vector2i(W, 5)   # the menu board's cell, by the door; closed to walking
 const BIN_REACH := 1.3   # how near the outside bin the chef must stand to put the bag in
 const CLOSE_EARLY_FROM := 0.5   # the door card can be flipped to CLOSED from this far into the day
 const FLYERS := {"id": "flyers", "tier": 1}   # sold in the shop's Extras, never placed
@@ -235,9 +238,8 @@ var _shot_time := 0.0
 
 func _ready() -> void:
 	var seed_value := int(Time.get_unix_time_from_system())
-	grid = Grid.new(W + 2 - LOT.position.x, LOT.size.y, LOT.position)   # columns W and W + 1 are the pavement outside
-	grid.pavement_from = W   # a chef steps out only as far as the outside bin
-	grid.chef_pavement = {DOOR: true, DOOR + Vector2i(1, 0): true}
+	grid = Grid.new(W + 3 - LOT.position.x, LOT.size.y, LOT.position)   # columns W, W + 1, W + 2 are the pavement outside
+	grid.pavement_from = KERB_X   # a chef walks the two open rows, never the kerb tile
 	town = Town.new(seed_value, Scenery.theme_id)
 	critic = Critic.new(seed_value, town.people.size())
 	staff = Staff.new(seed_value)
