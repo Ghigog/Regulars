@@ -28,7 +28,7 @@ static func sink_load(n: Node3D, plates: int, piled: bool) -> void:
 static func rack_load(n: Node3D, plates: int) -> void:
 	for i in mini(plates, 8):
 		var p := BuildFood.item("plate")
-		p.position = Vector3(-0.245 + i * 0.07, 0.99, 0.0)
+		p.position = Vector3(-0.245 + i * 0.07, 1.02, 0.0)
 		p.rotation = Vector3(0.0, 0.0, -1.45)
 		n.add_child(p)
 

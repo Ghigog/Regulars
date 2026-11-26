@@ -117,7 +117,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			# A steel fryer: a deep well of golden oil, a basket hung on the back, and a
 			# drain rack on the right where fried food rests before it is picked up.
 			BuildStations._counter(n, Build.STEEL, Build.STEEL_DARK, false)
-			Build.box(n, Vector3(-0.15, 0.88, 0), Vector3(0.5, 0.04, 0.6), "#2b2f31", 0.0, Build.R_WOOD)
+			Build.box(n, Vector3(-0.15, 0.88, 0), Vector3(0.5, 0.06, 0.6), "#2b2f31", 0.0, Build.R_WOOD)
 			Build.box(n, Vector3(-0.15, 0.9, 0), Vector3(0.42, 0.02, 0.52), "#e8b04e", 0.4, Build.R_GLOSS)
 			Build.box(n, Vector3(0.28, 0.9, 0), Vector3(0.3, 0.02, 0.5), "#c9d0d1", 0.0, Build.R_WOOD)
 			for z: float in [-0.16, 0.0, 0.16]:
@@ -343,7 +343,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			Build.cyl(n, Vector3(0, 0.6, 0), 0.1, 0.28, "#ffd98a", 1.4, Build.R_GLOSS)
 			for i in 4:
 				var a := TAU * i / 4.0 + PI / 4
-				Build.box(n, Vector3(cos(a) * 0.11, 0.6, sin(a) * 0.11), Vector3(0.025, 0.28, 0.025), Scenery.BRASS, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(cos(a) * 0.11, 0.6, sin(a) * 0.11), Vector3(0.025, 0.27, 0.025), Scenery.BRASS, 0.0, Build.R_WOOD)
 			Build.lathe(n, Vector3(0, 0.88, 0), [[0.0, 0.0], [0.14, 0.0], [0.08, 0.1], [0.0, 0.1]], Scenery.BRASS, 0.0, Build.R_WOOD)
 			var ring := Build.lathe(n, Vector3(0, 1.04, 0), [[0.05, -0.012], [0.07, -0.012], [0.07, 0.012], [0.05, 0.012]], Scenery.BRASS, 0.0, Build.R_WOOD)
 			ring.rotation.x = PI / 2
@@ -391,10 +391,10 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 		"dish_rack":
 			# A worktop with a wooden rack; the dishes drying in it are `BuildStations.rack_load`.
 			BuildStations._counter(n, Build.CABINET, Build.WORKTOP)
-			Build.box(n, Vector3(0, 0.87, 0), Vector3(0.72, 0.03, 0.5), Build.WOOD_DARK, 0.0, Build.R_WOOD)
+			Build.box(n, Vector3(0, 0.9, 0), Vector3(0.72, 0.03, 0.5), Build.WOOD_DARK, 0.0, Build.R_WOOD)
 			for i in 9:
-				Build.box(n, Vector3(-0.28 + i * 0.07, 0.9, 0.2), Vector3(0.03, 0.2, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
-				Build.box(n, Vector3(-0.28 + i * 0.07, 0.9, -0.2), Vector3(0.03, 0.3, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, 0.2), Vector3(0.03, 0.2, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, -0.2), Vector3(0.03, 0.3, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
 		"table":
 			# Two-seat table (sheet 1): a slab top with a small bevel on a slim pedestal and
 			# disc foot; coral chairs on dark wooden legs (`_chair`).
