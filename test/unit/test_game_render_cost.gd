@@ -37,6 +37,11 @@ func test_shop_renders_only_the_middle_piece():
 	var views := _views(game.hud, [])
 	assert_gt(views.size(), 1)
 	assert_lte(_always(views), 1, "only the selected piece renders every frame")
+	var steady := 0
+	for v in views:
+		if v.vp.render_target_update_mode == SubViewport.UPDATE_WHEN_VISIBLE:
+			steady += 1
+	assert_eq(steady, 0, "no shop piece is left rendering whenever visible")
 
 
 func test_peg_stops_rendering_once_settled():

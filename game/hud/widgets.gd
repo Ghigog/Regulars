@@ -555,7 +555,7 @@ class ModelView extends TextureRect:
 	func animate(on: bool) -> void:
 		if on:
 			vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-		elif vp.render_target_update_mode == SubViewport.UPDATE_ALWAYS and _settle <= 0.0:
+		elif _settle <= 0.0 and vp.render_target_update_mode in [SubViewport.UPDATE_ALWAYS, SubViewport.UPDATE_WHEN_VISIBLE]:
 			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 	func _init(px: int, live_: bool) -> void:
