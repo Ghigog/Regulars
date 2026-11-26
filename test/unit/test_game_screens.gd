@@ -19,12 +19,15 @@ func test_options_screen_works_from_the_keyboard():
 	_tap(KEY_LEFT)
 	_tap(KEY_LEFT)
 	assert_almost_eq(float(hud.options_ui.options.music), 0.3, 0.001, "left turns the music down")
+	while hud.options_ui._options_row() != hud.options_ui._options_done:
+		_tap(KEY_DOWN)
+	assert_eq(hud.options_ui._options_row(), hud.options_ui._options_done, "down reaches Done")
 	_tap(KEY_DOWN)
-	_tap(KEY_DOWN)
-	assert_eq(hud.options_ui._options_row(), hud.options_ui._options_done, "down stops at Done")
+	assert_eq(hud.options_ui._options_row(), hud.options_ui._options_tab_row, "down from Done wraps to the tabs")
 	_tap(KEY_UP)
-	_tap(KEY_UP)
-	_tap(KEY_UP)
+	assert_eq(hud.options_ui._options_row(), hud.options_ui._options_done, "up from the tabs wraps to Done")
+	while hud.options_ui._options_row() != hud.options_ui._options_tab_row:
+		_tap(KEY_UP)
 	_tap(KEY_RIGHT)
 	assert_eq(hud.options_ui._options_tab, "graphics", "right on the tabs switches tab")
 	var tilt: bool = hud.options_ui.options.tilt_shift
@@ -165,7 +168,9 @@ func test_title_quit_where_quitting_is_a_thing():
 	_tap(KEY_DOWN)
 	_tap(KEY_DOWN)
 	_tap(KEY_DOWN)
-	assert_eq(game.hud.options_ui.title.sel, 2, "down stops at Quit")
+	assert_eq(game.hud.options_ui.title.sel, 0, "down from Quit wraps to Play")
+	_tap(KEY_UP)
+	assert_eq(game.hud.options_ui.title.sel, 2, "up from Play wraps to Quit")
 	_tap(KEY_SPACE)
 	assert_true(game.quit_asked)
 
@@ -344,3 +349,33 @@ func test_a_comfortable_guest_eats_longer_and_pays_more():
 	assert_eq(rushed_paid, rushed.bill_base)
 	assert_gt(cosy.mood.pay_for(cosy.bill_base), cosy.bill_base, "a cosy guest's extras go with the tip")
 	assert_lt(rushed.mood.pay_for(rushed.bill_base), rushed.bill_base, "a rushed one skimps on it")
+
+
+func test_title_wraps_past_both_ends_with_keys_and_pad():
+	game.session.open_title()
+	var title = game.hud.options_ui.title
+	var last: int = title.buttons.size() - 1
+	_tap(KEY_UP)
+	assert_eq(title.sel, last, "up from Play goes to the last button")
+	_tap(KEY_DOWN)
+	assert_eq(title.sel, 0, "down from the last goes to Play")
+	assert_true(title.action("up"))
+	assert_eq(title.sel, last, "pad up wraps")
+	assert_true(title.action("down"))
+	assert_eq(title.sel, 0, "pad down wraps")
+
+
+func test_pause_menu_wraps_past_both_ends():
+	game.hud.options_ui.toggle_pause()
+	var pause = game.hud.options_ui.pause
+	var last: int = pause.buttons.size() - 1
+	pause.action("up")
+	assert_eq(pause.sel, last, "up from Resume goes to the last button")
+	pause.action("down")
+	assert_eq(pause.sel, 0, "down from the last goes to Resume")
+	pause.press_id("quit")
+	pause.pick(0)
+	pause.action("up")
+	assert_eq(pause.sel, pause.buttons.size() - 1, "the confirm card wraps too")
+	pause.action("down")
+	assert_eq(pause.sel, 0)

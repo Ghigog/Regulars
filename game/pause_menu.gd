@@ -129,9 +129,9 @@ func pick(i: int) -> void:
 func action(a: String, echo := false) -> bool:
 	match a:
 		"up":
-			pick(sel - 1)
+			pick(posmod(sel - 1, buttons.size()))
 		"down":
-			pick(sel + 1)
+			pick(posmod(sel + 1, buttons.size()))
 		"use", "confirm":
 			if echo:
 				return false
