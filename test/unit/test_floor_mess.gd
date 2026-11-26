@@ -104,16 +104,54 @@ func test_cannot_clean_under_furniture_until_moved():
 
 # ---------- Tracking ----------
 
-func test_stepping_off_dirt_carries_one_level():
+func _dirty(m: FloorMess, c: Vector2i, n: int) -> void:
+	for i in n:
+		m.add_dirt(c)
+
+
+func test_light_dirt_is_never_tracked():
+	for n in [1, 2]:
+		var m := _room()
+		m.track_chance = 1.0
+		_dirty(m, Vector2i(1, 1), n)
+		assert_false(m.track(Vector2i(1, 1), Vector2i(2, 1)))
+		assert_eq(m.level(Vector2i(1, 1)), n)
+		assert_eq(m.level(Vector2i(2, 1)), 0)
+
+
+func test_a_heavy_patch_tracks_one_level_when_the_roll_succeeds():
 	var m := _room()
+	m.track_chance = 1.0
 	var a := Vector2i(1, 1)
 	var b := Vector2i(2, 1)
-	m.add_dirt(a)
-	m.add_dirt(a)
+	_dirty(m, a, 3)
 	assert_true(m.track(a, b))
-	assert_eq(m.level(a), 1)
+	assert_eq(m.level(a), 2)
 	assert_eq(m.level(b), 1)
+	assert_false(m.track(a, b), "the level 2 left behind stays put")
+	_dirty(m, a, 2)
+	assert_true(m.track(a, Vector2i(3, 1)), "level 4 tracks too")
+	assert_eq(m.level(a), 3)
 
+
+func test_a_heavy_patch_stays_put_when_the_roll_fails():
+	var m := _room()
+	m.track_chance = 0.0
+	_dirty(m, Vector2i(1, 1), 3)
+	assert_false(m.track(Vector2i(1, 1), Vector2i(2, 1)))
+	assert_eq(m.level(Vector2i(1, 1)), 3)
+
+
+func test_default_track_chance_is_about_one_step_in_ten():
+	var m := _room()
+	m.rng.seed = 7
+	var hits := 0
+	for i in 500:
+		m.dirt.clear()
+		_dirty(m, Vector2i(1, 1), 3)
+		if m.track(Vector2i(1, 1), Vector2i(2, 1)):
+			hits += 1
+	assert_between(hits, 500 * FloorMess.TRACK_CHANCE * 0.5, 500 * FloorMess.TRACK_CHANCE * 1.5)
 
 
 func test_clean_feet_track_nothing():
@@ -127,13 +165,13 @@ func test_tracking_onto_a_full_cell_overflows():
 	var m := _room()
 	var a := Vector2i(1, 2)
 	var b := Vector2i(2, 2)
-	m.add_dirt(a)
-	for i in 4:
-		m.add_dirt(b)
+	m.track_chance = 1.0
+	_dirty(m, a, 3)
+	_dirty(m, b, 4)
 	m.track(a, b)
-	assert_eq(m.level(a), 0)
+	assert_eq(m.level(a), 2)
 	assert_eq(m.level(b), 4)
-	assert_eq(m.total(), 5, "the carried level spilled to a neighbour")
+	assert_eq(m.total(), 7, "the carried level spilled to a neighbour")
 
 
 

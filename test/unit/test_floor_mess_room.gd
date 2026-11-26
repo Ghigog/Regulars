@@ -15,15 +15,31 @@ func test_the_room_floors_are_where_dirt_can_be_and_furniture_covers_cells():
 func test_a_chef_walking_off_a_dirty_cell_tracks_a_level_and_leaves_footprints():
 	var game = _game()
 	var from: Vector2i = game.player.cell()
-	_dirty(game, from, 2)
+	game.floor_dirt.mess.track_chance = 1.0
+	_dirty(game, from, 3)
 	game.step(0.01)
 	var to := from + Vector2i(1, 0)
 	assert_false(game.floor_dirt.mess.is_covered(to), "the test needs open floor to the right")
 	game.player.position = Grid.center(to)
 	game.step(0.01)
-	assert_eq(game.floor_dirt.mess.level(from), 1)
+	assert_eq(game.floor_dirt.mess.level(from), 2)
 	assert_eq(game.floor_dirt.mess.level(to), 1)
 	assert_eq(game.floor_dirt.prints.get(to), Vector2i(1, 0), "footprints the way they walked")
+
+
+
+func test_a_chef_walking_off_light_dirt_leaves_no_footprints():
+	var game = _game()
+	game.floor_dirt.mess.track_chance = 1.0
+	var from: Vector2i = game.player.cell()
+	_dirty(game, from, 1)
+	game.step(0.01)
+	var to := from + Vector2i(1, 0)
+	game.player.position = Grid.center(to)
+	game.step(0.01)
+	assert_eq(game.floor_dirt.mess.level(from), 1)
+	assert_eq(game.floor_dirt.mess.level(to), 0)
+	assert_false(game.floor_dirt.prints.has(to))
 
 
 
@@ -32,6 +48,7 @@ func test_guests_track_dirt_too():
 	var g: Guest = game.seating.spawn_guest(0)
 	var from := Vector2i(6, 5)
 	g.position = Grid.center(from)
+	game.floor_dirt.mess.track_chance = 1.0
 	_dirty(game, from, 3)
 	game.floor_dirt.step_feet([[g, from]])
 	game.floor_dirt.step_feet([[g, from + Vector2i(0, 1)]])
