@@ -21,6 +21,8 @@ func prompt_for(st: Station, ch: Player = null) -> String:
 			"pour": "Let go to stop", "grate": "Hold to grate, keep it green",
 			"saw": "Press at the end of each stroke", "juice": "Squeeze, let go on the green",
 			"blend": "Pulse %d times, don't spill" % Prep.BLEND_PULSES, "steam": "Lift the lid on the green"}.get(s.tool, "")
+	if _wash_hold.has(ch) and _wash_hold[ch].st == st:
+		return "Washing %d%%" % clampi(int(float(_wash_hold[ch].t) / WASH_HOLD * 100.0), 0, 100)
 	return use_station(st, true, ch)
 
 
@@ -624,7 +626,7 @@ func wash_one(st: Station) -> Dish:
 
 
 ## Washing at a sink: E starts a hold and one dish comes clean in the hands once E has been
-## held WASH_HOLD, with the same fill bar as every hold. Let go, or walk off, and the
+## held WASH_HOLD; the prompt counts "Washing N%" like scrubbing, with no bar. Let go, or walk off, and the
 ## progress is lost.
 const WASH_HOLD := 1.5   # tunable
 const WASH_BEAT := 0.45  # seconds between scrubs of the arm
@@ -638,18 +640,15 @@ func _tick_wash(ch: Player, held: bool, delta: float) -> void:
 	var st: Station = w.st
 	if not held or not is_instance_valid(st) or st.dirty <= 0 or ch.held != "" or game.world.station_at(ch.target_cell()) != st:
 		_wash_hold.erase(ch)
-		ch.stop_giving()
 		return
 	w.t = float(w.t) + delta
 	w.punch = float(w.punch) - delta
-	ch.show_hold(st.global_position, float(w.t) / WASH_HOLD, "dishes")
 	if float(w.punch) <= 0.0:
 		w.punch = WASH_BEAT
 		ch.punch()   # the scrubbing arm
 		game.audio.burst(st.global_position + Vector3(0, 1.0, 0), "bubbles", 0.15)
 	if float(w.t) >= WASH_HOLD:
 		_wash_hold.erase(ch)
-		ch.stop_giving()
 		ch.take_dish(wash_one(st))
 		game.audio.sfx("wash")
 		game.audio.burst(st.global_position + Vector3(0, 1.15, 0), "bubbles", 0.4)

@@ -57,6 +57,7 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- Washing up at the sink shows its progress in the prompt chip ("Washing N%"), the way scrubbing does. There is no hold bar and no plate-and-fork icon above the sink; the arm scrub and bubbles stay.
 - **Split head (departure from the whole-head tint rule).** The "Mood tint" rule says the whole head takes one colour. The game instead gives each feeling its own colour (red anger, green disgust, rosy delight), and when a guest is both angry and disgusted the head splits: red from the forehead, green from the chin, with a soft line. The person approved the split. The face reads both feelings: anger on the brows and eyes, disgust on the mouth and nose.
 - **Shadows.** Floating effects (grime motes), labels (name tags, money popups) and gauges cast no shadow; only solid pieces do.
 - **Dish rack.** The four always-there coral trays are gone; the wooden rack stays and `BuildStations.rack_load` stands up to eight cream plates on end in its slots (the rack is the plate store; the plate stack is gone), so how full it is can be counted at 20 px.
