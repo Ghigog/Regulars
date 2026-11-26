@@ -52,6 +52,7 @@ const DIRT_PER_LEVEL := 0.5    # tunable: urgency a level of dirt adds over `DIR
 const TRAIL_URGENCY := 0.5     # tunable: level 1 dirt (a tracked trail) ranks below every other task
 const WAIT_PULL := 0.05        # tunable: urgency a second of waiting adds
 const URGENCY_CELLS := 4.0     # tunable: cells of walking an urgency point is worth
+const FAILED_COOLDOWN := 5.0   # tunable: seconds a task a helper failed is kept from that helper
 const REACT_BASE := 0.5        # tunable: seconds a content helper takes to pick a new task
 
 ## A helper's prep roll. (tunable)
@@ -70,6 +71,7 @@ var reserved: Dictionary = {}      # key -> helper (person id)
 var held_by: Dictionary = {}       # helper -> key
 var station_of: Dictionary = {}    # helper -> the station their prep task uses
 var chef_keys: Dictionary = {}     # key -> true: a chef is doing it
+var failed: Dictionary = {}        # helper -> {key: seconds left}: tasks they could not do
 var _stations: Dictionary = {}     # station id -> station
 
 
@@ -301,7 +303,7 @@ func assign(staff: Staff, helpers: Array, day: int, t: float, day_length: float)
 		var e := staff.employee(person)
 		if float(h.get("idle", 0.0)) < reaction(float(e.satisfaction)):
 			continue
-		var task := best_for(e.duties, h.cell)
+		var task := best_for(e.duties, h.cell, person)
 		if task.is_empty():
 			continue
 		reserve(person, task)
@@ -312,11 +314,12 @@ func assign(staff: Staff, helpers: Array, day: int, t: float, day_length: float)
 ## The open task these duties allow with the best score from `cell`: urgency (in cells)
 ## minus the walk. Prep tasks narrow to the stations the duties cover, and the chosen
 ## station goes on the task as "station" (the free one with the best quality, then nearest).
-func best_for(duties: Array, cell: Vector2i) -> Dictionary:
+func best_for(duties: Array, cell: Vector2i, person := -1) -> Dictionary:
+	var skip: Dictionary = failed.get(person, {})
 	var best := {}
 	var best_score := -INF
 	for key: String in tasks:
-		if reserved.has(key) or chef_keys.has(key):
+		if reserved.has(key) or chef_keys.has(key) or skip.has(key):
 			continue
 		var task: Dictionary = tasks[key]
 		if not _allowed(task, duties):
@@ -368,6 +371,26 @@ func _station_reserved(station: Variant) -> bool:
 
 static func _walk(a: Vector2i, b: Vector2i) -> float:
 	return float(absi(a.x - b.x) + absi(a.y - b.y))
+
+
+## A helper could not do this task: it is kept from them for `FAILED_COOLDOWN` seconds, so the
+## board does not hand it straight back. Others may still take it.
+func fail(person: int, key: String) -> void:
+	if not failed.has(person):
+		failed[person] = {}
+	failed[person][key] = FAILED_COOLDOWN
+
+
+## Counts the cool-downs down, and forgets tasks that have left the board.
+func cool(delta: float) -> void:
+	for person: int in failed.keys():
+		var mine: Dictionary = failed[person]
+		for key: String in mine.keys():
+			mine[key] -= delta
+			if mine[key] <= 0.0 or not tasks.has(key):
+				mine.erase(key)
+		if mine.is_empty():
+			failed.erase(person)
 
 
 func reserve(person: int, task: Dictionary) -> void:
