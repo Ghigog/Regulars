@@ -17,15 +17,44 @@ func storing() -> bool:
 	return game.shopping and game.storing_cell != Game.NO_CELL
 
 
-## The piece a card would open for on a cell: what hangs on the wall, else what stands
-## there (a tool on a counter before the counter). Once a wall piece's card has been
-## shut, the next E there takes what stands under it, so a sink under a shelf is reached.
+## Whether the chef holds Reach (Alt / Cmd, RT, the Reach button): E then goes to the high
+## layer, the wall shelf, cabinet or hook. Without a Controls (headless tests) a `reach`
+## meta on the Player stands in for the held key.
+func reaching(ch: Player) -> bool:
+	if ch == null:
+		return false
+	if ch.get_meta("reach", false):
+		return true
+	return game.controls != null and game.controls.reaching(maxi(game.chefs.find(ch), 0))
+
+
+## What Reach would do at the faced cell, when the chef is not holding it and something
+## hangs there ("Take cheese", "Pick up wall shelf"); "" for nothing. Asks as if reaching.
+func reach_action(ch: Player) -> String:
+	if reaching(ch) or game.phase == Game.Phase.SUMMARY:
+		return ""
+	var cell := ch.target_cell() if game.phase == Game.Phase.SERVICE else Grid.to_cell(game.room_edit._piece_in_front(ch))
+	if not game.highs.has(cell):
+		return ""
+	ch.set_meta("reach", true)
+	var out := ""
+	if game.phase == Game.Phase.SERVICE:
+		var st: Station = game.world.station_at(cell, ch)
+		out = game.cooking.prompt_for(st, ch) if st != null else ""
+	elif game.phase == Game.Phase.BUILD and game.shopper != ch:
+		out = "Pick up %s" % lift_name(ch)
+	ch.set_meta("reach", false)
+	return out
+
+
+## The piece a card would open for on a cell: reaching, what hangs on the wall (or nothing);
+## else what stands there (a tool on a counter before the counter), never the wall piece.
 func _card_layer_at(c: Vector2i, ch: Player) -> String:
 	var st: Station = game.stations.get(c)
-	if game.highs.has(c) and (st == null or ch.get_meta("low_next", Game.NO_CELL) != c):
-		return "high"
+	if reaching(ch):
+		return "high" if game.highs.has(c) else ""
 	if st == null:
-		return ""
+		return "high" if game.highs.has(c) else ""   # over bare floor there is nothing to choose between
 	return "top" if Kitchen.is_top(st.type) and not Kitchen.grows_from_counter(st.node) else "base"
 
 
@@ -64,7 +93,6 @@ func _open_card_at(c: Vector2i, layer: String, ch: Player) -> bool:
 	game.storing_cell = c
 	game.card_layer = layer
 	game._card_hold.erase(ch)
-	ch.set_meta("low_next", c if layer == "high" else Game.NO_CELL)   # a wall piece's card shut: next E, what is under it
 	game.audio.sfx("slide")
 	game.hud.shop_ui.show_shop()
 	return true
@@ -282,17 +310,16 @@ func _keeps_boxes(st: Station, layer: String) -> bool:
 	return layer in ["base", "high"] and Kitchen.slots_of(game.kitchen.get_piece(st.cell, layer)) > 0
 
 
-## Which piece on a cell E picks up: a tool off its counter, else what hangs on the wall,
-## else what stands on the floor. Once a wall piece is put back where it was, the next E
-## there takes what stands under it, so a sink under a shelf can be reached.
+## Which piece on a cell E picks up: reaching, what hangs on the wall (or nothing); else
+## a tool off its counter, else what stands on the floor, never the wall piece.
 func _lift_layer(c: Vector2i, ch: Player) -> String:
 	var st: Station = game.stations.get(c)
+	if reaching(ch) or (st == null and game.highs.has(c)):
+		return "high" if game.highs.has(c) else ""
 	if st != null and st.has_node("till"):
 		return "till"   # the till comes off before what it stands on
 	if st != null and Kitchen.is_top(st.type) and not Kitchen.grows_from_counter(st.node):
 		return "top"   # a stove is its counter upgraded: it lifts whole
-	if game.highs.has(c) and (st == null or ch.get_meta("low_next", Game.NO_CELL) != c):
-		return "high"
 	return "base" if st != null else ""
 
 
@@ -330,8 +357,6 @@ func _settle(ch: Player) -> void:
 	var n: Variant = ch.hand.get("node")
 	if n is Node3D and is_instance_valid(n):
 		(n as Node3D).position.y = float(ch.hand.get("y", (n as Node3D).position.y))
-	if ch.hand.get("layer", "") == "high":
-		ch.set_meta("low_next", Vector2i(ch.hand.from.x, ch.hand.from.y))
 	ch.hand = {}
 
 

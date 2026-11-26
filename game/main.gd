@@ -499,7 +499,7 @@ func _update_cursor(ch: Player = null) -> void:
 		ch.cursor.visible = false
 		hud.day_ui.show_prompt(cam.unproject_position(fallen.position + Vector3(0, 1.9, 0)), "Help up", chefs.find(ch))
 		return
-	var st: Station = null if clean_kit.floor_first(ch) else world.station_at(ch.target_cell())
+	var st: Station = null if clean_kit.floor_first(ch) else world.station_at(ch.target_cell(), ch)
 	var action := ""
 	if st != null:
 		action = cooking.prompt_for(st, ch) if phase == Phase.SERVICE else room_edit.night_clean_action(st, ch)
@@ -520,7 +520,7 @@ func _update_cursor(ch: Player = null) -> void:
 	ch.cursor.visible = action != ""
 	var at := Vector2.ZERO
 	if st != null:
-		var top := 0.9
+		var top := BuildStations.HIGH_Y0 + 0.2 if highs.get(st.cell) == st and card.reaching(ch) else 0.9
 		ch.cursor.position = st.position + Vector3(0, top, 0)
 		var over := 2.25 if st.type in ["stove", "fryer"] else top + 0.7
 		if st.widget != null and st.widget.visible:
@@ -553,6 +553,10 @@ func _update_cursor(ch: Player = null) -> void:
 		var held := room_edit.held_prompt(ch, action)
 		action = held.text
 		extras = held.extras
+	if extras.is_empty() and ch.hand.is_empty():
+		var high := card.reach_action(ch)   # what Reach would do here, as a second keycap chip
+		if high != "" and high != action:
+			extras = [["reach", high, true]]
 	hud.day_ui.show_prompt(at, action, chefs.find(ch), ready, extras)
 
 

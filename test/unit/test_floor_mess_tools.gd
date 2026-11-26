@@ -232,7 +232,9 @@ func test_a_sponge_hangs_on_its_hook():
 	var h: Station = game.world.add_high("hook", w)
 	game.clean_kit.on_built(h, "sponge")
 	assert_eq(h.kit_tool, "sponge")
-	assert_eq(game.clean_kit.home_at(w), h)
+	assert_null(game.clean_kit.home_at(w, game.player), "a hook is reached, not walked up to")
+	game.player.set_meta("reach", true)   # holding Reach
+	assert_eq(game.clean_kit.home_at(w, game.player), h)
 	assert_eq(game.cooking.use_station(h, true), "Take sponge")
 	game.cooking.use_station(h)
 	assert_eq(game.player.held, "tool:sponge")

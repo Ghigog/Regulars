@@ -7,9 +7,9 @@ extends RefCounted
 ## action's key: `game.coop.act(owner, action)`. `Controls.buttons()` reads `specs()`
 ## to hit-test fingers, so touch and clicks share one set of discs.
 
-const HOLD := ["use", "aim"]   ## held by a finger, not pressed once
-const ORDER := ["use", "aim", "turn", "sell", "shop", "menu", "back", "options"]
-const ICONS := {"use": "use", "aim": "aim", "turn": "turn", "sell": "sell", "shop": "shop",
+const HOLD := ["use", "aim", "reach"]   ## held by a finger, not pressed once
+const ORDER := ["use", "aim", "reach", "turn", "sell", "shop", "menu", "back", "options"]
+const ICONS := {"use": "use", "aim": "aim", "reach": "reach", "turn": "turn", "sell": "sell", "shop": "shop",
 	"menu": "dishes", "back": "back", "options": "cog"}
 
 var hud
@@ -67,6 +67,8 @@ func specs() -> Array[Dictionary]:
 		want.append({"id": "use", "badge": word, "r": Controls.USE_R, "face": Hud.CORAL,
 			"centre": Vector2(x, y)})
 		want.append({"id": "aim", "r": r, "centre": Vector2(x - Controls.USE_R - r - 18.0, y + Controls.USE_R - r)})
+		if ch != null and (game.card.reaching(ch) or game.card.reach_action(ch) != ""):   # only where something hangs to reach
+			want.append({"id": "reach", "r": r, "centre": Vector2(x - Controls.USE_R - r - 18.0, y + Controls.USE_R - r - d - 14.0)})
 		y -= Controls.USE_R + r + 16.0
 	var step := d + (14.0 if touch else 30.0)
 	if free:

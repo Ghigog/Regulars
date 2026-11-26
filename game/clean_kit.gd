@@ -28,15 +28,13 @@ func setup(game_) -> void:
 
 # ---------------------------------------------------------------- homes
 
-## The piece at a cell that keeps a tool: a mop bucket standing there, a hook hung there,
-## Null for none.
-func home_at(cell: Vector2i) -> Station:
-	var st: Station = game.stations.get(cell)
+## The piece at a cell that keeps a tool: a mop bucket standing there, or, to a chef
+## holding Reach, a hook hung there. Null for none.
+func home_at(cell: Vector2i, ch: Player = null) -> Station:
+	var reach: bool = game.card.reaching(ch)
+	var st: Station = game.highs.get(cell) if reach else game.stations.get(cell)
 	if st != null and CleanTools.home_kind(st.type) != "":
 		return st
-	var h: Station = game.highs.get(cell)
-	if h != null and CleanTools.home_kind(h.type) != "":
-		return h
 	return null
 
 
@@ -166,7 +164,7 @@ static func hold(ch: Player, tool: String, used: int) -> void:
 func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 	if st == null:
 		return ""
-	var home := home_at(st.cell)
+	var home := home_at(st.cell, ch)
 	var tool := held_tool(ch)
 	if tool != "":
 		var used := held_used(ch)
