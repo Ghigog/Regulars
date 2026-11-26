@@ -606,3 +606,9 @@ func test_tag_hint_needs_three_items():
 	var items := _menu_items()
 	assert_eq(Menu.tag_hint(items, ["vegetable"]), "vegetable", "salad, fries and corn")
 	assert_eq(Menu.tag_hint(items, ["meat"]), "")
+
+
+func test_toggled_adds_in_pantry_order_and_removes_every_copy():
+	assert_eq(Menu.toggled(["cheese", "bun"], "patty"), ["bun", "patty", "cheese"], "bottom of the stack first")
+	assert_eq(Menu.toggled(["bun", "patty", "bun"], "bun"), ["patty"], "every copy out")
+	assert_eq(Menu.toggled(["bun"], "bun"), [], "the last one out leaves nothing")
