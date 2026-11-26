@@ -187,8 +187,8 @@ func _refresh_ready() -> void:
 ## The options screen and the shop are shared; the rest is done by that
 ## player's chef.
 func act(p: int, action: String, echo := false) -> void:
-	if action == "aim":
-		return   # held, not pressed: read each frame (`Controls.aiming`)
+	if action == "aim" or action == "reach":
+		return   # held, not pressed: read each frame (`Controls.aiming`, `Controls.reaching`)
 	if action in ["buy", "prev", "next"] and not game.upgrades.strip_open(p):
 		if action == "buy":
 			action = "use"   # Space is E everywhere but the lifted piece's strip
@@ -246,7 +246,7 @@ func act(p: int, action: String, echo := false) -> void:
 			elif action == "use" and game.floor_dirt.help_up(ch):
 				ch.punch()
 			elif action == "use":
-				var st: Station = game.world.station_at(ch.target_cell())
+				var st: Station = game.world.station_at(ch.target_cell(), ch)
 				if game.clean_kit.floor_first(ch):
 					game.clean_kit.floor_use(ch)   # dirt straight ahead, a tool in hand (PRD 9.4)
 				elif st != null and game.cooking.prompt_for(st, ch) != "":
@@ -259,7 +259,10 @@ func act(p: int, action: String, echo := false) -> void:
 			if action == "confirm":
 				confirm_receipt(p)
 			elif action == "back":
-				unconfirm_receipt(p)
+				if game.hud._town_open:
+					game.hud.screens_ui.back_from_town()
+				else:
+					unconfirm_receipt(p)
 			elif action == "town":
 				game.hud.screens_ui.toggle_town()
 		Game.Phase.CLOSED:

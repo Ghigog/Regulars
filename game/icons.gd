@@ -488,6 +488,10 @@ static func icon(id: String) -> Array:
 			o.append([rect(0, -0.78, 0.16, 0.4), INK])
 			o.append([rect(0.78, 0, 0.4, 0.16), INK])
 			o.append([rect(-0.78, 0, 0.4, 0.16), INK])
+		"reach":  # an upward arrow over a shelf plank
+			o.append([rect(0, -0.62, 1.5, 0.26), INK])
+			o.append([rect(0, 0.0, 0.26, 0.7), INK])
+			o.append([PackedVector2Array([Vector2(-0.5, 0.25), Vector2(0.5, 0.25), Vector2(0.0, 0.85)]), INK])
 		"use":  # a hand: palm, four fingers, a thumb
 			o.append([rect(0, -0.35, 1.2, 1.0), INK])
 			for i in 4:

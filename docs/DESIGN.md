@@ -227,7 +227,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
 - **Build phase, between days only, played from the keyboard.** Receipt, then Enter. The
   chef walks the room (WASD or arrows). E picks up the nearest piece within reach (a partition
   on a nearby edge included), the one the chef faces winning a near tie, and puts it down
-  again in front; aiming (Shift, trigger, touch Aim) picks exactly; R turns it, X
+  again in front; aiming (Shift, LT, touch Aim) picks exactly; holding Reach (Left Alt or Cmd, RT, touch Reach) takes the wall layer (shelf, cabinet, hook) instead of what stands below; R turns it, X
   sells it, Esc puts it back. Tab opens the shop: a tray along the bottom holds one row of
   every piece in the category. The row slides so the selected piece is always in the
   middle, much bigger than the small ones either side (about five show each way), on a
@@ -317,11 +317,14 @@ Survive as many days as you can; three walkouts in one day ends the run.
   down the right a big Use button that names the action, and above it, by night, Shop,
   Drop or Done, Turn, Sell, or Erase (with a build tool, Erase makes drags take things
   away); a small Menu button for options. **Aiming** (asked for after the first
-  playtest, 17 November 2026): Shift, either trigger, or the touch Aim button beside Use,
-  held, plants the chef; the move input only turns them. At night they may face a
+  playtest, 17 November 2026): Shift, LT, or the touch Aim button beside Use,
+  held, plants the chef (RT is **Reach**, below); the move input only turns them. At night they may face a
   diagonal too (`Player.aim_dir`, a 45 degree slice each), so W alone faces the cell
   straight up the screen and all eight cells around can be picked up or built on without
-  a step; in service the station turned to wins over a nearer one. Taps on the room work as clicks (pick a guest,
+  a step; in service the station turned to wins over a nearer one. **Reach** (held: Left Alt, Cmd on a Mac, RT, or
+  the touch Reach button) is the high layer: E alone is always what stands below (till, tool, counter,
+  bin, sink), Reach+E always what hangs above (wall shelf, cabinet, hook); a second keycap chip
+  "Alt + E: Take cheese" shows while something hangs there, and the Reach button on touch only then. Taps on the room work as clicks (pick a guest,
   place a piece, drag floors), and a touch on a control never reaches the room. Keys,
   pad buttons and touch buttons all become the same actions (use, back, turn, sell,
   shop, town, options, confirm, search and the four browse directions), sent to the
