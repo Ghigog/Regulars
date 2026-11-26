@@ -22,6 +22,7 @@ const NIGHT_ACTIONS := {
 }
 
 const CLEAN_FIRST := "Clean it first."              # trying to move or sell a messy piece
+const RACK_FIRST := "Put your plates on the rack first."   # trying to lift a piece with a dish in hand
 const WALK_OVER := "Walk over and press Use"        # the mouse over a messy piece at night
 const HANDS_FULL := "Put that down first."          # opening the shop with mess in hand
 
@@ -46,6 +47,11 @@ static func night_action(service_action: String) -> String:
 ## Whether what the chef holds is mess that blocks building and the shop.
 static func carrying_mess(held: String) -> bool:
 	return held in CARRIED_MESS
+
+
+## Whether the chef's hands are too busy to lift a piece: mess, or a washed plate or cup.
+static func hands_busy(held: String) -> bool:
+	return carrying_mess(held) or held == "dishes"
 
 
 ## How old a piece's mess is after `delta` seconds. Mess ages only while it is
