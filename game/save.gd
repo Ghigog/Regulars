@@ -133,6 +133,7 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 	g.staff.rng.state = int(d.staff.rng)
 	_put(g.critic, CRITIC, d.critic)
 	_put(g.town, TOWN, d.town)
+	g.town.fill_missing_keys()
 	g.town.rng.state = int(d.town.rng)
 	_put(g.plan, ["floors", "built", "openings", "finishes"], d.plan)
 	for e: Vector3i in d.screens:
