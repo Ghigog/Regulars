@@ -117,3 +117,23 @@ func test_food_left_on_a_stove_is_gone_and_the_cook_bar_hidden():
 	assert_false(stove._bar.visible)
 	stove.set_item("raw:patty")
 	assert_eq(stove.item, "raw:patty")
+
+
+func _playing_loops() -> Array[String]:
+	var out: Array[String] = []
+	for id: String in Game.LOOPING:
+		if game._sfx.has(id) and game._sfx[id].playing:
+			out.append(id)
+	return out
+
+
+func test_nightfall_silences_the_cooking_loops():
+	var stove: Station = game.world.find_station("stove")
+	stove.set_item("raw:patty")
+	game.prep_games._fade_loops({"sizzle_raw": true, "smoke_warn": true}, 0.1)
+	assert_false(_playing_loops().is_empty(), "a loop is playing before the day ends")
+	_end_day_now()
+	game.session.open_build()
+	assert_eq(_playing_loops(), [] as Array[String])
+	assert_eq(stove.item, "")
+	assert_false(stove.is_cooking())
