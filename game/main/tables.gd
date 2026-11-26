@@ -38,6 +38,7 @@ func _draw_cards() -> void:
 		mid /= t.pieces.size()
 		var l := Label3D.new()
 		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		l.font = Hud.lettering()
 		l.font_size = 40
 		l.pixel_size = 0.006
