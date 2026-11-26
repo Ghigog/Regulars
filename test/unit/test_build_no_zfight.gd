@@ -9,7 +9,7 @@ func _flat_meshes(type: String, rack_dishes := 0) -> Array:
 	add_child_autofree(n)
 	BuildStations.station(n, type, 1)
 	if rack_dishes > 0:
-		BuildStations.rack_load(n, rack_dishes, 1)
+		BuildStations.rack_load(n, rack_dishes)
 	var out := []
 	for c in n.get_children():
 		var m := c as MeshInstance3D

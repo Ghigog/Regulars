@@ -103,3 +103,26 @@ func test_lifting_in_a_broken_room_names_what_is_shut_in():
 	_shut_in(fridge.cell)
 	_lift_table()
 	assert_eq(game.hud.toast.text, "The under-counter fridge can't be reached")
+
+
+func _refusal_holding(box: String) -> String:
+	game.player.hand.id = box
+	return game.placing.place_refusal(Vector3i(2, 3, 0))
+
+
+func test_unchilled_box_over_bare_floor_goes_on_a_counter_not_a_fridge():
+	_to_build()
+	assert_eq(game.kitchen.slots(Vector2i(2, 3)), 0, "bare floor")
+	assert_eq(_refusal_holding("box_bun"), "That box needs a counter")
+	assert_eq(_refusal_holding("box_lettuce"), "That box needs a counter")
+
+
+func test_chilled_box_over_bare_floor_needs_a_fridge():
+	_to_build()
+	assert_eq(_refusal_holding("box_patty"), "That box needs a fridge")
+	assert_eq(_refusal_holding("box_cheese"), "That box needs a fridge")
+
+
+func test_frozen_box_over_bare_floor_needs_a_freezer():
+	_to_build()
+	assert_eq(_refusal_holding("box_ice_cream"), "That box needs a freezer")

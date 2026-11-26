@@ -150,21 +150,17 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			if h.held == "dishes":
 				return [{"do": "restack"}]
 		"wash":
-			var rack := crew.room_view.rack_near(st.cell)
-			if rack == null:
+			# A washed plate goes on the nearest rack with room, a washed cup on the cup stack.
+			var cup := st.dirty_cups >= st.dirty
+			var home: Station = crew.room_view._nearest("cups", st.cell) if cup else crew.room_view.rack_near(st.cell, true)
+			if home == null:
 				return null   # nowhere to put a clean dish: the step ends
-			if rack.count >= Station.RACK_CAPACITY:
-				crew.game.tidy.put_away(rack)   # a full rack is emptied back onto the stacks
 			if JobBoard.roll_task(crew.game.staff, h.person).ok:
-				var d: Dish = crew.game.cooking.wash_one(st)
-				rack.count += 1
-				if d.vessel == Dish.CUP:
-					rack.rack_cups += 1
-				rack.refresh()
+				crew.game.cooking.wash_one(st)
+				home.count += 1
+				home.refresh()
 				crew.game.audio.sfx("wash")
 				crew.game.audio.burst(st.position + Vector3(0, 1.15, 0), "bubbles", 0.4)
-				if st.dirty == 0:
-					crew.game.tidy.put_away(rack)   # the last dish: the washer puts the clean ones away
 			st.used()
 			if st.dirty > 0:
 				return [s.duplicate()]
@@ -284,7 +280,7 @@ func _plate_steps(h: Helper, ticket: int) -> Variant:
 			break
 		var it: Dictionary = tk.order.lines[li].item
 		var type := "cups" if it.course == "drink" else "plates"
-		var stack: Station = crew.game.world.find_station(type)
+		var stack: Station = crew.game.world.find_station("cups") if type == "cups" else crew.room_view.rack_with_plates()
 		if stack == null or stack.count - int(left[type]) <= 0:
 			continue
 		left[type] = int(left[type]) + 1

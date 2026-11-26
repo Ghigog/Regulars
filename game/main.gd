@@ -138,10 +138,10 @@ const NIGHT_ZERO_BLOCK := "Write a menu first: a main the kitchen can make (N, o
 const NIGHT_HINTS: Array[String] = ["The first main needs a stove and a fridge (both are a counter upgraded: E on a counter), each with its box.",
 	"Write a menu: N, or the board by the door.", "Flip the door card to open."]
 var menu_board: MenuBoard               # the chalkboard by the door: tonight's names
-const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "plates": "Plate stack", "cups": "Cup stack", "pass": "Pass counter"}
+const PIECE_NAMES := {"sink": "Sink", "bin": "Bin", "cups": "Cup stack", "pass": "Pass counter"}
 ## What a kitchen cannot open without. Every piece can be sold, these too; while there is
 ## none of one, the shop sells it at any level and the door card stays shut.
-const ESSENTIALS: Array[String] = ["sink", "bin", "plates", "till", "dish_rack"]
+const ESSENTIALS: Array[String] = ["sink", "bin", "till", "dish_rack"]
 const LIFT := 0.3   # how high a piece rises while its storage card is open on it
 var _demo_hover: Vector3:            # chef 1's held spot, for tests and demos
 	get: return player.demo_hover

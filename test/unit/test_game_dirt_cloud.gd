@@ -10,7 +10,7 @@ func test_messy_pieces_show_the_cloud_and_lose_it_when_clean():
 	var t := _dirty_table(2)
 	var sink: Station = game.world.find_station("sink")
 	var bin: Station = game.world.find_station("bin")
-	sink.dirty = Station.SINK_PILED
+	sink.dirty = Station.piled_at(sink.racked)
 	bin.count = Station.BIN_HOLDS
 	sink.refresh()
 	bin.refresh()
@@ -63,6 +63,6 @@ func test_grime_motes_cast_no_shadow():
 	var off := GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	assert_eq(FloorDirt.motes(3, 1).cast_shadow, off, "floor cell motes")
 	var sink: Station = game.world.find_station("sink")
-	sink.dirty = Station.SINK_PILED
+	sink.dirty = Station.piled_at(sink.racked)
 	sink.refresh()
 	assert_eq(_cloud(sink).cast_shadow, off, "station cloud")

@@ -12,7 +12,7 @@ const CATEGORIES: Array[String] = ["Kitchen", "Pantry", "Dining", "Decor", "Buil
 ## Furniture is what stands in the room; Tools are what sits on a counter, the cleaning
 ## kit and the service stacks; Ingredients are the boxes, food and chemicals alike.
 const TABS: Array[String] = ["Furniture", "Tools", "Ingredients", "Build"]
-const TOOLS_TAB: Array[String] = ["mop_bucket", "hook", "sponge", "robot_dock", "plates", "cups", "tray_stack", "till"]
+const TOOLS_TAB: Array[String] = ["mop_bucket", "hook", "sponge", "robot_dock", "dish_rack", "cups", "tray_stack", "till"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## PRD 10: the desk was kept out of the shop until helpers could work; since 10.6 it is
 ## on sale. The one switch that puts every "staff" piece on sale.
@@ -105,14 +105,12 @@ const ITEMS := {
 		"blurb": "Write job posts and read CVs. One desk per employee"},
 	"bin": {"name": "Bin", "price": 30, "level": 2, "category": "Kitchen", "tiers": 1,
 		"blurb": "Another bin. The chef uses the nearest"},
-	"dish_rack": {"name": "Dish rack", "price": 50, "level": 3, "category": "Kitchen", "tiers": 1,
-		"blurb": "Holds 4 washed dishes to dry. Beside a sink, more soak before it looks piled"},
+	"dish_rack": {"name": "Dish rack", "price": 50, "level": 1, "category": "Kitchen", "tiers": 1,
+		"blurb": "Where clean plates are kept, 8 to a rack. Food goes out on them. Beside a sink, more soak before it looks piled. The kitchen needs one to open"},
 	"sink": {"name": "Sink", "price": 70, "level": 3, "category": "Kitchen", "tiers": 1,
 		"blurb": "Another place to wash up"},
 	"till": {"name": "Till", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Where guests pay. Stands on a counter. The kitchen needs one to open"},
-	"plates": {"name": "Plate stack", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,
-		"blurb": "Where clean plates are kept. Food goes out on them. The kitchen needs one to open"},
 	"cups": {"name": "Cup stack", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Where clean cups are kept. Fill one at a drink station. The kitchen needs one to open"},
 	"tray_stack": {"name": "Tray stack", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1,
@@ -310,7 +308,7 @@ static func bp_blurb(bp: Dictionary) -> String:
 ## Where a Kitchen piece sits in the tab, in kitchen order: storage, cooking tools,
 ## drinks, the hood, washing up, cleaning, the desk. Other tabs are one group.
 const KITCHEN_GROUPS := {"counter": 0, "fridge": 0, "shelf": 0, "cabinet": 0, "hood": 3,
-	"bin": 4, "sink": 4, "plates": 4, "cups": 4, "tray_stack": 4, "till": 4, "dish_rack": 4, "mop_bucket": 5, "hook": 5, "sponge": 5, "robot_dock": 5, "desk": 6}
+	"bin": 4, "sink": 4, "cups": 4, "tray_stack": 4, "till": 4, "dish_rack": 4, "mop_bucket": 5, "hook": 5, "sponge": 5, "robot_dock": 5, "desk": 6}
 
 
 static func group_of(bp: Dictionary) -> int:

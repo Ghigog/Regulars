@@ -10,6 +10,8 @@ const WONT_GO := "That won't go here"
 const TAKEN := "Something's already there"
 const NEEDS_COUNTER := "Tools go on a counter"
 const NEEDS_FRIDGE := "That box needs a fridge"
+const NEEDS_FREEZER := "That box needs a freezer"
+const BOX_NEEDS_COUNTER := "That box needs a counter"
 const NO_WALL := "Nothing to hang it on here"
 
 
@@ -72,7 +74,7 @@ func buy_level(id: String) -> int:
 	return 999 if missing(id) else game.ledger.level()
 
 
-## Whether the kitchen is without one of its essentials (a sink, a bin, a plate stack).
+## Whether the kitchen is without one of its essentials (a sink, a bin, a dish rack).
 func missing(id: String) -> bool:
 	if id == "till":
 		return game.paying.till_station() == null
@@ -462,6 +464,13 @@ func can_place(spot: Vector3i, ch: Player = null) -> bool:
 	return place_refusal(spot, ch) == ""
 
 
+## The line for a box put down where nothing stores: names what that box really needs.
+static func _no_storage_refusal(box: String) -> String:
+	if Kitchen.is_frozen(box):
+		return NEEDS_FREEZER
+	return NEEDS_FRIDGE if Kitchen.is_chilled(box) else BOX_NEEDS_COUNTER
+
+
 ## Why the piece in hand cannot go at this spot, in a line for the player; "" when it fits.
 ## A moving piece always fits the spot it came from (`place` turns it back if it must), unless
 ## `strict`, which judges that spot like any other (for trying a turn there).
@@ -474,7 +483,7 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 	var cell := Vector2i(spot.x, spot.y)
 	if Catalog.is_box(ch.hand.id):   # a box goes into a free storage slot that takes it
 		var why := game.kitchen.store_refusal(cell, ch.hand.id)
-		return "" if why == "" else (why if game.kitchen.slots(cell) > 0 else NEEDS_FRIDGE)
+		return "" if why == "" else (why if game.kitchen.slots(cell) > 0 else _no_storage_refusal(ch.hand.id))
 	var reach := _reach()
 	var touch := _touch()
 	match tool_kind(ch.hand.id):

@@ -185,7 +185,9 @@ func _fail(h: Helper) -> void:
 ## Plates and cups that must be let go of go back on their stacks, food and all lost.
 func _back_to_stacks(h: Helper) -> void:
 	for d: Dish in h.dishes:
-		var stack: Station = game.world.find_station("cups" if d.vessel == Dish.CUP else "plates") if d.vessel != "" and not d.dirty else null
+		var stack: Station = null
+		if d.vessel != "" and not d.dirty:
+			stack = game.world.find_station("cups") if d.vessel == Dish.CUP else room_view.rack_near(h.cell(), true)
 		if stack != null:
 			stack.count += 1
 			stack.refresh()

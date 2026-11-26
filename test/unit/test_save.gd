@@ -125,6 +125,27 @@ func test_old_cheese_block_box_becomes_the_cheese_box():
 	assert_eq(other.kitchen.take_stock(b).base, ["box_cheese"], "one box of a kind per cell")
 
 
+func test_an_old_plate_stack_loads_as_a_dish_rack_and_old_rack_cups_go_to_the_cup_stack():
+	game.world.add_station("cups", Vector2i(2, 5))
+	game.world.add_station("dish_rack", Vector2i(2, 4))
+	var data := SaveGame.capture(game)
+	for p: Dictionary in data.pieces:
+		if p.cell == Vector2i(2, 2):
+			p.type = "plates"   # a plate stack, as an old save has it
+			p.count = 12
+		elif p.cell == Vector2i(2, 4):
+			p.count = 4
+			p.rack_cups = 2   # an old rack held cups among its dishes
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = data
+	add_child_autofree(other)
+	other.set_process(false)
+	assert_eq(other.stations[Vector2i(2, 2)].type, "dish_rack", "the plate stack is a rack in the same cell")
+	assert_eq(other.stations[Vector2i(2, 2)].count, Station.RACK_CAPACITY, "its plates, capped at what a rack holds")
+	assert_eq(other.stations[Vector2i(2, 4)].count, 2, "the old rack keeps only its plates")
+	assert_eq(other.stations[Vector2i(2, 5)].count, Station.CUPS + 2, "its cups went to the cup stack")
+
+
 func _saved_cells() -> Array:
 	var cells := []
 	for p in SaveGame.read(SAVE_TEST_PATH).pieces:

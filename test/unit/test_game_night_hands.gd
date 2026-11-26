@@ -14,7 +14,7 @@ func _face_station(st: Station) -> void:
 
 func test_the_plate_stack_hands_out_nothing_at_night():
 	_to_build()
-	var plates: Station = game.world.find_station("plates")
+	var plates: Station = game.world.find_station("dish_rack")
 	var count := plates.count
 	assert_eq(game.cooking.use_station(plates, true), LINE, "a dry run is the refusal")
 	assert_eq(game.cooking.use_station(plates), LINE)
@@ -33,7 +33,7 @@ func test_a_counter_patty_stays_put_at_night():
 
 func test_the_prompt_at_the_plate_stack_still_moves_furniture():
 	_to_build()
-	_face_station(game.world.find_station("plates"))
+	_face_station(game.world.find_station("dish_rack"))
 	assert_eq(game.room_edit.build_action(), "Pick up")
 
 
@@ -47,6 +47,6 @@ func test_clear_table_still_works_at_night():
 
 
 func test_service_still_hands_a_plate():
-	var plates: Station = game.world.find_station("plates")
+	var plates: Station = game.world.find_station("dish_rack")
 	game.cooking.use_station(plates)
 	assert_ne(game.player.held, "")

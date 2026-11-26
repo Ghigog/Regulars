@@ -23,15 +23,13 @@ static func sink_load(n: Node3D, plates: int, piled: bool) -> void:
 		Build.ball(n, Vector3(b[0], b[1], 0.04), b[2], "#9fd3de", 0.0, Build.R_GLOSS)
 
 
-## The clean dishes drying in a rack: up to four plates (and cups) standing on end, one
-## to a slot, so how full it is can be counted at a glance.
-static func rack_load(n: Node3D, dishes: int, cups: int) -> void:
-	for i in mini(dishes, 4):
-		var cup := i >= dishes - cups
-		var p := BuildFood.item("cup" if cup else "plate")
-		p.position = Vector3(-0.21 + i * 0.14, 1.02 if not cup else 0.99, 0.0)
-		p.rotation = Vector3(0.0, 0.0, -1.45 if not cup else 0.0)
-		p.scale = Vector3.ONE * (1.0 if not cup else 0.9)
+## The clean plates in a rack: up to eight standing on end, one to a slot, so how full
+## it is can be counted at a glance.
+static func rack_load(n: Node3D, plates: int) -> void:
+	for i in mini(plates, 8):
+		var p := BuildFood.item("plate")
+		p.position = Vector3(-0.245 + i * 0.07, 1.02, 0.0)
+		p.rotation = Vector3(0.0, 0.0, -1.45)
 		n.add_child(p)
 
 

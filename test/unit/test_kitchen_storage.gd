@@ -304,7 +304,7 @@ func test_wall_cells_are_back_wall_cells_without_a_window():
 
 func test_a_cabinet_hangs_over_a_piece_and_comes_off_before_it():
 	_game()
-	var c := Vector2i(2, 2)   # the tray stack, against the back wall
+	var c := Vector2i(2, 2)   # the dish rack, against the back wall
 	assert_true(game.placing.pick_catalog("cabinet"))
 	assert_false(game.placing.can_place(Vector3i(2, 4, 0)), "not away from a wall")
 	assert_true(game.placing.can_place(Vector3i(2, 2, 0)))
@@ -315,7 +315,7 @@ func test_a_cabinet_hangs_over_a_piece_and_comes_off_before_it():
 	assert_eq(game.ledger.money, 500 - Catalog.price_of("cabinet"))
 	var cab: Station = game.highs[c]
 	assert_true(cab.high)
-	assert_eq(game.stations[c].type, "plates", "the tray stack still stands below")
+	assert_eq(game.stations[c].type, "dish_rack", "the dish rack still stands below")
 	assert_false(game.grid.blocked.has(Vector2i(2, 3)))
 	assert_true(game.placing.pick_catalog("hood"))
 	assert_false(game.placing.can_place(Vector3i(2, 2, 0)), "one high piece a cell")
@@ -326,7 +326,7 @@ func test_a_cabinet_hangs_over_a_piece_and_comes_off_before_it():
 	assert_eq(game.highs[c], cab, "cancel hangs it back")
 	assert_true(cab.visible)
 	assert_true(game.placing.pick_up(_at(2, 2)))
-	assert_eq(game.player.hand.id, "plates", "hung back, the next E takes what stands under it")
+	assert_eq(game.player.hand.id, "dish_rack", "hung back, the next E takes what stands under it")
 	game.placing.cancel_hand()
 	assert_true(game.placing.pick_up(_at(2, 2)))
 	assert_true(game.placing.place(Vector3i(1, 2, 0)), "moved along the wall")

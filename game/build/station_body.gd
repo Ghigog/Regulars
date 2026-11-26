@@ -175,7 +175,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 				BuildStations._counter(n, Build.CABINET, Build.WORKTOP, base != "double_counter")
 		"pass":
 			BuildStations._pass(n)
-		"plates", "cups", "tray_stack":
+		"cups", "tray_stack":
 			BuildStations._counter(n, Build.CABINET, Build.WORKTOP)
 			Build._add(n, Build.bevel_mesh(Vector3(0.74, 0.02, 0.54), 0.008), Vector3(0, 0.9, 0), Color(Build.CORAL), 0.0)
 		"sink":
@@ -392,9 +392,9 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			# A worktop with a wooden rack; the dishes drying in it are `BuildStations.rack_load`.
 			BuildStations._counter(n, Build.CABINET, Build.WORKTOP)
 			Build.box(n, Vector3(0, 0.9, 0), Vector3(0.72, 0.03, 0.5), Build.WOOD_DARK, 0.0, Build.R_WOOD)
-			for i in 5:
-				Build.box(n, Vector3(-0.28 + i * 0.14, 0.93, 0.2), Vector3(0.03, 0.2, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
-				Build.box(n, Vector3(-0.28 + i * 0.14, 0.93, -0.2), Vector3(0.03, 0.3, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
+			for i in 9:
+				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, 0.2), Vector3(0.03, 0.2, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, -0.2), Vector3(0.03, 0.3, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
 		"table":
 			# Two-seat table (sheet 1): a slab top with a small bevel on a slim pedestal and
 			# disc foot; coral chairs on dark wooden legs (`_chair`).

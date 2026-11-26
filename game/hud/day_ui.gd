@@ -394,6 +394,10 @@ func refresh_tickets() -> void:
 				var row := HBoxContainer.new()
 				row.add_theme_constant_override("separation", 4)
 				col.add_child(row)
+				# Served lines fade, so the item still missing stands out on the card.
+				var tray: Tray = tk.get("order")
+				if tray != null and tray.line_served(line) and not tray.is_complete():
+					row.modulate.a = 0.45
 				row.add_child(HudWidgets.Icon.new(Icons.dish_id(it), 22, false))
 				var box := VBoxContainer.new()
 				box.add_theme_constant_override("separation", 0)

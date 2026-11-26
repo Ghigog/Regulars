@@ -28,7 +28,7 @@ func test_a_three_item_order_is_one_bill():
 	# The side and the drink first, one in each hand: a bun put down and plated, a cup poured.
 	game.cooking.use_station(game.menu_stock.storage_of("bun"))
 	game.cooking.use_station(_the_pass())
-	_use("plates")
+	_use("dish_rack")
 	assert_eq(game.cooking.use_station(_the_pass()), "Plate it", "a bun alone is the side")
 	assert_eq(game.cooking.use_station(_the_pass()), "Pick up")
 	_use("cups")
@@ -67,7 +67,7 @@ func test_a_half_made_plate_says_what_it_needs():
 	var g := _ordered_guest()
 	game.cooking.use_station(game.menu_stock.storage_of("bun"))
 	game.cooking.use_station(_the_pass())
-	_use("plates")
+	_use("dish_rack")
 	game.cooking.use_station(_the_pass())
 	game.cooking.use_station(_the_pass())
 	assert_eq(game.cooking.use_station(g.table), "Needs patty")
@@ -301,3 +301,17 @@ func test_a_partly_served_guest_s_bubble_shows_the_missing_item():
 	_cook_burger()
 	game.cooking.use_station(g.table)
 	assert_eq(g.want_icon(), Icons.dish_id(g.order.drink), "the drink once the main is down")
+
+
+func test_a_partly_served_guest_s_rail_card_fades_the_served_item():
+	game.world.add_station("fountain", Vector2i(2, 5))
+	game.world.add_station("cups", Vector2i(1, 6))
+	game.menu.add("drink", ["soda"], "Soda")
+	game.town.people[0].likes = ["soda"]
+	var g := _ordered_guest()
+	_cook_burger()
+	game.cooking.use_station(g.table)
+	var card: Node = game.hud.ticket_rail.get_child(game.hud.ticket_rail.get_child_count() - 1)
+	var rows := card.get_child(0).get_children().filter(func(n): return n is HBoxContainer)
+	assert_lt(rows[1].modulate.a, 1.0, "the served main fades")
+	assert_eq(rows[2].modulate.a, 1.0, "the missing drink stays bright")
