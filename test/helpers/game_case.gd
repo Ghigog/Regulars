@@ -279,6 +279,14 @@ func _face(cell: Vector2i, dir: Vector2i) -> void:
 
 
 
+func _face_station(st: Station) -> void:
+	var c := game.stations.find_key(st) as Vector2i
+	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+		_face(c + d, -d)
+		if game.world.station_at(game.player.target_cell()) == st:
+			return
+
+
 func _face_table() -> void:
 	_face(Vector2i(8, 2), Vector2i(0, 1))   # the table at (8, 3)
 

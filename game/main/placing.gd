@@ -99,7 +99,11 @@ func lift_box(c: Vector2i, layer: String) -> String:
 ## `layer` names the piece to lift on a cell ("high" or "base"); by default `_lift_layer`.
 func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool:
 	ch = game._me(ch)
-	if game.phase != Game.Phase.BUILD or not ch.hand.is_empty() or Cleaning.carrying_mess(ch.held) or CleanKit.holding(ch):
+	if game.phase == Game.Phase.BUILD and ch.hand.is_empty() and ch.held == "dishes":
+		game.audio.sfx("fail")
+		game.hud.day_ui.say(Cleaning.RACK_FIRST)
+		return false
+	if game.phase != Game.Phase.BUILD or not ch.hand.is_empty() or Cleaning.hands_busy(ch.held) or CleanKit.holding(ch):
 		return false   # hands full: a bag, a plate, a mop (PRD 9.4)
 	var c := Grid.to_cell(p)
 	var edge := snap_edge(p)
