@@ -424,7 +424,7 @@ func walk_out(g: Guest) -> void:
 	for m in going:
 		m.mood.think("I'm never coming back")
 		m.stormed = true
-		talk = game.town.gossip_line(m.idx, game.town.record_walkout(m.idx, game.ledger.day))
+		talk = game.town.gossip_line(m.idx, game.town.record_walkout(m.idx, game.ledger.day), "", true)
 		game.day._critic_leaves(m, true)
 		names.append(m.info.name)
 		var mark := Fx.play(m, "anger", Vector3(0, 1.75, 0), 0.3, true)

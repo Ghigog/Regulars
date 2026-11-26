@@ -215,7 +215,7 @@ func test_topic_split_changes_no_affinity():
 	for i in a.people.size():
 		assert_eq(float(a.people[i].affinity), float(b.people[i].affinity), "affinity of %d" % i)
 		assert_almost_eq(_sum_parts(a, i), float(a.people[i].affinity), 0.00001, "parts add up for %d" % i)
-	assert_almost_eq(float(a.people[0].affinity), 0.88, 0.00001, "held at 1, then disgust took 0.1 and a friend 0.02")
+	assert_almost_eq(float(a.people[0].affinity), 0.9, 0.00001, "held at 1, then disgust took 0.1; a friend finding nothing no longer reaches them")
 	assert_almost_eq(float(Town.new(3).record_visit(0, 0.9)), 0.3, 0.00001, "a visit moves affinity as it always did")
 
 

@@ -191,7 +191,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   ingredients and cheap ones are picked more often. In a group, someone with no main
   orders a drink they do not mind, or nothing; the group walks on only if nobody finds
   a main. A guest who walks on stops at the board, thinks "Nothing I liked on the menu"
-  and leaves: no strike, a small drop in opinion that friends hear about; the receipt
+  and leaves: no strike, a small drop in their own opinion (friends do not hear); the receipt
   counts them. Tastes are never listed: the guest card shows how often they ordered
   each item ("Orders:"), a guest reading a menu with three or more items of a kind they
   like says so ("So many things with vegetables. I love vegetables!"), a liked
@@ -671,7 +671,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   (patience `speed`, savour up to the order's quality `quality`, savour from liked
   ingredients `variety`, joy and the baseline `other`), finding nothing on the menu is
   `variety`, kindness, walkouts and forgiving are `other`; friends hear it under the
-  same topic. The review, printed at the end of the day, replaces everyone's four topics
+  same topic, but bad news only from walkouts, unpaid exits and disgust (disgusted or worse): finding nothing and so-so visits stay with the guest, and only those really bad visits make the receipt say "is warning people off" (cleared by a good visit). Good visits and praise still spread. The review, printed at the end of the day, replaces everyone's four topics
   with (rating - 3) x 0.1, leaves `other`, grudges and "never coming back" alone, and
   gives `roll_guests` an extra -0.25 to +0.25 for the next four days (stacks with flyers, which add a fixed `Town.FLYER_GUESTS` extra guests,
   replaced by the next review). The clipping (headline by stars, the four ratings with
