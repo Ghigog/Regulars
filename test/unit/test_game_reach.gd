@@ -1,66 +1,81 @@
 extends "res://test/helpers/game_case.gd"
-## The E target is the nearest thing within reach: a wall stops a hand, so the door card
-## beats a rug or station on the far side of the front wall.
+## Reach: a held modifier (Left Alt / Cmd, RT, the touch Reach button) picks the high layer
+## (wall shelf, cabinet, hook); plain E is what stands below. No guessing, no alternating.
+## Headless there is no Controls, so a `reach` meta on the Player stands in for the key.
+
+const C := Vector2i(0, 6)
 
 
-func before_each():
-	super.before_each()
-	game.arrivals.clear()
-	game.step(0.1)
-	game.step(0.1)
+func _reach(on: bool) -> void:
+	game.player.set_meta("reach", on)
 
 
-func _stand(cell: Vector2i, off := Vector3.ZERO, face := Vector2i(0, 1)) -> Player:
-	var ch: Player = game.player
-	ch.position = Grid.center(cell) + off
-	ch.look(face)
-	return ch
+## A counter with a box of buns below and a wall shelf with cheese above it.
+func _stocked_counter() -> void:
+	if not game.stations.has(C):
+		game.world.add_station("counter", C)
+	if not game.highs.has(C):
+		game.world.add_high("shelf", C)
+	game.kitchen.cells[C].stock.base.assign(["box_bun"])
+	game.kitchen.cells[C].stock.high.assign(["box_cheese"])
+	game.player.position = Grid.center(Vector2i(1, 6))
+	game.player.look(Vector2i(-1, 0))
 
 
-func _clear_rugs() -> void:
-	for a: Vector2i in game.rugs:
-		game.rugs[a].queue_free()
-	game.rugs.clear()
+func test_service_plain_use_takes_from_below_and_reach_from_the_shelf():
+	_stocked_counter()
+	var low: Station = game.world.station_at(C, game.player)
+	assert_eq(game.cooking.use_station(low, true, game.player), "Take %s" % Pantry.name_of("bun").to_lower())
+	_reach(true)
+	var high: Station = game.world.station_at(C, game.player)
+	assert_eq(high, game.highs[C], "reaching finds the shelf")
+	assert_eq(game.cooking.use_station(high, true, game.player), "Take cheese")
+	game.cooking.use_station(high, false, game.player)
+	assert_eq(game.player.held, Tray.kind("raw", "cheese"))
 
 
-func test_the_door_beats_a_rug_behind_the_front_wall():
+func test_reach_with_an_empty_high_layer_does_nothing():
+	_stocked_counter()
+	game.highs.erase(C)
+	_reach(true)
+	assert_null(game.world.station_at(C, game.player))
+	assert_eq(game.card.reach_action(game.player), "", "no chip while reaching, and none for nothing")
+
+
+func test_the_prompt_chip_names_the_reach_action_until_it_is_held():
+	_stocked_counter()
+	assert_eq(game.card.reach_action(game.player), "Take cheese")
+	_reach(true)
+	assert_eq(game.card.reach_action(game.player), "", "held: the main prompt names it instead")
+
+
+func test_a_sponge_on_a_hook_is_only_taken_with_reach():
+	_stocked_counter()
+	game.highs.erase(C)
+	var hook: Station = game.world.add_high("hook", C)
+	game.clean_kit.on_built(hook, "sponge")
+	assert_null(game.clean_kit.home_at(C, game.player))
+	_reach(true)
+	assert_eq(game.clean_kit.home_at(C, game.player), hook)
+	assert_eq(game.cooking.use_station(game.world.station_at(C, game.player), true, game.player), "Take sponge")
+
+
+func test_night_plain_and_reach_pick_their_layer_every_time():
+	_stocked_counter()
 	game.session.open_build()
-	game.player.hand = {}
-	_clear_rugs()
-	game.placing.add_rug(Vector2i(Game.W - 2, Game.DOOR.y - 3))   # covers (9, 1) and (9, 2)
-	var ch := _stand(Vector2i(Game.W, Game.DOOR.y - 1), Vector3(0, 0, 0.4), Vector2i(-1, 0))
-	assert_true(game.day.at_door(ch), "set-up: at the door")
-	assert_eq(game.room_edit._piece_in_front(ch), Vector3.INF)
-	assert_eq(game.room_edit.build_action(ch), "Open up")
+	for i in 3:
+		_reach(false)
+		assert_eq(game.card._card_layer_at(C, game.player), "base")
+		assert_eq(game.card._lift_layer(C, game.player), "base")
+		_reach(true)
+		assert_eq(game.card._card_layer_at(C, game.player), "high")
+		assert_eq(game.card._lift_layer(C, game.player), "high")
+	game.highs.erase(C)
+	assert_eq(game.card._card_layer_at(C, game.player), "", "Reach with nothing hung opens nothing")
 
 
-func test_a_nearer_rug_beats_the_door_until_the_doorway_is_nearer():
-	game.session.open_build()
-	game.player.hand = {}
-	_clear_rugs()
-	game.placing.add_rug(Vector2i(Game.W - 2, Game.DOOR.y - 1))   # covers (9, 3) and (9, 4)
-	var ch := _stand(Vector2i(Game.W - 1, Game.DOOR.y + 1), Vector3(0, 0, -0.5))
-	assert_true(game.day.at_door(ch), "set-up: at the door")
-	assert_eq(game.room_edit.build_action(ch), "Pick up", "the rug is nearer")
-	ch.position = Game.DOORWAY + Vector3(-0.05, 0, 0.55)
-	assert_eq(game.room_edit.build_action(ch), "Open up", "the doorway is nearer")
-
-
-func test_a_piece_through_the_doorway_is_still_reached():
-	game.session.open_build()
-	game.player.hand = {}
-	_clear_rugs()
-	game.placing.add_rug(Vector2i(Game.W - 2, Game.DOOR.y))
-	var ch := _stand(Vector2i(Game.W, Game.DOOR.y), Vector3.ZERO, Vector2i(-1, 0))
-	assert_ne(game.room_edit._piece_in_front(ch), Vector3.INF)
-
-
-func test_a_station_through_the_wall_is_not_targeted():
-	var st: Station = game.menu_stock.storage_of("patty")
-	game.player.position = Grid.center(st.cell + Vector2i(0, 0))
-	assert_eq(game.player.target_cell(), st.cell, "set-up: reachable inside")
-	var wall := Grid.edge_between(st.cell, st.cell + Vector2i(1, 0))
-	game.grid.walls[wall] = true
-	game.grid.walls[Grid.edge_between(st.cell + Vector2i(0, 1), st.cell + Vector2i(1, 1))] = true
-	game.player.position = Grid.center(st.cell + Vector2i(1, 1))
-	assert_ne(game.player.target_cell(), st.cell, "diagonal through the wall")
+func test_glyphs_and_the_reach_key():
+	assert_eq(Controls.GLYPHS.keys.reach, "Alt")
+	assert_eq(Controls.GLYPHS.pad.reach, "RT")
+	assert_eq(Controls.GLYPHS.pad.aim, "LT")
+	assert_eq(Controls.GLYPHS.touch.reach, "Reach")

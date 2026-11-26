@@ -105,7 +105,6 @@ func pick_up(p: Vector3, ch: Player = null, whole := false, layer := "") -> bool
 	var edge := snap_edge(p)
 	if layer == "":
 		layer = game.card._lift_layer(c, ch)
-	ch.set_meta("low_next", Game.NO_CELL)
 	var carried: Array = []
 	if layer == "till" and game.stations.has(c) and game.stations[c].has_node("till"):
 		var till: Node3D = game.stations[c].get_node("till")
@@ -214,10 +213,6 @@ func _put_down(h: Dictionary, spot: Vector3i, facing: int) -> void:
 			layer = "high"   # put back where it hung
 		if layer == "high":
 			game.world._hang(n, cell)
-			if h.get("from", Vector3i(0, 0, -1)) == spot:
-				for ch: Player in game.chefs:   # put back where it hung: E next takes what is under it
-					if ch.hand.get("node") == n:
-						ch.set_meta("low_next", cell)
 			_restock(h, cell)
 			return
 	if h.id == "screen":

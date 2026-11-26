@@ -402,8 +402,10 @@ func _refresh_wall(cell: Vector2i) -> void:
 
 
 ## The piece a chef uses at a cell: what stands there, else what hangs on the wall above
-## bare floor (a cabinet's stock is reached from below or beside it).
-func station_at(cell: Vector2i) -> Station:
+## bare floor. A chef holding Reach (`ch`) uses only what hangs there, or nothing.
+func station_at(cell: Vector2i, ch: Player = null) -> Station:
+	if ch != null and game.card.reaching(ch):
+		return game.highs.get(cell)
 	return game.stations.get(cell, game.highs.get(cell))
 
 
