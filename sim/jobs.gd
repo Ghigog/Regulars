@@ -33,7 +33,7 @@ extends RefCounted
 ##   tables:   [{id, cell, state: "order" | "clear", wait}]
 ##   bills:    [{id, cell, wait}]   a table ready to pay with no slip printed yet (PRD 11.4):
 ##       `id` is the table's number, `cell` where the bill is handed over.
-##   dirt:     {Vector2i: level}           as `FloorMess.dirt`; level `DIRT_FROM` and up is a task.
+##   dirt:     {Vector2i: level}           as `FloorMess.dirt`; every level from 1 up is a task.
 ##   grease:   {Vector2i: true}            dirt that is kitchen grease (the scraper's, PRD 9.5).
 ##   fallen:   [{id, cell, wait}]          someone down on the floor (PRD 9.3).
 ##   sinks:    [{cell, dishes: int}]       dirty dishes waiting.
@@ -47,8 +47,9 @@ const URGENCY := {
 	"help_up": 6.0, "carry": 5.0, "plates": 4.5, "assemble": 4.0, "scrap": 3.8, "prep": 3.5, "bill": 3.5, "fetch": 3.0, "order": 3.0,
 	"clear": 2.0, "tidy": 2.0, "dirt": 1.0, "wash": 1.5, "bin": 1.5,
 }
-const DIRT_FROM := 2           # dirt at this level or more is a task
+const DIRT_FROM := 2           # dirt at this level or more adds urgency per level
 const DIRT_PER_LEVEL := 0.5    # tunable: urgency a level of dirt adds over `DIRT_FROM`
+const TRAIL_URGENCY := 0.5     # tunable: level 1 dirt (a tracked trail) ranks below every other task
 const WAIT_PULL := 0.05        # tunable: urgency a second of waiting adds
 const URGENCY_CELLS := 4.0     # tunable: cells of walking an urgency point is worth
 const REACT_BASE := 0.5        # tunable: seconds a content helper takes to pick a new task
@@ -95,10 +96,13 @@ func rebuild(world: Dictionary) -> void:
 	var dirt: Dictionary = world.get("dirt", {})
 	for cell: Vector2i in dirt:
 		var level := int(dirt[cell])
-		if level >= DIRT_FROM:
+		if level >= 1:
 			var greasy: bool = (world.get("grease", {}) as Dictionary).has(cell)
 			var task := _add("dirt:%d,%d" % [cell.x, cell.y], "dirt", cell, 0.0, {"level": level, "grease": greasy})
-			task.urgency += DIRT_PER_LEVEL * (level - DIRT_FROM)
+			if level < DIRT_FROM:
+				task.urgency = TRAIL_URGENCY
+			else:
+				task.urgency += DIRT_PER_LEVEL * (level - DIRT_FROM)
 			task.duties = dirt_duties(level, greasy)
 	for f: Dictionary in world.get("fallen", []):
 		_add("help_up:%s" % str(f.id), "help_up", f.cell, float(f.get("wait", 0.0)), {"person": f.id})

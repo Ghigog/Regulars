@@ -152,7 +152,7 @@ a happy crew down. Breaks are the player's way to arrange this.
   opens and leave as it closes; the build phase is the chefs' alone.
 - **The task board** (`sim/jobs.gd`): every open task with its place and the duty it
   needs: an ingredient a ticket lacks (fetch, then prep), a tray to assemble, a tray to
-  carry, a table to order, a table to clear, dirt at level 2 or more, a fallen person,
+  carry, a table to order, a table to clear, any dirt (a level 1 trail ranks last), a fallen person,
   dishes in the sink, a full bin.
 - Each helper takes the nearest, most urgent task their duties allow and reserves it.
   A chef doing a task takes it off the board. A chef can take anything a helper is

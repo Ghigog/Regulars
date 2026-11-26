@@ -516,8 +516,8 @@ Survive as many days as you can; three walkouts in one day ends the run.
   - *In service (10.5, 10.6).* Hires walk in as the door opens and leave as it closes;
     the build phase is the chefs' alone. Five times a second the board is rebuilt from
     the room: an ingredient a ticket lacks (fetch, then prep at its tool), plates to
-    set out, food to assemble, plates to carry, leftover plates to tidy, a table to order or clear, dirt at level 2
-    or more, someone fallen, dishes in the sink, a full bin, burnt food to scrap. Each
+    set out, food to assemble, plates to carry, leftover plates to tidy, a table to order or clear, any dirt (level 1 last),
+    someone fallen, dishes in the sink, a full bin, burnt food to scrap. Each
     free helper takes the task their duties allow that is most urgent for the walk (an
     urgency point is worth four cells; help up 6,
     carry 5, plates 4.5, assemble 4, scrap 3.8, prep 3.5, fetch and order 3, clear 2, wash

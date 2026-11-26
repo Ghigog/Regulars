@@ -645,7 +645,7 @@ func test_every_task_kind_comes_with_its_duty():
 		"sinks": [{"cell": Vector2i(0, 3), "dishes": 2}, {"cell": Vector2i(0, 4), "dishes": 0}],
 		"bins": [{"cell": Vector2i(0, 5), "full": true}, {"cell": Vector2i(0, 6), "full": false}],
 	})
-	assert_eq(_types(b), ["assemble", "bin", "carry", "clear", "dirt", "fetch", "help_up", "order", "wash"])
+	assert_eq(_types(b), ["assemble", "bin", "carry", "clear", "dirt", "dirt", "fetch", "help_up", "order", "wash"])
 	assert_eq(b.tasks["fetch:1:0"].duties, ["fetch"])
 	assert_eq(b.tasks["fetch:1:0"].dest, Vector2i(1, 0), "fetched to the stove")
 	assert_eq(b.tasks["carry:9"].duties, ["carry_trays"])
@@ -656,7 +656,21 @@ func test_every_task_kind_comes_with_its_duty():
 	assert_eq(b.tasks["bin:0,5"].duties, ["empty_bin"])
 	assert_eq(b.tasks["assemble:2"].duties, ["assemble"])
 	assert_true(b.tasks["dirt:6,5"].duties.has("mop") and b.tasks["dirt:6,5"].duties.has("sponge"))
-	assert_false(b.tasks.has("dirt:5,5"), "dirt under level 2 is left")
+	assert_true(b.tasks.has("dirt:5,5"), "level 1 dirt is a task too")
+	assert_lt(b.tasks["dirt:5,5"].urgency, b.tasks["dirt:6,5"].urgency)
+
+
+func test_level_1_dirt_comes_after_a_carry_and_below_level_2_dirt():
+	var s := _crew({1: ["carry_trays", "mop"]})
+	var h := [{"id": 1, "cell": Vector2i(0, 0), "idle": 5.0}]
+	var b := _board({"dishes": [{"id": 3, "cell": Vector2i(3, 0)}], "dirt": {Vector2i(0, 3): 1}})
+	assert_eq(b.assign(s, h, 1, 0.0, 100.0)[1].key, "carry:3", "the carry first")
+	b.rebuild({"dirt": {Vector2i(0, 3): 1}})
+	b.done(1)
+	assert_eq(b.assign(s, h, 1, 0.0, 100.0)[1].key, "dirt:0,3", "level 1 dirt once nothing else is open")
+	b.rebuild({"dirt": {Vector2i(0, 3): 1, Vector2i(3, 0): 2}})
+	b.done(1)
+	assert_eq(b.assign(s, h, 1, 0.0, 100.0)[1].key, "dirt:3,0", "level 2 before level 1 at the same distance")
 
 
 func test_a_raw_item_at_a_station_is_a_prep_and_items_in_hand_cover_their_lack():
