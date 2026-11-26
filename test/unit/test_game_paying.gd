@@ -144,6 +144,7 @@ func test_at_the_till_a_slip_with_no_table_pays_the_guest_it_matches():
 	var a := _ready_to_pay(0)
 	var b := _ready_to_pay(1)
 	assert_ne(a.table, b.table)
+	a.order["side"] = {"id": 999}   # the two parties ordered the same main; give the front one a side
 	game.paying.send_to_till(a.table)
 	game.paying.send_to_till(b.table)
 	_run(8.0)
