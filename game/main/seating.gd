@@ -54,7 +54,7 @@ func spawn_group(ids: Array, as_critic := false) -> Array[Guest]:
 			g.state = "browse"
 			g.timer = Guest.BROWSE_TIME
 			g.hold = 0.4 * k
-			g.walk_to(Vector2i(Game.W + 1, Grid.to_cell(queue_spot(0)).y + k), queue_spot(0) + Vector3(1.0, 0, k * 0.9))
+			g.walk_to(outer_lane(Grid.to_cell(queue_spot(0)).y + k), queue_spot(0) + Vector3(1.0, 0, k * 0.9))
 	_reflow_queue()
 	return party
 
@@ -120,6 +120,22 @@ func queue_spot(i: int) -> Vector3:
 	return Grid.center(Game.DOOR) - Vector3(0, 0, Game.QUEUE_GAP * (i + 1))
 
 
+## The outer lane's cell at `row`, or the nearest open cell of the open pavement rows when a
+## table or decor piece stands there.
+func outer_lane(row: int) -> Vector2i:
+	var best := Vector2i(Game.W + 1, row)
+	var best_d := 1 << 30
+	for c in Game.PAVEMENT.size.x * Game.PAVEMENT.size.y:
+		var cell := Game.PAVEMENT.position + Vector2i(c % Game.PAVEMENT.size.x, c / Game.PAVEMENT.size.x)
+		if game.grid.is_blocked(cell):
+			continue
+		var d := absi(cell.y - row) * 2 + (0 if cell.x == Game.W + 1 else 1)
+		if d < best_d:
+			best_d = d
+			best = cell
+	return best
+
+
 ## Everyone in line steps up to their own place. Newcomers walk down the outer
 ## half of the pavement and step in beside their place, so they never walk
 ## through the people already waiting.
@@ -128,7 +144,7 @@ func _reflow_queue() -> void:
 		var g := game.queue[i]
 		var at := queue_spot(i)
 		var row := clampi(Grid.to_cell(at).y, Game.LOT.position.y, Game.LOT.end.y - 1)
-		g.walk_to(Vector2i(Game.W if g.cell.x == Game.W else Game.W + 1, row), at)
+		g.walk_to(Vector2i(Game.W, row) if g.cell.x == Game.W else outer_lane(row), at)
 		g.line_place = i
 
 
