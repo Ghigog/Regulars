@@ -177,9 +177,10 @@ func _apply_demo(demo: String) -> void:
 		game.arrivals.clear()
 		game.arrivals.append({"time": 0.2, "group": [0, 1]})
 		game.get_tree().create_timer(5.5).timeout.connect(_demo_slip)
-	elif demo == "messy":  # a sink piled with washing-up and an overflowing bin; shoot at about 10
+	elif demo == "messy":  # a sink with two plates and a cup to wash and an overflowing bin; shoot at about 10
 		var sink := game.world.find_station("sink")
-		sink.dirty = 4
+		sink.dirty = 3
+		sink.dirty_cups = 1
 		sink.refresh()
 		game.world.find_station("dish_rack").count = 0
 		game.world.find_station("dish_rack").refresh()
