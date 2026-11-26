@@ -540,6 +540,24 @@ func _face_at(st: Station) -> void:
 	game.player.look(Vector2i(0, -1))
 
 
+func test_washing_prompt_counts_up_with_no_hold_bar():
+	var sink: Station = game.world.find_station("sink")
+	sink.dirty = 2
+	_face_at(sink)
+	assert_eq(game.cooking.prompt_for(sink), "Wash")
+	game.cooking.use_station(sink)
+	_hold_wash(game.cooking.WASH_HOLD / 2.0)
+	assert_true(game.cooking.prompt_for(sink).begins_with("Washing "))
+	var pct := int(game.cooking.prompt_for(sink).trim_prefix("Washing ").trim_suffix("%"))
+	assert_between(pct, 40, 60)
+	assert_true(game.player._give_bar == null or not game.player._give_bar.visible)
+	game.cooking._tick_wash(game.player, false, 0.1)
+	assert_eq(game.cooking.prompt_for(sink), "Wash", "letting go resets")
+	game.cooking.use_station(sink)
+	_hold_wash(game.cooking.WASH_HOLD + 0.2)
+	assert_false(game.cooking.prompt_for(sink).begins_with("Washing"), "no percentage left over")
+
+
 func test_washing_a_dirty_plate_is_a_hold_then_a_rack():
 	var table: Station = game.stations[Vector2i(6, 1)]
 	table.dirty = 3
