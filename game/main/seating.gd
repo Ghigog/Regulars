@@ -221,6 +221,8 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 			var curve: Array = Game.GROSS[s.kind]
 			var rate := GuestMood.gross_rate(curve[0], age, curve[1], curve[2])
 			g.mood.see_gross(rate, delta, s.thought)
+			if rate >= GuestMood.NOTICE:
+				g.note_disgust(c, s.kind)
 			if g == game.critic_guest and rate >= GuestMood.NOTICE:
 				g.mood.think(Critic.thought("gross"))
 			saw_gross = saw_gross or rate >= GuestMood.NOTICE

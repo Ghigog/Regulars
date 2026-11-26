@@ -157,9 +157,13 @@ func disgust(g: Guest, delta: float, reach: int) -> bool:
 	if sight > 0.0:
 		g.mood.see_gross(sight, delta, "Look at the state of the floor")
 		noticed = sight >= GuestMood.NOTICE
+		if noticed:
+			g.note_disgust(seen_from(g.cell, reach)[0], "mess")
 	if smell > 0.0:
 		g.mood.see_gross(smell, delta, "What is that smell?")
-		noticed = noticed or smell >= GuestMood.NOTICE
+		if smell >= GuestMood.NOTICE:
+			g.note_disgust(g.cell, "smell")   # smell has no place: the last cause wins
+			noticed = true
 	if noticed and g == game.critic_guest:
 		g.mood.think(Critic.thought("gross"))
 	return noticed

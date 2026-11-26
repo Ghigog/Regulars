@@ -63,7 +63,8 @@ func _demo_mop(demo: String) -> void:
 			game.player.look(Vector2i(0, 1))
 			game.clean_kit.keep(bucket, "", 0)   # the mop is out, in the chef's hands
 			CleanKit.hold(game.player, "mop", CleanTools.dirty_after("mop"))
-			game.clean_kit.put_down("sponge", 1, Vector2i(6, 3))   # left lying about, in the way
+			var top: Station = game.stations.values().filter(func(x: Station) -> bool: return x.type == "counter" and x.item == "")[0]
+			top.set_item(CleanKit.PREFIX + "sponge", CleanTools.cleanness("sponge", 1))   # set on a counter, not the floor
 		"robot":
 			game.world.add_station("robot_dock", Vector2i(5, 6))
 			for i in 3:
@@ -207,6 +208,22 @@ func _apply_demo(demo: String) -> void:
 			p.position = Vector3(13.2 - i * 0.3, 0, 7.2 - i * 0.95)
 			p.rotation.y = PI / 4
 			game.add_child(p)
+		# Every feeling and mix on a head (anger, disgust stage, delight, eating), the
+		# last on the darkest skin.
+		var feels := [
+			[0.4, 0, 0.0, false], [0.75, 0, 0.0, false], [1.0, 0, 0.0, false],
+			[0.0, 1, 0.0, false], [0.0, 2, 0.0, false], [0.0, 3, 0.0, false],
+			[0.6, 2, 0.0, false], [0.9, 3, 0.0, false], [0.0, 0, 1.0, false], [0.0, 2, 0.0, true],
+		]
+		for i in feels.size():
+			var p := Peg.guest(names[i % names.size()])
+			if i >= feels.size() - 4:
+				p = Peg.guest("Priya")   # the darkest skin, #6f4428
+			var fe: Array = feels[i]
+			p.set_feelings({"anger": fe[0], "disgust": fe[1], "delight": fe[2]}, fe[3])
+			p.position = Vector3(5.6 + i * 0.3, 0, 6.0 + i * 0.95)
+			p.rotation.y = PI / 4
+			game.add_child(p)
 		for i in 4:
 			var c := Peg.chef(i)
 			c.position = Vector3(15.0 - i * 0.6, 0, 3.4 - i)
@@ -313,13 +330,13 @@ func _apply_demo(demo: String) -> void:
 		game.ledger.reputation = 0.0   # the meter at the bottom: closed down
 	elif demo in ["critic", "critic_bad", "critic_known", "critic_town"]:
 		_demo_critic(demo)
-	elif demo == "summary" or demo == "town":
+	elif demo == "summary" or demo == "town" or demo == "town_person":
 		game.ledger.record_sale(Game.DEMO_BILL, 5)
 		game.ledger.record_sale(Game.DEMO_BILL, 3)
 		game.ledger.record_unpaid_bill()   # PRD 11: the LEFT UNPAID line and its open-purse stamp
 		game.ledger.record_found_nothing(3)
 		game.arrivals.clear()
-		if demo == "town":  # a spread of opinions, then the town book over the receipt
+		if demo != "summary":  # town, town_person (shoot at 4: a page with friends and orders): a spread of opinions, then the town book over the receipt
 			for i in game.town.people.size():
 				game.town.record_visit(i, [0.9, 0.9, 0.3, -0.5, 0.6][i % 5])
 				if i == 0 or i == 5:
@@ -329,7 +346,17 @@ func _apply_demo(demo: String) -> void:
 					game.town.record_walkout(i, 1)
 				if i % 2 == 0:
 					game.town.record_visit(i, [0.9, -0.5, 0.9][i % 3])
-			game.get_tree().create_timer(1.5).timeout.connect(game.hud.screens_ui.show_town)
+			if demo == "town":
+				game.get_tree().create_timer(1.5).timeout.connect(game.hud.screens_ui.show_town)
+			else:
+				var who := 0
+				for i in game.town.people.size():
+					if not game.town.people[i].friends.is_empty():
+						who = i
+						break
+				game.town.record_order(who, int(game.menu.items[0].id))
+				game.town.record_order(who, int(game.menu.items[0].id))
+				game.get_tree().create_timer(1.5).timeout.connect(game.hud.screens_ui.show_person.bind(who))
 	elif demo.begins_with("coop"):  # PRD 4: coop (service), coop_build (two ghosts at night), coop_ready (the receipt, one ready)
 		var two := game.chefs[game.coop.join("pad:1")]
 		if demo == "coop":   # two chefs, two bubbles; shoot at about 8

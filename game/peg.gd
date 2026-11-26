@@ -42,7 +42,14 @@ const LOOKS := {
 	"Nell": {"skin": 3, "hair": "top_knot", "hair_col": "black", "outfit": "periwinkle", "pattern": "dungarees"},
 }
 const FACES: Array[String] = ["neutral", "content", "delighted", "impatient", "snap", "disgusted", "angry", "chewing", "dazed"]
-const TINTS := {"snap": ["#f08a3c", 0.5], "disgusted": ["#8fc27a", 0.7], "angry": ["#e0463a", 0.9]}
+const TINTS := {"disgusted": ["#8fc27a", 0.7], "angry": ["#e0463a", 0.9]}   # fixed faces; guests use set_feelings
+const HEAD_SHADER := preload("res://game/shaders/head.gdshader")
+const INK_LINE := preload("res://game/shaders/ink.gdshader")
+const ANGER_RED := "#e0463a"
+const DISGUST_GREEN := "#7ec457"
+const DELIGHT_ROSE := "#f28c8c"
+const DISGUST_AMOUNT: Array[float] = [0.0, 0.28, 0.6, 0.85]   # none, Ick, Disgusted, Revolted
+const HEAD_EASE := 0.5   # seconds for the head colour to ease to a new feeling
 
 var skin := SKINS[1]
 var pose := "idle"   # idle, carry, eat, tap, wave, help
@@ -51,6 +58,12 @@ var _head: MeshInstance3D
 var _features: Node3D
 var _hands: Array[Node3D] = []
 var _age := 0.0
+var _head_mat: ShaderMaterial
+var _head_now := {}     # the head uniforms as drawn right now
+var _head_goal := {}    # where the ease is heading
+var _head_tween: Tween
+var _feel_key := ""     # the feelings last drawn, so an unchanged call costs nothing
+var _face_key := ""
 
 
 ## A holder that brings a peg up to world size. Animate the peg; place the rig.
@@ -155,6 +168,9 @@ func _build(look: Dictionary, is_chef: bool, player: int) -> void:
 		_hands.append(hand)
 	_head = Build.ball(self, Vector3(0, HEAD_Y, 0), HEAD_R, skin)
 	_head.scale = Vector3.ONE * HEAD_SCALE
+	_head_mat = _new_head_material()   # its own: Build.mat shares by key, and this one is tweened
+	_head.material_override = _head_mat
+	_show_head(_head_target({}))
 	_features = Node3D.new()
 	_head.add_child(_features)
 	var hair_col: String = HAIR_COLS[look.get("hair_col", "brown")]
@@ -291,43 +307,74 @@ func _toque(trim: String) -> void:
 
 # ---------------------------------------------------------------- faces
 
+const EX := 0.088
+const EY := -0.012
+const WAVY := [Vector2(-0.045, -0.112), Vector2(-0.022, -0.1), Vector2(0, -0.112), Vector2(0.022, -0.1), Vector2(0.045, -0.112)]
+
+
+func _ink() -> String:
+	return "#1f1512" if skin == SKINS[4] else INK
+
+
+func _eye(sx: float, style: String) -> void:
+	var f := _features
+	var ink := _ink()
+	var c := Vector2(sx * EX, EY)
+	match style:
+		"dot":
+			Build.ball(f, _on_head(c.x, c.y, -0.016), 0.04, ink)
+		"arc":
+			_stroke(f, [c + Vector2(-0.034, -0.012), c + Vector2(0, 0.014), c + Vector2(0.034, -0.012)], 0.014, ink)
+		"squeeze":
+			_stroke(f, [c + Vector2(-sx * 0.03, 0.028), c + Vector2(sx * 0.022, 0), c + Vector2(-sx * 0.03, -0.028)], 0.014, ink)
+		"wince":   # Ick: a dot pinched flat from above
+			_stroke(f, [c + Vector2(-0.026, 0.004), c + Vector2(0.026, -0.004)], 0.025, ink)
+		"cross":   # knocked silly: an X for each eye
+			for k: float in [-1.0, 1.0]:
+				_stroke(f, [c + Vector2(-0.03, -0.03 * k), c + Vector2(0.03, 0.03 * k)], 0.014, ink)
+		"narrow":
+			_stroke(f, [c + Vector2(-0.028, 0), c + Vector2(0.028, 0)], 0.02, ink)
+
+
+func _brow(sx: float, inner: float, outer: float, r := 0.014) -> void:
+	_stroke(_features, [Vector2(sx * (EX - 0.045), EY + inner), Vector2(sx * (EX + 0.045), EY + outer)], r, _ink())
+
+
+func _mouth(pts: Array) -> void:
+	_stroke(_features, pts, 0.013, _ink())
+
+
+func _blush(delighted := false) -> void:
+	for sx: float in [-1.0, 1.0]:
+		var cheek := 0.062 if delighted else 0.052
+		Build.ball(_features, _on_head(sx * 0.15, -0.085, -cheek + 0.007), cheek, BLUSH)
+	Build.ball(_features, _on_head(0, -0.05, -0.012), 0.02, "#e8806c")
+
+
 ## Shows one of the eight faces from sheet 3. Strong moods tint the whole head.
 func set_face(kind: String) -> void:
 	if kind == face:
 		return
 	face = kind
+	_feel_key = ""
+	_face_key = ""
 	for c in _features.get_children():
 		c.queue_free()
 	var f := _features
-	var ink := "#1f1512" if skin == SKINS[4] else INK
+	var ink := _ink()
+	var ex := EX
+	var ey := EY
+	var wavy := WAVY
 	var tint: Array = TINTS.get(kind, ["#ffffff", 0.0])
-	_head.material_override = Build.mat(Color(skin).lerp(Color(tint[0]), tint[1]), 0.0, R_PAINT)
-	var ex := 0.088
-	var ey := -0.012
+	var flat := _head_target({})
+	flat.top = Color(tint[0])
+	flat.top_amount = tint[1]
+	_show_head(flat)
 	# Blush cheeks never go away.
-	for sx: float in [-1.0, 1.0]:
-		var cheek := 0.062 if kind == "delighted" else 0.052
-		Build.ball(f, _on_head(sx * 0.15, -0.085, -cheek + 0.007), cheek, BLUSH)
-	Build.ball(f, _on_head(0, -0.05, -0.012), 0.02, "#e8806c")
-	var eye := func(sx: float, style: String) -> void:
-		var c := Vector2(sx * ex, ey)
-		match style:
-			"dot":
-				Build.ball(f, _on_head(c.x, c.y, -0.016), 0.04, ink)
-			"arc":
-				_stroke(f, [c + Vector2(-0.034, -0.012), c + Vector2(0, 0.014), c + Vector2(0.034, -0.012)], 0.014, ink)
-			"squeeze":
-				_stroke(f, [c + Vector2(-sx * 0.03, 0.028), c + Vector2(sx * 0.022, 0), c + Vector2(-sx * 0.03, -0.028)], 0.014, ink)
-			"cross":   # knocked silly: an X for each eye
-				for k: float in [-1.0, 1.0]:
-					_stroke(f, [c + Vector2(-0.03, -0.03 * k), c + Vector2(0.03, 0.03 * k)], 0.014, ink)
-			"narrow":
-				_stroke(f, [c + Vector2(-0.028, 0), c + Vector2(0.028, 0)], 0.02, ink)
-	var brow := func(sx: float, inner: float, outer: float, r := 0.014) -> void:
-		_stroke(f, [Vector2(sx * (ex - 0.045), ey + inner), Vector2(sx * (ex + 0.045), ey + outer)], r, ink)
-	var mouth := func(pts: Array) -> void:
-		_stroke(f, pts, 0.013, ink)
-	var wavy := [Vector2(-0.045, -0.112), Vector2(-0.022, -0.1), Vector2(0, -0.112), Vector2(0.022, -0.1), Vector2(0.045, -0.112)]
+	_blush(kind == "delighted")
+	var eye := _eye
+	var brow := _brow
+	var mouth := _mouth
 	match kind:
 		"neutral":
 			eye.call(-1.0, "dot")
@@ -377,6 +424,166 @@ func set_face(kind: String) -> void:
 			Build.ball(f, _on_head(0.13, -0.09, -0.05), 0.075, skin)  # puffed cheek
 			Build.ball(f, _on_head(0.16, -0.085, -0.02), 0.05, BLUSH)
 			mouth.call([Vector2(-0.02, -0.108), Vector2(0.03, -0.108)])
+
+
+## Shows what a guest feels (`GuestMood.feelings()`): anger red from the forehead, disgust
+## green from the chin, delight a rosy glow, each on its own so they can show together,
+## and a face that reads both: anger sets the brows and eyes, disgust the mouth and nose.
+## `eating` adds the chewing cheek and mouth; the colour stays.
+func set_feelings(f: Dictionary, eating := false) -> void:
+	var anger: float = f.get("anger", 0.0)
+	var stage: int = f.get("disgust", 0)
+	var glow: float = f.get("delight", 0.0)
+	var key := "%.2f|%d|%.2f|%s" % [anger, stage, glow, eating]
+	if key == _feel_key:
+		return
+	_feel_key = key
+	_ease_head(_head_target(f))
+	var tier := 0 if anger <= 0.0 else (1 if anger < 0.6 else (2 if anger < 0.9 else 3))
+	var face_key := "%d|%d|%s|%s" % [tier, stage, glow > 0.0, eating]
+	if face_key == _face_key:
+		return
+	_face_key = face_key
+	face = "feelings"
+	for c in _features.get_children():
+		c.queue_free()
+	_blush(glow > 0.0 and tier == 0 and stage == 0 and not eating)
+	if glow > 0.0 and tier == 0 and stage == 0 and not eating:
+		_delighted_face()
+		return
+	# Eyes and brows: anger first, then the wince and squint of disgust.
+	var eyes := "dot"
+	var brows := []   # inner height, outer height, thickness
+	match tier:
+		1:
+			eyes = "dot"
+			brows = [0.026, 0.05, 0.017]
+		2:
+			brows = [0.022, 0.07, 0.017]
+		3:
+			eyes = "narrow"
+			brows = [0.02, 0.075, 0.021]
+		_:
+			if stage == 1:
+				eyes = "wince"
+			elif stage >= 2:
+				eyes = "squeeze"
+				brows = [0.04, 0.06, 0.014]
+	for sx: float in [-1.0, 1.0]:
+		var style := eyes
+		if eating and tier == 0 and stage == 0 and sx > 0.0:
+			style = "arc"
+		_eye(sx, style)
+		if not brows.is_empty():
+			_brow(sx, brows[0], brows[1], brows[2])
+	if eating and tier == 0 and stage == 0:
+		_brow(-1.0, 0.06, 0.07, 0.012)
+	# Mouth: disgust first (wavy), the pulled line of Ick, then anger's.
+	var pts: Array = [Vector2(-0.028, -0.1), Vector2(-0.014, -0.11), Vector2(0, -0.102), Vector2(0.014, -0.11), Vector2(0.028, -0.1)]
+	if stage >= 2:
+		pts = WAVY
+	elif stage == 1 and tier == 0:
+		pts = [Vector2(-0.045, -0.103), Vector2(-0.02, -0.108), Vector2(0.02, -0.108), Vector2(0.045, -0.103)]
+	elif tier == 1:
+		pts = [Vector2(-0.04, -0.105), Vector2(0.04, -0.105)]
+	elif tier == 2:
+		pts = WAVY
+	elif tier == 3:
+		pts = [Vector2(-0.045, -0.118), Vector2(-0.02, -0.1), Vector2(0.02, -0.1), Vector2(0.045, -0.118)]
+	if eating:
+		Build.ball(_features, _on_head(0.13, -0.09, -0.05), 0.075, skin)  # puffed cheek
+		Build.ball(_features, _on_head(0.16, -0.085, -0.02), 0.05, BLUSH)
+		if stage < 2:
+			pts = [Vector2(-0.02, -0.108), Vector2(0.03, -0.108)]
+	_mouth(pts)
+	if stage >= 2:   # the nose wrinkles
+		_stroke(_features, [Vector2(-0.022, -0.03), Vector2(0, -0.022), Vector2(0.022, -0.03)], 0.008, _ink())
+
+
+func _delighted_face() -> void:
+	for sx: float in [-1.0, 1.0]:
+		_eye(sx, "dot")
+		Build.ball(_features, _on_head(sx * EX + 0.012, EY + 0.014, 0.014), 0.011, "#ffffff")
+		_brow(sx, 0.07, 0.075, 0.011)
+	Build.ball(_features, _on_head(0, -0.11, -0.026), 0.046, _ink())
+	Build.ball(_features, _on_head(0, -0.125, -0.012), 0.026, Build.CORAL)
+
+
+# ---------------------------------------------------------------- head colour
+
+func _new_head_material() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = HEAD_SHADER
+	m.set_shader_parameter("rough", R_PAINT)
+	var line := ShaderMaterial.new()
+	line.shader = INK_LINE
+	m.next_pass = line
+	return m
+
+
+## The head's uniforms for a set of feelings. With one feeling its colour covers the whole
+## head; with both, red takes the top and green the bottom, each in proportion to its own
+## strength, and a soft line between.
+func _head_target(f: Dictionary) -> Dictionary:
+	var anger: float = clampf(f.get("anger", 0.0), 0.0, 1.0)
+	var stage: int = clampi(f.get("disgust", 0), 0, 3)
+	var glow: float = clampf(f.get("delight", 0.0), 0.0, 1.0)
+	var t := {
+		"skin": Color(skin).lerp(Color(DELIGHT_ROSE), glow * 0.45),
+		"top": Color(ANGER_RED), "top_amount": anger * 0.95, "top_y": -1.0,
+		"bottom": Color(DISGUST_GREEN), "bottom_amount": DISGUST_AMOUNT[stage], "bottom_y": 1.0,
+	}
+	if anger > 0.0 and stage > 0:
+		var red := clampf(anger / (anger + stage / 3.0), 0.25, 0.75)   # the share of the head
+		t.top_y = HEAD_R * (1.0 - 2.0 * red)
+		t.bottom_y = t.top_y
+	return t
+
+
+func _show_head(t: Dictionary) -> void:
+	if _head_tween:
+		_head_tween.kill()
+	_head_now = t.duplicate()
+	_head_goal = t
+	_apply_head(_head_now)
+
+
+func _apply_head(t: Dictionary) -> void:
+	_head_mat.set_shader_parameter("skin", t.skin)
+	_head_mat.set_shader_parameter("top_col", t.top)
+	_head_mat.set_shader_parameter("top_amount", t.top_amount)
+	_head_mat.set_shader_parameter("top_y", t.top_y)
+	_head_mat.set_shader_parameter("bottom_col", t.bottom)
+	_head_mat.set_shader_parameter("bottom_amount", t.bottom_amount)
+	_head_mat.set_shader_parameter("bottom_y", t.bottom_y)
+
+
+## Eases the head to `to`. A band that is coming or going keeps its place and fades.
+func _ease_head(to: Dictionary) -> void:
+	if not is_inside_tree():
+		_show_head(to)
+		return
+	if _head_tween:
+		_head_tween.kill()
+	var from := _head_now.duplicate()
+	if from.top_amount <= 0.0:
+		from.top_y = to.top_y
+	elif to.top_amount <= 0.0:
+		to = to.duplicate()
+		to.top_y = from.top_y
+	if from.bottom_amount <= 0.0:
+		from.bottom_y = to.bottom_y
+	elif to.bottom_amount <= 0.0:
+		to = to.duplicate()
+		to.bottom_y = from.bottom_y
+	_head_goal = to
+	_head_tween = create_tween()   # on the peg, so it ends with it
+	_head_tween.tween_method(func(w: float) -> void:
+		var now := {}
+		for k: String in to:
+			now[k] = lerpf(from[k], to[k], w) if to[k] is float else from[k].lerp(to[k], w)
+		_head_now = now
+		_apply_head(now), 0.0, 1.0, HEAD_EASE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 # ---------------------------------------------------------------- hands

@@ -525,6 +525,49 @@ func test_cannot_shelve_past_max_tier():
 
 
 
+func test_feelings_delight_alone():
+	var m := GuestMood.new()
+	m.joy = 0.9
+	var f := m.feelings()
+	assert_eq(f.anger, 0.0)
+	assert_eq(f.disgust, 0)
+	assert_gt(f.delight, 0.0)
+
+
+func test_feelings_anger_rises_as_patience_falls():
+	var m := GuestMood.new()
+	m.joy = 0.9
+	m.patience = 0.3
+	var flush: float = m.feelings().anger
+	m.patience = 0.1
+	var f := m.feelings()
+	assert_gt(f.anger, flush)
+	assert_gt(f.anger, GuestMood.ANGER_FLUSH)
+	assert_eq(f.disgust, 0)
+	assert_eq(f.delight, 0.0)
+	assert_eq(m.feelings(true).anger, 1.0)
+
+
+func test_feelings_anger_and_disgust_together():
+	var m := GuestMood.new()
+	m.patience = 0.2
+	m.disgust = 0.5
+	var f := m.feelings()
+	assert_gt(f.anger, 0.0)
+	assert_eq(f.disgust, 2)
+
+
+func test_disgust_holds_still_until_comped():
+	var m := GuestMood.new()
+	m.disgust = 0.5
+	for i in 60:
+		m.wait(1.0, 1000.0)
+	assert_eq(m.disgust, 0.5)
+	assert_eq(m.disgust_level(), 2)
+	assert_true(m.offer_comp())
+	assert_eq(m.disgust_level(), 1)
+
+
 func test_expression_follows_the_strongest_feeling():
 	var m := GuestMood.new()
 	assert_eq(m.expression(), "content", "people look pleasant by default")
