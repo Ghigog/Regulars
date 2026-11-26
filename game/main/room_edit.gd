@@ -462,7 +462,7 @@ func build_interact(ch: Player = null) -> void:
 				game.audio.sfx("fail")
 		"Use desk":
 			game.desk.open_desk(ch)
-		"Open up", "Take out rubbish":
+		"Open up", "Take out rubbish", "Write menu":
 			game.day.use_door(ch)
 			game.hud.hints_ui.show_build()
 

@@ -57,6 +57,8 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- *Glowing menu key* (`HudBoardKey`, `hud.board_key_ui`): one big keycap, the "E OPEN UP" prompt's key sheet at about 2.4x its size, hangs over the menu board by the door in the build phase and holds `controls.glyph("menu")` (N, a pad button or the touch word). It breathes slowly in a warm cream-to-orange pulse, bright while tonight's menu has no main and dimmer once it has one, and swells once, hard, when the door card refuses for want of a main. It replaces the two "board by the door" notes on night zero.
+
 - Washing up at the sink shows its progress in the prompt chip ("Washing N%"), the way scrubbing does. There is no hold bar and no plate-and-fork icon above the sink; the arm scrub and bubbles stay.
 - **Split head (departure from the whole-head tint rule).** The "Mood tint" rule says the whole head takes one colour. The game instead gives each feeling its own colour (red anger, green disgust, rosy delight), and when a guest is both angry and disgusted the head splits: red from the forehead, green from the chin, with a soft line. The person approved the split. The face reads both feelings: anger on the brows and eyes, disgust on the mouth and nose.
 - **Shadows.** Floating effects (grime motes), labels (name tags, money popups) and gauges cast no shadow; only solid pieces do.

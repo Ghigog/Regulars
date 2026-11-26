@@ -107,9 +107,7 @@ func read_board(g: Guest) -> void:
 	g.mood.think(Menu.NOTHING_THOUGHT)
 	game.audio.popup("Nothing I liked", g.position + Vector3(0, 2.3, 0), Color(Build.CABINET))
 	game.ledger.record_found_nothing()
-	var talk := game.town.gossip_line(g.idx, game.town.record_found_nothing(g.idx), "there was nothing on the menu for them")
-	if g == g.party[0] and talk != "":
-		game.hud.day_ui.say(talk)
+	game.town.record_found_nothing(g.idx)
 
 
 ## Where the guest `i`th in line stands: a single file up the pavement along the
