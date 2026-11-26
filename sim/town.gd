@@ -72,14 +72,7 @@ func _init(seed_value := 1, theme_id := "diner") -> void:
 	theme = theme_id
 	var names := town_names(seed_value, theme_id)
 	for i in names.size():
-		people.append({
-			"name": names[i], "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
-			"streak": 0, "away_until": 0, "sore": false, "warning": false, "grudges": 0, "gone": false, "deals": 0,
-			"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
-			"likes": [], "dislikes": [], "liked_tags": [], "orders": {},
-			"opinion": {"speed": 0.0, "clean": 0.0, "quality": 0.0, "variety": 0.0, "other": 0.0},
-			"tolerance": {"food": 3, "service": 3, "clean": 3},
-		})
+		people.append(new_person(names[i], i))
 	# A ring of friendships plus a few long-distance ones, so gossip travels.
 	var n := names.size()
 	for i in n:
@@ -92,6 +85,33 @@ func _init(seed_value := 1, theme_id := "diner") -> void:
 	make_tolerances()
 	make_ratings()
 	make_wealth()
+
+
+## One person with every key and its new-town default: the single definition of a person.
+static func new_person(person_name: String, i: int) -> Dictionary:
+	return {
+		"name": person_name, "affinity": 0.0, "friends": [], "visits": 0, "today": 0.0,
+		"streak": 0, "away_until": 0, "sore": false, "warning": false, "grudges": 0, "gone": false, "deals": 0,
+		"shirt": SHIRTS[i % SHIRTS.size()], "skin": i % 4,
+		"likes": [], "dislikes": [], "liked_tags": [], "orders": {},
+		"opinion": {"speed": 0.0, "clean": 0.0, "quality": 0.0, "variety": 0.0, "other": 0.0},
+		"tolerance": {"food": 3, "service": 3, "clean": 3},
+	}
+
+
+## After loading an older save: adds every person key (and opinion/tolerance topic) the
+## save predates, with the new-town default. Saved values are never overwritten.
+func fill_missing_keys() -> void:
+	for i in people.size():
+		var p: Dictionary = people[i]
+		var fresh := new_person(p.get("name", ""), i)
+		for k: String in fresh:
+			if not p.has(k):
+				p[k] = fresh[k]
+			elif fresh[k] is Dictionary and k in ["opinion", "tolerance"] and p[k] is Dictionary:
+				for sub: String in fresh[k]:
+					if not p[k].has(sub):
+						p[k][sub] = fresh[k][sub]
 
 
 ## The town's names: the fourteen drawn ones, then the theme's pool shuffled by the seed.

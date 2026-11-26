@@ -236,3 +236,16 @@ func test_a_post_put_up_tonight_has_no_applicants_after_continue():
 		other.session._open_night()
 	assert_true(other.applicants.is_empty())
 	assert_true(other.staff.cvs.is_empty())
+
+
+func test_a_save_from_before_the_warning_key_still_gives_a_headline():
+	var data := SaveGame.capture(game)
+	for p: Dictionary in data.town.people:
+		p.erase("warning")
+	var old = load("res://game/main.tscn").instantiate()
+	old._resume_data = data
+	add_child_autofree(old)
+	old.set_process(false)
+	for p: Dictionary in old.town.people:
+		assert_true(p.has("warning"))
+	assert_true(old.town.headline() is String)
