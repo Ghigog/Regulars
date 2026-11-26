@@ -259,7 +259,10 @@ func act(p: int, action: String, echo := false) -> void:
 			if action == "confirm":
 				confirm_receipt(p)
 			elif action == "back":
-				unconfirm_receipt(p)
+				if game.hud._town_open:
+					game.hud.screens_ui.back_from_town()
+				else:
+					unconfirm_receipt(p)
 			elif action == "town":
 				game.hud.screens_ui.toggle_town()
 		Game.Phase.CLOSED:
