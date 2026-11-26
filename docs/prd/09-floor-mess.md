@@ -22,7 +22,7 @@ This is separate from the existing mess (dirty plates on tables, the sink pile, 
 | Levels | Each floor cell holds dirt from 0 to 4. New dirt on a dirty cell grows it by one. At 4 the cell is fully covered. |
 | Overflow | Dirt landing on a level 4 cell goes to a random cell around it (the eight neighbours) instead, under furniture included. |
 | Under furniture | Dirt only gets under furniture by overflow. It cannot be cleaned until the restaurant closes and the furniture is moved. So furniture placement can shield cells, and a neglected puddle can spread where you cannot reach it until night. |
-| Tracking | Anyone (guest or chef) who walks from a dirty cell to the next carries one level with them: the cell left loses one, the cell entered gains one. |
+| Tracking | Light dirt (level 1 or 2) stays where it is. Anyone (guest or chef) who walks from a level 3 or 4 cell to the next carries one level with them on about one step in ten: the cell left loses one, the cell entered gains one (and overflows if it is full, so a big patch spreads slowly). |
 | Slowing | Everyone, guests included, is slowed by the level of the cell they stand on. |
 | Slipping | At level 4 a guest can slip and stays down on that cell until helped up. A chef helps up fast; a nearby guest helps up, much more slowly. Very bad for the fallen guest, bad for witnesses within one cell. |
 | Disgust | A puddle adds disgust to anyone who can see it (as sightlines do now). From level 3 it also smells: disgust within a set radius, seen or not. |
@@ -57,7 +57,7 @@ This is separate from the existing mess (dirty plates on tables, the sink pile, 
   other chef, or gets up alone after 4 seconds. On getting up, a guest walks out with
   chance `lerp(0.9, 0.1, opinion)` (*tunable*): their opinion of the restaurant (town
   affinity and current mood, 0 to 1) decides it.
-- **Tracking:** one level moves per step off a dirty cell. A fallen guest tracks nothing.
+- **Tracking:** off a level 3 or 4 cell, one level moves on about one step in ten (`TRACK_CHANCE`); lighter dirt never moves. A fallen guest tracks nothing.
   Guests and chefs leave footprints on the cells they gain dirt on, for the look.
 - **Grease (per prep done):** fry 0.5, grill 0.3, boil 0.15, chop and slice 0.1 (scraps),
   pour 0.1 (spills): the chance a level drops on the chef's cell or one beside the station.

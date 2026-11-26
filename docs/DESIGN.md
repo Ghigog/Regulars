@@ -420,7 +420,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     tree `mess`, x0.3 under a hood, x0.15 under an extractor). A guest finishing a meal
     may drop mess within two cells of the seat (0.15, x2 for a messy townsperson, x1.5 for
     a fried or meat dish, more when fed up).
-  - *Feet.* Stepping off a dirty cell carries a level onto the next one, with footprints.
+  - *Feet.* Stepping off a level 3 or 4 cell sometimes (about one step in ten) carries a level onto the next one, with footprints; lighter dirt stays put.
     Speed on a cell by level: 1, 0.9, 0.8, 0.65, 0.5. Guests see dirty cells (sight
     disgust by level: levels 1 and 2 are nearly harmless, level 3 bites (sight 0.075 plus smell
     0.015 a second, so about 5 s to Disgusted for an average guest), level 4 0.12 + 0.03; through `GuestMood`'s sightlines) and smell level 3 and 4 within
