@@ -63,7 +63,7 @@ func setup(game_, hud_) -> void:
 
 func _process(delta: float) -> void:
 	_frame.queue_redraw()
-	if _view != null and is_instance_valid(_view):
+	if _view != null and is_instance_valid(_view) and _view.is_visible_in_tree():
 		_view.spin.rotate_y(delta * 0.45)
 
 

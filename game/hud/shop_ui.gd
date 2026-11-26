@@ -265,6 +265,7 @@ func _refresh_catalog() -> void:
 		view.modulate = Color(0.22, 0.17, 0.14, 0.5) if info.locked else Color.WHITE   # a silhouette (review, item 10)
 		item.add_child(view)
 		view.show_piece(hud.game, bp)
+		view.animate(false)   # the middle piece is switched on by hud._process
 		hud._views.append(view)
 		var price := hud._label(item, 32, info.price)
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

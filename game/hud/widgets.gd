@@ -542,6 +542,21 @@ class ModelView extends TextureRect:
 	var tilt: Node3D
 	var spin: Node3D
 	var live := false
+	var _settle := 0.0   # seconds a peg still renders every frame while it settles its hands
+	var _lift := -1.0
+
+	func _process(delta: float) -> void:
+		_settle -= delta
+		if _settle <= 0.0:
+			set_process(false)
+			vp.render_target_update_mode = SubViewport.UPDATE_ONCE   # one last frame, then it stops
+
+	## A view renders each frame only while its model moves; still, it renders once and stops.
+	func animate(on: bool) -> void:
+		if on:
+			vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		elif vp.render_target_update_mode == SubViewport.UPDATE_ALWAYS and _settle <= 0.0:
+			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 	func _init(px: int, live_: bool) -> void:
 		live = live_
@@ -550,12 +565,13 @@ class ModelView extends TextureRect:
 		expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		stretch_mode = TextureRect.STRETCH_SCALE
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_process(false)
 		vp = SubViewport.new()
 		vp.size = Vector2i(px, px) * 2
 		vp.transparent_bg = true
 		vp.own_world_3d = true
 		vp.msaa_3d = Viewport.MSAA_4X
-		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if live else SubViewport.UPDATE_ONCE
+		vp.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if live else SubViewport.UPDATE_ONCE
 		add_child(vp)
 		texture = vp.get_texture()
 		var env := Environment.new()
@@ -647,10 +663,17 @@ class ModelView extends TextureRect:
 		for c in vp.get_children():
 			if c is Camera3D:
 				c.size = 1.5
-		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS   # the peg settles its hands first
+		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS   # the peg settles its hands first,
+		_settle = 0.6                                              # then it renders once more and stops
+		set_process(true)
 
 	## 0 is flat on the floor; 1 is lifted and tipped toward the camera, as on show.
 	func lift(t: float) -> void:
+		if is_equal_approx(t, _lift):
+			return
+		_lift = t
+		if vp.render_target_update_mode != SubViewport.UPDATE_ALWAYS:
+			vp.render_target_update_mode = SubViewport.UPDATE_ONCE   # draw the new pose
 		tilt.basis = Basis(LEAN, 0.2 * t) * Basis(Vector3(0.7071, 0, 0.7071), 0.1 * t)
 		tilt.position.y = lerpf(-0.3, 0.1, t)
 
