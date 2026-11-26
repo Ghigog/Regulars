@@ -376,9 +376,9 @@ func close_bill() -> void:
 	game.hud.close_bill()
 
 
-## "Print": the slip goes into the chef's hand, and the screen closes.
+## "Print": the slip goes into the chef's hand (replacing one already held), and the screen closes.
 func print_bill(ch: Player, bill: Bill) -> void:
-	if bill.is_empty() or (bill.table >= 0 and slip_out(bill.table)) or ch.held != "":
+	if bill.is_empty() or (bill.table >= 0 and slip_out(bill.table)) or ch.held not in ["", "bill"]:
 		game.audio.sfx("fail")
 		return
 	var slip := Bill.new(bill.table, bill.items)

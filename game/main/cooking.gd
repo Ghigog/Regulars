@@ -86,6 +86,11 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	if held == "bill":
 		if game.paying.bill_place(st):
 			return "Hold to give the bill"
+		# A wrong slip is not final: the till writes a new one over it.
+		if st == game.paying.till_station() and st.item == "" and not game.paying.bill_tables().is_empty():
+			if not dry_run:
+				game.paying.open_bill(ch)
+			return "Write a new bill"
 		if st.type == "bin":
 			if not dry_run:
 				ch.set_held("")
