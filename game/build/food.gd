@@ -550,15 +550,11 @@ static func tray(t: Tray, tag := "", bitten := false) -> Node3D:
 	return n
 
 
-## A stack of clean plates, cups or trays on its counter.
+## A stack of clean cups or trays on its counter.
 static func stack_load(n: Node3D, type: String, count: int) -> void:
 	for i in count:
 		var t: Node3D
 		match type:
-			"plates":
-				t = Node3D.new()
-				_serving_plate(t)
-				t.position = Vector3(0, 0.916 + i * 0.022, 0)
 			"cups":   # two rows of upturned cups
 				t = Node3D.new()
 				_empty_cup(t)

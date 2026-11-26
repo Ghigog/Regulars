@@ -839,15 +839,17 @@ func _order_by_chef(g: Guest) -> void:
 func test_a_washer_washes_up_through_the_dish_rack():
 	_game()
 	var sink: Station = game.world.find_station("sink")
-	var stack: Station = game.world.find_station("plates")
-	sink.dirty = 2
-	var before := stack.count
-	_helper(3, ["wash_up"], Vector2i(3, 3))
-	_run(10.0)
 	var rack: Station = game.world.find_station("dish_rack")
+	var cups: Station = game.world.add_station("cups", Vector2i(2, 5))
+	rack.count = 3
+	var cups_before := cups.count
+	sink.dirty = 3
+	sink.dirty_cups = 1
+	_helper(3, ["wash_up"], Vector2i(3, 3))
+	_run(15.0)
 	assert_eq(sink.dirty, 0)
-	assert_eq(rack.count, 0, "the last dish put the clean ones away")
-	assert_eq(stack.count, before + 2, "after passing through the rack")
+	assert_eq(rack.count, 5, "the washed plates stand on the rack")
+	assert_eq(cups.count, cups_before + 1, "the washed cup goes on the cup stack")
 
 
 func test_a_full_bin_is_emptied_and_the_bag_goes_out_the_front():
@@ -941,6 +943,7 @@ func test_enough_training_changes_a_tolerance_for_good():
 	var h := _helper(3, ["wash_up"], Vector2i(3, 3))
 	game.staff.employee(3).skills.clean = 3.49
 	var sink: Station = game.world.find_station("sink")
+	game.world.find_station("dish_rack").count = 0   # room for the washed plate
 	sink.dirty = 1
 	_run(6.0)
 	assert_eq(sink.dirty, 0)

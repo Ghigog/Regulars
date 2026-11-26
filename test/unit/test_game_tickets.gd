@@ -28,7 +28,7 @@ func test_a_three_item_order_is_one_bill():
 	# The side and the drink first, one in each hand: a bun put down and plated, a cup poured.
 	game.cooking.use_station(game.menu_stock.storage_of("bun"))
 	game.cooking.use_station(_the_pass())
-	_use("plates")
+	_use("dish_rack")
 	assert_eq(game.cooking.use_station(_the_pass()), "Plate it", "a bun alone is the side")
 	assert_eq(game.cooking.use_station(_the_pass()), "Pick up")
 	_use("cups")
@@ -67,7 +67,7 @@ func test_a_half_made_plate_says_what_it_needs():
 	var g := _ordered_guest()
 	game.cooking.use_station(game.menu_stock.storage_of("bun"))
 	game.cooking.use_station(_the_pass())
-	_use("plates")
+	_use("dish_rack")
 	game.cooking.use_station(_the_pass())
 	game.cooking.use_station(_the_pass())
 	assert_eq(game.cooking.use_station(g.table), "Needs patty")

@@ -303,12 +303,12 @@ func test_a_group_orders_together_in_one_go():
 func test_serving_a_guest_who_has_not_ordered_is_refused():
 	var g: Guest = game.seating.spawn_guest(0)
 	_run(12.0)
-	_use("plates")
+	_use("dish_rack")
 	assert_eq(game.cooking.prompt_for(g.table), "Take order first")
 	game.cooking.use_station(g.table)
 	assert_eq(g.state, "ordering", "still waiting to order")
 	assert_eq(game.player.held, "dishes", "the chef keeps the plate")
-	_use("plates")    # put it back, take the order, then cook
+	_use("dish_rack")    # put it back, take the order, then cook
 	assert_eq(game.player.held, "")
 	game.serving.take_orders(g.table)
 	_cook_burger()

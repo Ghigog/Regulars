@@ -128,7 +128,7 @@ func _why(tk: Dictionary) -> String:
 			tops.append("%s:%s" % [str(st.cell), st.item if st.item != "dish" else "dish" + str(st.dish.ings) + "t" + str(st.dish.ticket)])
 	return "ticket %d (%s) stuck: %s; board %s; tops %s; cups %d plates %d" % [tk.id, str(tk.items.map(func(i: Dictionary) -> String: return i.name)),
 		_state_of(tk), str(tasks), str(tops), game.world.find_station("cups").count if game.world.find_station("cups") else -1,
-		game.world.find_station("plates").count]
+		game.world.find_station("dish_rack").count]
 
 
 func _check(theme: String, seed_value: int, day := 1) -> Dictionary:

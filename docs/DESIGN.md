@@ -48,7 +48,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   fridge, made by lifting a counter and upgrading it. The shop's tabs are Furniture,
   Tools, Ingredients, Build and Extras, listing only base pieces that can be bought at
   this level (tree steps are bought on the lifted piece). The old card code
-  (`open_card`, `card_act`) remains for the storage demos only. Every piece sells, the start's pieces and the last sink, bin, plate stack and
+  (`open_card`, `card_act`) remains for the storage demos only. Every piece sells, the start's pieces and the last sink, bin, dish rack and
   till too; while the kitchen has none of one of those four the shop sells it at any
   level and the door card stays shut (`ESSENTIALS`). The till is its own piece: it
   stands on a counter (or a tool on one), and there is one at a time.
@@ -87,14 +87,14 @@ Survive as many days as you can; three walkouts in one day ends the run.
 - **Tools.** Each prep tool stands on a counter: stove (grill, $50), chopping board
   ($25), the fryer, stock pot and slicer reached in their trees (PRD 8.3). Pour happens
   at the drink's own dispenser. Every piece can be sold, the last stove included.
-- **Washing up.** Dirty dishes soak in the sink. With empty hands, holding Use at the sink (`WASH_HOLD`, 1.5 s, fill bar, scrubbing arm, bubbles) washes one dish into the hands; letting go or walking off loses the progress. A clean dish goes on a dish rack (four at most, 'The rack is full' otherwise), and is taken from it to return to its stack or be plated. Dirty dishes can be put down on a counter ('Put down') and picked up again. Hired washers rack one dish per step.
+- **Washing up.** Dirty dishes soak in the sink. With empty hands, holding Use at the sink (`WASH_HOLD`, 1.5 s, fill bar, scrubbing arm, bubbles) washes one dish into the hands; letting go or walking off loses the progress. The dish rack is the plate store: it comes with eight plates (each rack bought adds eight), and a clean plate goes back on it ('Put back'; 'The rack is full' at eight) and is taken from it to be plated. Cups go on the cup stack, and the rack refuses one ('Cups go on the cup stack'). Dirty dishes can be put down on a counter ('Put down') and picked up again. Hired washers put a washed plate on the nearest rack with room and a washed cup on the cup stack.
 - **Tickets, plates and cups** (`sim/tray.gd`, `sim/dish.gd`). Taking a table's order
   puts a ticket for each guest who ordered on the rail along the top of the screen
   (oldest on the left, five shown, more counted on a last tab; each in the guest's shirt
   colour). Each menu item goes out on its own plate, or in a cup for a drink. Made food
   combines on a worktop: a bun put on a cooked patty makes a loose burger, in any order,
   but only into something the menu makes ("Nothing on the menu has patty with fries",
-  "One bun is enough", "Patty needs grilling first"). A plate from the plate stack then
+  "One bun is enough", "Patty needs grilling first"). A plate from the dish rack then
   goes down under it on the worktop ("Plate it") and is picked up from there, and a loose stack already in hand is plated at the stack too (no extra hand slot), or food goes onto a plate already put down. A drink station
   fills the cup in hand (a cup from the cup stack; "Bring a cup"); a two-tap station
   turns with empty hands or Turn. The hands hold two plates or cups; a tray from the
@@ -104,11 +104,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
   a guest starts eating once their whole order is there. The bill is the sum of the item
   prices. After the meal each plate and cup is left dirty on the table, cleared two at a
   time (four on a tray), soaks in the sink, and is washed one press each back onto its
-  own stack. An empty plate or cup in hand goes back on its stack with Use. A guest who
+  own home (plates on the dish rack, cups on the cup stack). An empty plate or cup in hand goes back with Use. A guest who
   leaves tears their ticket off and leaves what was served dirty on the table. The
-  kitchen needs a plate stack to open, and a cup stack once a drink is on the menu (the
-  start has the plate stack; the cup stack is bought). Saves from before keep their
-  tray stack as the plate stack.
+  kitchen needs a dish rack to open, and a cup stack once a drink is on the menu (the
+  start has the dish rack; the cup stack is bought). There is no plate stack: saves from
+  before load their plate (once tray) stack as a dish rack in the same cell, and an old
+  rack's cups move to the cup stack.
 - **Prep minigames** (`sim/prep.gd`, gauges in `game/prep_widget.gd`). One per tool,
   each ending good, plain or bad: *grill* (the doneness dial: take it off in the green
   window), *fry* (the same, then two seconds draining on the rack before it can be
@@ -140,7 +141,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   flip with no makeable main or when the stock cannot be paid. Tonight's item names are
   chalked on the A-frame board by the door (`game/menu_board.gd`).
 - **The starter kitchen.** A run opens on night zero with $150 and a kitchen holding
-  the sink, the bin, the plate stack, the counters and a starter set (review, item 7):
+  the sink, the dish rack (beside the sink), the bin, the counters and a starter set (review, item 7):
   the first main's stove under the hood, a corner fridge with its chilled kind, its
   bread's box on a counter and a cup stack (`_starter_kitchen`). The hints lead on from
   there ("Write a menu: N, or the board by the door.", "Flip the door card to open.");
@@ -163,7 +164,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   the bag out"); cleaning comes before "Pick up". At nightfall the kitchen tidies itself
   (`game/main/tidy.gd`): clean plates, cups and trays, on stations or in hands, go back to
   their stack, and every piece of food, plated or carried, goes into the nearest bin as one
-  scrap (it may overflow); with no bin it is just cleared. Dirty plates stay as mess; clean dishes left on a dish rack go back to their stacks.
+  scrap (it may overflow); with no bin it is just cleared. Dirty plates stay as mess; clean plates stay on the dish rack, and clean dishes elsewhere go back to it or the cup stack.
   The state changes in `_end_day`; opening the build phase plays it (plates slide to the
   rack 0.15 s apart, food hops into the bin and its lid bounces). There is no "Clear food". A messy piece cannot be picked up to
   move or sell ("Clean it first."); the mouse cannot clean ("Walk over and press Use").
@@ -302,7 +303,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     a little round table with one stool, so only a guest alone sits there (the smallest
     free table that fits is chosen, so a single takes a stool first). Kitchen: a bin
     ($30, level 2) and a sink ($70, level 3), which are now catalog pieces like any other
-    (every one can be sold; while there is none the shop sells one at any level), and a dish rack ($50, level 3, and now an essential, one stands in the kitchen at the start): washed dishes dry on it, four at most; a sink with one
+    (every one can be sold; while there is none the shop sells one at any level), and a dish rack ($50, level 3, and now an essential, one stands in the kitchen at the start): it is where the clean plates are kept, eight at most; a sink with one
     beside it piles at 10 dishes, not 6. Each sink and bin has its own mess and sightline,
     and the "still dirty" note counts them ("2 sinks").
 - **Keyboard, controller or touch** (`game/controls.gd`, `game/player_input.gd`). Each
