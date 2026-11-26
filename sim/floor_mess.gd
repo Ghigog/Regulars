@@ -37,10 +37,14 @@ const HELPED_THOUGHT := "Thanks for the hand"
 
 ## Disgust per second to anyone who can see a dirty cell, by level. Same scale as GROSS
 ## in game/main.gd. (tunable)
-const SIGHT_DISGUST: Array[float] = [0.0, 0.0002, 0.0005, 0.075, 0.12]
+const SIGHT_DISGUST: Array[float] = [0.0, 0.0002, 0.0005, 0.015, 0.025]
+## However many dirty cells are in view, the floor's sight plus smell disgust per second
+## is at most this, before the guest's tolerance. (tunable)
+const FLOOR_DISGUST_CAP := 0.025
+
 ## Disgust per second from smell, seen or not, by level of a cell within SMELL_RADIUS
 ## (Chebyshev distance, so the 5x5 square around it). (tunable)
-const SMELL_DISGUST: Array[float] = [0.0, 0.0, 0.0, 0.015, 0.03]
+const SMELL_DISGUST: Array[float] = [0.0, 0.0, 0.0, 0.008, 0.015]
 const SMELL_RADIUS := 2
 
 ## Grease: the chance per prep done that a level drops on the chef's cell or one beside the
@@ -293,7 +297,17 @@ func smell_disgust(cell: Vector2i) -> float:
 
 ## Both together: what standing at `cell` and seeing `visible` costs a guest a second.
 func disgust_at(cell: Vector2i, visible: Array) -> float:
-	return sight_disgust(visible) + smell_disgust(cell)
+	return minf(FLOOR_DISGUST_CAP, sight_disgust(visible) + smell_disgust(cell))
+
+
+## Sight and smell at `cell`, scaled down in proportion so together they stay within
+## FLOOR_DISGUST_CAP. Returns {"sight": float, "smell": float}.
+func capped_disgust(cell: Vector2i, visible: Array) -> Dictionary:
+	var sight := sight_disgust(visible)
+	var smell := smell_disgust(cell)
+	var total := sight + smell
+	var k := minf(1.0, FLOOR_DISGUST_CAP / total) if total > 0.0 else 1.0
+	return {"sight": sight * k, "smell": smell * k}
 
 
 ## The hood's multiplier on a stove's grease (a hood hangs over it, PRD 8.5). `has_hood`

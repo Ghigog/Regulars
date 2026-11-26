@@ -3,6 +3,7 @@ extends RefCounted
 ## The four things we track about every guest, plus what they are thinking.
 
 var patience := 1.0  # drains while queueing or waiting for food
+var reached_ick := false   # once Ick, disgust never fades below it: they remember
 var disgust := 0.0   # rises when they can see something gross
 var joy := 0.5       # atmosphere, friends, kindness
 var savour := 0.0    # how good the food was
@@ -142,6 +143,8 @@ const NOTICE := 0.005   # disgust per second below which a guest has not really 
 ##   2 Disgusted  they also tell their friends, and think less of the place
 ##   3 Revolted   they also never come back
 const DISGUST_STAGES: Array[float] = [0.2, 0.45, 0.75]
+## Disgust halves about every this many seconds while nothing gross is in view. (tunable)
+const DISGUST_HALF_LIFE := 20.0
 const DISGUST_NAMES: Array[String] = ["", "Ick", "Disgusted", "Revolted"]
 const DISGUST_ICONS: Array[String] = ["", "ick", "gross", "stink"]
 
@@ -165,9 +168,19 @@ static func gross_rate(base: float, age: float, doubling: float, cap: float) -> 
 	return minf(cap, base * pow(2.0, maxf(0.0, age) / doubling))
 
 
+## Disgust passes when nothing gross is in view: it halves every DISGUST_HALF_LIFE, but a
+## guest who has been Ick keeps at least that much.
+func fade(delta: float) -> void:
+	var floor_to := DISGUST_STAGES[0] if reached_ick else 0.0
+	if disgust > floor_to:
+		disgust = maxf(floor_to, disgust * pow(0.5, delta / DISGUST_HALF_LIFE))
+
+
 func see_gross(strength: float, delta: float, thought: String) -> void:
 	var felt := strength * scale_for("clean")
 	disgust = minf(1.0, disgust + felt * delta)
+	if disgust >= DISGUST_STAGES[0]:
+		reached_ick = true
 	if felt >= NOTICE:   # they notice at once; it only starts to matter at the first stage
 		think(thought)
 	if strength >= NOTICE:   # a mess anyone would see: an easy-going guest shrugs it off
