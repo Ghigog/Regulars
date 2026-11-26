@@ -139,6 +139,7 @@ func popup(text: String, at: Vector3, col: Color) -> void:
 	var l := Label3D.new()
 	l.text = text
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	l.no_depth_test = true
 	l.font_size = 64
 	l.outline_size = 20
