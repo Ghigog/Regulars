@@ -11,8 +11,9 @@ func test_a_helper_mops_the_trail_feet_left_behind_a_patch():
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])   # no guests wait, but the day stays open
 	game.crew.crew_demos.demo_hire(PERSON, "Server", ["take_orders", "carry_trays", "clear_tables", "mop", "sponge"], Vector2i(5, 3))
 	var mess: FloorMess = game.floor_dirt.mess
-	var row: Array[Vector2i] = [Vector2i(8, 5), Vector2i(7, 5)]
-	mess.dirt[row[0]] = 2
+	var row: Array[Vector2i] = [Vector2i(8, 5), Vector2i(7, 5), Vector2i(7, 4)]
+	mess.track_chance = 1.0
+	mess.dirt[row[0]] = 3
 	assert_true(mess.track(row[0], row[1]), "feet track a level off the patch")
 	for i in range(row.size() - 1):   # feet carry the patch along as level 1 trail
 		mess.dirt[row[i + 1]] = 1

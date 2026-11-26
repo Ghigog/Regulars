@@ -6,13 +6,24 @@ extends RefCounted
 
 ## The washing-up in a sink: dirty plates leaning in the basin and, once it has
 ## piled up, a heap of suds that rises over the rim (readable from across the room).
-static func sink_load(n: Node3D, plates: int, piled: bool) -> void:
-	for i in mini(plates, 4):
+static func sink_load(n: Node3D, plates: int, cups: int, piled: bool) -> void:
+	# Four dishes at most; whenever both kinds are soaking, at least one of each shows.
+	var shown_cups := mini(cups, 4 - mini(plates, 3))
+	var shown_plates := mini(plates, 4 - shown_cups)
+	for i in shown_plates:
 		var p := BuildFood.item("dirty_plate")
-		p.position = Vector3(-0.15 + i * 0.1, 0.95 + 0.01 * i, 0.06)
+		p.name = "dirty_plate"
+		p.position = Vector3(-0.2 + i * 0.1, 0.95 + 0.01 * i, 0.06)
 		p.rotation = Vector3(0.0, 0.0, -1.15)
 		p.scale = Vector3.ONE * 0.8
-		n.add_child(p)
+		n.add_child(p, true)
+	# Cups stand upright at the right-hand end of the basin, straw and rim clear of the foam.
+	for i in shown_cups:
+		var c := BuildFood.item("dirty_cup")
+		c.name = "dirty_cup"
+		c.position = Vector3(0.22 - (i % 2) * 0.1, 0.95 + (0.1 if piled else 0.0), 0.0 + (i / 2) * 0.12 - 0.02)
+		c.scale = Vector3.ONE * 0.9
+		n.add_child(c, true)
 	if not piled:
 		return
 	# A foam dome over the whole basin, lumpy, with a few bubbles floating off.

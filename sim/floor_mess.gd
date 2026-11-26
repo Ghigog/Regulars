@@ -64,6 +64,9 @@ const GUEST_MESSY := 2.0    # a townsperson with the messy trait
 const GUEST_GREASY := 1.5   # a fried or meat dish
 const GUEST_RADIUS := 2     # lands on a free floor cell within this of the seat
 
+## Feet carry dirt only off a heavy patch, and only sometimes (PRD 9.2).
+const TRACK_LEVEL := 3       # the least level a step off carries from (lighter stays put)
+const TRACK_CHANCE := 0.1    # per step off such a cell (tunable)
 const OVERFLOW_TRIES := 8   # chained overflows before a level is lost (all full around)
 
 const NEIGHBOURS: Array[Vector2i] = [
@@ -83,6 +86,8 @@ var grease := {}
 ## An extractor hangs somewhere (PRD 9.5): kitchen grease smells one cell less far.
 var extractor := false
 var rng := RandomNumberGenerator.new()
+## The chance a step off a heavy cell tracks; tests set it to 1.0 or 0.0.
+var track_chance := TRACK_CHANCE
 
 
 func _init(cells: Array = [], seed_value: int = 0) -> void:
@@ -183,14 +188,17 @@ func clean(cell: Vector2i, levels: int = 1) -> int:
 	return off
 
 
-## Someone walks from `from` to the next cell `to`. Off a dirty cell they carry one
-## level: `from` loses one, `to` gains one (overflowing as new dirt does). Returns
-## whether anything was tracked. A fallen guest does not walk, so is never passed here.
+## Someone walks from `from` to the next cell `to`. Off a cell at TRACK_LEVEL or more
+## they sometimes (`track_chance`) carry one level: `from` loses one, `to` gains one
+## (overflowing as new dirt does). Lighter dirt stays put. Returns whether anything
+## was tracked. A fallen guest does not walk, so is never passed here.
 ## A strong cleaner under `from` (PRD 9.5) keeps its dirt where it is.
 func track(from: Vector2i, to: Vector2i) -> bool:
-	if level(from) <= 0 or not is_floor(to) or from == to:
+	if level(from) < TRACK_LEVEL or not is_floor(to) or from == to:
 		return false
 	if treat.has(from) and Treatments.no_track(treat[from]):
+		return false
+	if rng.randf() >= track_chance:
 		return false
 	var greasy := grease.has(from)
 	_set_level(from, level(from) - 1)

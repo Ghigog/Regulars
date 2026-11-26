@@ -83,9 +83,10 @@ func test_a_primer_stops_some_new_dirt_but_not_dirt_tracked_in():
 			landed += 1
 		m.dirt.clear()
 	assert_between(landed, 55, 110, "about two in five land (60%% stopped): %d" % landed)
+	m.track_chance = 1.0
 	m.add_dirt(Vector2i(1, 2), false)
 	for i in 20:
-		m.dirt[Vector2i(1, 2)] = 1
+		m.dirt[Vector2i(1, 2)] = 3
 		m.dirt.erase(c)
 		assert_true(m.track(Vector2i(1, 2), c))
 		assert_eq(m.level(c), 1, "tracked dirt always lands")
@@ -95,10 +96,11 @@ func test_a_primer_stops_some_new_dirt_but_not_dirt_tracked_in():
 func test_a_strong_cleaner_keeps_its_dirt_off_feet():
 	var m := _room()
 	var c := Vector2i(2, 2)
-	m.add_dirt(c)
+	m.track_chance = 1.0
+	m.dirt[c] = 3
 	m.treat[c] = "strong_cleaner"
 	assert_false(m.track(c, Vector2i(3, 2)))
-	assert_eq(m.level(c), 1)
+	assert_eq(m.level(c), 3)
 	m.treat[c] = "cleaner"
 	assert_true(m.track(c, Vector2i(3, 2)), "a plain cleaner does not stop it")
 
@@ -202,7 +204,10 @@ func test_the_grease_scraper_clears_kitchen_grease_only():
 	assert_eq(r.did, "clean")
 	assert_eq(m.level(g), 0, "a whole cell a press")
 	assert_false(m.is_grease(g), "a clean cell holds no grease")
+	m.track_chance = 1.0
+	m.dirt[g] = 3
 	m.add_dirt(g, true, true)
+	m.dirt[g] = 3
 	m.track(g, guest)
 	assert_true(m.is_grease(guest), "grease tracked across stays grease")
 
