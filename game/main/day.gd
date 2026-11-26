@@ -35,6 +35,7 @@ var _glow_on := false
 func start_day() -> void:
 	if game.phase == Game.Phase.CLOSED:
 		return
+	game.session.save_night()   # Continue comes back to this night as built, before the day changes anything
 	game.ready_chefs.clear()
 	for ch in game.chefs:
 		if ch.hand.get("moving", false):
