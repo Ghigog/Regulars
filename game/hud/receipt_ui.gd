@@ -47,16 +47,17 @@ func paper_box(clip: Control, stack: VBoxContainer) -> VBoxContainer:
 	scroll.add_child(box)
 	paper_scroll = scroll
 	scroll.set_meta("clip", clip)
-	var ref: WeakRef = weakref(scroll)   # a captured node that is freed first logs an engine error
-	var refit := func() -> void:
-		var s: ScrollContainer = ref.get_ref()
-		if s and s.is_inside_tree():
-			fit_paper(s)
-	hud.center.resized.connect(refit)
-	scroll.tree_exited.connect(func() -> void:
-		if is_instance_valid(hud) and is_instance_valid(hud.center) and hud.center.resized.is_connected(refit):
-			hud.center.resized.disconnect(refit))
+	# A method, not a lambda: the engine drops the connection when this part is freed, and a
+	# lambda holding a freed capture logs "Lambda capture ... was freed" on the next resize.
+	if not hud.center.resized.is_connected(_refit_open_paper):
+		hud.center.resized.connect(_refit_open_paper)
 	return box
+
+
+## The window was resized: fit whatever paper is open.
+func _refit_open_paper() -> void:
+	if is_instance_valid(paper_scroll) and paper_scroll.is_inside_tree():
+		fit_paper(paper_scroll)
 
 
 ## A ScrollContainer reports no height of its own, so give it the paper's, or the room the
@@ -113,12 +114,7 @@ func _ribbon(box: VBoxContainer, text: String, col: Color) -> void:
 ## Fit now, and again once the labels have their widths.
 func _fit_when_laid_out(scroll: ScrollContainer) -> void:
 	fit_paper(scroll)
-	var ref: WeakRef = weakref(scroll)   # the scene may be freed before the deferred call runs
-	var again := func() -> void:
-		var s: ScrollContainer = ref.get_ref()
-		if s and s.is_inside_tree():
-			fit_paper(s)
-	again.call_deferred()
+	_refit_open_paper.call_deferred()
 
 
 ## A rule with a small round token in the middle, as on the game-over card.
