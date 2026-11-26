@@ -48,6 +48,18 @@ static func price_of(item: Dictionary) -> int:
 	return maxi(1, roundi(worth * float(PRICE_MULT[item.get("price_level", "fair")])))
 
 
+## The ingredients after ticking `ing` on or off: every copy out if it is in, else
+## it goes in and the stack is kept in pantry order, bottom first (bun, patty, cheese).
+static func toggled(ingredients: Array, ing: String) -> Array:
+	if ingredients.has(ing):
+		return ingredients.filter(func(i: String) -> bool: return i != ing)
+	var out := ingredients.duplicate()
+	out.append(ing)
+	var order := Pantry.ITEMS.keys()
+	out.sort_custom(func(a: String, b: String) -> bool: return order.find(a) < order.find(b))
+	return out
+
+
 ## A made-up name from the ingredients, topping first ("Cheese Patty Bun"). A fish
 ## with a coating is a breaded fillet (PRD 8.6).
 static func default_name(ingredients: Array) -> String:

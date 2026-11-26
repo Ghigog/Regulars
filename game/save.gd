@@ -1,5 +1,5 @@
 class_name SaveGame
-## The saved game: one file, written at the start of each night and when saving and quitting in the build phase,
+## The saved game: one file, written at the start of each night, when the restaurant opens and when saving and quitting in the build phase,
 ## read back by Continue on the title screen. A save is plain data (Variants stored as
 ## text), taken from the world by `capture` and put back by `restore_world` (the room,
 ## before the interface exists) and `restore_after` (what needs the helpers up).
