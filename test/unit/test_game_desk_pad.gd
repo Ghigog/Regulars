@@ -16,7 +16,8 @@ func _open_with_three() -> void:
 	for p in game.town.people:
 		p.affinity = 0.5
 	for tries in 10:
-		game.desk.roll_applicants()
+		if not game.desk.roll_applicants().is_empty():
+			break
 	var base: Array = game.staff.cvs.duplicate(true)
 	assert_false(base.is_empty())
 	game.staff.cvs.clear()
