@@ -348,7 +348,7 @@ func build_action(ch: Player = null) -> String:
 	var kit := _kit_action(ch)
 	if kit != "":
 		return kit
-	var clean := night_clean_action(game.world.station_at(ch.target_cell()), ch)
+	var clean := night_clean_action(game.world.station_at(ch.target_cell(), ch), ch)
 	if clean != "":
 		return clean
 	if game.desk.desk_in_front(ch) != null and not Cleaning.carrying_mess(ch.held):
@@ -357,6 +357,8 @@ func build_action(ch: Player = null) -> String:
 		var spot := _piece_in_front(ch)
 		if spot != Vector3.INF:
 			var door := game.day.door_action(ch)
+			if game.card.reaching(ch) and not game.highs.has(Grid.to_cell(spot)):
+				return door   # Reach finds nothing on the wall here
 			if door == "" or not _nearer_door(spot, ch):
 				return "Pick up"
 			return door
@@ -405,7 +407,7 @@ func held_prompt(ch: Player, action: String) -> Dictionary:
 func _kit_action(ch: Player) -> String:
 	if game.clean_kit.floor_first(ch):
 		return game.clean_kit.floor_action(ch)
-	var st: Station = game.world.station_at(ch.target_cell())
+	var st: Station = game.world.station_at(ch.target_cell(), ch)
 	var kit := game.clean_kit.station_use(st, true, ch) if st != null else ""
 	if kit != "":
 		return kit
@@ -437,7 +439,7 @@ func _mess_to_clean(st: Station) -> bool:
 func build_interact(ch: Player = null) -> void:
 	ch = game._me(ch)
 	if ch.hand.is_empty() and _kit_action(ch) != "":   # a cleaning tool (PRD 9.4)
-		var st: Station = game.world.station_at(ch.target_cell())
+		var st: Station = game.world.station_at(ch.target_cell(), ch)
 		if game.clean_kit.floor_first(ch) or st == null or game.clean_kit.station_use(st, false, ch) == "":
 			game.clean_kit.floor_use(ch)
 		return
@@ -445,7 +447,7 @@ func build_interact(ch: Player = null) -> void:
 	if not ch.hand.is_empty():
 		action = "Put down"   # hung or stood, place() decides
 	if action in Cleaning.NIGHT_ACTIONS.values() or action == "Put back":
-		game.cooking.use_station(game.world.station_at(ch.target_cell()), false, ch)
+		game.cooking.use_station(game.world.station_at(ch.target_cell(), ch), false, ch)
 		game.hud.hints_ui.show_build()   # the dirty note counts down
 		return
 	if action == "" and ch.hand.is_empty() and ch.held == "dishes" and _piece_in_front(ch) != Vector3.INF:

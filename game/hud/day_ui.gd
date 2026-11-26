@@ -212,14 +212,15 @@ func show_prompt(at: Vector2, text: String, p := 0, ready := true, extras := [])
 	var sheet: Control = d.sheet
 	if hud.game.controls == null or hud.game.controls.owner_of("touch") == p:
 		hud.last_action = text
-	sheet.visible = text != "" and hud.options_ui.title == null
-	if text == "":
+	sheet.visible = (text != "" or not extras.is_empty()) and hud.options_ui.title == null
+	if text == "" and extras.is_empty():
 		return
 	var coop: bool = hud.game.chefs.size() > 1
 	(d.tag as HudWidgets.ChefTag).visible = coop
 	(d.tag as HudWidgets.ChefTag).set_player(p)
 	var m: String = hud.game.controls.input_of(p).mode if hud.game.controls and p < hud.game.controls.players.size() else "keys"
-	d.key.visible = m != "touch"
+	d.key.visible = m != "touch" and text != ""
+	d.label.visible = text != ""
 	d.key_label.text = hud.game.controls.glyph("use", p) if hud.game.controls and p < hud.game.controls.players.size() else "E"
 	d.label.text = text.to_upper()
 	_show_extras(d, p, m, extras)
@@ -261,6 +262,8 @@ func _show_extras(d: Dictionary, p: int, mode: String, extras: Array) -> void:
 		e.label.visible = on
 		if on:
 			e.key_label.text = hud.game.controls.glyph(extras[i][0], p) if hud.game.controls and p < hud.game.controls.players.size() else ""
+			if extras[i].size() > 2 and e.key_label.text != "":   # a chord: "Alt + E"
+				e.key_label.text += " + " + hud.game.controls.glyph("use", p)
 			e.label.text = String(extras[i][1]).to_upper()
 
 

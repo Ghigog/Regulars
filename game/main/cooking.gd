@@ -419,7 +419,9 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 ## as it came out of a box here, each use swaps it for the next kind, or with one kind
 ## puts it back. Returns [action, refusal].
 func _use_storage(st: Station, dry_run: bool, ch: Player) -> Array:
-	var boxes := game.kitchen.stock(st.cell).filter(func(b: String) -> bool: return not Kitchen.is_cleaning(b))
+	var stock: Dictionary = game.kitchen.take_stock(st.cell)   # a hung piece keeps its own boxes: Reach takes those
+	var layer: Array = stock.get("high", []) if game.highs.get(st.cell) == st else stock.get("base", [])
+	var boxes := layer.filter(func(b: String) -> bool: return not Kitchen.is_cleaning(b))
 	if boxes.is_empty():
 		return ["", ""]
 	var held := ch.held

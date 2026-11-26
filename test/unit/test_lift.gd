@@ -48,12 +48,16 @@ func test_the_dish_rack_is_sold_and_the_door_waits_for_another():
 
 func test_the_last_sink_is_sold_and_sold_again_at_any_level():
 	_face(Vector2i(3, 3), Vector2i(0, -1))
-	assert_eq(game.card.lift_name(game.player), "wall shelf", "what hangs over the sink comes first")
+	assert_eq(game.card.lift_name(game.player), "sink", "plain E is the sink")
+	game.player.set_meta("reach", true)
+	assert_eq(game.card.lift_name(game.player), "wall shelf", "Reach is what hangs over it")
 	game.room_edit.build_interact()
 	assert_eq(game.player.hand.id, "shelf")
 	game.room_edit.build_interact()   # put back where it hung
 	assert_true(game.highs.has(Vector2i(3, 2)))
-	assert_eq(game.card.lift_name(game.player), "sink", "then E reaches the sink under it")
+	assert_eq(game.card.lift_name(game.player), "wall shelf", "every time, no alternating")
+	game.player.set_meta("reach", false)
+	assert_eq(game.card.lift_name(game.player), "sink", "and plain E the sink, every time")
 	game.room_edit.build_interact()
 	game.coop.act(0, "sell")
 	assert_null(game.world.find_station("sink"), "the last sink sells")
@@ -116,12 +120,14 @@ func test_a_wall_piece_gives_up_its_boxes_then_itself_then_the_counters_boxes_th
 	cells.stock.base.assign(["box_cheese"])
 	_face(Vector2i(1, 6), Vector2i(-1, 0))
 	var order: Array[String] = []
-	for i in 6:
-		game.room_edit.build_interact()
-		if game.player.hand.is_empty():
-			break
-		order.append(game.player.hand.id)
-		game.player.hand = {}   # set it aside: this test follows the order only
+	for reach in [true, false]:   # Reach empties the wall piece, plain E the counter
+		game.player.set_meta("reach", reach)
+		for i in 3:
+			game.room_edit.build_interact()
+			if game.player.hand.is_empty():
+				break
+			order.append(game.player.hand.id)
+			game.player.hand = {}   # set it aside: this test follows the order only
 	assert_eq(order, ["box_bun", "cabinet", "box_cheese", "counter"])
 
 

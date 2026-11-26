@@ -38,13 +38,13 @@ const BTN_R := 44.0
 const USE_R := 66.0
 ## What each action is called on screen, per mode.
 const GLYPHS := {
-	"keys": {"move": "WASD", "aim": "Shift", "use": "E", "back": "Esc", "turn": "R", "sell": "C", "shop": "Tab",
+	"keys": {"move": "WASD", "aim": "Shift", "reach": "Alt", "use": "E", "back": "Esc", "turn": "R", "sell": "C", "shop": "Tab",
 		"prev": "Z", "next": "X", "buy": "Space",
 		"confirm": "Enter", "town": "T", "options": "O", "search": "F", "browse": "Arrows", "menu": "N"},
-	"pad": {"move": "Stick", "aim": "LT", "use": "A", "back": "B", "turn": "RS", "sell": "X", "shop": "Y",
+	"pad": {"move": "Stick", "aim": "LT", "reach": "RT", "use": "A", "back": "B", "turn": "RS", "sell": "X", "shop": "Y",
 		"prev": "LB", "next": "RB", "buy": "Y",
 		"confirm": "A", "town": "Y", "options": "Start", "search": "", "browse": "D-pad", "menu": "Back"},
-	"touch": {"move": "Joystick", "aim": "Aim", "use": "Use", "back": "Back", "turn": "Turn", "sell": "Sell", "shop": "Shop",
+	"touch": {"move": "Joystick", "aim": "Aim", "reach": "Reach", "use": "Use", "back": "Back", "turn": "Turn", "sell": "Sell", "shop": "Shop",
 		"prev": "", "next": "", "buy": "Tap it again",
 		"confirm": "Tap", "town": "Tap", "options": "Menu", "search": "", "browse": "Swipe", "menu": "Dishes"},
 }
@@ -189,12 +189,22 @@ func stick(p := 0) -> Vector2:
 	return players[p].stick()
 
 
-## Whether player p holds their chef in place to aim: Shift on the keyboard, either
-## trigger on a controller, the Aim button on touch.
+## Whether player p holds their chef in place to aim: Shift on the keyboard, LT on a
+## controller, the Aim button on touch.
 func aiming(p := 0) -> bool:
 	if owner_of("keys") == p and Input.is_physical_key_pressed(KEY_SHIFT):
 		return true
 	return players[p].holding("aim")
+
+
+## Whether player p holds Reach, to use the high layer (wall shelf, cabinet, hook): Left Alt
+## on the keyboard (Cmd too on a Mac; never the Windows key, it opens the Start menu), RT on
+## a controller, the Reach button on touch.
+func reaching(p := 0) -> bool:
+	if owner_of("keys") == p and (Input.is_physical_key_pressed(KEY_ALT) \
+			or (OS.get_name() == "macOS" and Input.is_physical_key_pressed(KEY_META))):
+		return true
+	return players[p].holding("reach")
 
 
 static func keys_vector() -> Vector2:
@@ -334,8 +344,8 @@ func _pad_axis(e: InputEventJoypadMotion) -> void:
 	var source := "pad:%d" % e.device
 	var who := players[owner_of(source)]
 	var v: Vector2 = who._sticks.get(source, Vector2.ZERO)
-	if e.axis in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:   # held: the chef stands and aims
-		who.hold(source, "trigger%d" % e.axis, "aim", e.axis_value > 0.5)
+	if e.axis in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:   # held: LT stands and aims, RT reaches high
+		who.hold(source, "trigger%d" % e.axis, "reach" if e.axis == JOY_AXIS_TRIGGER_RIGHT else "aim", e.axis_value > 0.5)
 		if e.axis_value > 0.5:
 			_use(source)
 		return
