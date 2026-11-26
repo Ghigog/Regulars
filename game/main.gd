@@ -531,7 +531,9 @@ func _update_cursor(ch: Player = null) -> void:
 		if action in ["Open up", "Close early"] and ready_chefs.has(ch):
 			action = "Not ready"   # co-op: using the card again takes their ready back
 		var p := DOORWAY + Vector3(0, 2.9, 0)
-		if action == "Write menu":
+		if action == "Take out rubbish":   # the bag's target is the outside bin, not the door
+			p = Scenery.outside_bin_at() + Vector3(0, 1.6, 0)
+		elif action == "Write menu":
 			p = menu_board.global_position + Vector3(0, 1.0, 0)
 		if not ch.hand.is_empty() and room_edit._hover_point(ch) != Vector3.INF:
 			p = room_edit._hover_point(ch) + Vector3(0, 2.9 if world.hand_layer(ch) == "high" else 2.0, 0)
@@ -553,7 +555,7 @@ func _update_cursor(ch: Player = null) -> void:
 		var held := room_edit.held_prompt(ch, action)
 		action = held.text
 		extras = held.extras
-	if extras.is_empty() and ch.hand.is_empty():
+	if extras.is_empty() and ch.hand.is_empty() and ch.held != "rubbish_bag":   # a bag fills the hands
 		var high := card.reach_action(ch)   # what Reach would do here, as a second keycap chip
 		if high != "" and high != action:
 			extras = [["reach", high, true]]
