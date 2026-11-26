@@ -1,13 +1,14 @@
 class_name HudBoardKey
 extends RefCounted
-## The big glowing key over the menu board: a keycap in the style of the chef's prompt,
-## holding whatever is bound to "menu" on the first player's device. It shows in the build
-## phase only, pulses slowly and warmly (brighter while tonight's menu has no main), and
+## The menu board's glow and its key: a prompt-sized keycap just above the board, the
+## chef prompt's key sheet, holding whatever is bound to "menu" on the first player's
+## device, while the board itself glows (MenuBoard.update_glow). They show in the build
+## phase only, pulse slowly and warmly (brighter while tonight's menu has no main), and
 ## swells once, hard, when the door card refuses for want of a main.
 
 const BRIGHT := 1.0
 const DIM := 0.5
-const FOOT := Vector3(0, 0.8, 0)   # above the board's slate
+const FOOT := Vector3(0, 0.45, 0)   # the board's top edge
 
 var hud: Hud
 var cap: HudWidgets.Sheet
@@ -24,10 +25,10 @@ func _init(hud_: Hud) -> void:
 
 func _build() -> void:
 	_built = true
-	cap = HudWidgets.Sheet.new("key", 20, 6).pad(26, 4, 26, 14)
+	cap = HudWidgets.Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
 	cap.visible = false
 	hud.root.add_child(cap)
-	label = hud._label(cap, 58, "N")
+	label = hud._label(cap, 24, "N")
 
 
 ## Called every frame from Game._process.
@@ -37,13 +38,16 @@ func update() -> void:
 		_build()
 	var show: bool = game.phase == Game.Phase.BUILD and hud.options_ui.title == null and game.menu_board != null
 	cap.visible = show
+	var no_main: bool = not Menu.has_main(game.menu_stock.tonight_menu())
+	if game.menu_board != null:
+		game.menu_board.update_glow(show, no_main)
 	if not show:
 		return
 	var glyph: String = game.controls.glyph("menu") if game.controls != null else "N"
 	if label.text != glyph:
 		label.text = glyph
 		cap.reset_size()
-	var want: bool = not Menu.has_main(game.menu_stock.tonight_menu())
+	var want := no_main
 	if _tween == null or want != bright:
 		bright = want
 		_start_pulse()

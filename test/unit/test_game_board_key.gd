@@ -69,3 +69,18 @@ func test_write_menu_opens_the_menu_screen():
 	assert_eq(game.day.door_action(), "Write menu")
 	game.day.use_door()
 	assert_true(game.hud.menu_open())
+
+
+func test_board_glows_in_build_only_and_key_is_prompt_sized():
+	_to_build()
+	_no_main()
+	_frame()
+	var k: HudBoardKey = game.hud.board_key_ui
+	assert_true(game.menu_board.glow.visible, "halo in build")
+	game.hud.day_ui.show_prompt(Vector2(300, 300), "Cook")
+	var key: Control = game.hud._prompts[0].key
+	assert_almost_eq(k.cap.size.y, key.size.y, 6.0, "no bigger than the chef prompt's key")
+	game.phase = game.Phase.SERVICE
+	_frame()
+	await wait_seconds(0.6)
+	assert_false(game.menu_board.glow.visible, "halo gone in service")
