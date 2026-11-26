@@ -57,7 +57,7 @@ func close_desk() -> void:
 
 ## Puts up a post. Refused (-1) when every desk is taken.
 func desk_post(post_name: String, duties: Array, breaks: int, days_off: int) -> int:
-	var id := game.staff.add_post(post_name, duties, breaks, days_off, desk_count())
+	var id := game.staff.add_post(post_name, duties, breaks, days_off, desk_count(), game.ledger.day)
 	game.audio.sfx("page" if id >= 0 else "fail")
 	return id
 
@@ -121,7 +121,7 @@ func desk_haggle(cv_id: int, offer: int) -> String:
 ## stand in a line outside the door. Earlier CVs stay in the pile; their people do not
 ## queue again.
 func roll_applicants() -> Array[Dictionary]:
-	var fresh := game.staff.roll_applicants(Staff.candidates(game.town, game.ledger.day))
+	var fresh := game.staff.roll_applicants(Staff.candidates(game.town, game.ledger.day), game.ledger.day)
 	_clear_applicants()
 	for i in fresh.size():
 		var person := int(fresh[i].person)
