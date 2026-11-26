@@ -50,6 +50,13 @@ func test_crowd_floor_grows_slowly():
 	assert_eq(Town.crowd_floor(20), 12)
 
 
+func test_table_patience_eases_one_second_a_day_to_a_42_s_floor():
+	assert_almost_eq(Town.table_patience(1), 54.0, 0.01)
+	assert_almost_eq(Town.table_patience(10), 45.0, 0.01)
+	for d in [13, 14, 30]:
+		assert_almost_eq(Town.table_patience(d), 42.0, 0.01)
+
+
 func test_day_20_is_not_easier_than_day_10():
 	for affinity in [0.0, 0.4, 0.9]:
 		var c10 := _mean_crowd(10, affinity)
