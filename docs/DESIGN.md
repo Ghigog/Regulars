@@ -834,6 +834,12 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   plan; `Scenery.build_room` draws it. Ceilings are not planned (the camera looks down).
 - **Two currencies**: money (earned per day) and XP (10 per meal plus the tip; 100 per level).
 - **Built**: moving, selling and rotating furniture (section 1).
+- **Built**: outdoor seating. Tables, chairs and decor (not floors, walls, rugs, paint, doors or kitchen
+  pieces) may stand on the two open pavement rows. Refused: the queue line (the wall-side column from the
+  doorway up the street), the doorway, the menu board's cell, the kerb tile and the road. A piece must
+  leave a path between both street ends, the door and the queue ("That would shut someone in"). An
+  outdoor table is counted and seated like an indoor one; guests whose outer-lane step is taken step to
+  the nearest open pavement cell.
 - **Built**: floor and wall finishes that cheer seated guests, and movable rugs (section 1).
 - **Built** (PRD 7): themes that change the catalog. **To add**: buying more lot.
 

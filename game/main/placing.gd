@@ -8,6 +8,7 @@ var game: Game
 
 const WONT_GO := "That won't go here"
 const TAKEN := "Something's already there"
+const KEEP_CLEAR := "Keep that clear for the queue"
 const NEEDS_COUNTER := "Tools go on a counter"
 const NEEDS_FRIDGE := "That box needs a fridge"
 const NEEDS_FREEZER := "That box needs a freezer"
@@ -523,7 +524,39 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 		if game.world._stacks_on(cell, ch.hand):   # a tool needs a counter under it
 			return ""
 		return NEEDS_COUNTER if Kitchen.is_top(ch.hand.id) and not game.stations.has(cell) else TAKEN
-	return _grid_words(game.grid.block_refusal(cell, Station.seats_for(ch.hand.id, cell, int(ch.hand.facing)), Game.LOT, Game.DOOR, reach, touch))
+	var seats := Station.seats_for(ch.hand.id, cell, int(ch.hand.facing))
+	if _is_street_piece(ch.hand.id) and not Game.LOT.has_point(cell):
+		return _street_refusal(cell, seats, reach, touch)
+	return _grid_words(game.grid.block_refusal(cell, seats, Game.LOT, Game.DOOR, reach, touch))
+
+
+## Tables, chairs and decor may stand out on the pavement; nothing else does.
+static func _is_street_piece(id: String) -> bool:
+	return Catalog.ITEMS.has(id) and str(Catalog.ITEMS[id].get("category", "")) in ["Dining", "Decor"]
+
+
+## The queue line: the pavement column by the wall from the doorway up to the street end.
+static func _on_queue_line(c: Vector2i) -> bool:
+	return c.x == Game.W and c.y >= Game.LOT.position.y and c.y <= Game.DOOR.y
+
+
+## A table, chair or decor piece on the pavement: the two open rows, off the queue line,
+## the doorway and the board, and never where it would cut a street end off from the door.
+func _street_refusal(cell: Vector2i, seats: Array[Vector2i], reach: Array[Vector2i], touch: Array[Vector2i]) -> String:
+	var cells: Array[Vector2i] = [cell]
+	cells.append_array(seats)
+	for c in cells:
+		if not Game.PAVEMENT.has_point(c):   # the back tile, the road, or the room's own side
+			return "That's off the lot"
+		if c == Game.DOOR or c == Game.BOARD_CELL or _on_queue_line(c):
+			return KEEP_CLEAR
+	reach.append(Game.SPAWN)
+	reach.append(Game.EXIT)
+	reach.append(Game.DOOR)
+	for y in range(Game.LOT.position.y, Game.DOOR.y + 1):
+		reach.append(Vector2i(Game.W, y))
+	var area := Game.LOT.merge(Game.PAVEMENT)
+	return _grid_words(game.grid.block_refusal(cell, seats, area, Game.DOOR, reach, touch))
 
 
 ## The player's words for a Grid refusal code.
