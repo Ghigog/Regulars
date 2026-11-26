@@ -260,3 +260,32 @@ func test_a_good_grill_gives_a_burst():
 	_use("stove")
 	assert_eq(game.player.held_quality, Prep.GOOD)
 	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.BURST_SPEED, 0.01)
+
+
+func test_a_guest_is_served_and_eats_after_the_day_changes():
+	var left := _ordered_guest()
+	game.serving.serve(left, game.serving.full_tray_for(left))
+	_run(left.eat_time + Guest.CHAT_TIME + 0.5)
+	game.paying.pay_bill(left.table)
+	game.day._end_day()
+	game.day.start_day()
+	var g := _ordered_guest(1)
+	_cook_burger()
+	assert_eq(game.player.held, "dishes")
+	game.cooking.use_station(g.table)
+	assert_eq(g.state, "eating", "a complete plated order starts them eating")
+	assert_true(game.tickets.is_empty() or game.serving.find_ticket(int(g.order.ticket)).is_empty(), "their ticket left the rail")
+
+
+
+func test_a_partial_serve_says_what_the_guest_still_waits_for():
+	game.world.add_station("fountain", Vector2i(2, 5))
+	game.world.add_station("cups", Vector2i(1, 6))
+	game.menu.add("drink", ["soda"], "Soda")
+	game.town.people[0].likes = ["soda"]
+	var g := _ordered_guest()
+	assert_false(g.order.drink.is_empty(), "they ordered a drink")
+	_cook_burger()
+	game.cooking.use_station(g.table)
+	assert_eq(g.state, "waiting")
+	assert_eq(game.hud.toast.text, "%s is still waiting for the %s." % [g.info.name, str(g.order.drink.name).to_lower()])

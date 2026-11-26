@@ -177,6 +177,15 @@ func serve_dish(d: Dish, items: Array) -> int:
 	return li
 
 
+## The names of the items with nothing served yet, in course order: ["Soda"].
+func waiting_for() -> Array[String]:
+	var out: Array[String] = []
+	for l in lines:
+		if not _served(l):
+			out.append(str(l.item.name))
+	return out
+
+
 ## The first line for this menu item with nothing served on it yet, or -1.
 func open_line(item_id: int) -> int:
 	for li in lines.size():
