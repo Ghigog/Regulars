@@ -465,7 +465,7 @@ func test_turned_table_has_seats_above_and_below():
 	var cells: Array = []
 	var all: Array[Guest] = []
 	for n in 3:
-		all.append_array(game.seating.spawn_group([n * 2, n * 2 + 1]))
+		all.append_array(game.seating.spawn_group([n * 2, n * 2 + 1], true))   # critics always join the line
 	_run(14.0)
 	for g in all:
 		cells.append(g.cell)
@@ -968,6 +968,14 @@ func test_a_group_takes_a_whole_table_and_singles_do_not_share():
 	var pair: Array[Guest] = game.seating.spawn_group([0, 1])
 	var solo_a: Guest = game.seating.spawn_guest(5)
 	var solo_b: Guest = game.seating.spawn_guest(9)
+	var pin := RandomNumberGenerator.new()   # a seed whose roll joins the line (QueueChoice)
+	var seed_ := 0
+	while true:
+		pin.seed = seed_
+		if pin.randf() < 0.5:
+			break
+		seed_ += 1
+	game.order_rng.seed = seed_
 	var late: Guest = game.seating.spawn_guest(11)
 	_run(14.0)
 	assert_eq(pair[0].table, pair[1].table, "the pair sits together")

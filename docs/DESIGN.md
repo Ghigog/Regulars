@@ -605,6 +605,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
   Guests holding a grudge are not used to top up a thin crowd.
 - **Flyers.** In the shop's Extras tab, $15 buys +25% visit chance for everyone tomorrow. One
   batch a night. 
+- **The line decides.** There is no cap on the line. A party reaching its end rolls once to join:
+  `QueueChoice.join_chance` = clamp(1 - groups_ahead x `PER_GROUP_DROP` x (1 - `AFFINITY_WEIGHT` x like),
+  `FLOOR`, 1), where groups_ahead counts parties, and like is the party's mean affinity plus the
+  critic's visit boost, -1..1. An empty line always joins; strangers are put off well before
+  regulars. A party that declines reads the line, says "Line's too long" and walks on, like
+  "No table": no affinity change, no grudge, no warning to friends. The critic always joins.
 - **Mood drives pay and stay.** When the food reaches the table the guest's comfort is
   read once and kept: `0.6 joy + 0.4 patience - felt disgust`, 0 to 1 (savour is left
   out: comfort is about the room and the service). It scales the bill from x0.90 to

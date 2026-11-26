@@ -29,6 +29,7 @@ var liked_meal := false   # their meal had something they like
 var order := {}
 var planned := {}
 var no_table := false   # no table in the room could ever seat their group: they turn away at the door
+var line_too_long := false   # the line outside put them off: they walk on without joining it
 var orders_nothing := false   # found nothing on the menu at the door: no notepad, no ticket
 var bill_base := 0       # the order's price: what the bill is before mood and deals
 var _meal_tray: Tray

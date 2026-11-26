@@ -44,9 +44,11 @@ func spawn_group(ids: Array, as_critic := false) -> Array[Guest]:
 	if as_critic:
 		game.critic_guest = party[0]
 	var no_table := not TableJoins.fits_ever(party.size(), game.tables.list)   # before the menu is read
-	var plan := {"walk": true} if no_table else _plan_orders(party)
+	var too_long := not no_table and not as_critic and not _joins_line(party)
+	var plan := {"walk": true} if no_table or too_long else _plan_orders(party)
 	for g in party:
 		g.no_table = no_table
+		g.line_too_long = too_long
 	if plan.walk:   # nobody has a main: they read the menu at the door and walk on
 		for k in party.size():
 			var g := party[k]
@@ -57,6 +59,21 @@ func spawn_group(ids: Array, as_critic := false) -> Array[Guest]:
 			g.walk_to(outer_lane(Grid.to_cell(queue_spot(0)).y + k), queue_spot(0) + Vector3(1.0, 0, k * 0.9))
 	_reflow_queue()
 	return party
+
+
+## Whether the party joins the line: one roll per party, from the groups already waiting and how
+## much the party likes the place. Their own earlier opinion is never touched by turning away.
+func _joins_line(party: Array[Guest]) -> bool:
+	var ahead := {}
+	for g: Guest in game.queue:
+		if not party.has(g):
+			ahead[g.party] = true
+	if ahead.is_empty():
+		return true   # an empty line: everyone joins, no roll
+	var like := game.critic.visit_boost(game.ledger.day)
+	for g in party:
+		like += float(game.town.people[g.idx].affinity) / party.size()
+	return game.order_rng.randf() < QueueChoice.join_chance(ahead.size(), like)
 
 
 ## The group reads the menu at the door and each decides what they will order.
@@ -96,6 +113,9 @@ const _COUNT_WORDS := ["", "one", "two", "three", "four"]
 ## and not a strike, but they think a little less of the place, friends hear it, and
 ## the receipt counts them.
 func read_board(g: Guest) -> void:
+	if g.line_too_long:   # nobody served them badly: no opinion, no record, just a note
+		game.audio.popup("Line's too long", g.position + Vector3(0, 2.3, 0), Color(Build.CABINET))
+		return
 	if g.no_table:   # no walkout, no grudge, no opinion: the room just has nothing for them
 		var line := "No table for the %s of us" % _COUNT_WORDS[mini(g.party.size(), _COUNT_WORDS.size() - 1)] if g.party.size() > 1 \
 			else "No table for me"
