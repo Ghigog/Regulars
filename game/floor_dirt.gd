@@ -62,8 +62,8 @@ func speed_at(p: Vector3) -> float:
 	return FloorMess.speed_of(CleanTools.felt_level(mess.level(c), in_way.has(c))) * mess.treat_speed(c)
 
 
-## One step of feet: each walker is [node, cell]. Stepping off a dirty cell onto the next
-## carries a level with them, and leaves footprints where it lands. With `slips` (during
+## One step of feet: each walker is [node, cell]. Stepping off a heavy (level 3+) cell onto the
+## next sometimes carries a level with them, and leaves footprints where it lands. With `slips` (during
 ## service), stepping onto a level 4 cell may put them down (9.3). Anyone down tracks nothing.
 func step_feet(walkers: Array, slips := false) -> void:
 	var here := {}
