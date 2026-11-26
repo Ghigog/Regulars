@@ -84,6 +84,7 @@ func tick(delta: float) -> void:
 	if helpers.is_empty():
 		return
 	_since += delta
+	board.cool(delta)
 	if _since >= REBUILD_EVERY:
 		_since = 0.0
 		board.rebuild(room_view.world())
@@ -167,6 +168,8 @@ func _complete(h: Helper) -> void:
 func _fail(h: Helper) -> void:
 	var was: Dictionary = h.steps[0] if not h.steps.is_empty() else {}
 	_let_go(h)
+	if h.task.has("key"):
+		board.fail(h.person, h.task.key)
 	board.release(h.person)
 	h.task = {}
 	h.steps.clear()

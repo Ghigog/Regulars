@@ -213,7 +213,7 @@ func _stand_for(h: Helper, s: Dictionary) -> Variant:
 
 
 func _open(c: Vector2i) -> bool:
-	return crew.game.grid.in_bounds(c) and not crew.game.grid.is_blocked(c)
+	return crew.game.grid.in_bounds(c) and not crew.game.grid.chef_blocked(c)
 
 
 ## The work at the spot begins: its seconds, or -1 when it cannot be done.
