@@ -139,8 +139,19 @@ func serve_dishes(ch: Player, table: Station) -> int:
 		else:
 			g.show_served(t)
 			game.audio.sfx("plate_food")
+			game.hud.day_ui.say("%s is still waiting for the %s." % [g.info.name, _list(t.waiting_for())])
 	game.hud.day_ui.refresh_tickets()
 	return n
+
+
+## Names joined for a sentence: "soda", "soda and fries", "soda, fries and a bun".
+func _list(names: Array[String]) -> String:
+	var low: Array[String] = []
+	for n in names:
+		low.append(n.to_lower())
+	if low.size() < 2:
+		return "".join(low)
+	return ", ".join(low.slice(0, -1)) + " and " + low[-1]
 
 
 ## Why none of the dishes in hand can be served here.
