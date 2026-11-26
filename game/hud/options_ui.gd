@@ -115,8 +115,8 @@ func toggle_pause() -> void:
 ## whether the action was used.
 func options_action(action: String, echo := false) -> bool:
 	match action:
-		"up": _options_pick(_options_sel - 1)
-		"down": _options_pick(_options_sel + 1)
+		"up": _options_pick(posmod(_options_sel - 1, maxi(_options_rows.size(), 1)))
+		"down": _options_pick(posmod(_options_sel + 1, maxi(_options_rows.size(), 1)))
 		"left": _options_turn(-1)
 		"right": _options_turn(1)
 		_:
