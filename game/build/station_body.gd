@@ -379,10 +379,12 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			for i in 9:
 				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, 0.2), Vector3(0.03, 0.2, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
 				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, -0.2), Vector3(0.03, 0.3, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
-		"table":
+		"table", "table_fast", "table_comfy":   # the branches are drawn as the plain table for now
 			_table_tile(n, joined, candle)
 		"chair":
 			BuildStations._chair(n, Vector2i(1, 0), Build.CORAL, true)
+		"chair_fast":   # hard seats: the plain chair, in steel
+			BuildStations._chair(n, Vector2i(1, 0), Build.STEEL, true)
 		"booth_seat":
 			_booth_seat(n, joined)
 	if tier > 1:
