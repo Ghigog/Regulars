@@ -77,6 +77,7 @@ var used_any := false           # a device has been used: it is player one's, an
 const LEAVE_HOLD := 1.0          # seconds Start is held to leave
 const JOIN_NOTE_GAP := 4.0       # seconds between join notes for one pad
 var _join_noted := {}           # pad source -> when it was last told to press Start
+var join_offer := ""            # a stranger pad that was plugged in or pressed and can press Start to join
 var _start_held := {}           # pad source -> seconds Start has been held (-1 once it left)
 var _fingers := {}              # touch index -> what it holds: "stick" or [button id, action]
 var _right_y := {}   # source -> right stick's vertical axis, kept apart from the walking stick
@@ -156,11 +157,29 @@ func is_stranger_pad(source: String) -> bool:
 func _offer_join(source: String) -> void:
 	if seats.has(source) or game.chefs.size() >= game.MAX_CHEFS:
 		return
+	if join_offer != source:
+		join_offer = source
+		_refresh_pause()
 	var now := Time.get_ticks_msec() / 1000.0
 	if now - float(_join_noted.get(source, -100.0)) < JOIN_NOTE_GAP:
 		return
 	_join_noted[source] = now
 	game.hud.day_ui.say("Press Start to join as Chef %d" % (game.chefs.size() + 1))
+
+
+## How far player p's Start has been held towards leaving, 0 to 1.
+func leave_progress(p: int) -> float:
+	if game.chefs.size() <= 1:
+		return 0.0
+	for s: String in seats:
+		if seats[s] == p and _start_held.get(s, -1.0) > 0.0:
+			return clampf(_start_held[s] / LEAVE_HOLD, 0.0, 1.0)
+	return 0.0
+
+
+func _refresh_pause() -> void:
+	if game.hud.options_ui.pause_open():
+		game.hud.options_ui.pause.refresh_chefs()
 
 
 func glyph(action: String, p := 0) -> String:
@@ -371,6 +390,9 @@ func _start_button(source: String, pressed: bool) -> void:
 ## A controller was unplugged: its player leaves (unless they are the only one).
 func _on_joy_connection(device: int, connected: bool) -> void:
 	var source := "pad:%d" % device
+	if not connected and join_offer == source:
+		join_offer = ""
+		_refresh_pause()
 	if connected:
 		if used_any and not seats.has(source) and players[0].source != source:
 			_offer_join(source)
@@ -382,6 +404,8 @@ func _on_joy_connection(device: int, connected: bool) -> void:
 		q.let_go(source)
 	if game.chefs.size() > 1:
 		game.coop.leave(p)
+	else:
+		_refresh_pause()
 
 
 func _pad_axis(e: InputEventJoypadMotion) -> void:

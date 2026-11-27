@@ -28,11 +28,14 @@ func join(source: String) -> int:
 	game.audio.burst(ch.position + Vector3(0, 1.0, 0), "stars", 0.5)
 	game.audio.door_bell()
 	ch.punch()
+	game.controls.join_offer = ""
 	game.hud.day_ui.say("Chef %d joined." % (p + 1))
 	game.hud.hints_ui.refresh_input()
 	if game.phase == Game.Phase.BUILD:
 		game.hud.hints_ui.show_build()
 	_refresh_ready()
+	if game.hud.options_ui.pause_open():
+		game.hud.options_ui.pause.refresh_chefs()
 	return p
 
 
@@ -80,6 +83,8 @@ func leave(p: int) -> bool:
 	_refresh_ready()
 	if game.phase == Game.Phase.SUMMARY and game.ready_chefs.size() >= game.chefs.size() and not game.ready_chefs.is_empty():
 		game.session.open_build()
+	if game.hud.options_ui.pause_open():
+		game.hud.options_ui.pause.refresh_chefs()
 	return true
 
 
