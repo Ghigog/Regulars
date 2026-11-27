@@ -145,11 +145,12 @@ func test_title_play_with_a_controller():
 func test_title_settings_opens_the_options_and_comes_back():
 	game.session.open_title()
 	_tap(KEY_DOWN)
+	_tap(KEY_DOWN)   # past Practice
 	_tap(KEY_E)
 	assert_true(game.hud.options_ui.options_open(), "Settings opens the options")
 	_tap(KEY_DOWN)
 	assert_true(game.hud.options_ui.title_open())
-	assert_eq(game.hud.options_ui.title.sel, 1, "the arrows belong to the options meanwhile")
+	assert_eq(game.hud.options_ui.title.sel, 2, "the arrows belong to the options meanwhile")
 	_tap(KEY_ESCAPE)
 	assert_false(game.hud.options_ui.options_open())
 	assert_true(game.hud.options_ui.title_open(), "back on the title")
@@ -164,13 +165,14 @@ func test_title_quit_where_quitting_is_a_thing():
 	if not Title.can_quit():
 		assert_false(names.has("Quit"), "no Quit on phones or the web")
 		return
-	assert_eq(names, ["Play", "Settings", "Quit"])
+	assert_eq(names, ["Play", "Practice", "Settings", "Quit"])
+	_tap(KEY_DOWN)
 	_tap(KEY_DOWN)
 	_tap(KEY_DOWN)
 	_tap(KEY_DOWN)
 	assert_eq(game.hud.options_ui.title.sel, 0, "down from Quit wraps to Play")
 	_tap(KEY_UP)
-	assert_eq(game.hud.options_ui.title.sel, 2, "up from Play wraps to Quit")
+	assert_eq(game.hud.options_ui.title.sel, 3, "up from Play wraps to Quit")
 	_tap(KEY_SPACE)
 	assert_true(game.quit_asked)
 

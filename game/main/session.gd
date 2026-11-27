@@ -141,6 +141,22 @@ func play() -> void:
 	game.hud.options_ui.title.show_themes()
 
 
+## Practice on the title screen: the starter kitchen in service with no guests, in the
+## room's current theme. Nothing is paid, rolled or saved; the pause menu ends it.
+func practice() -> void:
+	if game.phase != Game.Phase.TITLE:
+		return
+	game.hud.options_ui.hide_title()
+	game.practice = true
+	_starter_kitchen()
+	game.day.open_room()
+	game.arrivals.clear()
+	game.audio.play_music("day")
+	game.hud.day_ui.show_banner("Practice")
+	game.hud.day_ui.say("Practice: no guests today. Pause to end it.")
+	game.audio.sfx("day")
+
+
 ## REGULARS_THEME is set: a developer's switch that skips the theme card.
 static func theme_forced() -> bool:
 	return OS.get_environment("REGULARS_THEME") != ""
