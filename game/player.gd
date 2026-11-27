@@ -25,7 +25,7 @@ var facing := Vector2i(0, 1)      # nearest grid direction to `aim`
 var aim := Vector3(0, 0, 1)       # the way the chef is really looking (any of 8 ways)
 var _velocity := Vector3.ZERO
 var _held_node: Node3D
-var _held_size := 1.0   # the carried item's size in the world; it pops in from 0.4
+var _held_size := BuildFood.SIZE   # the carried item's size in the world; it pops in from 0.4
 var _body: Peg
 var _stride := 0.0
 var boost_speed := 1.0   # times SPEED: a prep minigame's burst (1.5) or penalty (0.5)
@@ -103,8 +103,8 @@ func set_held(kind: String, quality := 1.0, dishes_: Array = [], tray_ := false)
 		_held_node = BuildFood.carried(dishes, on_tray) if kind in ["dishes", "dirty_dishes", "tray"] else BuildFood.item(kind, quality)
 		_held_node.position = Vector3(0, 0.42, 0.34)
 		_body.add_child(_held_node)
-		_held_size = 0.4
-		_held_node.create_tween().tween_property(self, "_held_size", 1.0, 0.18) \
+		_held_size = 0.4 * BuildFood.SIZE
+		_held_node.create_tween().tween_property(self, "_held_size", BuildFood.SIZE, 0.18) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
