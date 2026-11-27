@@ -651,7 +651,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   who called (else the first) stands and queues at the till, on the room side of the
   pass, bubble always up; the line follows the till if the pass moves. A chef facing the
   till with empty hands (and nothing on that counter top) gets "Write the bill" (holding a slip with nobody queued at the till, "Write a new bill": the screen opens filled in from the slip, Print replaces it, Esc keeps it): the
-  bill screen, a paper slip with a read-only line of the waiting tables by number and party
+  bill screen, a small paper slip at the top right that leaves the room undimmed (the other chef keeps playing), with a read-only line of the waiting tables by number and party
   size (at the till marked; there is no table to pick, the slip is for the table it is
   handed to), then tonight's menu by course with a count beside each (E or click adds, Backspace, X
   or right click takes off), then Print. It never shows what the table had: the player
