@@ -20,11 +20,11 @@ var pay_since := {}        # table Station -> clock when it became ready to pay
 var _call_t := 0.0
 
 
-## Every table with seats, in a fixed order: down the room, then across. Numbered from 1.
+## Every Table tile, in a fixed order: down the room, then across. Numbered from 1.
 func dining_tables() -> Array[Station]:
 	var out: Array[Station] = []
 	for st: Station in game.stations.values():
-		if not st.seats.is_empty():
+		if Station.is_table(st.type):
 			out.append(st)
 	out.sort_custom(func(a: Station, b: Station) -> bool:
 		return a.cell.x < b.cell.x if a.cell.x != b.cell.x else a.cell.y < b.cell.y)

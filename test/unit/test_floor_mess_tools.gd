@@ -147,7 +147,7 @@ func test_hands_are_full_while_holding_a_tool():
 
 func test_e_at_a_dirty_cell_in_front_clears_a_level_and_held_e_repeats():
 	var game = _game()
-	var front := _stand(game, Vector2i(7, 2))
+	var front := _stand(game, Vector2i(8, 1))
 	for i in 3:
 		game.floor_dirt.mess.add_dirt(front)
 	CleanKit.hold(game.player, "mop", 0)
@@ -168,7 +168,7 @@ func test_e_at_a_dirty_cell_in_front_clears_a_level_and_held_e_repeats():
 
 func test_held_e_with_bare_hands_scrubs_slower_than_a_tool():
 	var game = _game()
-	var front := _stand(game, Vector2i(7, 2))
+	var front := _stand(game, Vector2i(8, 1))
 	for i in 2:
 		game.floor_dirt.mess.add_dirt(front)
 	assert_null(game.world.station_at(game.player.target_cell()), "nothing stands in front")
@@ -202,7 +202,7 @@ func test_dirty_cells_send_motes_up_more_when_dirtier():
 
 func test_a_dirty_mop_is_slow_until_rinsed_at_a_sink():
 	var game = _game()
-	var front := _stand(game, Vector2i(7, 2))
+	var front := _stand(game, Vector2i(8, 1))
 	game.floor_dirt.mess.add_dirt(front)
 	CleanKit.hold(game.player, "mop", 4)
 	assert_string_contains(game.clean_kit.floor_action(game.player), "slow")
@@ -277,7 +277,7 @@ func test_a_shelf_keeping_a_sponge_moves_with_it_at_night():
 
 func test_a_tool_put_down_elsewhere_lies_in_the_way():
 	var game = _game()
-	var front := _stand(game, Vector2i(7, 2))
+	var front := _stand(game, Vector2i(8, 1))
 	CleanKit.hold(game.player, "scourer", 1)
 	assert_eq(game.clean_kit.floor_action(game.player), "Put scourer down")
 	game.coop.act(0, "use")

@@ -1,13 +1,14 @@
 class_name GameTables
 extends RefCounted
-## The room's tables: which dining pieces make one table (TableJoins), worked out again
+## The room's tables: which Table tiles and seats make one table (TableJoins), worked out again
 ## whenever a piece is placed, turned, lifted or sold. A party sits at one table, named by
-## its lead half: the piece with the lowest table number.
+## its lead tile: the one with the lowest table number.
 
 var game: Game
-var list: Array[Dictionary] = []   # TableJoins.runs of the room: {pieces: numbers, seats}
+var list: Array[Dictionary] = []   # TableJoins.tables of the room: {pieces: tile numbers, seats, chairs}
 var cards: Array[Label3D] = []     # the seat-count card at each table's centre, one per run
 
+const SEAT_BASE := 1000          # seat pieces are numbered from here, clear of the table tiles
 const CARD_HEIGHT := 0.95          # just above the table top
 
 
@@ -15,15 +16,43 @@ func _init(game_: Game) -> void:
 	game = game_
 
 
-## Works the joins out again from game.stations.
+## Works the tables out again from game.stations: each Table tile gets the cells of the
+## seats facing it.
 func rebuild() -> void:
-	var pieces := []
+	var dining := game.paying.dining_tables()
+	for st: Station in dining:
+		st.seats = []
+	for st: Station in _seat_stations():
+		var tile: Station = game.stations.get(st.cell + TableJoins.FACE[st.facing % 4])
+		if tile != null and Station.is_table(tile.type):
+			tile.seats.append(st.cell)
+	list = TableJoins.tables(pieces())
+	_draw_cards()
+
+
+## The room's tiles (numbered from 1 in dining order) and seats (numbered from SEAT_BASE)
+## as TableJoins pieces; the seats are not yet on the tiles' `seats`.
+func pieces() -> Array:
+	var out := []
 	var dining := game.paying.dining_tables()
 	for i in dining.size():
-		var st: Station = dining[i]
-		pieces.append({"type": st.type, "cell": st.cell, "facing": st.facing, "number": i + 1})
-	list = TableJoins.runs(pieces)
-	_draw_cards()
+		out.append({"type": "table", "cell": dining[i].cell, "facing": 0, "number": i + 1})
+	var seat_stations := _seat_stations()
+	for i in seat_stations.size():
+		var st := seat_stations[i]
+		out.append({"type": st.type, "cell": st.cell, "facing": st.facing, "number": SEAT_BASE + i})
+	return out
+
+
+## The chairs and booth seats in a fixed order: down the room, then across.
+func _seat_stations() -> Array[Station]:
+	var out: Array[Station] = []
+	for st: Station in game.stations.values():
+		if Station.is_seat(st.type):
+			out.append(st)
+	out.sort_custom(func(a: Station, b: Station) -> bool:
+		return a.cell.x < b.cell.x if a.cell.x != b.cell.x else a.cell.y < b.cell.y)
+	return out
 
 
 ## One card per table, at the middle of its pieces, saying how many it seats.

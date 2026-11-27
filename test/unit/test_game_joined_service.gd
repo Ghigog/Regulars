@@ -1,14 +1,11 @@
 extends "res://test/helpers/game_case.gd"
-## Two tables pushed together are served, billed and cleared as one table.
+## One table of two tiles is served, billed and cleared as one table.
 
 
-## Clears the dining tables and pushes two tables for two together; a party of four sits.
+## Clears the room and builds one table of two tiles with four chairs; a party of four sits.
 func _joined() -> Array[Station]:
-	for st: Station in game.paying.dining_tables():
-		game.world._unregister(st)
-		st.queue_free()
-	var out: Array[Station] = [game.world.add_station("table", Vector2i(6, 1)), game.world.add_station("table", Vector2i(6, 2))]
-	return out
+	_clear_dining()
+	return _add_table([Vector2i(6, 1), Vector2i(6, 2)], [Vector2i(5, 1), Vector2i(5, 2), Vector2i(7, 1), Vector2i(7, 2)])
 
 
 func _party_of_four() -> Array[Guest]:

@@ -1,9 +1,9 @@
 class_name GameTableCards
 extends RefCounted
 ## The seat-count card on every free table (EPIC 28): one paper tent card at the centre of
-## each table (the seam of a joined pair) showing how many chairs it seats. Shown in the
+## each table (the middle of its tiles) showing how many chairs it seats. Shown in the
 ## build phase and on free tables in service; it folds flat when a group sits and pops back
-## up with a squash once the table is free and clear (no plates left on any half).
+## up with a squash once the table is free and clear (no plates left on any tile).
 
 const FOLD_TIME := 0.15
 const TOP := 0.8   # tabletop height the card stands on
@@ -36,7 +36,7 @@ func should_show(lead: Station) -> bool:
 	return true
 
 
-## The centre of the table: the seam of a joined pair.
+## The centre of the table: the middle of its tiles.
 func centre(lead: Station) -> Vector3:
 	var sum := Vector3.ZERO
 	var halves := game.tables.halves(lead)
@@ -55,23 +55,33 @@ func is_up(lead: Station) -> bool:
 	return cards.has(lead) and cards[lead].shown
 
 
-## What putting down the table for two a chef carries, on its ghost, would join: {seats, at,
-## mate} (the seats of the table it would make, its centre, the table it joins), or {}.
+## What putting down the Table tile, chair or booth seat a chef carries, on its ghost, would
+## change: {seats, at, mate} (the seats of the table it would make or join, its centre, one of
+## its tiles), or {}. A tile shows only when it joins a table; a seat when it faces one.
 func join_preview(ch: Player) -> Dictionary:
-	if game.phase != Game.Phase.BUILD or ch.hand.get("id", "") != "table" or ch.ghost == null or not ch.ghost.visible:
+	var id: String = ch.hand.get("id", "")
+	if game.phase != Game.Phase.BUILD or not (id == "table" or Station.is_seat(id)) or ch.ghost == null or not ch.ghost.visible:
 		return {}
 	var cell := Grid.to_cell(ch.ghost.position)
-	var pieces := []
-	var dining := game.paying.dining_tables()
-	for i in dining.size():
-		var st: Station = dining[i]
-		pieces.append({"type": st.type, "cell": st.cell, "facing": st.facing, "number": i + 1})
-	var mine := dining.size() + 1
-	pieces.append({"type": "table", "cell": cell, "facing": int(ch.hand.facing), "number": mine})
-	for t in TableJoins.runs(pieces):
-		if mine in t.pieces and t.pieces.size() > 1:
-			var mate: Station = game.paying.table_by_number(int(t.pieces[0] if t.pieces[0] != mine else t.pieces[1]))
-			return {"seats": int(t.seats), "mate": mate, "at": (Grid.center(cell) + mate.position) / 2.0 + Vector3(0, TOP, 0)}
+	if game.stations.has(cell) and not ch.hand.get("moving", false):
+		return {}
+	var pieces: Array = game.tables.pieces()
+	var mine := GameTables.SEAT_BASE + 999 if id != "table" else game.paying.dining_tables().size() + 1
+	pieces = pieces.filter(func(p: Dictionary) -> bool: return p.cell != cell)   # the one being moved
+	pieces.append({"type": id, "cell": cell, "facing": int(ch.hand.facing), "number": mine})
+	for t in TableJoins.tables(pieces):
+		if not (mine in t.pieces or mine in t.chairs) or (id == "table" and t.pieces.size() < 2):
+			continue
+		var sum := Vector3.ZERO
+		var mate: Station = null
+		for n: int in t.pieces:
+			var pos: Vector3 = Grid.center(cell) if n == mine else game.paying.table_by_number(n).position
+			sum += pos
+			if n != mine and mate == null:
+				mate = game.paying.table_by_number(n)
+		if mate == null:
+			continue
+		return {"seats": int(t.seats), "mate": mate, "at": sum / t.pieces.size() + Vector3(0, TOP, 0)}
 	return {}
 
 

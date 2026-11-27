@@ -52,7 +52,7 @@ func _menu_items() -> Array:
 # ---------------------------------------------------------------- PRD 7: catalog and themes
 
 const PRD7_PIECES := ["floor_lamp", "flower_stand", "coat_stand", "jukebox", "gumball", "aquarium",
-	"palm", "lantern", "stool", "bin", "dish_rack", "sink"]
+	"palm", "lantern", "chair", "bin", "dish_rack", "sink"]
 
 
 

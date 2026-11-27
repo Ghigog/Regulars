@@ -148,7 +148,7 @@ func _place_cups() -> void:
 
 func _all_reachable() -> bool:
 	for st: Station in crew.game.stations.values():
-		if st.type in ["fern", "desk"] or Station.is_table(st.type):
+		if st.type in ["fern", "desk"] or Station.is_table(st.type) or Station.is_seat(st.type):
 			continue
 		var ok := false
 		for d: Vector2i in Grid.DIRS:

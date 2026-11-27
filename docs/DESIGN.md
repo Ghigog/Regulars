@@ -299,9 +299,13 @@ Survive as many days as you can; three walkouts in one day ends the run.
     theme's room starts with its own) and a ship's lantern (as the gumball machine). A
     decor piece's reach is data (`"reach"` in `Catalog.ITEMS`, one more a tier) read by
     `Decor.reach`; the fern is no longer a special case (3 + tier - 1). Each has a thought
-    line and shows reach marks while carried. Dining: a counter stool ($25, three tiers),
-    a little round table with one stool, so only a guest alone sits there (the smallest
-    free table that fits is chosen, so a single takes a stool first). Kitchen: a bin
+    line and shows reach marks while carried. Dining (EPIC-85-T4): the shop sells single
+    pieces, not sets: a Table ($20, one tile, one tier) and a Chair ($10, three tiers, with the booth seat as
+    its upgrade). Tiles that touch edge to edge make one table of any shape; the chairs and booth seats beside
+    it and facing it are its seats (`TableJoins.tables`, rebuilt by `GameTables.rebuild`, which sets each tile's
+    `Station.seats`). A chair is not blocked (guests walk onto it) but its cell is reserved. The old table for
+    two, booth, table for four and counter stool are gone from the shop (a lone guest sits at a one-chair table;
+    save migration of old sets is a later ticket). Kitchen: a bin
     ($30, level 2) and a sink ($70, level 3), which are now catalog pieces like any other
     (every one can be sold; while there is none the shop sells one at any level), and a dish rack ($50, level 3, and now an essential, one stands in the kitchen at the start): it is where the clean plates are kept, eight at most; a sink with one
     beside it piles at 10 dishes, not 6. Each sink and bin has its own mess and sightline,
@@ -358,7 +362,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   rule stops a day being skipped outright; it is a guess and easy to change.
 - **Move, turn, sell.** With nothing in hand, clicking a piece in the room picks it up
   (it keeps whatever is on it). Click to put it down for free, R to turn it a quarter
-  turn (a turned table seats guests above and below), right-click or Esc to put it
+  turn (a turned chair faces another table tile and seats there), right-click or Esc to put it
   back; a piece still carried when the day opens goes back too. Sell (button or X)
   refunds half the catalog price, except same-night returns: whatever was paid for a
   piece since the last day ended (buying it, or an upgrade step) comes back in full if
@@ -379,7 +383,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   shop stays shut; a new, unpaid piece in hand opens the shop as before. Trees: the
   board, stove, soda fountain, wine barrel and the counter (double, long counter;
   under-counter fridge, tall fridge, glass fridge; storage, 8.4, is above). Tiered
-  catalog pieces (fern, palm, jukebox, aquarium, tables, booth, stool) get a short tree of
+  catalog pieces (fern, palm, jukebox, aquarium, chair) get a short tree of
   their tiers, priced and levelled as before. The shop sells tier 1 and tree roots only:
   the fryer, pot and slicer are reached from the stove and board. Selling pays half the
   piece's whole price, as before. A counter bought into a double in its tree lifts off
@@ -561,8 +565,8 @@ Survive as many days as you can; three walkouts in one day ends the run.
   redrawing. Two demos added: `desk_fire` and `helpers_slip`. Hires keep their own look
   with a white apron rather than sheet 5's role uniforms. Details in the style guide's
   "As built".
-- **Tier effects:** a fern that gives more and is seen from further, a tier 2+ table gives seated guests
-  +0.05 joy per tier. Counters and partitions gain nothing but looks.
+- **Tier effects:** a fern that gives more and is seen from further, a tier 2+ chair gives seated guests
+  +0.05 joy per tier (a booth seat adds `BOOTH_DELIGHT`). Counters and partitions gain nothing but looks.
 - **Guest card.** Click a guest during service to see their standing, visit number, the
   four meters and their last six thoughts. It follows them live and closes when they go.
 - **Sightlines.** A guest is disgusted only by what they can see; a partition hides it.
@@ -582,8 +586,8 @@ Survive as many days as you can; three walkouts in one day ends the run.
   view. A guest who can see a working stove and nothing they have noticed gains joy
   (0.01 a second).
 - **Groups.** Guests arrive in groups of friends, never with strangers. The biggest
-  group is the most seats any one table has (2, or 4 once a table for four is placed). A group queues together, takes
-  a whole empty table (the smallest that fits) and shares it with nobody, so a lone
+  group is the most seats any one table has, up to `Town.MAX_PARTY` (the starting room: 2). A group queues together, takes
+  a whole empty table (the smallest that fits, then the fewest tiles) and shares it with nobody, so a lone
   guest has a table to themselves. If one of a group runs out of patience, those still
   waiting leave with them and it counts as one walkout; each of them holds a grudge.
 - **The line at the door.** Guests walk down the street from beyond the end of the
@@ -832,12 +836,11 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Nightly crate** (parked by decision): after each day, pick one of two blueprints.
   Place it, or shelve it for two days and it returns one tier higher (max tier 3).
 - **Catalog** (built): buy furniture with money, gated by XP level. Starting list:
-  partition wall $10, counter $15, fern $20, table for two $40 (level 2), booth $60
-  (level 2), stove $80 (level 3), table for four $90 (level 3). Each piece fits one cell
-  and keeps its seats on the cells beside it: the booth has a bench either side (seats two;
-  guests get a small joy bump, "A booth! How cosy"), the table for four a chair on every
-  side, so a group of four can come once one is placed. Booth and table for four come in
-  three tiers like the table for two. *Built* (PRD 7): twelve more one-cell pieces and a
+  partition wall $10, counter $15, fern $20, table $20 (level 1), chair $10 (level 1), stove $80 (level 3).
+  Each piece fits one cell. Seating is built from pieces (EPIC-85-T4): a table is the Table tiles that touch,
+  and it seats the chairs and booth seats beside it and facing it; a guest on a booth seat gets a small joy
+  bump, "A booth! How cosy", and a chair's tier adds joy as the table's did. The old table for two, booth,
+  table for four and counter stool were retired. *Built* (PRD 7): twelve more one-cell pieces and a
   shop that sells by theme (section 1, *More pieces and themed shops*). To add: more
   pieces after playtesting (a booth seating four over two cells needs multi-cell
   footprints), wall-mounted pieces, pictures on the cards.

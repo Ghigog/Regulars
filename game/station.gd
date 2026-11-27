@@ -484,27 +484,18 @@ func _update_cooking_visuals() -> void:
 
 
 ## Redraws stacks, racks and dirty dishes.
-## Pieces guests sit at: each has seats around it and takes dirty plates.
-const TABLES: Array[String] = ["table", "booth", "table4", "stool"]
+## Pieces guests sit at: a table tile has the seats facing it (set by GameTables.rebuild)
+## and takes dirty plates; a seat piece's own cell is the guest's seat.
+const TABLES: Array[String] = ["table"]
+const SEATS: Array[String] = ["chair", "booth_seat"]
 
 
 static func is_table(type_: String) -> bool:
 	return type_ in TABLES
 
 
-## Where a piece's seats are: either side of a table or booth, turning with it,
-## all four sides of a table for four, or the one stool at a counter stool's
-## little table (on its +x side, turning with it as the model does).
-static func seats_for(type_: String, cell_: Vector2i, facing_: int) -> Array[Vector2i]:
-	var out: Array[Vector2i] = []
-	if type_ == "table" or type_ == "booth":
-		var side := Vector2i(1, 0) if facing_ % 2 == 0 else Vector2i(0, 1)
-		out = [cell_ - side, cell_ + side]
-	elif type_ == "stool":
-		out = [cell_ + [Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 1)][posmod(facing_, 4)]]
-	elif type_ == "table4":
-		out = [cell_ + Vector2i(-1, 0), cell_ + Vector2i(1, 0), cell_ + Vector2i(0, -1), cell_ + Vector2i(0, 1)]
-	return out
+static func is_seat(type_: String) -> bool:
+	return type_ in SEATS
 
 
 ## Stands the piece on a cell, turned `facing_` quarter turns.
@@ -520,7 +511,6 @@ func place_at(cell_: Vector2i, facing_: int) -> void:
 		tool_node.rotation.y = _vis.rotation.y
 	if _item_node and item.begins_with("tool:"):
 		_item_node.rotation.y = _vis.rotation.y
-	seats = seats_for(type, cell, facing)
 	if lamp:
 		lamp.position = position + Vector3(0, 1.0, 0)
 
