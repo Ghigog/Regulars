@@ -460,6 +460,18 @@ static func icon(id: String) -> Array:
 			u.append(Vector2(-0.3, -0.7))
 			o.append([u, INK])
 			o.append([PackedVector2Array([Vector2(-0.95, 0.5), Vector2(-0.25, -0.05), Vector2(-0.25, 1.05)]), INK])
+		"undo":  # a counter-clockwise curved arrow: an open arc with its head at the upper left
+			var arc := ell(0, 0, 0.62, 0.62, 150, -80, 16)
+			var swoop := PackedVector2Array()
+			for p: Vector2 in arc:
+				swoop.append(p * (1.0 + 0.26 / 0.62))
+			for k in range(arc.size() - 1, -1, -1):
+				swoop.append(arc[k] * (1.0 - 0.26 / 0.62))
+			o.append([swoop, INK])
+			var nock := Vector2(cos(deg_to_rad(150)), sin(deg_to_rad(150))) * 0.62
+			var way := Vector2(-sin(deg_to_rad(150)), cos(deg_to_rad(150)))   # the way round, counter-clockwise
+			var side := Vector2(-way.y, way.x)
+			o.append([PackedVector2Array([nock + way * 0.62, nock - way * 0.3 + side * 0.55, nock - way * 0.3 - side * 0.55]), INK])
 		"sell":  # a coin with a minus
 			o.append([ell(0, 0, 0.95), INK])
 			o.append([ell(0, 0, 0.74), GOLD])

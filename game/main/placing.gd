@@ -333,18 +333,16 @@ func sell_hand(ch: Player = null) -> bool:
 	ch = game._me(ch)
 	if game.phase != Game.Phase.BUILD or sell_block(ch) != "":
 		return false
-	game.ledger.refund(sell_value(ch))
+	var value := sell_value(ch)
+	game.ledger.refund(value)
+	game.undo.record_sold(ch.hand, value)
 	if Catalog.is_box(ch.hand.id):   # a box sold: its kind is no longer stocked
 		ch.hand = {}
 		game.audio.sfx("coin")
 		game.menu_stock.menu_changed()
 		game.hud.hints_ui.show_build()
 		return true
-	var n: Node3D = ch.hand.node
-	if n is Station and (n as Station).lamp:
-		game._sconces.erase((n as Station).lamp)
-		(n as Station).lamp.queue_free()
-	n.queue_free()
+	# The piece is kept, hidden, so that undo can stand it back; the undo stack frees it.
 	var had_boxes := not (ch.hand.get("stock", []) as Array).is_empty()
 	ch.hand = {}
 	if had_boxes:
@@ -600,8 +598,10 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 	if game.phase != Game.Phase.BUILD or not can_place(spot, ch):
 		return false
 	if Catalog.is_build_tool(ch.hand.id):
+		var before := game.undo.plan_snapshot()
 		if not game.room_edit._build_at(spot, ch):
 			return false
+		game.undo.record_plan(before)
 		game.room_edit._plan_changed()
 		game.audio.sfx("putdown")
 		_after_building(ch)
@@ -609,7 +609,9 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 	var cell := Vector2i(spot.x, spot.y)
 	if ch.hand.get("moving", false):
 		var back: bool = spot == ch.hand.from and place_refusal(spot, ch, true) != ""
-		_put_down(ch.hand, spot, int(ch.hand.from_facing) if back else int(ch.hand.facing))
+		var facing := int(ch.hand.from_facing) if back else int(ch.hand.facing)
+		_put_down(ch.hand, spot, facing)
+		game.undo.record_moved(ch.hand, spot, facing)
 		ch.hand = {}
 		game.audio.sfx("putdown")
 		game.hud.hints_ui.show_build()
@@ -618,30 +620,37 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		return false
 	if Catalog.is_box(ch.hand.id):
 		_store_box(cell, ch.hand.id)
+		game.undo.record_placed(spot, ch.hand.id, null, int(ch.hand.price))
 		ch.hand = {}   # one box a kind: hands are free again
 		game.audio.sfx("putdown")
 		game.hud.hints_ui.show_build()
 		return true
 	var paid := int(ch.hand.price)
+	var built: Object
 	if ch.hand.id == "screen":
 		var n := game.world.add_wall(cell, spot.z, 0.9 + 0.1 * int(ch.hand.tier))
 		n.set_meta("tier", int(ch.hand.tier))
 		game.wall_nodes[spot] = n
 		_bought_tonight(n, paid)
+		built = n
 	elif ch.hand.id == "rug":
-		add_rug(cell, int(ch.hand.facing))
-		_bought_tonight(rug_at(cell), paid)
+		built = add_rug(cell, int(ch.hand.facing))
+		_bought_tonight(built, paid)
 	elif ch.hand.id == "till":
 		BuildStations.register(game.paying._till_host(cell), int(ch.hand.facing))
-		_bought_tonight(game.stations[cell].get_node("till"), paid)
+		built = game.stations[cell].get_node("till")
+		_bought_tonight(built, paid)
 	elif game.world.layer_for(cell, GameWorld.hand_node(ch.hand)) == "high":
 		var hung := game.world.add_high(GameWorld.hand_node(ch.hand) if ch.hand.id == "sponge" else str(ch.hand.get("up", ch.hand.id)), cell)
 		_bought_tonight(hung, paid)
 		game.clean_kit.on_built(hung, ch.hand.id)
+		built = hung
 	else:
 		var st := game.world.add_station(str(ch.hand.get("up", ch.hand.id)), cell, int(ch.hand.tier), int(ch.hand.facing), ch.hand.get("base", ""))
 		_bought_tonight(st, paid)
 		game.clean_kit.on_built(st, ch.hand.id)
+		built = st
+	game.undo.record_placed(spot, ch.hand.id, built, paid)
 	game.audio.burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
 	game.audio.sfx("putdown")
 	_after_building(ch)
