@@ -13,7 +13,7 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 		return
 	var ing := Catalog.ingredient_of(type)
 	if ing != "" and not type in ["coffee_machine", "beer_tap"]:
-		BuildStations._ingredient_station(n, ing, Catalog.ITEMS[type].get("ready", false), Catalog.is_box(type))
+		BuildStations._ingredient_station(n, ing, Catalog.ITEMS[type].get("ready", false), Catalog.is_box(type), Catalog.ITEMS[type].get("marinated", false))
 		return
 	match type:
 		# PRD 8.6: the new jobs' tools, each with a silhouette of its own at 20 px.
