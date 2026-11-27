@@ -572,7 +572,13 @@ Win by earning five stars from the critic; lose when the reputation meter hits 0
     tools kept on shelves counted); food is never set down on treatment boxes or a tall fridge.
   - *Demos:* `tolerance`, `desk_line`, `desk_post`, `desk_cvs`, `desk_haggle`,
     `desk_staff`, `desk_raise`, `desk_fire`, `desk_restock`, `desk_wages`, `helpers`,
-    `helpers_break`, `helpers_slip`, `staff_only` (see `CLAUDE.md`).
+    `helpers_break`, `helpers_slip`, `helpers_home`, `staff_only` (see `CLAUDE.md`).
+  - *Going home (T-123).* At nightfall nobody takes a new task and breaks end. A helper on a
+    cleaning task (dirt, wash, bin) or clearing a table finishes it; any other task is let go.
+    Then they stand at an open cell beside the nearest desk for about a second, pick up a small
+    bag, and walk through the door and down the pavement to the exit at their normal pace, and are
+    removed there (with no desk they walk straight out). Opening the door, closing down or
+    restarting removes anyone still on the way out.
 - **Art pass (PRD 10.8).** Every PRD 10 visual checked in both themes; nothing needed
   redrawing. Two demos added: `desk_fire` and `helpers_slip`. Hires keep their own look
   with a white apron rather than sheet 5's role uniforms. Details in the style guide's

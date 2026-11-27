@@ -432,6 +432,7 @@ func step(delta: float) -> void:
 	table_cards.tick()
 	day.update_door_glow()
 	if phase != Phase.SERVICE:
+		crew.tick(delta)   # the night: staff finish up and go home
 		return
 	clock += delta
 	while not arrivals.is_empty() and float(arrivals[0].time) <= clock:

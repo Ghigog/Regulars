@@ -12,6 +12,7 @@ const REBUILD_EVERY := 0.2
 const HELPER_PREP := 99        # `Station.prep_by` while a helper works a press tool or dispenser
 const BIN_FULL := 3            # a bin with this many scraps is worth emptying (it overflows at 4)
 const RETRY_AFTER := -1.0      # idle seconds set after a failed task, so they do not retry at once
+const COLLECT := 1.0           # seconds at the desk collecting their things before they leave
 const STASH: Array[String] = ["stash", "to_sink", "to_outside_bin", "bin", "drop"]
 
 var game
@@ -65,6 +66,23 @@ func clear() -> void:
 	_since = REBUILD_EVERY
 
 
+## The day is over: nobody takes a new task and breaks end. Cleaning in hand is finished;
+## anything else (food, orders, bills, carrying) is let go. Then each goes by the desk and home.
+func end_day() -> void:
+	for h in helpers:
+		h.going_home = true
+		h.resting = false
+		h.chatting = false
+		if not h.task.is_empty() and not _finishes_at_night(h):
+			_fail(h)
+
+
+## Mess tasks are seen through at night: cleaning, and clearing a table's dirty plates.
+func _finishes_at_night(h: Helper) -> bool:
+	var type := str(h.task.get("type", ""))
+	return HelperWork.TASK_KIND.get(type, "") == "clean" or type == "clear"
+
+
 ## Whether a helper's post includes `duty`.
 func has_duty(h: Helper, duty: String) -> bool:
 	var e: Dictionary = game.staff.employee(h.person)
@@ -90,18 +108,21 @@ func tick(delta: float) -> void:
 		board.rebuild(room_view.world())
 		var free := []
 		for h in helpers:
-			if h.steps.is_empty() and not h.resting and not game.floor_dirt.is_down(h):
+			if h.steps.is_empty() and not h.going_home and not h.resting and not game.floor_dirt.is_down(h):
 				free.append({"id": h.person, "cell": h.cell(), "idle": h.idle})
 		var got := board.assign(game.staff, free, game.ledger.day, game.clock, game.day.day_length())
 		for h in helpers:
 			if got.has(h.person):
 				_begin(h, got[h.person])
-	for h in helpers:
+	for h in helpers.duplicate():
 		_tick_helper(h, delta)
 	_chat(delta)
 
 
 func _tick_helper(h: Helper, delta: float) -> void:
+	if h.going_home:
+		_tick_home(h, delta)
+		return
 	var at_work := JobBoard.at_work(game.staff, h.person, game.ledger.day, game.clock, game.day.day_length())
 	if not at_work and not h.resting and _on_the_heat(h):
 		pass   # what is on the heat is seen to before the break (PRD 10.7): it would burn
@@ -221,12 +242,86 @@ func _let_go(h: Helper) -> void:
 			_claims.erase(c)
 
 
+# ---------------------------------------------------------------- going home
+
+## A helper going home: any steps left are run to the end, then the desk, the bag, the door.
+func _tick_home(h: Helper, delta: float) -> void:
+	if game.floor_dirt.is_down(h):
+		h.walk(delta)
+		return
+	if not h.steps.is_empty():
+		h.idle = 0.0
+		task_run._run(h, delta)
+		h.walk(delta)
+		return
+	match h.home_stage:
+		"":
+			var c: Variant = _desk_spot(h)
+			if c == null:
+				_head_out(h)
+			elif h.go_to(c):
+				h.home_stage = "to_desk"
+			else:
+				_head_out(h)
+		"to_desk":
+			if h.arrived():
+				h.desk = _desk_beside(h.cell())
+				h.look_at_cell(h.desk)
+				h.collect_left = COLLECT
+				h.home_stage = "collect"
+		"collect":
+			h.collect_left -= delta
+			if h.collect_left <= 0.0:
+				h.take_bag()
+				_head_out(h)
+		"out":
+			if h.arrived():
+				_leave_for_good(h)
+				return
+	h.walk(delta)
+
+
+## Out of the door and down the pavement, the way guests leave.
+func _head_out(h: Helper) -> void:
+	var exit: Vector2i = game.exit_cell()
+	h.home_stage = "out"
+	h.path.assign(game.grid.find_path(h.cell(), game.DOOR) + game.grid.find_path(game.DOOR, exit))
+	h.stand = exit
+	if h.path.is_empty() and h.cell() != exit:
+		_leave_for_good(h)   # no way out at all
+
+
+func _leave_for_good(h: Helper) -> void:
+	_let_go(h)
+	helpers.erase(h)
+	h.queue_free()
+	if h.get_parent():
+		h.get_parent().remove_child(h)
+
+
+## The desk beside a cell, or the cell itself when none is.
+func _desk_beside(c: Vector2i) -> Vector2i:
+	for side: Vector2i in Grid.DIRS:
+		var st: Station = game.world.station_at(c + side)
+		if st != null and st.type == "desk":
+			return c + side
+	return c
+
+
 # ---------------------------------------------------------------- idle
 
 ## With nothing to do, they wait by a desk.
 func _wait_by_desk(h: Helper) -> void:
 	if not h.path.is_empty():
 		return
+	var c: Variant = _desk_spot(h)
+	if c != null and c != h.stand:
+		h.go_to(c)
+
+
+## The open cell beside the nearest desk for this helper to stand on: the one they hold if
+## they are first for it, else the closest free one. Null with no desk or no room.
+func _desk_spot(h: Helper) -> Variant:
 	var desks: Array = []
 	for st: Station in game.stations.values():
 		if st.type == "desk":
@@ -242,14 +337,12 @@ func _wait_by_desk(h: Helper) -> void:
 			if o != h and o.stand == h.stand:
 				mine = mine and helpers.find(o) > helpers.find(h)
 		if mine:
-			return
+			return h.stand
 	var taken := {}
 	for o in helpers:
 		if o != h:
 			taken[o.stand] = true
-	var c: Variant = HelperWork.wait_cell(desks, open, taken, h.cell())
-	if c != null and c != h.stand:
-		h.go_to(c)
+	return HelperWork.wait_cell(desks, open, taken, h.cell())
 
 
 ## Free helpers near each other chat: speech bubbles. It no longer moves their
@@ -258,7 +351,7 @@ func _chat(delta: float) -> void:
 	var free := []
 	for h in helpers:
 		h.chatting = false
-		if h.steps.is_empty() and (h.resting or h.idle >= HelperWork.IDLE_CHAT_AFTER) and h.arrived() \
+		if h.steps.is_empty() and not h.going_home and (h.resting or h.idle >= HelperWork.IDLE_CHAT_AFTER) and h.arrived() \
 				and not game.floor_dirt.is_down(h):
 			free.append({"id": h.person, "cell": h.cell()})
 	for pair: Array in HelperWork.chat_pairs(free):

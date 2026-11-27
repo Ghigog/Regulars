@@ -154,6 +154,8 @@ func _apply_demo(demo: String) -> void:
 			a.time = 1.0
 	elif demo in ["helpers", "helpers_break", "helpers_slip"]:   # PRD 10.6/10.8: staff at work; see Crew.crew_demos.demo
 		game.crew.crew_demos.demo(demo)
+	elif demo == "helpers_home":   # T-123: a washer finishing at night, a server at the desk with their bag; shoot at about 2
+		game.crew.crew_demos.demo_home()
 	elif demo.begins_with("pay_"):   # PRD 11: paying the bill; see _demo_pay
 		game.demo_scenes._demo_pay(demo)
 	elif demo == "staff_only":   # PRD 10.7: a busy day run by helpers alone; see Crew.crew_demos.staff_only
