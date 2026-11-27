@@ -75,6 +75,8 @@ var erase: bool:
 	get: return players[0].erase
 var used_any := false           # a device has been used: it is player one's, and others can join
 const LEAVE_HOLD := 1.0          # seconds Start is held to leave
+const JOIN_NOTE_GAP := 4.0       # seconds between join notes for one pad
+var _join_noted := {}           # pad source -> when it was last told to press Start
 var _start_held := {}           # pad source -> seconds Start has been held (-1 once it left)
 var _fingers := {}              # touch index -> what it holds: "stick" or [button id, action]
 var _right_y := {}   # source -> right stick's vertical axis, kept apart from the walking stick
@@ -141,6 +143,24 @@ func unseat(p: int) -> void:
 func joins(source: String) -> bool:
 	return used_any and source != "touch" and not seats.has(source) and source != players[0].source \
 		and game.chefs.size() < game.MAX_CHEFS
+
+
+## Is this an unseated pad while player one is on another pad? It does not reach
+## player one (only its Start joins), so a second controller never steers chef one.
+func is_stranger_pad(source: String) -> bool:
+	return source.begins_with("pad:") and not seats.has(source) \
+		and players[0].source.begins_with("pad:") and players[0].source != source
+
+
+## A stranger pad was pressed or pushed: say how it joins, at most once every few seconds each.
+func _offer_join(source: String) -> void:
+	if seats.has(source) or game.chefs.size() >= game.MAX_CHEFS:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - float(_join_noted.get(source, -100.0)) < JOIN_NOTE_GAP:
+		return
+	_join_noted[source] = now
+	game.hud.day_ui.say("Press Start to join as Chef %d" % (game.chefs.size() + 1))
 
 
 func glyph(action: String, p := 0) -> String:
@@ -307,6 +327,10 @@ func _pad_button(e: InputEventJoypadButton) -> void:
 	if e.button_index == JOY_BUTTON_START:
 		_start_button(source, e.pressed)
 		return
+	if is_stranger_pad(source):
+		if e.pressed:
+			_offer_join(source)
+		return
 	var action: String = PAD_ACTIONS.get(e.button_index, "")
 	if e.pressed and game.phase == game.Phase.SUMMARY and e.button_index in [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_DOWN]:
 		if game.hud.receipt_ui.scroll_paper(-90.0 if e.button_index == JOY_BUTTON_DPAD_UP else 90.0):
@@ -327,6 +351,8 @@ func _start_button(source: String, pressed: bool) -> void:
 			if game.coop.join(source) >= 0:
 				_start_held[source] = -1.0   # its release does nothing
 				return
+		if is_stranger_pad(source):
+			return   # no free chef place: Start on it does nothing
 		_use(source)
 		_start_held[source] = 0.0
 		return
@@ -339,7 +365,11 @@ func _start_button(source: String, pressed: bool) -> void:
 ## A controller was unplugged: its player leaves (unless they are the only one).
 func _on_joy_connection(device: int, connected: bool) -> void:
 	var source := "pad:%d" % device
-	if connected or not seats.has(source):
+	if connected:
+		if used_any and not seats.has(source) and players[0].source != source:
+			_offer_join(source)
+		return
+	if not seats.has(source):
 		return
 	var p := owner_of(source)
 	for q: PlayerInput in players:
@@ -350,6 +380,10 @@ func _on_joy_connection(device: int, connected: bool) -> void:
 
 func _pad_axis(e: InputEventJoypadMotion) -> void:
 	var source := "pad:%d" % e.device
+	if is_stranger_pad(source):
+		if absf(e.axis_value) > 0.5 and e.axis in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y, JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:
+			_offer_join(source)
+		return
 	var who := players[owner_of(source)]
 	var v: Vector2 = who._sticks.get(source, Vector2.ZERO)
 	if e.axis in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:   # held: LT stands and aims, RT reaches high
