@@ -12,7 +12,7 @@ const CATEGORIES: Array[String] = ["Kitchen", "Pantry", "Dining", "Decor", "Buil
 ## Furniture is what stands in the room; Tools are what sits on a counter, the cleaning
 ## kit and the service stacks; Ingredients are the boxes, food and chemicals alike.
 const TABS: Array[String] = ["Furniture", "Tools", "Ingredients", "Build"]
-const TOOLS_TAB: Array[String] = ["mop_bucket", "hook", "sponge", "robot_dock", "dish_rack", "cups", "tray_stack", "till"]
+const TOOLS_TAB: Array[String] = ["mop_bucket", "sponge", "robot_dock", "dish_rack", "cups", "tray_stack", "till"]
 const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## PRD 10: the desk was kept out of the shop until helpers could work; since 10.6 it is
 ## on sale. The one switch that puts every "staff" piece on sale.
@@ -66,10 +66,8 @@ const ITEMS := {
 	# its dock is sold here.
 	"mop_bucket": {"name": "Mop bucket", "price": 35, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Holds the mop and rinses it. Mop floor dirt a level a press"},
-	"hook": {"name": "Wall hook", "price": 5, "level": 1, "category": "Kitchen", "tiers": 1,
-		"blurb": "Hangs on a wall. Holds one small cleaning tool"},
 	"sponge": {"name": "Sponge", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,
-		"blurb": "Comes on its own wall hook. Quick spot cleaning, dirty after two"},
+		"blurb": "A hand tool for quick spot cleaning, dirty after two. Keep it on a shelf"},
 	"robot_dock": {"name": "Robot sweeper", "price": 315, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Drifts to the nearest dirt and slowly cleans it, then docks. Anyone can trip on it"},
 	"plant": {"name": "Potted fern", "price": 20, "level": 1, "category": "Decor", "tiers": 3, "theme": "diner",
@@ -270,7 +268,7 @@ static func node_blueprint(node: String) -> Dictionary:
 static func sells_node(key: String) -> bool:
 	if Upgrades.is_tiered(key):
 		return true
-	return Kitchen.has_node(key) and not Kitchen.fit_of(key) in ["floor", "hook"]
+	return Kitchen.has_node(key) and not Kitchen.fit_of(key) in ["floor", "hand"]
 
 
 ## The blueprint the shop sells for a tree node, upgrades and all, priced as the whole
@@ -316,7 +314,7 @@ static func bp_blurb(bp: Dictionary) -> String:
 ## Where a Kitchen piece sits in the tab, in kitchen order: storage, cooking tools,
 ## drinks, the hood, washing up, cleaning, the desk. Other tabs are one group.
 const KITCHEN_GROUPS := {"counter": 0, "fridge": 0, "shelf": 0, "cabinet": 0, "hood": 3,
-	"bin": 4, "sink": 4, "cups": 4, "tray_stack": 4, "till": 4, "dish_rack": 4, "mop_bucket": 5, "hook": 5, "sponge": 5, "robot_dock": 5, "desk": 6}
+	"bin": 4, "sink": 4, "cups": 4, "tray_stack": 4, "till": 4, "dish_rack": 4, "mop_bucket": 5, "sponge": 5, "robot_dock": 5, "desk": 6}
 
 
 static func group_of(bp: Dictionary) -> int:

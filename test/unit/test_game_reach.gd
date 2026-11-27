@@ -1,6 +1,6 @@
 extends "res://test/helpers/game_case.gd"
 ## Reach: a held modifier (Left Alt / Cmd, RT, the touch Reach button) picks the high layer
-## (wall shelf, cabinet, hook); plain E is what stands below. No guessing, no alternating.
+## (wall shelf, cabinet); plain E is what stands below. No guessing, no alternating.
 ## Headless there is no Controls, so a `reach` meta on the Player stands in for the key.
 
 const C := Vector2i(0, 6)
@@ -49,14 +49,16 @@ func test_the_prompt_chip_names_the_reach_action_until_it_is_held():
 	assert_eq(game.card.reach_action(game.player), "", "held: the main prompt names it instead")
 
 
-func test_a_sponge_on_a_hook_is_only_taken_with_reach():
-	_stocked_counter()
+func test_a_sponge_on_a_shelf_is_only_taken_with_reach():
+	if not game.stations.has(C):
+		game.world.add_station("counter", C)
+	game.player.position = Grid.center(Vector2i(1, 6))
+	game.player.look(Vector2i(-1, 0))
 	game.highs.erase(C)
-	var hook: Station = game.world.add_high("hook", C)
-	game.clean_kit.on_built(hook, "sponge")
+	var shelf: Station = game.clean_kit.shelve(C, "sponge")
 	assert_null(game.clean_kit.home_at(C, game.player))
 	_reach(true)
-	assert_eq(game.clean_kit.home_at(C, game.player), hook)
+	assert_eq(game.clean_kit.home_at(C, game.player), shelf)
 	assert_eq(game.cooking.use_station(game.world.station_at(C, game.player), true, game.player), "Take sponge")
 
 

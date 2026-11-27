@@ -780,7 +780,7 @@ const TOOL_DUTIES := {"grill": "grill", "fry": "fryer", "boil": "pot", "chop": "
 ## Cleaning duties: each clears floor dirt with its tool.
 const CLEAN_TOOLS: Array[String] = ["mop", "sponge", "scraper", "spill_kit"]
 ## A room piece that brings a cleaning duty (PRD 9.4: the bucket comes with a mop, the sponge
-## is sold on its hook). The robot sweeper works by itself and needs no one.
+## is a hand tool). The robot sweeper works by itself and needs no one.
 const CLEAN_PIECES := {"mop_bucket": "mop", "mop": "mop", "sponge": "sponge", "scraper": "scraper",
 	"spill_kit": "spill_kit"}
 ## Every tree node a cleaning home can be bought up to (PRD 9.5) brings its line's duty

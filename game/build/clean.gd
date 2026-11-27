@@ -131,11 +131,6 @@ static func treatment_box(n: Node3D, key: String) -> void:
 	Build.box(n, Vector3(0, 0.62, 0.262), Vector3(0.06, 0.06, 0.005), col).rotation.z = PI / 4
 
 
-## Where a tool hangs off a hook drawn at height y0 against the wall.
-static func hook_spot(y0: float) -> Vector3:
-	return Vector3(0, y0 - 0.12, -0.5 + 0.2)
-
-
 ## The mop bucket: a yellow pail on castors with a grey wringer box on one side.
 static func mop_bucket(n: Node3D, node := "") -> void:
 	for x: float in [-0.2, 0.2]:

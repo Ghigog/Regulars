@@ -182,6 +182,9 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 ## Puts one saved piece back and returns how many cups it held that have no place there now.
 static func _place(g: Node3D, p: Dictionary) -> int:
 	var st: Station
+	if p.type == "hook" or str(p.node) == "hook":
+		p.type = "shelf"   # the wall hook is gone: its tool and wear stay, on a wall shelf at the same cell
+		p.node = "shelf"
 	if p.type in ["trays", "plates"]:
 		p.type = "dish_rack"   # a plate stack (once the tray stack) is the dish rack now
 	if p.high:
@@ -216,9 +219,10 @@ static func _to_cup_stack(g: Node3D, cell: Vector2i, n: int) -> void:
 
 ## What needs the helpers: the cleaning tools back in their homes, the floor's dirt.
 static func restore_after(g: Node3D, d: Dictionary) -> void:
+	g.kitchen.tools.clear()
 	for st: Station in g.stations.values() + g.highs.values():
 		if st.kit_tool != "":
-			g.clean_kit.show_home(st)
+			g.clean_kit.keep(st, st.kit_tool, st.kit_used)   # drawn, and the kitchen knows it keeps a tool
 	g.floor_dirt.sync_room()
 	g.floor_dirt.mess.dirt = d.dirt.duplicate(true)
 	g.floor_dirt.mess.grease = d.grease.duplicate(true)
