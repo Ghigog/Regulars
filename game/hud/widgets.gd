@@ -369,11 +369,13 @@ class Calendar extends Control:
 
 
 ## The day timer: a wooden clock. Service runs from eight in the morning to
-## eight at night; a little window at the top shows the sun crossing the sky,
-## or the moon after closing. It rolls like a wheel when it moves.
+## eleven at night; a little window at the top shows the sun crossing the sky
+## (blue morning, high noon, orange evening), then the moon once dusk has fallen,
+## during service and after closing. It rolls like a wheel when it moves.
 class Clock extends Control:
 	const R := 40.0
 	const NIGHT := Color("#2f3e63")
+	const DUSK := 0.88   # the part of the day at which the window turns to the moon
 	var progress := 0.0:
 		set(v):
 			progress = v
@@ -389,6 +391,9 @@ class Clock extends Control:
 		pivot_offset = Vector2(R, R)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	func is_night() -> bool:
+		return night or progress >= DUSK
+
 	func _draw() -> void:
 		var c := Vector2(R, R)
 		var down := Vector2(0, 1).rotated(-rotation)   # light and shadow stay put while it rolls
@@ -402,20 +407,21 @@ class Clock extends Control:
 		var w := c + Vector2(0, -face * 0.45)
 		var wr := face * 0.3
 		draw_circle(w, wr + 1.5, Hud.INK)
-		if night:
+		if is_night():
 			draw_circle(w, wr, NIGHT)
 			draw_circle(w + Vector2(-wr * 0.15, 0), wr * 0.55, Color("#ffe9a8"))
 			draw_circle(w + Vector2(wr * 0.08, -wr * 0.12), wr * 0.5, NIGHT)
 			draw_circle(w + Vector2(wr * 0.55, wr * 0.35), 1.2, Color("#ffe9a8"))
 		else:
-			draw_circle(w, wr, Color("#bfe3f0").lerp(Color("#f6b26b"), progress))
-			var s := w + Vector2(lerpf(wr * 0.5, -wr * 0.5, progress), wr * 0.35 - sin(progress * PI) * wr * 0.55)
-			draw_circle(s, wr * 0.4, Color("#ffd452").lerp(Color("#e8621c"), progress))
+			var sky := clampf(progress / DUSK, 0.0, 1.0)   # the sun's crossing, from sunrise to the last light
+			draw_circle(w, wr, Color("#bfe3f0").lerp(Color("#f6b26b"), smoothstep(0.4, 1.0, sky)))
+			var s := w + Vector2(lerpf(wr * 0.5, -wr * 0.5, sky), wr * 0.35 - sin(sky * PI) * wr * 0.55)
+			draw_circle(s, wr * 0.4, Color("#ffd452").lerp(Color("#e8621c"), smoothstep(0.4, 1.0, sky)))
 		for i in 12:
 			var d := Vector2.UP.rotated(TAU * i / 12.0)
 			var big := i % 3 == 0
 			draw_line(c + d * (face - (7.0 if big else 4.0)), c + d * (face - 1.5), Hud.INK, 3.0 if big else 1.6, true)
-		var hours := 8.0 + 12.0 * progress
+		var hours := 8.0 + 15.0 * progress
 		draw_line(c, c + Vector2.UP.rotated(TAU * fmod(hours, 12.0) / 12.0) * face * 0.5, Hud.INK, 5.0, true)
 		draw_line(c, c + Vector2.UP.rotated(TAU * fmod(hours, 1.0)) * face * 0.75, Hud.INK, 3.0, true)
 		draw_circle(c, 4.5, Hud.CORAL)
