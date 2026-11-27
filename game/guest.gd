@@ -14,7 +14,7 @@ var game
 var idx := 0
 var info: Dictionary
 var mood := GuestMood.new()
-var state := "queue"  # queue, to_seat, ordering, waiting (for food), eating, company, browse, leaving,
+var state := "queue"  # queue, to_seat, reading (the menu), ordering, waiting (for food), eating, company, browse, leaving,
 ## and paying (PRD 11): chatting (after the last bite), to_pay (seated, waiting for the
 ## bill), to_till (walking to pay at the till), at_till (queued in front of the pass)
 const CHAT_TIME := 3.0    # tunable: seconds of chat after the meal before asking for the bill
@@ -207,12 +207,13 @@ func seated_waiting() -> bool:
 
 
 func _sit() -> void:
-	state = "ordering"
+	state = "reading"   # the menu first; the notepad comes when they have read it
 	game.audio.sfx("sit")
 	mood.patience = minf(1.0, mood.patience + 0.3)
 	_body.create_tween().tween_property(_body, "position:y", SEAT_HEIGHT, 0.2) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	game.seating.on_seated(self)
+	game.seating.on_seated(self)   # sets seat_fx
+	timer = Seating.reading_time(game.menu_stock.tonight_menu().size(), Seating.order_scale([seat_fx.order]))
 
 
 ## The chef has written down what they want. Now they wait for the food, or,
@@ -244,6 +245,7 @@ func want_icon() -> String:
 
 ## How long this guest eats, once served: longer when they are comfortable.
 var eat_time := EAT_TIME
+var seat_fx := Seating.neutral()   # their chair's and table's effects together (Seating.combine)
 var perfect_streak := 0   # their tray's place in a run of perfect ones: raises their tip
 
 
@@ -252,7 +254,7 @@ var perfect_streak := 0   # their tray's place in a run of perfect ones: raises 
 func start_eating(quality: float, tray: Tray = null) -> String:
 	mood.taste(quality)
 	var said := mood.settle_comfort(idx)
-	eat_time = EAT_TIME * GuestMood.stay_scale(mood.served_comfort)
+	eat_time = EAT_TIME * GuestMood.stay_scale(mood.served_comfort) * float(seat_fx.eat)
 	if quality > 0.95:
 		_heart_time = 2.5
 	state = "eating"
@@ -374,6 +376,12 @@ func tick(delta: float) -> void:
 			_ring_bell_at_door(was_x)
 			if done:
 				_sit()
+		"reading":   # patience holds while they read; the mess still bothers them
+			_face(Grid.center(table.cell) - position, delta)
+			timer -= delta
+			game.seating.apply_surroundings(self, delta)
+			if timer <= 0.0:
+				state = "ordering"
 		"ordering", "waiting":
 			_face(Grid.center(table.cell) - position, delta)
 			mood.wait(delta, game.day.table_patience(party.size()) * (game.ORDER_PATIENCE_SCALE if state == "ordering" else 1.0))
