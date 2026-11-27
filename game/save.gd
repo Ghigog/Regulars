@@ -157,7 +157,7 @@ static func capture(g: Node3D) -> Dictionary:
 		"critic": _take(g.critic, CRITIC),
 		"town": _take(g.town, TOWN).merged({"rng": g.town.rng.state}),
 		"lot": g.lot.to_dict(),
-		"plan": _take(g.plan, ["floors", "built", "openings", "finishes"]),
+		"plan": _take(g.plan, ["floors", "built", "openings", "finishes", "windows"]),
 		"pieces": pieces,
 		"stock": stock,
 		"screens": screens,
@@ -191,7 +191,7 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 	_put(g.town, TOWN, d.town)
 	g.town.fill_missing_keys()
 	g.town.rng.state = int(d.town.rng)
-	_put(g.plan, ["floors", "built", "openings", "finishes"], d.plan)
+	_put(g.plan, ["floors", "built", "openings", "finishes", "windows"], d.plan)
 	for e: Vector3i in d.screens:
 		var n: Node3D = g.world.add_wall(Vector2i(e.x, e.y), e.z, 0.9 + 0.1 * int(d.screens[e]))
 		n.set_meta("tier", int(d.screens[e]))
