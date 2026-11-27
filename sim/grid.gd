@@ -192,7 +192,7 @@ static func _adds_cut_off(before: Array[Vector2i], after: Array[Vector2i]) -> bo
 ## Why furniture cannot go on `c` (with `seats` beside it): "" when it fits, "off_lot" (outside
 ## the area or on bare ground), "taken" (blocked or reserved), "shut_in" (it would cut off
 ## someone the door reaches now; a room that is already broken does not count against the spot).
-func block_refusal(c: Vector2i, seats: Array[Vector2i], area: Rect2i, door: Vector2i,
+func block_refusal(c: Vector2i, seats: Array[Vector2i], area, door: Vector2i,
 		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> String:
 	var cells: Array[Vector2i] = [c]
 	cells.append_array(seats)
@@ -212,14 +212,14 @@ func block_refusal(c: Vector2i, seats: Array[Vector2i], area: Rect2i, door: Vect
 
 
 ## Can furniture go on `c` (with `seats` beside it) inside `area` without cutting anyone off?
-func can_place_block(c: Vector2i, seats: Array[Vector2i], area: Rect2i, door: Vector2i,
+func can_place_block(c: Vector2i, seats: Array[Vector2i], area, door: Vector2i,
 		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
 	return block_refusal(c, seats, area, door, must_reach, must_touch) == ""
 
 
 ## Why a wall cannot go on this edge (x, y, axis); it must lie between two cells of `area`.
 ## "" when it fits, else "off_lot", "taken" (a wall is already there) or "shut_in".
-func wall_refusal(edge: Vector3i, area: Rect2i, door: Vector2i,
+func wall_refusal(edge: Vector3i, area, door: Vector2i,
 		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> String:
 	var a := Vector2i(edge.x, edge.y)
 	var b := a + (Vector2i(0, -1) if edge.z == 0 else Vector2i(-1, 0))
@@ -235,6 +235,6 @@ func wall_refusal(edge: Vector3i, area: Rect2i, door: Vector2i,
 
 
 ## Can a wall go on this edge (x, y, axis)? It must lie between two cells of `area`.
-func can_place_wall(edge: Vector3i, area: Rect2i, door: Vector2i,
+func can_place_wall(edge: Vector3i, area, door: Vector2i,
 		must_reach: Array[Vector2i], must_touch: Array[Vector2i]) -> bool:
 	return wall_refusal(edge, area, door, must_reach, must_touch) == ""

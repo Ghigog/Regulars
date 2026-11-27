@@ -107,7 +107,7 @@ func set_down(ch: Player) -> void:
 func _walk_out(ch: Player) -> void:
 	ch.set_process(false)
 	var tw := ch.create_tween()
-	var path: Array[Vector3] = [Grid.center(Game.ENTRANCE_CELL), Game.DOORWAY, Grid.center(Game.DOOR), Grid.center(Game.EXIT)]
+	var path: Array[Vector3] = [Grid.center(Game.ENTRANCE_CELL), Game.DOORWAY, Grid.center(Game.DOOR), Grid.center(game.exit_cell())]
 	var from := ch.position
 	for at: Vector3 in path:
 		var t := from.distance_to(at) / Player.SPEED

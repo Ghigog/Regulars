@@ -45,7 +45,7 @@ func _demo_mop(demo: String) -> void:
 	var m := game.floor_dirt.mess
 	var at := Vector2i(1, 6)
 	for c: Vector2i in [Vector2i(1, 6), Vector2i(2, 6), Vector2i(3, 6), Vector2i(1, 5), Vector2i(3, 5)]:
-		if not game.stations.has(c) and game.grid.can_place_block(c, [], Game.LOT, Game.DOOR, game.placing._reach(), game.placing._touch()):
+		if not game.stations.has(c) and game.grid.can_place_block(c, [], game.lot, Game.DOOR, game.placing._reach(), game.placing._touch()):
 			at = c   # out of everyone's way
 			break
 	var bucket := game.world.add_station("mop_bucket", at)

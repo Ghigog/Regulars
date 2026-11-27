@@ -243,8 +243,10 @@ Survive as many days as you can; three walkouts in one day ends the run.
 - **Building the room** (Build tab). Tiled floor and plank floor ($5 a tile), wall ($5 a
   length), door ($20) and archway ($15) are tools: they stay in hand while there is money.
   - *Floors* grow the room. New floor must touch floor already laid (a dragged
-    rectangle is laid outward from the room) and stay on the lot, which reaches 5 cells
-    left and 2 back (`LOT`): the street is on the right and the near edge stays put.
+    rectangle is laid outward from the room) and stay on the lot (`Game.lot`, a `Lot` of 5x5-tile
+    blocks; the default is 3 deep by 2 along the street, x -5..9, y -3..6, and bought blocks
+    add to it): the street is on the right and the near edge stays put. The pavement
+    and the guests' spawn and exit follow the lot's ends along the street; the door and board stay.
     Laying one kind over the other swaps it. The outer walls are never placed: any
     edge with floor on one side is a wall, so they move out as the floor grows, and
     the wall between the old room and the new floor comes down.

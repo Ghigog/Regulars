@@ -23,9 +23,7 @@ const DEMO_PREP_NEW := {
 const W := 10            # restaurant interior is 10 x 7 cells
 const H := 7             # columns 10 and 11 are the pavement outside, to the right
 const DOOR := Vector2i(W, 4)         # the pavement cell just outside the doorway, on the right-hand wall
-const SPAWN := Vector2i(W + 1, LOT.position.y)   # the far end of the pavement; guests walk down from beyond it
 const QUEUE_GAP := 0.8   # metres between guests standing in line on the pavement
-const EXIT := Vector2i(W + 1, H - 1)
 const SIGHT_RANGE := 7
 const DEMO_BILL := 12   # a bill for the receipt demos
 ## Disgust sources: [starting rate per second, seconds to double, top rate]. See
@@ -41,13 +39,9 @@ const GROSS := {
 }
 const BIN_RANGE := 5          # the bin only bothers guests seated this close
 const AREA := Rect2i(0, 0, W, H)   # the first room
-## The lot: where floor may be laid. It grows back and to the left only: the
-## street runs down the right, and the near edge of the floor stays where it is.
-const LOT := Rect2i(-5, -2, W + 5, H + 2)
 const ENTRANCE_CELL := Vector2i(W - 1, DOOR.y)   # the floor just inside the front door; never lifted
 const DOORWAY := Vector3(W, 0, DOOR.y + 0.5)   # the middle of the doorway, on the floor
 const DOOR_REACH := 1.25
-const PAVEMENT := Rect2i(W, LOT.position.y, 2, LOT.size.y)   # the two open pavement rows, which chefs walk
 const KERB_X := W + 2   # the back tile by the road: street furniture stands on it, nobody walks it
 const BOARD_CELL := Vector2i(W, 5)   # the menu board's cell, by the door; closed to walking
 const BOARD_REACH := 1.3   # how near the menu board the chef must stand to write the menu
@@ -129,6 +123,7 @@ var hand: Dictionary:
 	set(v): player.hand = v
 var wall_nodes := {}                   # Vector3i edge -> Node3D, player-built partitions only
 var rugs := {}                         # Vector2i anchor cell -> Node3D (meta "facing"); see rug_cells
+var lot := Lot.new()                   # the ground the restaurant owns; grows as blocks are bought
 var plan: Floorplan                    # floors, walls, doors and archways
 var _room: Node3D                      # the room as drawn from the plan; rebuilt when it changes
 var _room_lights: Array[OmniLight3D] = []
@@ -249,11 +244,28 @@ func _fit_3d() -> void:
 	get_viewport().scaling_3d_scale = scale_3d_for(get_window().size)
 
 
+## The two open pavement rows, which chefs walk: they run the length of the lot.
+func pavement() -> Rect2i:
+	var b := lot.bounds()
+	return Rect2i(W, b.position.y, 2, b.size.y)
+
+
+## The far end of the pavement; guests walk down from beyond it.
+func spawn_cell() -> Vector2i:
+	return Vector2i(W + 1, lot.bounds().position.y)
+
+
+## The near end of the pavement, where guests leave.
+func exit_cell() -> Vector2i:
+	return Vector2i(W + 1, lot.bounds().end.y - 1)
+
+
 func _ready() -> void:
 	get_window().size_changed.connect(_fit_3d)
 	_fit_3d()
 	var seed_value := int(Time.get_unix_time_from_system())
-	grid = Grid.new(W + 3 - LOT.position.x, LOT.size.y, LOT.position)   # columns W, W + 1, W + 2 are the pavement outside
+	var reach := Lot.max_bounds()   # the largest lot the cap allows; columns W, W + 1, W + 2 are the pavement outside
+	grid = Grid.new(W + 3 - reach.position.x, reach.size.y, reach.position)
 	grid.pavement_from = KERB_X   # a chef walks the two open rows, never the kerb tile
 	town = Town.new(seed_value, Scenery.theme_id)
 	critic = Critic.new(seed_value, town.people.size())
@@ -270,7 +282,8 @@ func _ready() -> void:
 		world._start_plan()
 		world._hang_fixtures()
 	else:
-		plan = Floorplan.new(LOT)
+		lot = SaveGame.lot_of(saved)
+		plan = Floorplan.new(lot)
 		SaveGame.restore_world(self, saved)
 	floor_dirt = FloorDirt.new()
 	add_child(floor_dirt)

@@ -140,7 +140,7 @@ func _hang_fixtures() -> void:
 ## The first room is an L (sheet 1): a tiled kitchen on the left, set forward of
 ## the planked dining room, with the front door in the right-hand wall.
 func _start_plan() -> void:
-	game.plan = Floorplan.new(Game.LOT)
+	game.plan = Floorplan.new(game.lot)
 	game.plan.fill(Rect2i(0, Scenery.KITCHEN_Z, Scenery.KITCHEN_W, Game.H - Scenery.KITCHEN_Z), "tile")
 	game.plan.fill(Rect2i(Scenery.KITCHEN_W, 0, Game.W - Scenery.KITCHEN_W, Game.H), "planks")
 	game.plan.openings[Vector3i(Game.DOOR.x, Game.DOOR.y, 1)] = "entrance"
@@ -159,12 +159,16 @@ func _sync_grid() -> void:
 	for e in game.plan.doors():
 		game.grid.doors[e] = true
 	game.grid.outside.clear()
-	for x in range(Game.LOT.position.x, Game.LOT.end.x):
-		for y in range(Game.LOT.position.y, Game.LOT.end.y):
-			if not game.plan.has_floor(Vector2i(x, y)):
-				game.grid.outside[Vector2i(x, y)] = true
-	for y in range(Game.LOT.position.y, Game.LOT.end.y):
-		game.grid.outside[Vector2i(Game.KERB_X, y)] = true   # the kerb tile: props, no walking
+	var pave := game.pavement()
+	var from: Vector2i = game.grid.origin
+	for x in range(from.x, from.x + game.grid.size.x):   # the grid spans the largest lot the cap allows
+		for y in range(from.y, from.y + game.grid.size.y):
+			var c := Vector2i(x, y)
+			if game.lot.has_point(c):
+				if not game.plan.has_floor(c):
+					game.grid.outside[c] = true   # bare ground
+			elif not pave.has_point(c):
+				game.grid.outside[c] = true   # not ours yet, or the kerb and the road
 	game.grid.outside[Game.BOARD_CELL] = true   # the menu board stands here; people go round it
 
 
