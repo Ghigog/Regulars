@@ -13,6 +13,9 @@ var confirming := false   # the "leave this day?" card is showing
 var _box: VBoxContainer
 var _keys: Label
 var _frame: Control
+var _chefs: VBoxContainer   # the Chefs section; null while the confirm card shows
+var _rows := {}             # seat -> signature of its row as last built
+var _tags := {}             # seat -> its ChefTag, for the leave ring
 
 
 func setup(hud_: Hud) -> void:
@@ -50,6 +53,8 @@ func _clear() -> void:
 		_box.remove_child(c)
 		c.queue_free()
 	buttons.clear()
+	_chefs = null
+	_tags.clear()
 
 
 func _add_button(text: String, id: String) -> void:
@@ -64,6 +69,11 @@ func show_main() -> void:
 	_clear()
 	confirming = false
 	hud.receipt_ui._ribbon(_box, "PAUSED", Hud.CORAL)
+	_chefs = VBoxContainer.new()
+	_chefs.add_theme_constant_override("separation", 8)
+	_box.add_child(_chefs)
+	_rows.clear()
+	refresh_chefs()
 	_add_button("Resume", "resume")
 	_add_button("Options", "options")
 	_add_button(quit_label(), "quit")
@@ -112,7 +122,83 @@ func refresh() -> void:
 	_frame.queue_redraw()
 
 
+func _ready() -> void:
+	hud.root.move_child(hud.toast_sheet, -1)   # "Chef 2 joined." sits above the dim
+
+
 func _process(_delta: float) -> void:
+	for p: int in _tags:
+		(_tags[p] as HudWidgets.ChefTag).set_progress(hud.game.controls.leave_progress(p))
+	_frame.queue_redraw()
+
+
+const DEVICE_WORDS := {"pad": "Controller", "keys": "Keyboard", "touch": "Touch"}
+
+
+## Rebuilds only the Chefs rows: one per seat up to MAX_CHEFS, filled or empty. A row
+## that is new or changed pops in. The pointer and the confirm card are left alone.
+func refresh_chefs() -> void:
+	if _chefs == null:
+		return
+	var game: Game = hud.game
+	for c in _chefs.get_children():
+		_chefs.remove_child(c)
+		c.queue_free()
+	_tags.clear()
+	var old := _rows.duplicate()
+	_rows.clear()
+	var changed := false
+	for p in Game.MAX_CHEFS:
+		var filled: bool = p < game.chefs.size()
+		var device := ""
+		var line1 := ""
+		var line2 := ""
+		var sig := "empty"
+		if filled:
+			device = str(game.controls.players[p].mode)
+			line1 = DEVICE_WORDS.get(device, "Controller")
+			if device == "pad" and game.chefs.size() > 1:
+				line2 = "Hold %s to leave" % hud._g("options", p)
+			sig = "%s|%s" % [device, line2]
+		else:
+			var offer: String = game.controls.join_offer
+			if offer != "" and not game.controls.seats.has(offer):
+				line1 = "Controller ready: press Start to join as Chef %d" % (p + 1)
+				sig = "offer"
+			else:
+				line1 = "Press Start on a controller to join"
+			if p > game.chefs.size():
+				continue   # only the next seat shows; the rest wait for it
+		_rows[p] = sig
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		_chefs.add_child(row)
+		if filled:
+			var tag := HudWidgets.ChefTag.new(p, 32)
+			tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(tag)
+			_tags[p] = tag
+		else:
+			var ring := HudWidgets.SeatRing.new(32)
+			ring.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(ring)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", -2)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(col)
+		var l := hud._label(col, 18, line1)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size.x = 280
+		if line2 != "":
+			var h := hud._label(col, 15, line2)
+			h.modulate.a = 0.7
+		if old.get(p, "") != sig:
+			changed = true
+			if old.has(p) or not old.is_empty():
+				hud.receipt_ui._pop_in(row)
+				row.pivot_offset = Vector2(150, 18)   # the card's pivot is far off a row
+	if changed and not old.is_empty():
+		game.audio.sfx("tick")
 	_frame.queue_redraw()
 
 
