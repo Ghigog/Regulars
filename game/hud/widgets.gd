@@ -703,6 +703,8 @@ class Sheet extends MarginContainer:
 	var kind := "paper"
 	var tint := Hud.CORAL
 	var unavailable := false   # the "tab" prompt in its muted, can't-do-that-now look
+	var edge := Hud.INK   # the "tab" rim: the chef's trim colour
+	var unit := 1.0   # the "tab" corner radii and inset, scaled with the bubble
 
 	func _init(kind_: String, mx := 14, my := 10) -> void:
 		kind = kind_
@@ -818,9 +820,9 @@ class Sheet extends MarginContainer:
 					draw_circle(Vector2(x, 11), 4.5, Hud.CORAL)
 					draw_circle(Vector2(x - 1.5, 9.5), 1.6, Hud.CORAL.lightened(0.5))
 			"tab":  # the prompt: a keycap and a word on one wood-edged tab
-				_box(Rect2(r.position + Vector2(0, 5), r.size), Hud.SHADOW, 11)
-				_box(r, Hud.WOOD.lightened(0.1), 11, 2, Hud.INK)
-				_box(r.grow(-5), Color("#c9b9a3") if unavailable else Color("#f0d9ae"), 7)
+				_box(Rect2(r.position + Vector2(0, 5) * maxf(unit, 0.6), r.size), Hud.SHADOW, roundi(11 * unit))
+				_box(r, Hud.WOOD.lightened(0.1), roundi(11 * unit), 3 if unit < 1.0 else 2, edge)
+				_box(r.grow(-maxf(5.0 * unit, 3.0)), Color("#c9b9a3") if unavailable else Color("#f0d9ae"), roundi(7 * unit))
 			"receipt":  # torn at the bottom
 				var shape := PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0)])
 				var teeth := int(size.x / 16.0)

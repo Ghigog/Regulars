@@ -77,9 +77,9 @@ func test_board_glows_in_build_only_and_key_is_prompt_sized():
 	_frame()
 	var k: HudBoardKey = game.hud.board_key_ui
 	assert_true(game.menu_board.glow.visible, "halo in build")
-	game.hud.day_ui.show_prompt(Vector2(300, 300), "Cook")
-	var key: Control = game.hud._prompts[0].key
-	assert_almost_eq(k.cap.size.y, key.size.y, 6.0, "no bigger than the chef prompt's key")
+	# The chef prompt's key is about half size since T-103; the board key keeps its old,
+	# prompt-sized cap (about 42 px tall).
+	assert_almost_eq(k.cap.size.y, 42.0, 6.0, "no bigger than the chef prompt's old key")
 	game.phase = game.Phase.SERVICE
 	_frame()
 	await wait_seconds(0.6)

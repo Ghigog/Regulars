@@ -178,24 +178,33 @@ func _stamp(slot: HudWidgets.Punch, delay: float) -> void:
 	tw.tween_callback(st.queue_free)
 
 
+## The prompt bubble's size against its first design; every literal below goes through `_ps`.
+const PROMPT_SCALE := 0.5
+
+
+func _ps(v: float, floor_px := 1) -> int:
+	return maxi(roundi(v * PROMPT_SCALE), floor_px)
+
+
 ## One chef's prompt bubble: their number tag (shown in co-op), a keycap and a word.
 func _make_prompt() -> Dictionary:
-	var sheet := HudWidgets.Sheet.new("tab").pad(10, 8, 16, 12)
+	var sheet := HudWidgets.Sheet.new("tab").pad(_ps(10), _ps(8), _ps(16), _ps(12))
+	sheet.unit = PROMPT_SCALE
 	sheet.visible = false
 	hud.root.add_child(sheet)
 	if hud._prompts.size() > 0:
 		hud.root.move_child(sheet, hud._prompts[0].sheet.get_index() + hud._prompts.size())
 	var prow := HBoxContainer.new()
-	prow.add_theme_constant_override("separation", 10)
+	prow.add_theme_constant_override("separation", _ps(10))
 	sheet.add_child(prow)
-	var tag := HudWidgets.ChefTag.new(hud._prompts.size(), 30)
+	var tag := HudWidgets.ChefTag.new(hud._prompts.size(), _ps(30, 16))
 	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	tag.visible = false
 	prow.add_child(tag)
-	var key := HudWidgets.Sheet.new("key", 13, 4).pad(13, 1, 13, 7)
+	var key := HudWidgets.Sheet.new("key", _ps(13), _ps(4)).pad(_ps(13), _ps(1, 0), _ps(13), _ps(7))
 	prow.add_child(key)
-	var key_label := hud._label(key, 24, "E")
-	var d := {"sheet": sheet, "key": key, "key_label": key_label, "label": hud._label(prow, 26), "tag": tag, "row": prow, "extras": []}
+	var key_label := hud._label(key, _ps(24, 12), "E")
+	var d := {"sheet": sheet, "key": key, "key_label": key_label, "label": hud._label(prow, _ps(26, 12)), "tag": tag, "row": prow, "extras": []}
 	hud._prompts.append(d)
 	return d
 
@@ -224,6 +233,7 @@ func show_prompt(at: Vector2, text: String, p := 0, ready := true, extras := [])
 	d.key_label.text = hud.game.controls.glyph("use", p) if hud.game.controls and p < hud.game.controls.players.size() else "E"
 	d.label.text = text.to_upper()
 	_show_extras(d, p, m, extras)
+	sheet.edge = Color(Peg.PLAYER_TRIM[p % 4])
 	sheet.unavailable = not ready   # muted tan, cream text, as a disabled stamp button
 	if ready:
 		d.label.remove_theme_color_override("font_color")
@@ -246,14 +256,14 @@ func show_prompt(at: Vector2, text: String, p := 0, ready := true, extras := [])
 ## Fills the small tags after the main word: shrunk to about 70%, the main cap too.
 func _show_extras(d: Dictionary, p: int, mode: String, extras: Array) -> void:
 	var small := not extras.is_empty()
-	var fs := 18 if small else 26
+	var fs := _ps(18 if small else 26, 13)
 	d.label.add_theme_font_size_override("font_size", fs)
-	d.key_label.add_theme_font_size_override("font_size", 17 if small else 24)
+	d.key_label.add_theme_font_size_override("font_size", _ps(17 if small else 24, 12))
 	while d.extras.size() < extras.size():
-		var cap := HudWidgets.Sheet.new("key", 9, 3).pad(9, 1, 9, 5)
+		var cap := HudWidgets.Sheet.new("key", _ps(9), _ps(3)).pad(_ps(9), _ps(1, 0), _ps(9), _ps(5))
 		d.row.add_child(cap)
-		var kl := hud._label(cap, 17, "")
-		d.extras.append({"cap": cap, "key_label": kl, "label": hud._label(d.row, 18)})
+		var kl := hud._label(cap, _ps(17, 12), "")
+		d.extras.append({"cap": cap, "key_label": kl, "label": hud._label(d.row, _ps(18, 12))})
 		d.row.move_child(d.extras[-1].label, cap.get_index() + 1)
 	for i in d.extras.size():
 		var e: Dictionary = d.extras[i]
