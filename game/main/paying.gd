@@ -444,7 +444,7 @@ func _leave(g: Guest) -> void:
 	game.serving.tear_ticket(g)
 	game.seat_taken.erase(g.seat)
 	g.stand_up()
-	g.walk_to(Game.EXIT)
+	g.walk_to(game.exit_cell())
 	if game.queue.has(g):
 		game.queue.erase(g)
 		game.seating._reflow_queue()
@@ -452,7 +452,7 @@ func _leave(g: Guest) -> void:
 		# Out of the line onto the outer half of the pavement first, not down
 		# through the people still waiting.
 		var out := game.seating.outer_lane(g.cell.y)
-		g.path.assign(game.grid.find_path(g.cell, out) + game.grid.find_path(out, Game.EXIT))
+		g.path.assign(game.grid.find_path(g.cell, out) + game.grid.find_path(out, game.exit_cell()))
 
 
 func remove_guest(g: Guest) -> void:

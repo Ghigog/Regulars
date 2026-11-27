@@ -53,6 +53,28 @@ func test_restore_rebuilds_the_room():
 	assert_ne(other.paying.till_cell(), other.NO_CELL)
 
 
+func test_bought_block_survives_a_save():
+	game.lot.buy(Vector2i(-2, 0))
+	var data := SaveGame.capture(game)
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = data
+	add_child_autofree(other)
+	other.set_process(false)
+	assert_true(other.lot.blocks.has(Vector2i(-2, 0)))
+	assert_eq(other.lot.bought, 1)
+
+
+func test_save_without_a_lot_loads_the_default():
+	var data := SaveGame.capture(game)
+	data.erase("lot")
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = data
+	add_child_autofree(other)
+	other.set_process(false)
+	assert_eq(other.lot.bounds(), Lot.new().bounds())
+	assert_eq(other.plan.floors, game.plan.floors)
+
+
 func test_closing_down_deletes_the_save():
 	game.session.autosave()
 	assert_true(SaveGame.exists(SAVE_TEST_PATH))

@@ -199,7 +199,7 @@ func _update_range(ch: Player = null) -> void:
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	var y := 0.03
 	for r: Rect2i in [pr.area, pr.close]:
-		var area := r.intersection(Game.LOT)
+		var area := r.intersection(game.lot.bounds())
 		if not area.has_area():
 			continue
 		var wash := MeshInstance3D.new()

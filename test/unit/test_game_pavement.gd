@@ -7,8 +7,8 @@ func _can_stand(c: Vector2i) -> bool:
 
 
 func test_chef_stands_on_both_open_rows_to_either_end():
-	var top: int = Game.LOT.position.y
-	var bottom: int = Game.LOT.end.y - 1
+	var top: int = game.lot.bounds().position.y
+	var bottom: int = game.lot.bounds().end.y - 1
 	assert_true(_can_stand(Vector2i(Game.W, top)))
 	assert_true(_can_stand(Vector2i(Game.W + 1, bottom)))
 	assert_true(game.grid.reachable(Game.DOOR, Vector2i(Game.W + 1, bottom)))
@@ -16,7 +16,7 @@ func test_chef_stands_on_both_open_rows_to_either_end():
 
 
 func test_chef_never_stands_on_the_kerb_tile_or_the_road():
-	for y in range(Game.LOT.position.y, Game.LOT.end.y):
+	for y in range(game.lot.bounds().position.y, game.lot.bounds().end.y):
 		assert_false(_can_stand(Vector2i(Game.KERB_X, y)), "kerb %d" % y)
 		assert_false(_can_stand(Vector2i(Game.KERB_X + 1, y)), "road %d" % y)
 		assert_true(game.grid.is_blocked(Vector2i(Game.KERB_X, y)), "guests too")

@@ -5,8 +5,8 @@ extends "res://test/helpers/game_case.gd"
 ## Every cell of the lot where the piece in hand is accepted.
 func _accepted() -> Array[Vector3i]:
 	var out: Array[Vector3i] = []
-	for x in range(Game.LOT.position.x, Game.LOT.end.x):
-		for y in range(Game.LOT.position.y, Game.LOT.end.y):
+	for x in range(game.lot.bounds().position.x, game.lot.bounds().end.x):
+		for y in range(game.lot.bounds().position.y, game.lot.bounds().end.y):
 			if game.placing.can_place(Vector3i(x, y, 0)):
 				out.append(Vector3i(x, y, 0))
 	return out

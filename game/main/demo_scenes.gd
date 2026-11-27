@@ -53,7 +53,7 @@ func _demo_seating() -> void:
 			game.world.add_station(seat[0], cell, seat[1], seat[3])
 			var g := Guest.new()
 			game.add_child(g)
-			g.setup(game, person % game.town.people.size(), Game.SPAWN)
+			g.setup(game, person % game.town.people.size(), game.spawn_cell())
 			person += 1
 			g.position = Grid.center(cell)
 			g.cell = cell

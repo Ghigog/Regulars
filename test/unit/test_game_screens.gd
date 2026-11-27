@@ -229,10 +229,11 @@ func test_a_group_comes_in_single_file_not_stacked():
 
 func test_a_rush_never_walks_guests_through_one_another():
 	# critics always join, so the whole rush queues whatever the line (QueueChoice)
-	game.arrivals.assign([{"time": 0.3, "group": [0, 1], "critic": true}, {"time": 0.6, "idx": 2, "critic": true},
-		{"time": 0.9, "group": [3, 4], "critic": true}, {"time": 1.2, "idx": 6, "critic": true},
-		{"time": 1.5, "group": [7, 8], "critic": true}, {"time": 1.8, "group": [9, 10, 11], "critic": true},
-		{"time": 2.1, "idx": 13, "critic": true}])
+	# (timed 0.4 s later than before: the street end is a cell further out now, the lot being a row longer)
+	game.arrivals.assign([{"time": 0.7, "group": [0, 1], "critic": true}, {"time": 1.0, "idx": 2, "critic": true},
+		{"time": 1.3, "group": [3, 4], "critic": true}, {"time": 1.6, "idx": 6, "critic": true},
+		{"time": 1.9, "group": [7, 8], "critic": true}, {"time": 2.2, "group": [9, 10, 11], "critic": true},
+		{"time": 2.5, "idx": 13, "critic": true}])
 	for p in game.town.people:   # middling, so the line clears by walkouts in time (PRD 10.1)
 		p.tolerance = {"food": 3, "service": 3, "clean": 3}
 	var worst := 99.0

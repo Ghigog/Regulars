@@ -63,7 +63,7 @@ func test_comfort_comes_from_the_guests_own_seat():
 	var booth := Guest.new()
 	for g: Guest in [high, low, booth]:
 		add_child_autofree(g)
-		g.setup(game, 0, Game.SPAWN)
+		g.setup(game, 0, game.spawn_cell())
 		g.table = t[0]
 		g.mood.joy = 0.5
 	high.seat = Vector2i(5, 1)

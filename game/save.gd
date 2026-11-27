@@ -156,6 +156,7 @@ static func capture(g: Node3D) -> Dictionary:
 		"staff": _take(g.staff, STAFF).merged({"rng": g.staff.rng.state}),
 		"critic": _take(g.critic, CRITIC),
 		"town": _take(g.town, TOWN).merged({"rng": g.town.rng.state}),
+		"lot": g.lot.to_dict(),
 		"plan": _take(g.plan, ["floors", "built", "openings", "finishes"]),
 		"pieces": pieces,
 		"stock": stock,
@@ -176,6 +177,11 @@ static func theme_of(data: Dictionary) -> String:
 
 ## The people, books and room as saved, put in place of the starting ones. Runs in the
 ## game's _ready where the starting layout would be built; the interface is not up yet.
+## The saved lot; a save from before lots has the default one.
+static func lot_of(d: Dictionary) -> Lot:
+	return Lot.from_dict(d.get("lot", {}))
+
+
 static func restore_world(g: Node3D, d: Dictionary) -> void:
 	_put(g.ledger, LEDGER, d.ledger)
 	_put(g.menu, MENU, d.menu)

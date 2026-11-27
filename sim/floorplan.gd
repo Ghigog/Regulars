@@ -12,14 +12,14 @@ const KINDS: Array[String] = ["tile", "planks", "parquet", "marble"]
 const FINISHES: Array[String] = ["paint", "paper_stripe", "paper_rose"]
 const OPENINGS: Array[String] = ["door", "arch"]   # plus "entrance", the front door, which is fixed
 
-var lot: Rect2i       # where floor may be laid
+var lot               # where floor may be laid: a Lot (a plain Rect2i in tests)
 var floors := {}      # Vector2i -> "tile" | "planks"
 var built := {}       # Vector3i edge -> true: walls the player put up between two floors
 var openings := {}    # Vector3i edge -> "door" | "arch" | "entrance"
 var finishes := {}    # Vector3i edge -> a FINISHES id: paint or wallpaper on a wall
 
 
-func _init(lot_: Rect2i) -> void:
+func _init(lot_) -> void:
 	lot = lot_
 
 

@@ -34,10 +34,10 @@ func spawn_group(ids: Array, as_critic := false) -> Array[Guest]:
 	for idx: int in ids:
 		var g := Guest.new()
 		game.add_child(g)
-		g.setup(game, idx, Game.SPAWN)
+		g.setup(game, idx, game.spawn_cell())
 		# Up the street past the end of the line, so newcomers walk towards the door
 		# like everyone else; friends come in single file, not stacked on one spot.
-		var back := minf(Grid.center(Game.SPAWN).z, queue_spot(game.queue.size()).z) - 1.5
+		var back := minf(Grid.center(game.spawn_cell()).z, queue_spot(game.queue.size()).z) - 1.5
 		for o: Guest in game.guests:
 			if o.position.x > Game.W and o.state != "leaving":   # out on the pavement, coming in
 				back = minf(back, o.position.z - Game.QUEUE_GAP)
@@ -150,8 +150,9 @@ func queue_spot(i: int) -> Vector3:
 func outer_lane(row: int) -> Vector2i:
 	var best := Vector2i(Game.W + 1, row)
 	var best_d := 1 << 30
-	for c in Game.PAVEMENT.size.x * Game.PAVEMENT.size.y:
-		var cell := Game.PAVEMENT.position + Vector2i(c % Game.PAVEMENT.size.x, c / Game.PAVEMENT.size.x)
+	var pave := game.pavement()
+	for c in pave.size.x * pave.size.y:
+		var cell := pave.position + Vector2i(c % pave.size.x, c / pave.size.x)
 		if game.grid.is_blocked(cell):
 			continue
 		var d := absi(cell.y - row) * 2 + (0 if cell.x == Game.W + 1 else 1)
@@ -168,7 +169,7 @@ func _reflow_queue() -> void:
 	for i in game.queue.size():
 		var g := game.queue[i]
 		var at := queue_spot(i)
-		var row := clampi(Grid.to_cell(at).y, Game.LOT.position.y, Game.LOT.end.y - 1)
+		var row := clampi(Grid.to_cell(at).y, game.pavement().position.y, game.pavement().end.y - 1)
 		g.walk_to(Vector2i(Game.W, row) if g.cell.x == Game.W else outer_lane(row), at)
 		g.line_place = i
 

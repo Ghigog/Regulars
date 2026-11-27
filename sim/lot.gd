@@ -39,6 +39,13 @@ func has_point(cell: Vector2i) -> bool:
 	return blocks.has(block_of(cell))
 
 
+## The cells of the largest lot the cap allows: every block MAX_BOUGHT steps from the default
+## ones, away from the street and along it.
+static func max_bounds() -> Rect2i:
+	var r := Lot.new().bounds()
+	return Rect2i(r.position - Vector2i(MAX_BOUGHT, MAX_BOUGHT) * BLOCK_SIZE, r.size + Vector2i(MAX_BOUGHT, MAX_BOUGHT * 2) * BLOCK_SIZE)
+
+
 ## The smallest rect holding every owned block.
 func bounds() -> Rect2i:
 	var r := Rect2i()

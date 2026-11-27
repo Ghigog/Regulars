@@ -517,12 +517,12 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 		"wall":
 			if not game.plan.can_build(spot):
 				return WONT_GO
-			return _grid_words(game.grid.wall_refusal(spot, Game.LOT, Game.DOOR, reach, touch))
+			return _grid_words(game.grid.wall_refusal(spot, game.lot, Game.DOOR, reach, touch))
 		"door", "arch":
 			var ok: bool = game.plan.can_open(spot, ch.hand.id) and not game.world._strands_high([spot])
 			return "" if ok else WONT_GO
 	if ch.hand.id == "screen":
-		var why := _grid_words(game.grid.wall_refusal(spot, Game.LOT, Game.DOOR, reach, touch))
+		var why := _grid_words(game.grid.wall_refusal(spot, game.lot, Game.DOOR, reach, touch))
 		return why if why != "" else (TAKEN if game.plan.is_wall(spot) else "")
 	if ch.hand.id == "till":   # on a counter, or a tool standing on one
 		return "" if game.paying._till_host(cell) != null else NEEDS_COUNTER
@@ -534,15 +534,15 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 	if Kitchen.grows_from_counter(hn):   # a stove is its counter upgraded: the floor only
 		if game.stations.has(cell) or game.kitchen.layer_for(cell, "counter") != "base":
 			return "A stove stands on the floor"
-		return _grid_words(game.grid.block_refusal(cell, NO_SEATS, Game.LOT, Game.DOOR, reach, touch))
+		return _grid_words(game.grid.block_refusal(cell, NO_SEATS, game.lot, Game.DOOR, reach, touch))
 	if game.stations.has(cell) or Kitchen.is_top(ch.hand.id):
 		if game.world._stacks_on(cell, ch.hand):   # a tool needs a counter under it
 			return ""
 		return NEEDS_COUNTER if Kitchen.is_top(ch.hand.id) and not game.stations.has(cell) else TAKEN
 	var seats := NO_SEATS   # a seat piece's own cell is its seat; a table tile has none of its own
-	if _is_street_piece(ch.hand.id) and not Game.LOT.has_point(cell):
+	if _is_street_piece(ch.hand.id) and not game.lot.has_point(cell):
 		return _street_refusal(cell, seats, reach, touch)
-	return _grid_words(game.grid.block_refusal(cell, seats, Game.LOT, Game.DOOR, reach, touch))
+	return _grid_words(game.grid.block_refusal(cell, seats, game.lot, Game.DOOR, reach, touch))
 
 
 ## Tables, chairs and decor may stand out on the pavement; nothing else does.
@@ -551,8 +551,8 @@ static func _is_street_piece(id: String) -> bool:
 
 
 ## The queue line: the pavement column by the wall from the doorway up to the street end.
-static func _on_queue_line(c: Vector2i) -> bool:
-	return c.x == Game.W and c.y >= Game.LOT.position.y and c.y <= Game.DOOR.y
+func _on_queue_line(c: Vector2i) -> bool:
+	return c.x == Game.W and c.y >= game.lot.bounds().position.y and c.y <= Game.DOOR.y
 
 
 ## A table, chair or decor piece on the pavement: the two open rows, off the queue line,
@@ -561,16 +561,16 @@ func _street_refusal(cell: Vector2i, seats: Array[Vector2i], reach: Array[Vector
 	var cells: Array[Vector2i] = [cell]
 	cells.append_array(seats)
 	for c in cells:
-		if not Game.PAVEMENT.has_point(c):   # the back tile, the road, or the room's own side
+		if not game.pavement().has_point(c):   # the back tile, the road, or the room's own side
 			return "That's off the lot"
 		if c == Game.DOOR or c == Game.BOARD_CELL or _on_queue_line(c):
 			return KEEP_CLEAR
-	reach.append(Game.SPAWN)
-	reach.append(Game.EXIT)
+	reach.append(game.spawn_cell())
+	reach.append(game.exit_cell())
 	reach.append(Game.DOOR)
-	for y in range(Game.LOT.position.y, Game.DOOR.y + 1):
+	for y in range(game.lot.bounds().position.y, Game.DOOR.y + 1):
 		reach.append(Vector2i(Game.W, y))
-	var area := Game.LOT.merge(Game.PAVEMENT)
+	var area := game.lot.bounds().merge(game.pavement())
 	return _grid_words(game.grid.block_refusal(cell, seats, area, Game.DOOR, reach, touch))
 
 

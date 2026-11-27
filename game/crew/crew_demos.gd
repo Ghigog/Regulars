@@ -224,6 +224,6 @@ func staff_only() -> void:
 	# Nobody cooks: the chef is not in today.
 	for ch: Player in crew.game.chefs:
 		ch.visible = false
-		ch.position = Grid.center(crew.game.LOT.position)
+		ch.position = Grid.center(crew.game.lot.bounds().position)
 	crew.game.ledger.money = maxi(crew.game.ledger.money, 2000)
 	crew.game.day.start_day()
