@@ -421,6 +421,7 @@ func tick(delta: float) -> void:
 			if timer <= 0.0:
 				state = "ordering"   # _refresh below pops the notepad in this same frame
 				_drop_card()
+				game.seating.on_decided(self)
 		"ordering", "waiting":
 			_face(Grid.center(table.cell) - position, delta)
 			mood.wait(delta, game.day.table_patience(party.size()) * (game.ORDER_PATIENCE_SCALE if state == "ordering" else 1.0))

@@ -241,9 +241,16 @@ func on_seated(g: Guest) -> void:
 				g.mood.delight(0.15, "Oh good, %s is here!" % mate.info.name)
 				mate.mood.delight(0.15, "Oh good, %s is here!" % g.info.name)
 	game.decor.cheer_with_decor(g)
-	if game.paying.party_at(g.table).all(func(o: Guest) -> bool: return o.state != "to_seat"):
-		# The whole party is down: a knock on the table, they are ready to order.
-		game.get_tree().create_timer(0.6).timeout.connect(game.audio.sfx.bind("order_ready", 0.04))
+
+
+## A guest has put the menu down and the notepad is up: the table knocks, once per calling table.
+func on_decided(g: Guest) -> void:
+	if g.orders_nothing:
+		return
+	for o in game.paying.party_at(g.table):
+		if o != g and o.state == "ordering" and not o.orders_nothing:
+			return
+	game.audio.sfx("order_ready", 0.04)
 
 
 ## The chair's and its table's effects on this guest (Seating), kept on the guest and the mood.

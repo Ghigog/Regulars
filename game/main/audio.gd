@@ -4,6 +4,7 @@ extends RefCounted
 ## tilt-shift, daylight and floating popups.
 
 var game: Game
+var last_sfx := ""   # id of the sound effect last asked for (tests read it)
 
 
 func _init(game_: Game) -> void:
@@ -85,6 +86,7 @@ func door_bell() -> void:
 
 
 func sfx(id: String, vary := 0.06, pitch := 1.0) -> void:
+	last_sfx = id
 	if game._sfx.has(id):
 		game._sfx[id].pitch_scale = pitch * randf_range(1.0 - vary, 1.0 + vary)
 		game._sfx[id].play()
