@@ -48,8 +48,8 @@ func demo(which: String) -> void:
 
 
 ## REGULARS_DEMO=helpers_home (T-123): the day has just ended. A washer is still at the sink
-## finishing the dishes; a server stands at the desk with their bag, about to walk out.
-## Shoot at about 2.
+## mid-wash (the ring on the sink); a server stands clear of the desks, turned side-on so the
+## bag at their side reads, about to walk out. Shoot at about 2.
 func demo_home() -> void:
 	var g: Game = crew.game
 	for c: Vector2i in [Vector2i(8, 6), Vector2i(9, 6)]:
@@ -58,20 +58,25 @@ func demo_home() -> void:
 	var sink: Station = g.world.find_station("sink")
 	if g.world.find_station("dish_rack") == null:
 		g.world.add_station("dish_rack", sink.cell + Vector2i(0, 1))
+	var rack: Station = g.world.find_station("dish_rack")
+	rack.count = 0   # room on the rack, or there is nowhere for a washed plate to go
+	rack.refresh()
 	sink.dirty = 4
 	sink.refresh()
 	g.arrivals.assign([{"time": 99999.0, "idx": 13}])
-	demo_hire(9, "Washer", ["wash_up", "empty_bin", "clear_tables", "mop"], sink.cell + Vector2i(1, 0))
+	var washer := demo_hire(9, "Washer", ["wash_up", "empty_bin", "clear_tables", "mop"], sink.cell + Vector2i(1, 0))
 	var server := demo_hire(5, "Server", ["take_orders", "carry_trays"], Vector2i(8, 5))
-	for i in 40:   # the washer is at work before the day ends
+	for i in 300:   # the washer is mid-wash at the sink before the day ends
 		g.step(0.1)
+		if not washer.steps.is_empty() and washer.steps[0].get("do") == "wash" and washer.work_left > 0.0:
+			break
 	g.arrivals.clear()
 	g.day._end_day()
 	g.session.open_build()   # past the receipt, into the night
-	server.position = Grid.center(Vector2i(8, 5))
+	server.position = Grid.center(Vector2i(8, 4))   # a step back from the desk, so nothing hides the bag
 	server.path.clear()
-	server.stand = Vector2i(8, 5)
-	server.look_at_cell(Vector2i(8, 6))
+	server.stand = Vector2i(8, 4)
+	server.aim = Vector3(0, 0, 1)   # turned to show their side, so the bag reads against the body
 	server.home_stage = "collect"
 	server.collect_left = 99.0
 	server.take_bag()
