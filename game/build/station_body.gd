@@ -379,12 +379,11 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			for i in 9:
 				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, 0.2), Vector3(0.03, 0.2, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
 				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, -0.2), Vector3(0.03, 0.3, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
-		"table", "table_fast", "table_comfy":   # the branches are drawn as the plain table for now
-			_table_tile(n, joined, candle)
-		"chair":
-			BuildStations._chair(n, Vector2i(1, 0), Build.CORAL, true)
-		"chair_fast":   # hard seats: the plain chair, in steel
-			BuildStations._chair(n, Vector2i(1, 0), Build.STEEL, true)
+		"table", "table_fast", "table_comfy":
+			_table_tile(n, joined, candle, Upgrades.seat_path("%s%s%d" % [type, Upgrades.TIER_SEP, tier]))
+		"chair", "chair_fast":   # each look from the key's seating branch (EPIC-87)
+			var key := "%s%s%d" % [type, Upgrades.TIER_SEP, tier]
+			BuildStations._chair(n, Vector2i(1, 0), Build.CORAL, true, Upgrades.seat_path(key), Upgrades.seat_steps(key))
 		"booth_seat":
 			_booth_seat(n, joined)
 	if tier > 1:
@@ -415,16 +414,38 @@ static func _span(open: float, neg_joined: bool, pos_joined: bool) -> Array:
 ## in `joined` (SIDE_* bits) have no bevel and reach the cell edge, so a run of tiles has
 ## one continuous top; `candle` (the offset from the tile's centre, in cells) is where the
 ## table's one candle stands, or Vector2.INF for none.
-static func _table_tile(n: Node3D, joined: int, candle: Vector2) -> void:
-	Build.lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.25, 0.0], [0.27, 0.02], [0.27, 0.08], [0.25, 0.1], [0.075, 0.1], [0.075, 0.63], [0.0, 0.63]], Build.CABINET, 0.0, Build.R_WOOD)
+static func _table_tile(n: Node3D, joined: int, candle: Vector2, path := "") -> void:
+	var fast := path == "fast"
+	var cloth := path == "comfortable"
+	var wood := Build.WOOD if fast else Build.CABINET
+	if fast:   # a plain square post on a thin foot: nothing to sit a cloth or candle on
+		Build.box(n, Vector3(0, 0, 0), Vector3(0.5, 0.04, 0.5), wood, 0.0, Build.R_WOOD)
+		Build.box(n, Vector3(0, 0.04, 0), Vector3(0.12, 0.6, 0.12), wood, 0.0, Build.R_WOOD)
+	else:
+		Build.lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.25, 0.0], [0.27, 0.02], [0.27, 0.08], [0.25, 0.1], [0.075, 0.1], [0.075, 0.63], [0.0, 0.63]], wood, 0.0, Build.R_WOOD)
 	var sx := _span(0.56, joined & SIDE_X_NEG != 0, joined & SIDE_X_POS != 0)
 	var sz := _span(0.56, joined & SIDE_Z_NEG != 0, joined & SIDE_Z_POS != 0)
-	var top := Build._add(n, Build.bevel_mesh(Vector3(sx[1], 0.12, sz[1]), 0.035), Vector3(sx[0], 0.68, sz[0]), Color("#ecc88f"), 0.0, Build.R_WOOD)
+	var top := Build._add(n, Build.bevel_mesh(Vector3(sx[1], 0.12, sz[1]), 0.035), Vector3(sx[0], 0.68, sz[0]), Color(Build.WOOD if fast else "#ecc88f"), 0.0, Build.R_WOOD)
 	top.name = "top"
-	if candle != Vector2.INF:
+	var lift := 0.0
+	if cloth:   # a cream cloth over the top with a coral band, hanging a hand's width at the open edges
+		lift = 0.03
+		var cx := _span(0.58, joined & SIDE_X_NEG != 0, joined & SIDE_X_POS != 0)
+		var cz := _span(0.58, joined & SIDE_Z_NEG != 0, joined & SIDE_Z_POS != 0)
+		Build.box(n, Vector3(cx[0], 0.74, cz[0]), Vector3(cx[1], 0.03, cz[1]), "#f3dfb8", 0.0, Build.R_MATTE).name = "cloth"
+		for side: Array in [[SIDE_X_NEG, -1, 0], [SIDE_X_POS, 1, 0], [SIDE_Z_NEG, 0, -1], [SIDE_Z_POS, 0, 1]]:
+			if joined & int(side[0]) != 0:
+				continue
+			var along_x: bool = side[1] != 0
+			var drop := 0.2 if along_x else 0.19   # the z sides a hair shorter, so corners never share a face
+			var hang := Vector3(0.03, drop, cz[1]) if along_x else Vector3(cx[1], drop, 0.03)
+			var at := Vector3(float(side[1]) * 0.575 if along_x else cx[0], 0.64 if along_x else 0.635, cz[0] if along_x else float(side[2]) * 0.575)
+			Build.box(n, at, hang, "#f3dfb8", 0.0, Build.R_MATTE)
+			Build.box(n, at + Vector3(0, -0.075 if along_x else -0.07, 0), Vector3(hang.x + 0.01, 0.05 if along_x else 0.045, hang.z + 0.01), Build.CORAL, 0.0, Build.R_MATTE)
+	if candle != Vector2.INF and not fast:
 		var c := Node3D.new()
 		c.name = "candle"
-		c.position = Vector3(candle.x, 0, candle.y)
+		c.position = Vector3(candle.x, lift, candle.y)
 		n.add_child(c)
 		Build.cyl(c, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
 		Build.ball(c, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
