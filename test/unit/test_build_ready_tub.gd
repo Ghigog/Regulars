@@ -87,3 +87,88 @@ func test_nothing_covers_the_tub_opening():
 				continue
 			# no part over the floor's inner area may sit above the floor except as food
 			assert_false(_footprint(m).intersects(inner), "%s: a mesh covers the opening" % type)
+
+
+# A marinated box is its kind's own box (not a steel tub) with a dark glazed tray and a herb tag.
+func _marinated_types() -> Array:
+	var out := []
+	for t: String in Catalog.ITEMS:
+		if Catalog.ITEMS[t].get("marinated", false):
+			out.append(t)
+	return out
+
+
+func _meshes_with_color(n: Node, color: Color) -> int:
+	var count := 0
+	for m: Node in n.find_children("*", "MeshInstance3D", true, false):
+		var mat := (m as MeshInstance3D).material_override as ShaderMaterial
+		if mat != null and (mat.get_shader_parameter("albedo") as Color).is_equal_approx(color):
+			count += 1
+	return count
+
+
+func test_there_are_ready_items():
+	assert_gt(_ready_types().size(), 0)
+
+
+func test_tub_is_heaped_with_prepped_food():
+	for type: String in _ready_types():
+		assert_gte(_food_pieces(_build(type)), 3, type)
+
+
+func test_tub_walls_rise_above_its_floor():
+	for type: String in _ready_types():
+		var parts := _tub_parts(_build(type))
+		var floor_mesh := _floor(parts)
+		assert_not_null(floor_mesh, type)
+		var walls := 0
+		for m: MeshInstance3D in parts:
+			if m != floor_mesh and _top(m) > _top(floor_mesh) + 0.08:
+				walls += 1
+		assert_gte(walls, 4, "%s: four walls" % type)
+
+
+func test_nothing_covers_the_tub_opening():
+	for type: String in _ready_types():
+		var parts := _tub_parts(_build(type))
+		var floor_mesh := _floor(parts)
+		var inner := _footprint(floor_mesh).grow(-0.1)
+		for m: MeshInstance3D in parts:
+			if m == floor_mesh:
+				continue
+			# no part over the floor's inner area may sit above the floor except as food
+			assert_false(_footprint(m).intersects(inner), "%s: a mesh covers the opening" % type)
+
+
+# A marinated box is its kind's own box (not a steel tub) with a dark glazed tray and a herb tag.
+func _marinated_types() -> Array:
+	var out := []
+	for t: String in Catalog.ITEMS:
+		if Catalog.ITEMS[t].get("marinated", false):
+			out.append(t)
+	return out
+
+
+func _meshes_with_color(n: Node, color: Color) -> int:
+	var count := 0
+	for m: Node in n.find_children("*", "MeshInstance3D", true, false):
+		var mat := (m as MeshInstance3D).get_surface_override_material(0) as StandardMaterial3D
+		if mat == null:
+			mat = (m as MeshInstance3D).material_override as StandardMaterial3D
+		if mat != null and mat.albedo_color.is_equal_approx(color):
+			count += 1
+	return count
+
+
+func test_marinated_box_has_glazed_tray_and_herb_tag():
+	assert_gt(_marinated_types().size(), 0)
+	for type: String in _marinated_types():
+		var n := _build(type)
+		assert_gte(_meshes_with_color(n, Color(Build.TRIM)), 1, "%s: glazed tray" % type)
+		assert_gte(_meshes_with_color(n, Color(Build.LEAF)), 3, "%s: herb flecks" % type)
+
+
+func test_plain_and_prepared_boxes_have_no_marinated_marks():
+	for type in ["box_patty", "ready_lettuce"]:
+		if Catalog.ITEMS.has(type):
+			assert_eq(_meshes_with_color(_build(type), Color(Build.LEAF)), 0, type)
