@@ -472,6 +472,7 @@ func _process(delta: float) -> void:
 	audio._update_daylight()
 	hud.update_status()
 	hud.board_key_ui.update()
+	hud.prep_key_ui.update()
 	hud.hints_ui.place_door_ready(cam.unproject_position(DOORWAY + Vector3(0.3, 1.3, 0)))   # just under the card
 	if _shot_path != "":
 		_shot_time += delta

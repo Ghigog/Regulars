@@ -567,6 +567,14 @@ Survive as many days as you can; three walkouts in one day ends the run.
   "As built".
 - **Tier effects:** a fern that gives more and is seen from further, a tier 2+ chair gives seated guests
   +0.05 joy per tier (a booth seat adds `BOOTH_DELIGHT`). Counters and partitions gain nothing but looks.
+- **Seating branches (`sim/seating.gd`).** A chair or table is on the Fast or Comfortable branch (Booth seat is
+  Comfortable step 3). Per step, Fast: eating x0.9, ordering x0.9, tips x0.95, anger and disgust x1.1 (no joy).
+  Comfortable: eating x1.1, ordering x1.1, tips x1.05, anger and disgust x0.9, +0.05 joy (the chair's only). A chair and its table
+  multiply, then are capped: eating 0.6-1.5, ordering 0.5-1.6, tips 0.8-1.3, tolerance 0.7-1.4. The tolerance
+  factor is `GuestMood.seat_tolerance` (service and clean only), the tip factor `seat_tip`.
+- **Menu reading.** Before calling the chef a guest reads the menu: `clamp(1 + 0.5 x items, 0, 6)` seconds, times
+  an order scale (the product of ordering modifiers from any upgrade tree, held to 0.5-1.6). Patience does not
+  drain while reading.
 - **Guest card.** Click a guest during service to see their standing, visit number, the
   four meters and their last six thoughts. It follows them live and closes when they go.
 - **Sightlines.** A guest is disgusted only by what they can see; a partition hides it.
@@ -643,7 +651,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   who called (else the first) stands and queues at the till, on the room side of the
   pass, bubble always up; the line follows the till if the pass moves. A chef facing the
   till with empty hands (and nothing on that counter top) gets "Write the bill" (holding a slip with nobody queued at the till, "Write a new bill": the screen opens filled in from the slip, Print replaces it, Esc keeps it): the
-  bill screen, a paper slip with a read-only line of the waiting tables by number and party
+  bill screen, a small paper slip at the top right that leaves the room undimmed (the other chef keeps playing), with a read-only line of the waiting tables by number and party
   size (at the till marked; there is no table to pick, the slip is for the table it is
   handed to), then tonight's menu by course with a count beside each (E or click adds, Backspace, X
   or right click takes off), then Print. It never shows what the table had: the player
