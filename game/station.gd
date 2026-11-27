@@ -195,6 +195,8 @@ func _show_item(kind: String) -> void:
 				_item_node.position = Vector3(0, 1.05, 0)
 			_:
 				_item_node.position = Vector3(0, 0.9, 0)
+		if kind.begins_with("tool:"):
+			_item_node.rotation.y = facing * PI / 2   # a small tool sits centred, turned with the piece
 		add_child(_item_node)
 		_item_node.scale = Vector3.ONE * 0.4
 		_item_node.create_tween().tween_property(_item_node, "scale", Vector3.ONE, 0.18) \
@@ -513,9 +515,11 @@ func place_at(cell_: Vector2i, facing_: int) -> void:
 	_vis.rotation.y = facing * PI / 2
 	if _crates:
 		_crates.rotation.y = _vis.rotation.y
-	var tool_node := get_node_or_null("kit_tool")   # a hook's tool hangs on the hook's own wall
+	var tool_node := get_node_or_null("kit_tool")   # a shelf's tool turns with the shelf
 	if tool_node:
 		tool_node.rotation.y = _vis.rotation.y
+	if _item_node and item.begins_with("tool:"):
+		_item_node.rotation.y = _vis.rotation.y
 	seats = seats_for(type, cell, facing)
 	if lamp:
 		lamp.position = position + Vector3(0, 1.0, 0)

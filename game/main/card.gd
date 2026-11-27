@@ -18,7 +18,7 @@ func storing() -> bool:
 
 
 ## Whether the chef holds Reach (Alt / Cmd, RT, the Reach button): E then goes to the high
-## layer, the wall shelf, cabinet or hook. Without a Controls (headless tests) a `reach`
+## layer, the wall shelf or cabinet. Without a Controls (headless tests) a `reach`
 ## meta on the Player stands in for the held key.
 func reaching(ch: Player) -> bool:
 	if ch == null:
@@ -249,8 +249,8 @@ func storage_tree() -> String:
 	if st == null:
 		return ""
 	var key := ""
-	if st.type == "hook" and Kitchen.has_node(st.kit_tool):
-		key = st.kit_tool   # a hook's tree is its tool's: sponge, scourer and on (PRD 9.5)
+	if GameUpgrades.keeps_tool(st):
+		key = st.kit_tool   # a shelf that keeps a tool offers the tool's tree: sponge, scourer and on (PRD 9.5)
 	else:
 		key = Upgrades.key_of(st.type, st.tier, st.base if st.type == "counter" else st.node)
 	return key if Upgrades.has_tree(key) else ""

@@ -36,9 +36,14 @@ func hand_key(ch: Player = null) -> String:
 	if not ch.hand.get("moving", false) or not (ch.hand.get("node") is Station):
 		return ""
 	var st: Station = ch.hand.node
-	if st.type == "hook" and Kitchen.has_node(st.kit_tool):
-		return st.kit_tool   # a hook's tree is its tool's: sponge, scourer and on (PRD 9.5)
+	if ch.hand.get("in_place", false) and keeps_tool(st):
+		return st.kit_tool   # a shelf that keeps a tool offers the tool's tree: sponge, scourer and on (PRD 9.5)
 	return Upgrades.key_of(st.type, st.tier, st.base if st.type == "counter" else st.node)
+
+
+## Whether a wall shelf or cabinet keeps a small tool: its tree is the tool's.
+static func keeps_tool(st: Station) -> bool:
+	return st.high and st.kit_tool != "" and Kitchen.has_node(st.kit_tool)
 
 
 ## Buys a node of the tree for the piece in the shopper's hand: only a child of what it
@@ -94,25 +99,14 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		game.hud.hints_ui.show_build()
 		return true
 	var st: Station = ch.hand.node
-	if st.type == "hook" and Kitchen.fit_of(to) == "floor":   # the sponge grows into a mop bucket
-		if ch.hand.get("in_place", false):
-			game.ledger.refund(Upgrades.step_price(to))
-			game.audio.sfx("fail")
-			game.hud.day_ui.say("Lift the hook first: the bucket stands on the floor.")
-			return false
-		var bucket := Station.new()
-		game.add_child(bucket)
-		bucket.setup(to, st.cell, 1, 0)
-		bucket.visible = false
-		game.placing._bought_tonight(bucket, game.placing.spent_tonight(st) + Upgrades.step_price(to))
-		game.clean_kit.upgrade_home(st, bucket, Kitchen.tool_of(to))
-		st.queue_free()
-		ch.hand.node = bucket
-		ch.hand.id = bucket.type
-		ch.hand.tier = 1
-		ch.hand.layer = ""
-		ch.hand.facing = 0
+	if keeps_tool(st) and Kitchen.fit_of(to) == "floor":   # the sponge grows into a mop bucket
+		# The tool leaves the shelf, which stays; the bucket (with its mop) is a new piece in
+		# hand, paid for when it is put down on the floor.
+		game.ledger.refund(Upgrades.step_price(to))
+		game.clean_kit.take_from(st)
+		ch.hand = {"id": to, "tier": 1, "price": Upgrades.step_price(to), "facing": 0}
 		game.audio.sfx("coin")
+		game.session.close_shop()   # the tree shuts: the bucket is carried to the floor
 		game.hud.day_ui.say("The sponge is a mop bucket now: put it down on the floor.")
 		game.hud.hints_ui.show_build()
 		return true
@@ -127,7 +121,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		if Upgrades.is_tiered(to):   # a table or fern a tier up where it stands
 			st.tier = Upgrades.tier_of(to)
 			st.set_base(st.base)
-		elif st.type == "hook" and Kitchen.tool_of(to) != "":   # the hook's tool is swapped
+		elif keeps_tool(st) and Kitchen.tool_of(to) != "":   # the shelf's tool is swapped
 			game.clean_kit.upgrade_tool(st, Kitchen.tool_of(to))
 		elif st.high:   # what hangs on the wall a step up: made anew and hung back
 			var up := Station.new()
@@ -148,11 +142,6 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		game.world._show_boxes(st.cell)
 		game.menu_stock.menu_changed()
 		game.audio.sfx("coin")
-		return true
-	if st.type == "hook" and Kitchen.tool_of(to) != "":   # the hook's tool is swapped
-		game.clean_kit.upgrade_tool(st, Kitchen.tool_of(to))
-		game.audio.sfx("coin")
-		game.hud.hints_ui.show_build()
 		return true
 	if Upgrades.is_tiered(to):
 		st.tier = Upgrades.tier_of(to)

@@ -67,7 +67,7 @@ func _bucket(game, c: Vector2i) -> Station:
 
 func _wall_cell(game) -> Vector2i:
 	for c: Vector2i in game.kitchen.wall_cells:
-		if not game.stations.has(c) and game.kitchen.can_hang(c, "hook"):
+		if not game.stations.has(c) and game.kitchen.can_hang(c, "shelf"):
 			return c
 	return Vector2i(-99, -99)
 
