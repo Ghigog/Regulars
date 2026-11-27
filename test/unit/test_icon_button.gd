@@ -1,7 +1,7 @@
 extends GutTest
 ## The paper-and-wood icon button and the icons made for it.
 
-const NEW_ICONS := ["shop", "dishes", "cog", "back", "sell", "erase", "turn", "aim", "use", "basket"]
+const NEW_ICONS := ["shop", "flyer", "cog", "back", "sell", "erase", "turn", "aim", "use", "basket"]
 
 
 func _click(b: IconButton, pos := Vector2(20, 20)) -> void:
@@ -39,6 +39,14 @@ func test_new_icons_are_distinct():
 		var sig := str(Icons.icon(id))
 		assert_false(seen.has(sig), id + " differs from the others")
 		seen[sig] = true
+
+
+func test_flyer_differs_from_menu_card():
+	assert_ne(str(Icons.icon("flyer")), str(Icons.icon("menu_card")))
+
+
+func test_menu_button_wears_the_flyer():
+	assert_eq(HudButtons.ICONS["menu"], "flyer")
 
 
 func test_keycap_shows_key_and_hides_on_touch():

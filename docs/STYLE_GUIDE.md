@@ -88,7 +88,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 - The bottom controls bar is gone: no build slip of key words at night, no corner key line
   by day (one chef or co-op). What stays at the bottom: the night cleaning note, the restock
   note, the lifted piece's strip, the co-op ready marks and the shop's own key line.
-- Icon buttons (`game/hud/icon_button.gd`): paper-and-wood buttons for the shop and the menu.
+- Icon buttons (`game/hud/icon_button.gd`): paper-and-wood buttons for the shop and the menu; the menu button wears an opened flyer (two cream panels, a fold, coral bands).
   Tapped on touch; on desktop and pad they wear their key (Tab, N, or whatever is bound).
 - Head keycaps: WASD floats over the chef until all four keys have been pressed; E already
   shows over the chef in range of something to use.
