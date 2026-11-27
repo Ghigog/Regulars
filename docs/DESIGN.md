@@ -303,9 +303,9 @@ Survive as many days as you can; three walkouts in one day ends the run.
     pieces, not sets: a Table ($20, one tile, one tier) and a Chair ($10, three tiers, with the booth seat as
     its upgrade). Tiles that touch edge to edge make one table of any shape; the chairs and booth seats beside
     it and facing it are its seats (`TableJoins.tables`, rebuilt by `GameTables.rebuild`, which sets each tile's
-    `Station.seats`). A chair is not blocked (guests walk onto it) but its cell is reserved. The old table for
-    two, booth, table for four and counter stool are gone from the shop (a lone guest sits at a one-chair table;
-    save migration of old sets is a later ticket). Kitchen: a bin
+    `Station.seats`). A chair is not blocked (guests walk onto it) but its cell is reserved. The old sets
+    (table for two, booth, table for four, counter stool) are gone from the shop; a lone guest sits at a
+    chair at a one-tile table. An old save loads with each set turned into its pieces in the same place. Kitchen: a bin
     ($30, level 2) and a sink ($70, level 3), which are now catalog pieces like any other
     (every one can be sold; while there is none the shop sells one at any level), and a dish rack ($50, level 3, and now an essential, one stands in the kitchen at the start): it is where the clean plates are kept, eight at most; a sink with one
     beside it piles at 10 dishes, not 6. Each sink and bin has its own mess and sightline,
@@ -586,7 +586,9 @@ Survive as many days as you can; three walkouts in one day ends the run.
   view. A guest who can see a working stove and nothing they have noticed gains joy
   (0.01 a second).
 - **Groups.** Guests arrive in groups of friends, never with strangers. The biggest
-  group is the most seats any one table has, up to `Town.MAX_PARTY` (the starting room: 2). A group queues together, takes
+  group is the most seats any one table has, up to `Town.MAX_PARTY` (12; the starting room: 2). Small
+  groups (up to `Town.SMALL_PARTY`, 4) are the norm; bigger ones are rare, grow with the days, and wait
+  longer (`PARTY_PATIENCE_STEP`, 8% more patience per guest beyond 4). A group queues together, takes
   a whole empty table (the smallest that fits, then the fewest tiles) and shares it with nobody, so a lone
   guest has a table to themselves. If one of a group runs out of patience, those still
   waiting leave with them and it counts as one walkout; each of them holds a grudge.
@@ -989,8 +991,6 @@ Not built yet, except where marked; this is the agreed direction for future sess
   beside nice walls or a fern less, and one who can only see them least. Built: see
   *Decor* in section 1.
 - **Free meals** (built): the proposed numbers are accepted.
-- **Selling the last table for two** stays refused even when the room has a booth or
-  a table for four, for now.
 - **No language model for townspeople** (dropped): a small local model is too heavy for
   phones. Thoughts, gossip and reviews stay written lines chosen by the simulation.
 - **Banked:** the size of the lot is for the metagame (between runs); staff waits
