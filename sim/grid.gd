@@ -157,14 +157,23 @@ func cut_off(door: Vector2i, must_reach: Array[Vector2i], must_touch: Array[Vect
 		if not seen.has(c):
 			out.append(c)
 	for c in must_touch:
-		var open := false
-		for d in DIRS:
-			if seen.has(c + d) and edge_open(c, c + d):
-				open = true
-				break
-		if not open:
+		if not _touchable(seen, c):
 			out.append(c)
 	return out
+
+
+## A station can be used from a flooded cell beside it with no wall between, or across a
+## corner when at least one of the two L-paths around it has no wall.
+func _touchable(seen: Dictionary, c: Vector2i) -> bool:
+	for d in DIRS:
+		if seen.has(c + d) and edge_open(c, c + d):
+			return true
+	for dx in [-1, 1]:
+		for dy in [-1, 1]:
+			var n := c + Vector2i(dx, dy)
+			if seen.has(n) and reach_open(n, c):
+				return true
+	return false
 
 
 ## True when everyone can still get about: nobody is cut off (see `cut_off`).
