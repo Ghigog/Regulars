@@ -59,7 +59,6 @@ const DISCOUNT_BELOW := 0.5   # half price can be offered once a guest is this i
 const ORDER_PATIENCE_SCALE := 0.8   # waiting to order drains patience 1.25x as fast as waiting for food
 const ORDER_RELIEF := 0.1           # patience back when the chef comes over and takes the order
 const ORDER_HANDS_FREE := true      # the chef needs empty hands to take an order
-const BOOTH_DELIGHT := 0.08   # a booth's benches are cosier than chairs
 const SOUNDS := {  # name -> volume in dB
 	"pickup": -5.0, "putdown": -5.0, "ding": -1.7, "serve": -3.0, "coin": -4.0, "fail": -3.0, "burn": 0.5,
 	"day": -4.0, "wash": -6.0, "step": -16.0, "bell": -15.2, "perfect": -4.0, "sizzle": -10.0,

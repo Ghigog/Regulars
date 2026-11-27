@@ -3,6 +3,8 @@ extends RefCounted
 ## Guests: parties spawned and their orders planned, the board read, the queue, seating,
 ## what they notice around them, floor dirt each frame and the gross sources.
 
+const SEAT_THOUGHT_CHANCE := 0.5   # how often a Fast or Comfortable seat prompts a thought
+
 var game: Game
 
 
@@ -230,11 +232,7 @@ func _seat_waiting_guests() -> void:
 
 
 func on_seated(g: Guest) -> void:
-	var seat: Station = game.stations.get(g.seat)   # comfort is the guest's own seat's
-	if seat != null and seat.type == "chair" and seat.tier > 1:
-		g.mood.delight(0.05 * (seat.tier - 1), "What a lovely table")
-	if seat != null and seat.type == "booth_seat":
-		g.mood.delight(Game.BOOTH_DELIGHT, "A booth! How cosy")
+	_apply_seat_effects(g)
 	for other in game.tables.seats_of(g.table):
 		if other != g.seat and game.seat_taken.has(other):
 			var mate: Guest = game.seat_taken[other]
@@ -245,6 +243,30 @@ func on_seated(g: Guest) -> void:
 	if game.paying.party_at(g.table).all(func(o: Guest) -> bool: return o.state != "to_seat"):
 		# The whole party is down: a knock on the table, they are ready to order.
 		game.get_tree().create_timer(0.6).timeout.connect(game.audio.sfx.bind("order_ready", 0.04))
+
+
+## The chair's and its table's effects on this guest (Seating), kept on the guest and the mood.
+## Comfortable joy is the chair's own, so a booth is cosy through it and nothing is doubled.
+func _apply_seat_effects(g: Guest) -> void:
+	var chair: Station = game.stations.get(g.seat)
+	var half := game.tables.half_of_seat(g.table, g.seat)
+	g.seat_fx = Seating.combine(_piece_effect(chair), _piece_effect(half))
+	g.mood.seat_tolerance = g.seat_fx.tolerance
+	g.mood.seat_tip = g.seat_fx.tip
+	if g.seat_fx.joy > 0.0:
+		g.mood.delight(g.seat_fx.joy, "A booth! How cosy" if chair.type == "booth_seat" else "What a lovely table")
+	if randf() < SEAT_THOUGHT_CHANCE:
+		if g.seat_fx.eat < 1.0:
+			g.mood.think("Grab and go")
+		elif g.seat_fx.eat > 1.0:
+			g.mood.think("Nice to sit a while")
+
+
+func _piece_effect(st: Station) -> Dictionary:
+	if st == null:
+		return Seating.neutral()
+	var key := "%s%s%d" % [st.type, Upgrades.TIER_SEP, st.tier]
+	return Seating.piece_effect(Upgrades.seat_path(key), Upgrades.seat_steps(key))
 
 
 ## Everything a seated guest can see changes how they feel.
