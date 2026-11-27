@@ -26,14 +26,20 @@ func prompt_for(st: Station, ch: Player = null) -> String:
 	return use_station(st, true, ch)
 
 
+## What a hob says when it takes raw food of each heat job.
+const HOB_VERBS := {"grill": "Grill", "fry": "Fry", "boil": "Boil"}
+
+
 ## Which tool's way of working a station is used as right now (PRD 8.3): a heat tool
 ## works as the tool of what is cooking on it, or of the raw thing in hand when it can
-## cook that at all (a stove that fries works as a fryer). Others as themselves.
+## cook that at all (a hob never changes: it cooks every job itself). Others as themselves.
 func _use_as(st: Station, held_ing: Dictionary) -> String:
 	if Station.is_table(st.type):
 		return "table"   # a fast or comfortable table is used as a table
 	if not st.is_heat_tool():
 		return st.type
+	if st.type == "stove":
+		return "stove"   # a hob cooks every job in its own pan and never changes
 	if st.heat != "":
 		return st.mode()
 	if not held_ing.is_empty() and held_ing.state == "raw" and st.item == "":
@@ -154,22 +160,32 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				ch.set_held("")
 	match _use_as(st, held_ing):
 		"stove":
-			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "grill":
-				act = "Grill"
+			# A hob: every heat job it can do cooks in its one pan (grill, fry, boil).
+			var job := Pantry.tool_of(held_ing.id) if not held_ing.is_empty() else ""
+			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and HOB_VERBS.has(job) and st.q(job) > 0.0:
+				act = HOB_VERBS[job]
 				if not dry_run:
 					st.set_item(held)
 					st.set_meta("used_by", game.chefs.find(ch))
 					ch.set_held("")
+			elif held == "" and st.heat == "boil" and st.item.begins_with("raw"):
+				why = "Still boiling"
 			elif held == "" and st.item != "":
-				act = "Take off the heat"
+				act = "Take out" if st.heat == "boil" else "Take off the heat"
 				if not dry_run:
 					var p := Tray.parse(st.item)
-					var res := Prep.grill(st.cook, st.q("grill"))
-					ch.set_held(Tray.kind(res.state, p.id), res.quality)
-					st.set_item("")
-					game.prep_games._prep_done(game.chefs.find(ch), st, "grill", res.result)
+					if st.heat == "boil":
+						ch.set_held(st.item, Prep.PLAIN)
+						game.floor_dirt.prep_grease("boil", "plain", ch.cell(), st)
+						st.set_item("")
+					else:
+						var done_job := "fry" if st.heat == "fry" else "grill"
+						var res: Dictionary = (Prep.fry if done_job == "fry" else Prep.grill).call(st.cook, st.q(done_job))
+						ch.set_held(Tray.kind(res.state, p.id), res.quality)
+						st.set_item("")
+						game.prep_games._prep_done(game.chefs.find(ch), st, done_job, res.result)
 			elif not held_ing.is_empty() and st.item == "":
-				why = "%s doesn't go on the grill" % Pantry.name_of(held_ing.id)
+				why = "%s doesn't go on the hob" % Pantry.name_of(held_ing.id)
 			elif not held_ing.is_empty() and game.chefs.size() > 1 and int(st.get_meta("used_by", -1)) not in [-1, game.chefs.find(ch)]:
 				why = "Chef %d has it" % (int(st.get_meta("used_by", 0)) + 1)   # co-op: the losing press says who won
 		"fryer":
@@ -412,7 +428,7 @@ func _finish_use(st: Station, r: Array, dry_run: bool, ch: Player) -> String:
 		st.used()
 		if act == "Wash":
 			pass   # the hold makes the sound when the dish is clean
-		elif act == "Grill":
+		elif act == "Grill" or act == "Fry" and st.type == "stove":
 			game.audio.sfx("grill_drop")
 		elif act == "Take off the heat":
 			game.audio.sfx("patty_flip")   # the spatula under the patty

@@ -8,7 +8,6 @@ extends RefCounted
 ## Tool quality: the minigame's difficulty. All tunable.
 const BASE := 1.0             # a base tool at its own job
 const STAND_IN := 0.6         # a tool at a job it can do, but is not for
-const STAND_IN_FAR := 0.4     # a specialist's leftover stand-in (stock pot, fryer at grill)
 const EFFICIENT_STEP := 0.15  # what an efficient step adds to every job of its parent
 const SPECIALIST := 1.6       # a specialist at its one job
 
@@ -56,19 +55,19 @@ const NODES := {
 	"blender": {"name": "Blender", "fit": "top", "price": 150, "parent": "juicer", "step": SPECIALIST_STEP,
 		"jobs": {"blend": SPECIALIST, "juice": STAND_IN}},
 	# Heat
-	"stove": {"name": "Stove", "fit": "top", "price": 50,
-		"jobs": {"grill": BASE, "boil": STAND_IN, "fry": STAND_IN}},
+	"stove": {"name": "Hob", "fit": "top", "price": 50,
+		"jobs": {"grill": BASE, "fry": BASE, "boil": BASE}},
 	"range": {"name": "Range", "fit": "top", "price": 80, "parent": "stove", "step": EFFICIENT},
 	"two_hob_range": {"name": "Two-hob range", "fit": "top", "price": 130, "parent": "range", "step": EFFICIENT,
 		"pans": 2},
 	"char_grill": {"name": "Char grill", "fit": "top", "price": 110, "parent": "stove", "step": SPECIALIST_STEP,
 		"jobs": {"grill": SPECIALIST}, "tags": ["smoky"]},
 	"pot": {"name": "Stock pot", "fit": "top", "price": 60, "parent": "stove", "step": SPECIALIST_STEP,
-		"jobs": {"boil": SPECIALIST, "grill": STAND_IN_FAR}},
+		"jobs": {"boil": SPECIALIST}},
 	"steamer": {"name": "Steamer", "fit": "top", "price": 100, "parent": "pot", "step": SPECIALIST_STEP,
 		"jobs": {"steam": SPECIALIST}},
 	"fryer": {"name": "Fryer", "fit": "top", "price": 70, "parent": "stove", "step": SPECIALIST_STEP,
-		"jobs": {"fry": SPECIALIST, "grill": STAND_IN_FAR}},
+		"jobs": {"fry": SPECIALIST}},
 	"twin_fryer": {"name": "Twin fryer", "fit": "top", "price": 120, "parent": "fryer", "step": EFFICIENT,
 		"pans": 2},
 	# Pour: a dispenser stores its own drinks and needs no slot.
