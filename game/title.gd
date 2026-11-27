@@ -90,6 +90,7 @@ func show_main() -> void:
 		_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_note.modulate.a = 0.75
 	_add_button(_box, "New Game" if not saved.is_empty() else "Play", "play")
+	_add_button(_box, "Practice", "practice")
 	_add_button(_box, "Settings", "settings")
 	if can_quit():
 		_add_button(_box, "Quit", "quit")
@@ -204,6 +205,8 @@ func press_id(id: String) -> void:
 			hud.game.session.continue_game()
 		"play":
 			hud.game.session.play()
+		"practice":
+			hud.game.session.practice()
 		"settings":
 			hud.options_ui.toggle_options()
 		"quit":

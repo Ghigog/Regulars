@@ -54,6 +54,26 @@ func start_day() -> void:
 	if game.phase == Game.Phase.CLOSED:
 		return
 	game.session.save_night()   # Continue comes back to this night as built, before the day changes anything
+	open_room()
+	game.desk._clear_applicants()
+	game.ledger.pay_stock(game.menu_stock.night_cost())   # the door checked it can be paid (tests may skip the door)
+	game.floor_dirt.mess.treat = game.menu_stock.treat_active()   # tonight's laying lasts the day (PRD 9.5)
+	game.floor_dirt.mess.extractor = game.kitchen.has_extractor()
+	game.clean_kit.start_day()
+	game.floor_dirt.redraw()
+	game.desk.pay_staff()
+	game.menu_board.refresh(game.menu_stock.tonight_menu())
+	var line := _roll_arrivals()
+	game.crew.start_day()   # staff at work today walk in as the door opens (PRD 10.6)
+	game.audio.play_music("day")
+	game.hud.day_ui.show_banner("Day %d" % game.ledger.day)
+	game.hud.day_ui.say(line)
+	game.audio.sfx("day")
+
+
+## The room as service finds it, day or practice: chefs' hands emptied and on legal cells,
+## the door open, the clock at 0, the cards and the build HUD put away.
+func open_room() -> void:
 	game.ready_chefs.clear()
 	for ch in game.chefs:
 		if ch.hand.get("moving", false):
@@ -71,16 +91,12 @@ func start_day() -> void:
 	set_door(true)
 	game.hud.close_menu()
 	game.desk.close_desk()
-	game.desk._clear_applicants()
 	game.hud.receipt_ui.hide_card()
 	game.hud.hide_build()
-	game.ledger.pay_stock(game.menu_stock.night_cost())   # the door checked it can be paid (tests may skip the door)
-	game.floor_dirt.mess.treat = game.menu_stock.treat_active()   # tonight's laying lasts the day (PRD 9.5)
-	game.floor_dirt.mess.extractor = game.kitchen.has_extractor()
-	game.clean_kit.start_day()
-	game.floor_dirt.redraw()
-	game.desk.pay_staff()
-	game.menu_board.refresh(game.menu_stock.tonight_menu())
+
+
+## Rolls today's guests into `arrivals`; returns the line that says how many are coming.
+func _roll_arrivals() -> String:
 	game.town.new_day()
 	game.perfect_streak = 0
 	var coming := game.town.roll_guests(game.ledger.day, game.critic.visit_boost(game.ledger.day), Town.FLYER_GUESTS if game.flyers_out else 0)
@@ -100,11 +116,7 @@ func start_day() -> void:
 		game.arrivals.append({"time": t, "group": groups[i]})
 	if critic_day:
 		_book_critic(game.critic.arrival_time(day_length()))
-	game.crew.start_day()   # staff at work today walk in as the door opens (PRD 10.6)
-	game.audio.play_music("day")
-	game.hud.day_ui.show_banner("Day %d" % game.ledger.day)
-	game.hud.day_ui.say(("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else ""))
-	game.audio.sfx("day")
+	return ("%d guests expected today." % coming.size()) + (" The flyers worked." if flyered else "")
 
 
 ## Puts the critic in today's arrivals at `time`, in order. Nothing shows it.
@@ -280,7 +292,7 @@ func door_action(ch: Player = null) -> String:
 		return ""
 	if game.phase == Game.Phase.BUILD and ch.hand.is_empty() and game.shopper != ch:
 		return "Open up"
-	if game.phase == Game.Phase.SERVICE and game.door_open and day_progress() >= Game.CLOSE_EARLY_FROM:
+	if game.phase == Game.Phase.SERVICE and not game.practice and game.door_open and day_progress() >= Game.CLOSE_EARLY_FROM:
 		return "Close early"
 	return ""
 

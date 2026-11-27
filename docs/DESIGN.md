@@ -14,6 +14,10 @@ their bill at the till and take the money.
 Survive as many days as you can; three walkouts in one day ends the run.
 
 - Direct control of one chef (WASD, E/Space).
+- **Practice.** The title's Practice button opens the starter kitchen in service with no
+  guests, in the current theme: no stock paid, no save, no day, money or reputation
+  touched, no "Close early". It never ends by itself; the pause menu's "End practice"
+  goes straight back to the title.
 - **Ingredients** (PRD 1, `sim/pantry.gd`). Two themes of nine each. Diner: bun,
   patty, lettuce, tomato, onion, cheese, fries, corn cob, soda. Seaside: bread roll,
   fish fillet, calamari, lemon, courgette, pepper, new potatoes, green beans, white
