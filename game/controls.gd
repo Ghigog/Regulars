@@ -39,13 +39,13 @@ const USE_R := 66.0
 ## What each action is called on screen, per mode.
 const GLYPHS := {
 	"keys": {"move": "WASD", "aim": "Shift", "reach": "Alt", "use": "E", "back": "Esc", "turn": "R", "sell": "C", "shop": "Tab",
-		"prev": "Z", "next": "X", "buy": "Space", "undo": "Ctrl+Z",
+		"prev": "Z", "next": "X", "buy": "Space", "undo": "Ctrl+Z", "redo": "Ctrl+Y",
 		"confirm": "Enter", "town": "T", "options": "O", "search": "F", "browse": "Arrows", "menu": "N"},
 	"pad": {"move": "Stick", "aim": "LT", "reach": "RT", "use": "A", "back": "B", "turn": "RS", "sell": "X", "shop": "Y",
-		"prev": "LB", "next": "RB", "buy": "Y", "undo": "LS",
+		"prev": "LB", "next": "RB", "buy": "Y", "undo": "LS", "redo": "",
 		"confirm": "A", "town": "Y", "options": "Start", "search": "", "browse": "D-pad", "menu": "Back"},
 	"touch": {"move": "Joystick", "aim": "Aim", "reach": "Reach", "use": "Use", "back": "Back", "turn": "Turn", "sell": "Sell", "shop": "Shop",
-		"prev": "", "next": "", "buy": "Tap it again", "undo": "Undo",
+		"prev": "", "next": "", "buy": "Tap it again", "undo": "Undo", "redo": "Redo",
 		"confirm": "Tap", "town": "Tap", "options": "Menu", "search": "", "browse": "Swipe", "menu": "Dishes"},
 }
 ## The keyboard's actions. WASD and the arrows also walk (read in move()).
@@ -164,8 +164,11 @@ func _offer_join(source: String) -> void:
 
 
 func glyph(action: String, p := 0) -> String:
-	if action == "undo" and players[p].mode == "keys" and OS.get_name() == "macOS":
-		return "⌘Z"
+	if players[p].mode == "keys" and OS.get_name() == "macOS":
+		if action == "undo":
+			return "⌘Z"
+		if action == "redo":
+			return "⇧⌘Z"
 	return GLYPHS[players[p].mode].get(action, "")
 
 
@@ -313,6 +316,9 @@ func _input(event: InputEvent) -> void:
 ## search box) has had the chance to keep them.
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed) or event.physical_keycode == KEY_TAB:
+		return
+	if event.is_command_or_control_pressed() and ((event.physical_keycode == KEY_Z and event.shift_pressed) or event.physical_keycode == KEY_Y):
+		press("keys", "redo", true, null, event.echo)   # Ctrl+Shift+Z or Ctrl+Y, Cmd+Shift+Z on a Mac
 		return
 	if event.physical_keycode == KEY_Z and event.is_command_or_control_pressed():
 		press("keys", "undo", true, null, event.echo)   # Ctrl+Z, Cmd+Z on a Mac; plain Z stays "prev"
