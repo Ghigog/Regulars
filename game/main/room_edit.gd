@@ -355,6 +355,9 @@ func build_action(ch: Player = null) -> String:
 			var c := Grid.to_cell(_hover_point(ch))
 			var why := game.kitchen.store_refusal(c, ch.hand.id) if game.kitchen.slots(c) > 0 else ""
 			return why if why != "" else "Put in"
+		var over := game.placing.snap(_hover_point(ch), ch)
+		if game.placing.stack_target(Vector2i(over.x, over.y), ch) != null and game.placing.can_place(over, ch):
+			return "Make tall fridge"
 		return "Hang" if game.world.hand_layer(ch) == "high" else "Put down"
 	var kit := _kit_action(ch)
 	if kit != "":

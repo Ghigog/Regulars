@@ -14,6 +14,7 @@ const NEEDS_FRIDGE := "That box needs a fridge"
 const NO_SEATS: Array[Vector2i] = []   # the extra cells a piece needs beside its own: none now
 const NEEDS_FREEZER := "That box needs a freezer"
 const BOX_NEEDS_COUNTER := "That box needs a counter"
+const TALL_NEEDS_WALL := "A tall fridge needs the wall above clear. Take down what hangs there first."
 const NO_WALL := "Nothing to hang it on here"
 
 
@@ -498,6 +499,20 @@ static func _no_storage_refusal(box: String) -> String:
 	return NEEDS_FRIDGE if Kitchen.is_chilled(box) else BOX_NEEDS_COUNTER
 
 
+## The fridge standing at `cell` that the carried fridge would stack onto, or null. Only a bare
+## under-counter fridge lifted from the room stacks (not one new from the shop), and not on
+## the cell it came from.
+func stack_target(cell: Vector2i, ch: Player) -> Station:
+	var h := ch.hand
+	if not h.get("moving", false) or not (h.get("node") is Station) or Vector2i(h.from.x, h.from.y) == cell:
+		return null
+	var carried: Station = h.node
+	if carried.type != "counter" or carried.base != "fridge" or h.get("layer", "") == "high":
+		return null
+	var st: Station = game.stations.get(cell)
+	return st if st != null and st.base == "fridge" and not st.high else null
+
+
 ## Why the piece in hand cannot go at this spot, in a line for the player; "" when it fits.
 ## A moving piece always fits the spot it came from (`place` turns it back if it must), unless
 ## `strict`, which judges that spot like any other (for trying a turn there).
@@ -541,6 +556,11 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 	if ch.hand.id == "till":   # on a counter, or a tool standing on one
 		return "" if game.paying._till_host(cell) != null else NEEDS_COUNTER
 	var hn := GameWorld.hand_node(ch.hand)
+	var under := stack_target(cell, ch)
+	if under != null:   # an existing fridge on a bare one: the two become a tall fridge
+		if under.type != "counter":
+			return TAKEN
+		return TALL_NEEDS_WALL if game.kitchen.get_piece(cell, "high") != "" else ""
 	if Kitchen.can_go_high(hn):   # the wall layer (PRD 8.5): it hangs on a wall or not at all
 		return "" if game.world.layer_for(cell, hn) == "high" else NO_WALL
 	elif Kitchen.is_tall(hn) and game.kitchen.get_piece(cell, "high") != "":
@@ -641,6 +661,9 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		_after_building(ch)
 		return true
 	var cell := Vector2i(spot.x, spot.y)
+	if ch.hand.get("moving", false) and stack_target(cell, ch) != null:
+		_merge_fridges(ch, cell)
+		return true
 	if ch.hand.get("moving", false):
 		var back: bool = spot == ch.hand.from and place_refusal(spot, ch, true) != ""
 		var facing := int(ch.hand.from_facing) if back else _seat_facing(ch.hand.id, cell, int(ch.hand.facing))
@@ -689,6 +712,26 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 	game.audio.sfx("putdown")
 	_after_building(ch)
 	return true
+
+
+## The carried fridge becomes one with the fridge standing at `cell`: a tall fridge in place,
+## which cannot come apart. Nothing is charged; what was spent tonight on both carries over.
+func _merge_fridges(ch: Player, cell: Vector2i) -> void:
+	var h := ch.hand
+	var st: Station = game.stations[cell]
+	var spent := spent_tonight(h.node)
+	st.set_base(Kitchen.stacks_into(st.base))
+	game.kitchen.set_cell(cell, st.base)
+	(h.node as Node).queue_free()
+	_restock(h, cell)
+	_bought_tonight(st, spent)
+	game.world._show_boxes(cell)
+	game.undo.clear()   # earlier steps name the freed fridge
+	ch.hand = {}
+	game.audio.burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
+	game.audio.sfx("putdown")
+	game.hud.day_ui.say("The fridges are a tall fridge now. It won't come apart: sell it to be rid of it.")
+	game.hud.hints_ui.show_build()
 
 
 ## A seat set down beside a Table tile turns to face it (unless it already does); any other

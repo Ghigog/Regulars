@@ -146,6 +146,8 @@ const CATALOG_IDS := {}
 ## A double counter comes only from the counter's upgrade tree; a counter cannot go on a
 ## counter. Old saves may hold one made by hand: it still comes apart one counter at a time.
 const UNSTACKS := {"double_counter": "counter"}
+## An existing fridge put on another one becomes this, for good: it only sells, never splits.
+const STACKS := {"fridge": "tall_fridge"}
 ## Tools not sold in the shop: each grows from a bare counter, a branch of the counter's
 ## tree, and is a tree of its own after that. Buying one stands it on the counter, which
 ## stays under it, so its step costs the tool's whole price.
@@ -321,6 +323,11 @@ static func is_top(catalog_id: String) -> bool:
 static func is_counter(catalog_id: String) -> bool:
 	var n := node_of(catalog_id)
 	return n != "" and fit_of(n) == "counter"
+
+
+## What two of this base make when one is put on the other ("" if they do not stack).
+static func stacks_into(base: String) -> String:
+	return str(STACKS.get(base, ""))
 
 
 ## What a stacked base leaves behind when one piece comes off it ("" if it is not stacked).
