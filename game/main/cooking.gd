@@ -22,7 +22,7 @@ func prompt_for(st: Station, ch: Player = null) -> String:
 			"saw": "Press at the end", "juice": "Let go on the green",
 			"blend": "Pulse %d times, don't spill" % Prep.BLEND_PULSES, "steam": "Lift the lid on the green"}.get(s.tool, "")
 	if _wash_hold.has(ch) and _wash_hold[ch].st == st:
-		return "Washing %d%%" % clampi(int(float(_wash_hold[ch].t) / WASH_HOLD * 100.0), 0, 100)
+		return "Washing %d%%" % clampi(int(float(_wash_hold[ch].t) / wash_hold(st) * 100.0), 0, 100)
 	return use_station(st, true, ch)
 
 
@@ -692,6 +692,11 @@ const WASH_BEAT := 0.45  # seconds between scrubs of the arm
 var _wash_hold := {}     # Player -> {st: Station, t: seconds held, punch: seconds to the next scrub}
 
 
+## Seconds of held Wash to bring one dish clean at this sink: halved by a sponge on or beside it.
+func wash_hold(st: Station) -> float:
+	return WASH_HOLD * CleanTools.wash_factor(game.clean_kit.sponge_near(st))
+
+
 func _tick_wash(ch: Player, held: bool, delta: float) -> void:
 	if not _wash_hold.has(ch):
 		return
@@ -706,7 +711,7 @@ func _tick_wash(ch: Player, held: bool, delta: float) -> void:
 		w.punch = WASH_BEAT
 		ch.punch()   # the scrubbing arm
 		game.audio.burst(st.global_position + Vector3(0, 1.0, 0), "bubbles", 0.15)
-	if float(w.t) >= WASH_HOLD:
+	if float(w.t) >= wash_hold(st):
 		_wash_hold.erase(ch)
 		ch.take_dish(wash_one(st))
 		game.audio.sfx("wash")

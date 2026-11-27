@@ -15,8 +15,17 @@ func _stand_at_block() -> void:
 	game.player.look(Vector2i(-1, 0))
 
 
+func _go_out() -> void:
+	game.player.position = Grid.center(Vector2i(-4, 1))
+
+
+func _go_in() -> void:
+	game.player.position = Grid.center(Vector2i(2, 3))
+
+
 func test_build_phase_draws_the_edge_and_every_buyable_block():
 	game.phase = Game.Phase.BUILD
+	_go_out()
 	var root := _view()
 	assert_not_null(root)
 	var plus := 0
@@ -31,6 +40,7 @@ func test_build_phase_draws_the_edge_and_every_buyable_block():
 
 func test_day_phase_draws_nothing():
 	game.phase = Game.Phase.BUILD
+	_go_out()
 	_view()
 	game.phase = Game.Phase.SERVICE
 	assert_null(_view())
@@ -62,3 +72,44 @@ func test_without_the_money_nothing_is_bought_and_a_line_says_why():
 	assert_false(game.lot.blocks.has(BLOCK))
 	assert_eq(game.ledger.money, 100)
 	assert_true(game.hud.toast.text.contains("$150"))
+
+
+func test_overlay_is_hidden_while_the_only_chef_is_on_the_floor():
+	game.phase = Game.Phase.BUILD
+	_go_in()
+	assert_true(game.plan.has_floor(Grid.to_cell(game.player.position)))
+	assert_null(_view())
+
+
+func test_overlay_shows_when_a_chef_walks_out_and_hides_when_back_in():
+	game.phase = Game.Phase.BUILD
+	_go_in()
+	assert_null(_view())
+	_go_out()
+	assert_not_null(_view())
+	_go_in()
+	assert_null(_view())
+
+
+func test_a_chef_inside_facing_a_block_gets_none():
+	game.phase = Game.Phase.BUILD
+	game.player.position = Grid.center(Vector2i(2, 3))
+	game.player.look(Vector2i(-1, 0))
+	assert_eq(game.lot_view.block_for(game.player), Vector2i.MAX)
+	_go_out()
+	game.player.position = Grid.center(Vector2i(-5, -1))
+	assert_ne(game.lot_view.block_for(game.player), Vector2i.MAX)
+
+
+func test_with_two_chefs_one_outside_is_enough():
+	game.phase = Game.Phase.BUILD
+	_go_in()
+	var second := Player.new()
+	game.add_child(second)
+	second.position = Grid.center(Vector2i(-4, 1))
+	game.chefs.append(second)
+	assert_not_null(_view())
+	second.position = Grid.center(Vector2i(2, 3))
+	assert_null(_view())
+	game.chefs.erase(second)
+	second.queue_free()
