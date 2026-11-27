@@ -25,7 +25,7 @@ func test_a_pair_of_two_takes_the_lone_table_before_a_joined_pair():
 func test_a_pair_of_two_takes_a_joined_pair_when_nothing_else_is_free_and_it_is_all_theirs():
 	var t := _room([Vector2i(6, 1), Vector2i(6, 2)])
 	var party: Array[Guest] = game.seating.spawn_group([0, 1])
-	var next: Guest = game.seating.spawn_guest(5)
+	var next: Guest = _spawn_joining(5)   # the line is not empty: pin its roll to "joins"
 	_run(14.0)
 	assert_eq(party[0].table, t[0], "the lead half")
 	assert_eq(next.state, "queue", "nobody else sits at either half")
@@ -49,7 +49,7 @@ func test_a_group_of_four_fills_a_joined_pair_two_chairs_each_half_with_own_tier
 func test_a_run_of_three_seats_four_at_its_pair_and_two_at_the_leftover():
 	var t := _room([Vector2i(6, 1), Vector2i(6, 2), Vector2i(6, 3)])
 	var four: Array[Guest] = game.seating.spawn_group([0, 1, 2, 3])
-	var two: Array[Guest] = game.seating.spawn_group([4, 5])
+	var two: Array[Guest] = _spawn_group_joining([4, 5])   # the four are still in line: pin the roll to "joins"
 	_run(16.0)
 	assert_eq(four[0].table, t[0])
 	assert_eq(two[0].table, t[2])
