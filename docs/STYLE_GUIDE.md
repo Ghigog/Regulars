@@ -57,6 +57,7 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- **Use key on prep gauges (T-90).** `HudPrepKey` (`game/hud/prep_key_ui.gd`): one prompt-sized keycap per chef playing a prep minigame, the prompt's `key` sheet holding that chef's Use glyph (E, A or the touch word), placed beside the tool's gauge so it covers neither gauge nor prompt bubble. `GamePrepGames.key_cue` says how it moves: tap tools (chop, saw) press down once while the press is wanted; mash tools (slice, blend) bounce quickly; hold tools (pour, grate, juice) sit pushed down with a small ink bar under them while Use is held and spring up with a `Build.WARN` pop when the fill is in its good band; steam pops in its band. A real press dents the cap (0.9 for 0.08 s). Auto pieces show none. Screenshot: `REGULARS_DEMO=prep_chop` at 2 s.
 - **Loose items drawn 1.2x (T-87, 2026-11-27).** Food, plates, cups, stacks and trays on a station, in a chef's hands, on a guest's table and in tidy-up flight are scaled by `BuildFood.SIZE` (1.2) so they read at 20 px in the close camera. Stations, furniture, pegs and the camera framing keep their size (each piece fills one grid cell); shop previews and station decoration are unchanged.
 - **Single dining pieces (EPIC 85).** *Table tile* (`BuildStationBody._table_tile`): today's slab top with a small bevel on a slim teal pedestal. Tiles that touch draw one continuous top: a joined side runs on past the cell edge so its bevel hides under the neighbour's flat top, and only open sides keep a bevel and overhang. One candle per table, on the tile nearest its middle (offset toward the middle on an even run), not per tile. *Chair* (`BuildStations._chair`, `centred`): coral cushion on dark wood legs, back at 0.9 m, alone on its cell, back away from its table. *Booth seat* (`_booth_seat`): one teal bench with a coral cushion and back on a dark plinth; booth seats side by side facing the same way draw as one long bench, capped only at the open ends. `GameTables.rebuild` hands each tile and booth seat its joined sides with `Station.set_joined`, so placing, lifting or selling a piece redraws its neighbours. Tiers add the gold slab as before.
 - *Undo disc* (`HudButtons`, id `undo`, icon `undo` in `game/icons.gd`): a paper-and-wood disc exactly like Shop and Dishes (same size, same slide-in rustle and tick out), stacked in the right column above the menu (flyer) disc and Shop. It shows only in the build phase, with nothing in hand, while the undo stack (`GameUndo`) has a step. The glyph is a counter-clockwise curved arrow, an open arc with the head at the upper left, so it differs from Back (U-turn band) and Turn (three-quarter ring). Keycap: `Ctrl+Z` (`⌘Z` on a Mac), `LS` on a pad (provisional), none on touch.
@@ -277,6 +278,10 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   the slip icon at its left end, over the table, so the two never read as one another.
 - The bill screen is plain paper, a coral "THE BILL" ribbon and paper buttons; a table
   picked and an item ticked get a coral border, a table whose slip is out is greyed.
+  As built (T-89): the slip is small (400 px wide, courses stacked, ribbon 20, items 16) in the
+  top-right corner, 22 px from the edge like the cork board and guest card, over them while
+  open. There is no dim layer and the room takes input around it, so other chefs keep playing.
+  It pops in from its top-right corner and scrolls its item list if the screen is short.
 - Leaving without paying stamps an open coin purse (coral, the gold clasp swung apart)
   beside the receipt's LEFT UNPAID line, one per party up to five, never a strike mark.
 - Screenshots: `pay_call` (8), `pay_till` (8), `pay_bill` (3), `pay_hand` (3), `pay_wrong`
