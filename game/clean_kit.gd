@@ -1,7 +1,7 @@
 class_name CleanKit
 extends Node3D
 ## Cleaning tools in the room (PRD 9.4): wires sim/clean_tools.gd into the scene. Tools
-## live in homes (a mop bucket, a wall shelf or cabinet), are taken and put back with E, and
+## live in a mop bucket, or are hand tools kept on a wall shelf or in a cabinet; they are taken and put down with E, and
 ## while held fill the chef's hands. E at a dirty cell in front clears a level (held E
 ## repeats at the tool's pace); a dirty tool spreads instead until rinsed at the bucket or
 ## a sink. A tool put down anywhere else lies on the floor, in the way. The robot sweeper
@@ -150,7 +150,9 @@ func show_home(home: Station) -> void:
 		"store":   # centred in its cell, on the shelf's board or the cabinet's floor
 			# Centred in the cell (x = 0, z = 0): on the shelf's plank, or on the cabinet's cornice.
 			var y: float = BuildStations.HIGH_Y0 + (0.93 if home.node == "cabinet" else 0.145)
-			BuildClean.hand_tool(n, home.kit_tool, clean).position = Vector3(0, y, 0)
+			var t := BuildClean.hand_tool(n, home.kit_tool, clean)
+			t.scale = Vector3.ONE * BuildClean.HAND_TOOL_SIZE
+			t.position = Vector3(0, y, 0)
 
 
 # ---------------------------------------------------------------- held tools
@@ -176,7 +178,7 @@ static func hold(ch: Player, tool: String, used: int) -> void:
 # ---------------------------------------------------------------- E at a piece
 
 ## What E does at a piece for cleaning tools, by name ("" for nothing). Holding a tool:
-## put it back in a home with room for it, else rinse it at a bucket or sink. With empty
+## put it down in a home or store with room for it, else rinse it at a bucket or sink. With empty
 ## hands: take the tool kept here (a shelf over another piece only when that piece has nothing to do). With dry_run nothing changes.
 func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 	if st == null:
@@ -197,7 +199,7 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 				keep(home, tool, 0 if CleanTools.rinses(home.type) else used)
 				ch.set_held("")
 				_done(ch, home, "putdown")
-			return "Put %s back" % nm
+			return "Put %s back" % nm if kind_of(home) == "bucket" else "Put %s down" % nm
 		if CleanTools.rinses(st.type) and used > 0:
 			if not dry_run:
 				hold(ch, tool, 0)
