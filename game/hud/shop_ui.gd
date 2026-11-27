@@ -214,7 +214,7 @@ func _card_act_info(bp: Dictionary) -> Dictionary:
 			return {"name": "Upgrades", "blurb": "Its upgrade tree: upgrade the %s where it stands" % what,
 				"price": "Upgrade", "can": true, "locked": false}
 		"box_tree":
-			return {"name": "Upgrade the %s" % Catalog.label(bp).to_lower(), "blurb": "Its tree: a better treatment, kept in its slot",
+			return {"name": "Upgrade the %s" % Catalog.label(bp).to_lower(), "blurb": "Its tree: %s, kept in its slot" % ("Prepared or Marinated" if Upgrades.is_food_box(bp.box) else "a better treatment"),
 				"price": "Upgrade", "can": true, "locked": false}
 		"move":
 			return {"name": "Move", "blurb": "Pick the %s up to carry it somewhere else (or hold E)" % what,

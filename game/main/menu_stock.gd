@@ -218,7 +218,8 @@ func stock_lines() -> Array[Dictionary]:
 	for s: Dictionary in kitchen_stock():
 		if s.get("derived", false):
 			continue   # made from another kind's stock, which is listed
-		out.append({"name": Pantry.name_of(s.ingredient) + (" (ready)" if s.ready else (" (marinated)" if s.get("marinated", false) else "")),
+		var node := " (prepared)" if s.ready else (" (marinated)" if s.get("marinated", false) else "")
+		out.append({"name": Pantry.name_of(s.ingredient) + node,
 			"fee": Pantry.box_fee(Pantry.box_id(s.ingredient, s.ready, s.get("marinated", false)))})
 	var lines := Treatments.night_lines(_laid_on_floor(), game.treat_off, treat_boxed())
 	for k: String in lines:   # floor treatments, re-laid each night (PRD 9.5)
