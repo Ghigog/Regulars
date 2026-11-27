@@ -56,6 +56,31 @@ func test_a_washer_mid_wash_finishes_it_after_the_day_ends():
 	assert_eq(sink.dirty + rack.count, 3, "none lost, and no new dish taken up")
 
 
+func test_a_sink_removed_while_washing_at_night_drops_the_task_and_they_go_home():
+	var h := _day_with(WASHER)
+	var sink: Station = game.world.find_station("sink")
+	_rack(sink)
+	sink.dirty = 3
+	sink.refresh()
+	var n := 0
+	while n < 300 and not (not h.steps.is_empty() and str(h.steps[0].do) == "wash" and h.step_started):
+		game.step(0.1)
+		n += 1
+	assert_lt(n, 300, "the washer started washing")
+	_end()
+	game.phase = Game.Phase.BUILD   # the night's build phase: the sink is sold while they wash
+	sink.dirty = 0   # a messy piece is not sold; the plates are in the washer's hands
+	sink.refresh()
+	assert_true(game.placing.pick_up(Grid.center(sink.cell)), "the sink was lifted")
+	assert_true(game.placing.sell_hand(), "the sink was sold")
+	for i in 600:
+		game.step(0.1)
+		if not game.crew.helpers.has(h):
+			break
+	assert_false(game.crew.helpers.has(h), "they went home")
+	assert_true(h.task.is_empty(), "the wash was dropped")
+
+
 func test_a_food_task_is_dropped_at_nightfall():
 	var h := _day_with(COOK)
 	h.task = {"type": "fetch", "key": "x"}
