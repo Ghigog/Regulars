@@ -47,6 +47,8 @@ var dirty_age := 0.0  # seconds this piece has been messy (see `messy`)
 var seats: Array[Vector2i] = []
 var kit_tool := ""    # a home's cleaning tool kept here ("mop", "sponge"; PRD 9.4), drawn by CleanKit
 var kit_used := 0      # how many levels that tool has cleared since it was last rinsed
+var joined := 0       # a table tile or booth seat: which sides touch a piece it is one with (bit l = FACE[l], world)
+var candle := Vector2.ZERO   # a table tile: where the table's one candle stands, in cells from this tile (world), or INF
 var racked := false   # a sink: a dish rack stands beside it (see piled_at)
 var _item_node: Node3D
 var _stack: Node3D
@@ -162,7 +164,37 @@ func _draw() -> void:
 	if high:
 		BuildStations.wall_piece(_vis, node)
 	else:
-		BuildStations.station(_vis, type, tier, base, pass_look, node)
+		BuildStations.station(_vis, type, tier, base, pass_look, node, _local_sides(), _local_candle())
+
+
+## Tells a table tile or booth seat which sides are joined (world bits, bit f = the
+## neighbour at TableJoins.FACE[f]) and where the table's candle is (Vector2.INF: none),
+## and redraws it when that changed. Placing, lifting or selling a neighbour calls it.
+func set_joined(mask: int, candle_ := Vector2.INF) -> void:
+	if mask == joined and candle_ == candle:
+		return
+	joined = mask
+	candle = candle_
+	if _vis:
+		_draw()
+
+
+## `joined` in the piece's own turned frame, which is what its body is drawn in.
+func _local_sides() -> int:
+	var out := 0
+	for l in 4:
+		if joined & (1 << ((l + facing) % 4)) != 0:
+			out |= 1 << l
+	return out
+
+
+func _local_candle() -> Vector2:
+	var v := candle
+	if v == Vector2.INF:
+		return v
+	for i in facing:
+		v = Vector2(-v.y, v.x)
+	return v
 
 
 ## Hangs this piece in the high layer, or stands it low, and redraws it (PRD 8.5).
@@ -501,7 +533,10 @@ static func is_seat(type_: String) -> bool:
 ## Stands the piece on a cell, turned `facing_` quarter turns.
 func place_at(cell_: Vector2i, facing_: int) -> void:
 	cell = cell_
+	var turned := posmod(facing_, 4) != facing
 	facing = posmod(facing_, 4)
+	if turned and joined != 0 and _vis:   # its joined sides are drawn in its own turned frame
+		_draw()
 	position = Grid.center(cell)
 	_vis.rotation.y = facing * PI / 2
 	if _crates:

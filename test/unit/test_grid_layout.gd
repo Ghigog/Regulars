@@ -57,6 +57,8 @@ func test_closed_in_station_does_not_refuse_a_wall_elsewhere():
 	var st := Vector2i(4, 1)
 	for d in Grid.DIRS:
 		g.blocked[st + d] = true
+	g.blocked[Vector2i(3, 0)] = true   # and both corners
+	g.blocked[Vector2i(3, 2)] = true
 	g.blocked[st] = true
 	var touch := _cells([st])
 	assert_true(g.can_place_wall(Vector3i(2, 1, 0), AREA, DOOR, _cells([]), touch))
@@ -108,3 +110,41 @@ func test_reach_stops_at_a_wall_and_passes_a_doorway_or_door():
 	g.walls.erase(Grid.edge_between(Vector2i(2, 1), Vector2i(3, 1)))
 	assert_true(g.reach_open(Vector2i(2, 1), Vector2i(3, 1)), "through a door edge")
 	assert_false(g.has_los(Vector2i(2, 1), Vector2i(3, 1)), "sight still stops at the door")
+
+
+## A station shut on all four sides is still touched from a flooded diagonal cell.
+func _diagonal_station(blocked_sides: Array) -> Grid:
+	var g := _grid()
+	g.blocked[Vector2i(2, 1)] = true
+	for c in blocked_sides:
+		g.blocked[c] = true
+	return g
+
+
+## Shuts the other diagonals and walls off the corner at (1, 0): nothing reaches (2, 1).
+func _close_corner(g: Grid) -> void:
+	for c in [Vector2i(3, 0), Vector2i(1, 2), Vector2i(3, 2)]:
+		g.blocked[c] = true
+	g.walls[Grid.edge_between(Vector2i(1, 0), Vector2i(2, 0))] = true
+	g.walls[Grid.edge_between(Vector2i(1, 0), Vector2i(1, 1))] = true
+
+
+func test_station_open_only_from_a_diagonal_is_not_cut_off():
+	var g := _diagonal_station([Vector2i(1, 1), Vector2i(3, 1), Vector2i(2, 0), Vector2i(2, 2)])
+	assert_true(g.cut_off(DOOR, _cells([]), _cells([Vector2i(2, 1)])).is_empty())
+
+
+func test_station_is_cut_off_when_walls_close_both_corner_paths():
+	var g := _diagonal_station([Vector2i(1, 1), Vector2i(3, 1), Vector2i(2, 0), Vector2i(2, 2)])
+	_close_corner(g)
+	assert_true(g.cut_off(DOOR, _cells([]), _cells([Vector2i(2, 1)])).has(Vector2i(2, 1)))
+
+
+func test_last_orthogonal_side_is_not_shut_in_while_the_diagonal_stays_open():
+	var g := _diagonal_station([Vector2i(3, 1), Vector2i(2, 0), Vector2i(2, 2), Vector2i(1, 2)])
+	var touch := _cells([Vector2i(2, 1)])
+	var side := Vector2i(1, 1)
+	assert_eq(g.block_refusal(side, _cells([]), AREA, DOOR, _cells([]), touch), "", "(1, 0) is open")
+	g.walls[Grid.edge_between(Vector2i(1, 0), Vector2i(2, 0))] = true
+	g.walls[Grid.edge_between(Vector2i(1, 0), Vector2i(1, 1))] = true
+	assert_eq(g.block_refusal(side, _cells([]), AREA, DOOR, _cells([]), touch), "shut_in")

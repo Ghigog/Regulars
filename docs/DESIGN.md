@@ -854,6 +854,9 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
   leave a path between both street ends, the door and the queue ("That would shut someone in"). An
   outdoor table is counted and seated like an indoor one; guests whose outer-lane step is taken step to
   the nearest open pavement cell.
+- **Built**: a station counts as reachable from a diagonal cell unless walls close the corner, so a
+  piece may fill its last orthogonal side ("That would shut someone in" only when nothing reaches it);
+  helpers stand on a side first, on a diagonal cell only when no side is open.
 - **Built**: floor and wall finishes that cheer seated guests, and movable rugs (section 1).
 - **Built** (PRD 7): themes that change the catalog. **To add**: buying more lot.
 

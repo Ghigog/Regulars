@@ -543,6 +543,47 @@ func test_group_walks_on_only_when_nobody_has_a_main():
 	assert_false(g2.walk)
 	assert_true(g2.orders[0].drink.is_empty(), "sits with nothing")
 	assert_true(Menu.group_order(items, [picky, picky], rng).walk)
+	assert_eq(g.went_along, [], "a pair never goes along")
+
+
+func test_a_picky_member_of_three_usually_goes_along():
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var items := _menu_items()
+	var picky := {"likes": [], "dislikes": ["patty", "lettuce"]}
+	var easy := {"likes": [], "dislikes": []}
+	var only_one := 0
+	for i in 1000:
+		var g := Menu.group_order(items, [easy, picky, picky], rng)
+		assert_false(g.walk)
+		var mains := 0
+		for k in 3:
+			if not g.orders[k].main.is_empty():
+				mains += 1
+		if mains == 1:
+			only_one += 1
+		for k: int in g.went_along:
+			assert_false(g.found_nothing.has(k))
+			var fewest := 99
+			for it: Dictionary in items:
+				if it.course == "main":
+					fewest = mini(fewest, it.ingredients.filter(func(x): return picky.dislikes.has(x)).size())
+			assert_eq(g.orders[k].main.ingredients.filter(func(x): return picky.dislikes.has(x)).size(), fewest)
+	var limit := (1.0 - Menu.GO_ALONG_CHANCE) * (1.0 - Menu.GO_ALONG_CHANCE) + 0.05
+	assert_lte(only_one / 1000.0, limit)
+	assert_true(Menu.group_order(items, [picky, picky, picky], rng).walk, "all picky: still walks")
+
+
+func test_nobody_goes_along_when_two_found_a_main():
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var items := _menu_items()
+	var picky := {"likes": [], "dislikes": ["patty", "lettuce"]}
+	var easy := {"likes": [], "dislikes": []}
+	for i in 50:
+		var g := Menu.group_order(items, [easy, easy, picky], rng)
+		assert_eq(g.went_along, [])
+		assert_eq(g.found_nothing, [2])
 
 
 
