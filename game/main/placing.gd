@@ -58,6 +58,7 @@ func pick_catalog(id: String, tier := 1, ch: Player = null, base := "") -> bool:
 	ch.hand = {"id": id, "tier": tier, "price": Catalog.bp_price(bp), "facing": 0}
 	if base != "":
 		ch.hand.base = base
+	ch.paint_wait = floor_kind(id) != "" and game.controls.holding(game.chefs.find(ch), "use")
 	game.hud.hints_ui.show_build()
 	return true
 
