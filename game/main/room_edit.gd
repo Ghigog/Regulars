@@ -146,6 +146,7 @@ func drag_spots(from: Vector3, to: Vector3, ch: Player = null) -> Array[Vector3i
 func finish_drag(from: Vector3, to: Vector3, remove: bool, ch: Player = null) -> int:
 	ch = game._me(ch)
 	ch.drag = {"from": from, "remove": remove}
+	var before := game.undo.plan_snapshot()
 	var done := 0
 	for spot in drag_spots(from, to, ch):
 		if remove:
@@ -156,6 +157,7 @@ func finish_drag(from: Vector3, to: Vector3, remove: bool, ch: Player = null) ->
 			break
 	ch.drag = {}
 	if done > 0:
+		game.undo.record_plan(before)   # the whole drag is one step
 		_plan_changed()
 		game.audio.sfx("coin" if remove else "putdown")
 		if not remove:
