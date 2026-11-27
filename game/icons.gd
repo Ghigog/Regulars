@@ -449,9 +449,9 @@ static func icon(id: String) -> Array:
 					return rect(p.x, p.y, w, h, t)
 				o.append([at.call(0, 0, 1.0, 1.9), INK])
 				o.append([at.call(0, 0, 0.82, 1.72), CREAM])
-				o.append([at.call(0, 0.58, 0.82, 0.36), CORAL])
+				o.append([at.call(0, -0.58, 0.82, 0.36), CORAL])
 				for i in 3:
-					o.append([at.call(0, 0.0 - i * 0.36, 0.5, 0.1), INK])
+					o.append([at.call(0, -0.08 + i * 0.3, 0.5, 0.1), INK])
 			o.append([rect(0, 0, 0.1, 1.9), INK])
 		"cog":  # options: a toothed wheel with a hub hole
 			o.append([star(0, 0, 0.98, 8, 0.78, PI / 8), INK])
