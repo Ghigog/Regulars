@@ -87,6 +87,41 @@ func cancel_prep(p: int) -> void:
 	game.audio.sfx("putdown")
 
 
+## What the Use key should show for chef `p`'s minigame: "tap" (the press is wanted now),
+## "mash" (keep pressing), "hold" (keep it down), "release" (let go / lift now: the fill is in
+## its good band), "wait" (nothing to do yet), or "" (no minigame, or an auto piece).
+func key_cue(p: int) -> String:
+	var s: Dictionary = game.preps.get(p, {})
+	if s.is_empty() or s.get("auto", false):
+		return ""
+	var holding: bool = game.controls.holding(p, "use")
+	match s.tool:
+		"chop":
+			return "tap" if s.hits.size() == int(s.t / s.sweep) and Prep.chop_hit(_chop_pos(s), s.q) else "wait"
+		"saw":
+			return "tap" if s.hits.size() == int(s.t / s.sweep) and Prep.saw_hit(_chop_pos(s), s.q) else "wait"
+		"slice", "blend":
+			return "mash"
+		"pour":
+			if s.fill >= Prep.pour_good(s.q):
+				return "release"
+			return "hold" if holding else "wait"
+		"juice":
+			if holding and s.fill >= Prep.juice_good(s.q) and s.fill <= Prep.JUICE_TOP:
+				return "release"
+			return "hold" if holding else "wait"
+		"grate":
+			var band := Prep.grate_band(s.q)
+			if s.v >= band.x and s.v <= band.y:
+				return "release"
+			return "hold" if holding else "wait"
+		"steam":
+			var band := Prep.steam_band(s.q)
+			var frac: float = s.t / Prep.steam_time(s.q)
+			return "release" if frac >= band.x and frac <= band.y else "wait"
+	return ""
+
+
 func _chop_pos(s: Dictionary) -> float:
 	return fmod(s.t, s.sweep) / s.sweep
 
