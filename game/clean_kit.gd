@@ -1,7 +1,7 @@
 class_name CleanKit
 extends Node3D
 ## Cleaning tools in the room (PRD 9.4): wires sim/clean_tools.gd into the scene. Tools
-## live in homes (a mop bucket, a wall hook), are taken and put back with E, and
+## live in homes (a mop bucket, a wall shelf or cabinet), are taken and put back with E, and
 ## while held fill the chef's hands. E at a dirty cell in front clears a level (held E
 ## repeats at the tool's pace); a dirty tool spreads instead until rinsed at the bucket or
 ## a sink. A tool put down anywhere else lies on the floor, in the way. The robot sweeper
@@ -9,6 +9,7 @@ extends Node3D
 ## service and at night alike; the rules live in CleanTools.
 
 const PREFIX := "tool:"
+const NO_CHEMICALS := "No chemicals with food"
 ## Pieces a counter-only tool (the sponge) can sit on.
 const COUNTER_TYPES: Array[String] = ["counter", "pass", "sink"]
 
@@ -29,36 +30,40 @@ func setup(game_) -> void:
 # ---------------------------------------------------------------- homes
 
 ## The piece at a cell that keeps a tool: a mop bucket standing there, or, to a chef
-## holding Reach, a hook hung there. Null for none.
+## holding Reach, a wall shelf or cabinet hung there. Null for none.
 func home_at(cell: Vector2i, ch: Player = null) -> Station:
 	var reach: bool = game.card.reaching(ch)
 	var st: Station = game.highs.get(cell) if reach else game.stations.get(cell)
-	if st != null and CleanTools.home_kind(st.type) != "":
+	if st != null and CleanTools.home_kind(st.node) != "":
 		return st
 	return null
 
 
-## What kind of home a piece is: "bucket" or "hook".
+## What kind of home a piece is: "bucket" or "store" (a wall shelf or cabinet).
 func kind_of(home: Station) -> String:
-	return CleanTools.home_kind(home.type)
+	return CleanTools.home_kind(home.node)
 
 
-## A newly bought piece: a mop bucket comes with its mop, a sponge on its hook.
+## A newly bought piece: a mop bucket comes with its mop.
 func on_built(st: Station, bought: String) -> void:
 	var tool := CleanTools.comes_with(bought)
 	if st != null and tool != "":
 		keep(st, tool, 0)
 
 
-## A hook's tool bought up its tree (PRD 9.5): the new tool is kept there, clean. If the
-## old one was out (in someone's hands, on the floor), that one is swapped instead.
+## A shelf's tool bought up its tree (PRD 9.5): the new tool is kept there, clean.
 func upgrade_tool(home: Station, tool: String) -> void:
-	var was := home.kit_tool
-	if was == "":
-		was = CleanTools.comes_with(home.node) if home.node != "hook" else ""
-	if home.kit_tool == "" and _swap_out(was, tool):
-		return
 	keep(home, tool, 0)
+
+
+## Takes the tool off its shelf or out of its cabinet; the piece stays. Returns the tool.
+func take_from(home: Station) -> String:
+	var tool := home.kit_tool
+	home.kit_tool = ""
+	home.kit_used = 0
+	game.kitchen.take_tool(home.cell)
+	show_home(home)
+	return tool
 
 
 ## A bucket bought up its tree is a new piece: its mop (now the new one) goes with it.
@@ -109,10 +114,21 @@ func _homes() -> Array[Station]:
 	return out
 
 
-## Puts a tool in a home (no checks) and draws it there.
+## Hangs a new wall shelf (or `node`, a cabinet) on the wall cell and keeps a tool on it.
+## For demos and tests: no price, no checks beyond the wall.
+func shelve(cell: Vector2i, tool: String, node := "shelf") -> Station:
+	var st: Station = game.world.add_high(node, cell)
+	keep(st, tool, 0)
+	return st
+
+
+## Puts a tool in a home (no checks) and draws it there. A shelf or cabinet also tells
+## the kitchen, whose no-chemicals-with-food rule counts a kept tool.
 func keep(home: Station, tool: String, used: int) -> void:
 	home.kit_tool = tool
 	home.kit_used = used
+	if kind_of(home) == "store":
+		game.kitchen.tools[home.cell] = tool
 	show_home(home)
 
 
@@ -125,14 +141,16 @@ func show_home(home: Station) -> void:
 		return
 	var n := Node3D.new()
 	n.name = "kit_tool"
-	n.rotation.y = home.facing * PI / 2   # turned with the piece: a hook on a side wall faces out
+	n.rotation.y = home.facing * PI / 2   # turned with the piece: a shelf on a side wall faces out
 	home.add_child(n)
 	var clean := CleanTools.cleanness(home.kit_tool, home.kit_used)
 	match kind_of(home):
 		"bucket":
 			BuildClean.bucket_mop(n, clean, home.kit_tool)
-		"hook":
-			BuildClean.hand_tool(n, home.kit_tool, clean).position = BuildClean.hook_spot(BuildStations.HIGH_Y0)
+		"store":   # centred in its cell, on the shelf's board or the cabinet's floor
+			# Centred in the cell (x = 0, z = 0): on the shelf's plank, or on the cabinet's cornice.
+			var y: float = BuildStations.HIGH_Y0 + (0.93 if home.node == "cabinet" else 0.145)
+			BuildClean.hand_tool(n, home.kit_tool, clean).position = Vector3(0, y, 0)
 
 
 # ---------------------------------------------------------------- held tools
@@ -159,8 +177,7 @@ static func hold(ch: Player, tool: String, used: int) -> void:
 
 ## What E does at a piece for cleaning tools, by name ("" for nothing). Holding a tool:
 ## put it back in a home with room for it, else rinse it at a bucket or sink. With empty
-## hands: take the tool kept here (not off a hook at night, where E moves the hook; a hook over another piece only when that piece has
-## nothing to do). With dry_run nothing changes.
+## hands: take the tool kept here (a shelf over another piece only when that piece has nothing to do). With dry_run nothing changes.
 func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 	if st == null:
 		return ""
@@ -169,7 +186,13 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 	if tool != "":
 		var used := held_used(ch)
 		var nm := CleanTools.name_of(tool).to_lower()
-		if home != null and home.kit_tool == "" and CleanTools.fits(kind_of(home), tool):
+		if home != null and kind_of(home) == "store" and CleanTools.fits("store", tool) and game.kitchen.holds_food(home.cell):
+			if not dry_run:   # no chemicals with food (PRD 9.5): the tool stays in hand
+				game.hud.day_ui.say(NO_CHEMICALS)
+				game.audio.sfx("fail")
+			return NO_CHEMICALS
+		if home != null and home.kit_tool == "" and CleanTools.fits(kind_of(home), tool) \
+				and (kind_of(home) != "store" or game.kitchen.tool_refusal(home.cell) == ""):
 			if not dry_run:
 				keep(home, tool, 0 if CleanTools.rinses(home.type) else used)
 				ch.set_held("")
@@ -199,16 +222,12 @@ func station_use(st: Station, dry_run: bool, ch: Player) -> String:
 		return "Take %s" % CleanTools.name_of(kept).to_lower()
 	if ch.held != "" or home == null or home.kit_tool == "":
 		return ""
-	if game.phase == Game.Phase.BUILD and kind_of(home) == "hook":
-		return ""   # at night E lifts the hook to move it; the tool stays on it
 	if home != st and game.cooking._use_station(st, true, ch) != "":
-		return ""   # a hook over a working piece: the piece comes first
+		return ""   # a shelf over a working piece: the piece comes first
 	var what := CleanTools.name_of(home.kit_tool).to_lower()
 	if not dry_run:
 		hold(ch, home.kit_tool, home.kit_used)
-		home.kit_tool = ""
-		home.kit_used = 0
-		show_home(home)
+		take_from(home)
 		_done(ch, home, "pickup")
 	return "Take %s" % what
 

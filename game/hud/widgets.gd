@@ -638,7 +638,7 @@ class ModelView extends TextureRect:
 			var tool := CleanTools.comes_with(str(bp.get("node", bp.id)))
 			if CleanTools.is_mop(tool):   # a bucket up its tree shows the mop it keeps (PRD 9.5)
 				BuildClean.bucket_mop(n, 1.0, tool)
-			if CleanTools.home_kind(bp.id) != "" or bp.id in ["mop_bucket", "robot_dock", "sponge"]:
+			if bp.id in ["mop_bucket", "robot_dock", "sponge"]:
 				n.scale = Vector3.ONE * 1.5   # small floor and wall pieces, shown at a piece's size
 			if bare:   # without its counter it stands 0.9 lower and small: brought up into frame
 				n.scale = Vector3.ONE * 1.7

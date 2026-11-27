@@ -527,7 +527,7 @@ func _update_ghost(ch: Player = null) -> void:
 			else:
 				BuildStations.station(ch.ghost, ch.hand.id, int(ch.hand.tier), "counter" if ch.hand.get("counter", false) else ch.hand.get("base", ""), false, str(ch.hand.get("up", "")))
 			if layer != "" and game.wall_facing.has(cell):
-				_layer_band(ch.ghost, layer, 0 if layer == "high" else int(game.wall_facing[cell]) - int(ch.hand.facing), hn == "hook")
+				_layer_band(ch.ghost, layer, 0 if layer == "high" else int(game.wall_facing[cell]) - int(ch.hand.facing))
 	var p := hover
 	if ch.ghost == null or p == Vector3.INF:
 		ch.no_mark.visible = false
@@ -555,15 +555,12 @@ func _update_ghost(ch: Player = null) -> void:
 ## A pale band on the wall behind a ghost marking the layer it takes (PRD 8.5): the
 ## high band for a hung piece, the low band for a shelf standing low, both for a tall
 ## piece. `turn` is the wall's facing in the ghost's own frame.
-func _layer_band(ghost: Node3D, layer: String, turn: int, small := false) -> void:
+func _layer_band(ghost: Node3D, layer: String, turn: int) -> void:
 	var band := Node3D.new()
 	band.rotation.y = turn * PI / 2
 	ghost.add_child(band)
 	var y0 := BuildStations.HIGH_Y0 if layer == "high" else 0.0
 	var y1 := 0.92 if layer == "base" else BuildStations.HIGH_Y1
-	if small:   # a hook is a small thing low in the band: frame it, not the whole layer
-		y0 = BuildStations.HIGH_Y0 - 0.2
-		y1 = BuildStations.HIGH_Y0 + 0.5
 	y0 -= 0.24   # a margin round the piece, so the band still shows as a frame behind it
 	y1 += 0.24
 	var plate := Build.box(band, Vector3(0, y0, -0.495), Vector3(1.0, y1 - y0, 0.01), Build.GOOD)

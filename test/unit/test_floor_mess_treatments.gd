@@ -158,7 +158,7 @@ func test_the_cleaning_and_hood_trees_are_the_prds():
 		var t := Kitchen.tool_of(n)
 		if t != "":
 			assert_true(CleanTools.TOOLS.has(t), "%s keeps a real tool" % n)
-			assert_eq(CleanTools.TOOLS[t].home, "bucket" if Kitchen.fit_of(n) == "floor" else "hook", n)
+			assert_eq(CleanTools.TOOLS[t].home, "bucket" if Kitchen.fit_of(n) == "floor" else "store", n)
 	assert_eq(Kitchen.tool_of("robot_dock"), "", "the dock keeps the robot, not a hand tool")
 	assert_true(Upgrades.has_tree("mop_bucket") and Upgrades.has_tree("sponge") and Upgrades.has_tree("hood"))
 	assert_eq(Catalog.search("robot").size(), 0, "the robot is bought up the wringer bucket's tree")
@@ -440,21 +440,36 @@ func test_the_wringer_bucket_grows_into_the_robot_sweepers_dock():
 
 
 
-func test_a_hooks_tree_is_its_tools():
+func _open_tree_of_shelf(game, w: Vector2i) -> void:
+	game.player.set_meta("reach", true)
+	assert_true(game.card.open_storage(w))
+	game.card.storage_upgrades()
+	game.player.set_meta("reach", false)
+
+
+func test_a_shelfs_tree_is_its_tools():
 	var game = _game()
 	_night(game)
 	var w := _wall_cell(game)
-	var h: Station = game.world.add_high("hook", w)
-	game.clean_kit.on_built(h, "sponge")
-	assert_true(game.placing.pick_up(Grid.center(w)))
+	var h: Station = game.clean_kit.shelve(w, "sponge")
+	_open_tree_of_shelf(game, w)
 	assert_eq(game.upgrades.hand_key(), "sponge")
-	assert_true(game.upgrades.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "spill_kit"))
+	assert_has(Upgrades.children(game.upgrades.hand_key()), "spill_kit")
 	assert_true(game.upgrades.buy_upgrade("spill_kit"))
 	assert_eq(h.kit_tool, "spill_kit")
+	assert_eq(game.kitchen.tool_at(w), "spill_kit")
 	assert_eq(game.upgrades.hand_key(), "spill_kit")
-	game.session.close_shop()
-	assert_true(game.placing.place(Vector3i(w.x, w.y, 0)))
-	assert_eq((game.highs[w] as Station).kit_tool, "spill_kit")
+	assert_eq(game.highs[w], h, "the shelf stays")
+
+
+func test_an_empty_shelf_offers_its_own_steps():
+	var game = _game()
+	_night(game)
+	var w := _wall_cell(game)
+	game.world.add_high("shelf", w)
+	game.player.set_meta("reach", true)
+	assert_true(game.card.open_storage(w))
+	assert_eq(game.card.storage_tree(), "shelf")
 
 
 
@@ -513,23 +528,25 @@ func test_the_sponge_grows_into_a_mop_bucket_and_then_a_cleaner_in_its_pail():
 	_night(game)
 	game.ledger.money = 500
 	var w := _wall_cell(game)
-	var h: Station = game.world.add_high("hook", w)
-	game.clean_kit.on_built(h, "sponge")
-	assert_true(game.placing.pick_up(Grid.center(w)))
-	assert_true(game.upgrades.strip_choices().any(func(c: Dictionary) -> bool: return c.get("key", "") == "mop_bucket"),
-		"the sponge's strip offers the mop bucket")
+	var h: Station = game.clean_kit.shelve(w, "sponge")
+	_open_tree_of_shelf(game, w)
+	assert_has(Upgrades.children(game.upgrades.hand_key()), "mop_bucket", "the sponge's tree offers the mop bucket")
 	assert_true(game.upgrades.buy_upgrade("mop_bucket"))
+	game.session.close_shop()
+	assert_eq(game.player.hand.id, "mop_bucket", "off the shelf: a bucket in hand")
+	assert_eq(h.kit_tool, "", "the sponge left the shelf")
+	assert_eq(game.highs[w], h, "and the shelf stays where it is")
+	var spot := Vector2i(7, 2)
+	assert_true(game.placing.place(Vector3i(spot.x, spot.y, 0)))
 	assert_eq(game.ledger.money, 500 - Upgrades.step_price("mop_bucket"))
-	var b: Station = game.player.hand.node
-	assert_eq(b.type, "mop_bucket", "off the wall: a bucket in hand")
-	assert_eq(b.kit_tool, "mop", "with its mop")
+	assert_eq((game.stations[spot] as Station).kit_tool, "mop", "with its mop")
+	game.placing.cancel_hand()
+	assert_true(game.placing.pick_up(Grid.center(spot)))
 	var keys: Array = game.upgrades.strip_choices().map(func(c: Dictionary) -> String: return str(c.get("key", "")))
 	assert_has(keys, "sponge_mop", "better mops")
 	assert_has(keys, "cleaner_bucket", "or a liquid in the pail")
 	assert_true(game.upgrades.buy_upgrade("cleaner_bucket"))
 	assert_eq((game.player.hand.node as Station).kit_tool, "cleaner_mop")
 	assert_eq(int(CleanTools.TOOLS.cleaner_mop.levels), FloorMess.MAX_LEVEL, "a whole cell a press")
-	var spot := Vector2i(7, 2)
 	assert_true(game.placing.place(Vector3i(spot.x, spot.y, 0)))
 	assert_eq((game.stations[spot] as Station).kit_tool, "cleaner_mop")
-	assert_false(game.highs.has(w), "the hook is gone")
