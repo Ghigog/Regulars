@@ -19,7 +19,7 @@ func prompt_for(st: Station, ch: Player = null) -> String:
 	if not s.is_empty():
 		return {"chop": "Chop on the notch", "slice": "Slice %d times" % Prep.SLICE_COUNT,
 			"pour": "Let go to stop", "grate": "Hold to grate, keep it green",
-			"saw": "Press at the end of each stroke", "juice": "Squeeze, let go on the green",
+			"saw": "Press at the end", "juice": "Let go on the green",
 			"blend": "Pulse %d times, don't spill" % Prep.BLEND_PULSES, "steam": "Lift the lid on the green"}.get(s.tool, "")
 	if _wash_hold.has(ch) and _wash_hold[ch].st == st:
 		return "Washing %d%%" % clampi(int(float(_wash_hold[ch].t) / WASH_HOLD * 100.0), 0, 100)

@@ -92,6 +92,7 @@ var options_ui := HudOptions.new(self)   # the options screen, the title and the
 var receipt_ui := HudReceipt.new(self)   # the end-of-day receipt and the critic's review
 var hints_ui := HudHints.new(self)   # ready marks, the build notes and the lifted piece's strip
 var board_key_ui := HudBoardKey.new(self)   # the glowing menu key over the board by the door
+var prep_key_ui := HudPrepKey.new(self)   # the Use key beside a prep minigame's gauge, moving as it wants pressing
 var shop_ui := HudShop.new(self)   # the build shop: tabs, cards, info and buying
 var buttons_ui := HudButtons.new(self)   # the discs for every action the keys have, tapped on touch
 var screens_ui := HudScreens.new(self)   # the upgrade tree, the town book and the closed sign
