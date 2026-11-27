@@ -775,22 +775,20 @@ func test_a_meal_with_a_liked_ingredient_says_so():
 
 
 
-func test_dirty_table_disgusts_guests_unless_a_wall_hides_it():
-	game.stations.erase(Vector2i(0, 5))   # no bin, so only the plate is in question
+func test_gross_things_disgust_guests_unless_a_wall_hides_them():
+	var bin: Station = game.stations[Vector2i(0, 5)]
 	var g: Guest = game.seating.spawn_guest(2)
 	_run(12.0)
 	assert_eq(g.state, "ordering")
-	var other: Station = game.stations[Vector2i(6, 5)] if g.table.cell != Vector2i(6, 5) else game.stations[Vector2i(6, 1)]
-	other.dirty = 1
+	bin.count = Station.BIN_HOLDS   # overflowing
 	_run(2.0)
 	var fresh: float = g.mood.disgust
-	assert_lt(fresh, 0.01, "a plate just finished hardly registers")
-	assert_false(g.mood.thoughts.has("Nobody has cleared that table"))
-	other.dirty_age = 40.0
+	assert_lt(fresh, 0.05, "a bin just full hardly registers")
+	bin.dirty_age = 40.0
 	_run(2.0)
 	var seen: float = g.mood.disgust
-	assert_gt(seen - fresh, fresh * 3.0, "one left sitting is far worse")
-	assert_true(g.mood.thoughts.has("Nobody has cleared that table"))
+	assert_gt(seen - fresh, fresh * 3.0, "one left overflowing is far worse")
+	assert_true(g.mood.thoughts.has("The bin is overflowing"))
 	for c: Vector2i in [g.cell, g.cell + Vector2i(1, 0), g.cell + Vector2i(0, 1)]:
 		game.grid.walls[Vector3i(c.x, c.y, 0)] = true
 		game.grid.walls[Vector3i(c.x, c.y, 1)] = true

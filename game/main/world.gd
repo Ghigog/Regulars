@@ -304,6 +304,7 @@ func _register(st: Station) -> void:
 		game.kitchen.set_cell(st.cell, st.base, st.node if Kitchen.is_top(st.type) else "")
 	st.set_wall(false)
 	_refresh_wall(st.cell)
+	_show_boxes(st.cell)
 	_update_racks()
 	game.tables.rebuild()
 
@@ -436,6 +437,7 @@ func is_tall_at(cell: Vector2i) -> bool:
 
 func _unregister(st: Station) -> void:
 	game.stations.erase(st.cell)
+	st.set_boxes([])   # the lifted piece carries no tags of the cell it left
 	game.kitchen.set_cell(st.cell, "")
 	game.grid.blocked.erase(st.cell)
 	game.grid.reserved.erase(st.cell)
