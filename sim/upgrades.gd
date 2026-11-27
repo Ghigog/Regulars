@@ -9,9 +9,12 @@ extends RefCounted
 ## Pure: no scene dependencies.
 
 const TIER_SEP := "@"
-## The chair's tree grows to Chair 2 and 3, or branches into Booth seat 1, 2 and 3.
-const SEAT_TREE_ROOT := "chair"
-const SEAT_BRANCH := "booth_seat"
+## EPIC-87: the chair branches from Chair 1 into Fast (two nodes) and Comfortable (Chair 2,
+## Chair 3, then the Booth seat); the table branches into a fast and a comfortable table.
+const CHAIR_FAST := "chair_fast"
+const BOOTH := "booth_seat"
+const TABLE_FAST := "table_fast"
+const TABLE_COMFY := "table_comfy"
 ## What each job is called in a node's line.
 const JOB_WORDS := {"grill": "grilling", "fry": "frying", "boil": "boiling", "chop": "chopping",
 	"slice": "slicing", "grate": "grating", "saw": "sawing", "juice": "juicing", "blend": "blending",
@@ -31,6 +34,26 @@ static func key_of(id: String, tier := 1, node := "") -> String:
 	if Catalog.ITEMS.has(id) and int(Catalog.ITEMS[id].tiers) > 1:
 		return "%s%s%d" % [id, TIER_SEP, clampi(tier, 1, int(Catalog.ITEMS[id].tiers))]
 	return ""
+
+
+## Which seating branch a chair or table key is on: "fast", "comfortable", or "" for
+## Chair 1, Table 1 and every other piece.
+static func seat_path(key: String) -> String:
+	if not is_tiered(key):
+		return ""
+	match catalog_id(key):
+		CHAIR_FAST, TABLE_FAST: return "fast"
+		BOOTH, TABLE_COMFY: return "comfortable"
+		"chair": return "comfortable" if tier_of(key) > 1 else ""
+	return ""
+
+
+## How many steps along its branch a seating key is (Fast 2 is 2, the Booth seat 3).
+static func seat_steps(key: String) -> int:
+	match seat_path(key):
+		"fast": return tier_of(key)
+		"comfortable": return 3 if catalog_id(key) == BOOTH else (tier_of(key) - 1 if catalog_id(key) == "chair" else 1)
+	return 0
 
 
 static func is_tiered(key: String) -> bool:
@@ -64,7 +87,11 @@ static func parent(key: String) -> String:
 		var t := tier_of(key)
 		if t > 1:
 			return _tier_key(catalog_id(key), t - 1)
-		return _tier_key(SEAT_TREE_ROOT, 1) if catalog_id(key) == SEAT_BRANCH else ""
+		match catalog_id(key):
+			CHAIR_FAST: return "chair@1"
+			BOOTH: return "chair@3"
+			TABLE_FAST, TABLE_COMFY: return "table@1"
+		return ""
 	if is_treatment(key):
 		var up := Treatments.parent(Treatments.key_of(key))
 		return Treatments.box_id(up) if up != "" else ""
@@ -81,8 +108,12 @@ static func children(key: String) -> Array[String]:
 		var out: Array[String] = []
 		if tier_of(key) < int(Catalog.ITEMS[catalog_id(key)].tiers):
 			out.append(_tier_key(catalog_id(key), tier_of(key) + 1))
-		if key == _tier_key(SEAT_TREE_ROOT, 1):
-			out.append(_tier_key(SEAT_BRANCH, 1))   # the chair branches into the booth seat
+		match key:
+			"chair@1": out.append(_tier_key(CHAIR_FAST, 1))
+			"chair@3": out.append(_tier_key(BOOTH, 1))
+			"table@1":
+				out.append(_tier_key(TABLE_COMFY, 1))
+				out.append(_tier_key(TABLE_FAST, 1))
 		return out
 	if is_treatment(key):
 		var kids: Array[String] = []
@@ -110,7 +141,7 @@ static func has_tree(key: String) -> bool:
 ## Kitchen.EFFICIENT, Kitchen.SPECIALIST_STEP, or "" for a root. A tier is efficient.
 static func step(key: String) -> String:
 	if is_tiered(key):
-		return Kitchen.EFFICIENT if tier_of(key) > 1 else ""
+		return Kitchen.EFFICIENT if tier_of(key) > 1 or catalog_id(key) == BOOTH else ""
 	if is_treatment(key):
 		return Treatments.step(Treatments.key_of(key))   # the same words as Kitchen's steps
 	return Kitchen.step_of(key)
@@ -143,6 +174,10 @@ static func level(key: String) -> int:
 
 
 static func name_of(key: String) -> String:
+	if is_tiered(key) and catalog_id(key) == CHAIR_FAST:
+		return "Fast %d" % tier_of(key)
+	if is_tiered(key) and catalog_id(key) == "chair":
+		return "Chair %d" % tier_of(key)
 	if is_tiered(key):
 		return Catalog.label({"id": catalog_id(key), "tier": tier_of(key)})
 	if is_treatment(key):
@@ -219,6 +254,8 @@ static func _lay(key: String, col: int, row: int, out: Dictionary, rows: Array) 
 		if step(k) == Kitchen.EFFICIENT and straight:
 			straight = false
 			_lay(k, col + 1, row, out, rows)
+	if straight and is_tiered(key) and not kids.is_empty():
+		_lay(kids[0], col + 1, row, out, rows)   # a fork of pieces with no efficient step: the first goes on
 	for k: String in kids:
 		if out.has(k):
 			continue
