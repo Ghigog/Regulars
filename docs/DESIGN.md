@@ -303,7 +303,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     pieces, not sets: a Table ($20, one tile, one tier) and a Chair ($10, three tiers, with the booth seat as
     its upgrade). Tiles that touch edge to edge make one table of any shape; the chairs and booth seats beside
     it and facing it are its seats (`TableJoins.tables`, rebuilt by `GameTables.rebuild`, which sets each tile's
-    `Station.seats`). A chair is not blocked (guests walk onto it) but its cell is reserved. The old sets
+    `Station.seats`). A chair is not blocked (guests walk onto it) but its cell is reserved. A seat that faces no table tile can still be placed but is never used, and shows a red disc on the floor (also under a carried seat's ghost). The old sets
     (table for two, booth, table for four, counter stool) are gone from the shop; a lone guest sits at a
     chair at a one-tile table. An old save loads with each set turned into its pieces in the same place. Kitchen: a bin
     ($30, level 2) and a sink ($70, level 3), which are now catalog pieces like any other
