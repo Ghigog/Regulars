@@ -204,6 +204,8 @@ func _show_options_tab(tab: String) -> void:
 	var touch := hud._mode() == "touch"
 	_options_keys.visible = not touch
 	_options_keys.text = "%s choose and change     %s press     %s close" % [hud._g("browse"), hud._g("use"), hud._g("back")]
+	if hud._mode() == "pad":
+		_options_keys.text += "\n%s on another controller: join" % hud._g("options")
 	for row: Control in _options_rows:
 		if row is Button:
 			row.custom_minimum_size.y = 64.0 if touch else 0.0
