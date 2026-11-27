@@ -70,7 +70,7 @@ func leave(p: int) -> bool:
 	for k in game.chefs.size():
 		if game.chefs[k].trim != k:
 			game.chefs[k].set_trim(k)
-	for n: Node3D in [ch.cursor, ch.no_mark, ch.range_marks, ch.ghost, ch.tool_ghost]:
+	for n: Node3D in [ch.cursor, ch.aim_mark, ch.no_mark, ch.range_marks, ch.ghost, ch.tool_ghost]:
 		if n:
 			n.queue_free()
 	game._recolour_cursors()

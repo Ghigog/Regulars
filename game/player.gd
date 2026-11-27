@@ -52,6 +52,7 @@ var range_marks: Node3D           # floor marks for the reach of the piece being
 var range_key := ""
 var cursor: Node3D                # the frame on the station this chef would use
 var cursor_key := ""
+var aim_mark: Node3D             # the faint mark where Aim or Reach points
 
 
 func setup(game_, start: Vector2i, trim_ := 0) -> void:
