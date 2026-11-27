@@ -54,6 +54,18 @@ func _run(seconds: float) -> void:
 
 
 
+## Advances every running tween by `seconds` in fixed steps, with no real frame in between,
+## so animation tests do not depend on how many frames the machine delivers.
+func _step_tweens(seconds: float, dt := 1.0 / 60.0) -> void:
+	var t := 0.0
+	while t < seconds - 0.0001:
+		for tw: Tween in get_tree().get_processed_tweens():
+			if tw.is_valid():
+				tw.custom_step(dt)
+		t += dt
+
+
+
 ## A served guest eats, chats, and is handed the right bill (PRD 11).
 func _eat_and_pay(g: Guest) -> void:
 	_run(g.eat_time + Guest.CHAT_TIME + 0.5)

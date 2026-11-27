@@ -86,7 +86,7 @@ func test_board_glows_in_build_only_and_key_is_prompt_sized():
 	assert_almost_eq(k.cap.size.y, 42.0, 6.0, "no bigger than the chef prompt's old key")
 	game.phase = game.Phase.SERVICE
 	_frame()
-	await wait_seconds(0.6)
+	_step_tweens(0.6)
 	assert_false(game.menu_board.glow.visible, "halo gone in service")
 
 
