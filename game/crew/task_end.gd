@@ -126,11 +126,14 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 				crew.game.cooking.clear_one(st, h)
 			crew.game.audio.sfx("pickup")
 		"to_sink":
-			st.dirty += h.dishes.size()
-			st.dirty_cups += h.dishes.filter(func(d: Dish) -> bool: return d.vessel == Dish.CUP).size()
+			var rest := st.put_in_sink(h.dishes)
 			st.refresh()
-			h.set_held("")
 			crew.game.audio.sfx("putdown")
+			if rest.is_empty():
+				h.set_held("")
+			else:
+				h.set_held("dishes", 1.0, rest, h.on_tray)
+				return [{"do": "stash"}]   # the sink filled: the rest go down on a counter
 		"bin":
 			st.count += 1
 			st.refresh()

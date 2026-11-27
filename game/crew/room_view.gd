@@ -375,11 +375,11 @@ func rack_with_plates() -> Station:
 	return null
 
 
-func _nearest(type: String, near: Vector2i) -> Station:
+func _nearest(type: String, near: Vector2i, with_room := false) -> Station:
 	var best: Station = null
 	var best_d := INF
 	for st: Station in crew.game.stations.values():
-		if st.type != type:
+		if st.type != type or (with_room and st.sink_room() <= 0):
 			continue
 		var d := float(absi(st.cell.x - near.x) + absi(st.cell.y - near.y))
 		if d < best_d:
