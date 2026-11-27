@@ -148,3 +148,17 @@ func test_last_orthogonal_side_is_not_shut_in_while_the_diagonal_stays_open():
 	g.walls[Grid.edge_between(Vector2i(1, 0), Vector2i(2, 0))] = true
 	g.walls[Grid.edge_between(Vector2i(1, 0), Vector2i(1, 1))] = true
 	assert_eq(g.block_refusal(side, _cells([]), AREA, DOOR, _cells([]), touch), "shut_in")
+
+
+func test_chef_roams_outside_cells_only_while_roaming():
+	var g := Grid.new(6, 6)
+	g.outside[Vector2i(1, 1)] = true
+	g.roam[Vector2i(1, 1)] = true
+	g.outside[Vector2i(2, 2)] = true   # not in roam: always shut
+	assert_true(g.chef_blocked(Vector2i(1, 1)))
+	g.roaming = true
+	assert_false(g.chef_blocked(Vector2i(1, 1)))
+	assert_true(g.chef_blocked(Vector2i(2, 2)))
+	assert_true(g.is_blocked(Vector2i(1, 1)), "guests and furniture are not helped")
+	g.blocked[Vector2i(1, 1)] = true
+	assert_true(g.chef_blocked(Vector2i(1, 1)))
