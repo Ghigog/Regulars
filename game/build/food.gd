@@ -509,8 +509,10 @@ static func dish(d: Dish, items: Array = []) -> Node3D:
 		y = 0.015
 	if d.ings.size() == 1 and d.vessel == "":
 		ingredient(n, d.ings[0], "prep")
-		return n
-	_food(n, lay[0], lay[1], y)
+	else:
+		_food(n, lay[0], lay[1], y)
+	if d.any_marinated():
+		glaze(n, y + 0.08 + 0.05 * mini(d.ings.size(), 4))   # on top of the stack
 	return n
 
 
@@ -598,15 +600,26 @@ static func _breaded(ings: Array, have: Array) -> bool:
 	return fillet and crumbs
 
 
+## The mark of a Marinated piece: a faint amber sheen and a few herb flecks on top, at height
+## `y`. Readable at 20 px, small enough not to change the silhouette.
+static func glaze(n: Node3D, y: float) -> void:
+	Build.ball(n, Vector3(0, y, 0), 0.1, "#f2b84a", 0.0, Build.R_GLOSS).scale = Vector3(1.0, 0.12, 0.8)
+	for fleck: Vector3 in [Vector3(-0.06, 0.012, 0.03), Vector3(0.05, 0.012, -0.04), Vector3(0.0, 0.014, 0.0)]:
+		Build.ball(n, Vector3(fleck.x, y + fleck.y, fleck.z), 0.024, Build.LEAF_2)
+
+
 ## Anything that can be carried or put down. `look` overrides the grill look
-## (a stove knows more about what is on it than the item kind says).
-static func item(kind: String, quality := 1.0, look := "") -> Node3D:
+## (a stove knows more about what is on it than the item kind says). `marinated`: it came
+## from a Marinated box, so it wears a glaze.
+static func item(kind: String, quality := 1.0, look := "", marinated := false) -> Node3D:
 	var n := Node3D.new()
 	if look == "":
 		look = look_for(kind, quality)
 	var p := Tray.parse(kind)
 	if not p.is_empty():
 		ingredient(n, p.id, p.state, look)
+		if marinated:
+			glaze(n, 0.14)
 		return n
 	match kind:
 		"tray":
