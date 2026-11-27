@@ -99,6 +99,9 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		game.hud.hints_ui.show_build()
 		return true
 	var st: Station = ch.hand.node
+	if Station.is_seat(st.type) and Upgrades.catalog_id(to) != st.type:
+		_remake_seat(st, to, ch)   # a chair is a booth seat now: same cell, same facing
+		return true
 	if keeps_tool(st) and Kitchen.fit_of(to) == "floor":   # the sponge grows into a mop bucket
 		# The tool leaves the shelf, which stays; the bucket (with its mop) is a new piece in
 		# hand, paid for when it is put down on the floor.
@@ -185,6 +188,26 @@ func _remake_in_place(st: Station, to: String, ch: Player) -> void:
 	st.queue_free()
 	ch.hand.node = up
 	ch.hand.id = up.type
+
+
+## A chair bought into a booth seat: a booth seat on the same cell and facing, in hand or in place.
+func _remake_seat(st: Station, to: String, ch: Player) -> void:
+	var in_place: bool = ch.hand.get("in_place", false)
+	if in_place:
+		game.world._unregister(st)
+	var up := Station.new()
+	game.add_child(up)
+	up.setup(Upgrades.catalog_id(to), st.cell, Upgrades.tier_of(to), st.facing)
+	up.visible = in_place
+	if in_place:
+		game.world._register(up)
+	game.placing._bought_tonight(up, game.placing.spent_tonight(st) + Upgrades.step_price(to))
+	st.queue_free()
+	ch.hand.node = up
+	ch.hand.id = up.type
+	ch.hand.tier = up.tier
+	game.audio.sfx("coin")
+	game.hud.hints_ui.show_build()
 
 
 ## A treatment's box upgraded: the cells laid with the old one are the new one's now.
