@@ -11,6 +11,7 @@ const TAKEN := "Something's already there"
 const KEEP_CLEAR := "Keep that clear for the queue"
 const NEEDS_COUNTER := "Tools go on a counter"
 const NEEDS_FRIDGE := "That box needs a fridge"
+const NO_SEATS: Array[Vector2i] = []   # the extra cells a piece needs beside its own: none now
 const NEEDS_FREEZER := "That box needs a freezer"
 const BOX_NEEDS_COUNTER := "That box needs a counter"
 const NO_WALL := "Nothing to hang it on here"
@@ -533,12 +534,12 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 	if Kitchen.grows_from_counter(hn):   # a stove is its counter upgraded: the floor only
 		if game.stations.has(cell) or game.kitchen.layer_for(cell, "counter") != "base":
 			return "A stove stands on the floor"
-		return _grid_words(game.grid.block_refusal(cell, Station.seats_for("counter", cell, int(ch.hand.facing)), Game.LOT, Game.DOOR, reach, touch))
+		return _grid_words(game.grid.block_refusal(cell, NO_SEATS, Game.LOT, Game.DOOR, reach, touch))
 	if game.stations.has(cell) or Kitchen.is_top(ch.hand.id):
 		if game.world._stacks_on(cell, ch.hand):   # a tool needs a counter under it
 			return ""
 		return NEEDS_COUNTER if Kitchen.is_top(ch.hand.id) and not game.stations.has(cell) else TAKEN
-	var seats := Station.seats_for(ch.hand.id, cell, int(ch.hand.facing))
+	var seats := NO_SEATS   # a seat piece's own cell is its seat; a table tile has none of its own
 	if _is_street_piece(ch.hand.id) and not Game.LOT.has_point(cell):
 		return _street_refusal(cell, seats, reach, touch)
 	return _grid_words(game.grid.block_refusal(cell, seats, Game.LOT, Game.DOOR, reach, touch))
@@ -603,7 +604,7 @@ func shut_in_line() -> String:
 		return "The %s can't be reached" % name.to_lower()
 	for st: Station in game.stations.values():
 		if st.seats.has(c):
-			return "A %s's seat can't be reached" % piece_name({"id": st.type, "tier": st.tier}).to_lower().trim_suffix(" for two")
+			return "A %s's seat can't be reached" % piece_name({"id": st.type, "tier": st.tier}).to_lower()
 	return "You're shut in"
 
 

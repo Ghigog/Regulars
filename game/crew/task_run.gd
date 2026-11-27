@@ -199,11 +199,29 @@ func _stand_for(h: Helper, s: Dictionary) -> Variant:
 	if st != null and Station.is_table(st.type):
 		targets.append_array(crew.game.tables.seats_of(crew.game.tables.lead(st)))
 	var best: Variant = null
+	for diagonal in [false, true]:
+		best = _nearest_stand(h, targets, diagonal)
+		if best != null:
+			break
+	return best
+
+
+## The closest open cell to stand on beside (or, when `diagonal`, across a corner from) a target.
+func _nearest_stand(h: Helper, targets: Array[Vector2i], diagonal: bool) -> Variant:
+	var best: Variant = null
 	var best_d := INF
+	var dirs: Array[Vector2i] = Grid.DIRS
+	if diagonal:
+		dirs = [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
 	for t: Vector2i in targets:
-		for d: Vector2i in Grid.DIRS:
+		for d: Vector2i in dirs:
 			var c := t + d
-			if not _open(c) or not crew.game.grid.edge_open(c, t):
+			if not _open(c):
+				continue
+			if diagonal:
+				if not crew.game.grid.reach_open(c, t):
+					continue
+			elif not crew.game.grid.edge_open(c, t):
 				continue
 			var dist := float(absi(c.x - h.cell().x) + absi(c.y - h.cell().y))
 			if dist < best_d and (c == h.cell() or not crew.game.grid.find_path(h.cell(), c).is_empty()):

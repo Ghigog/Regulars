@@ -31,11 +31,11 @@ func test_layout_has_six_distinct_positions():
 	assert_eq(seen.size(), 6)
 
 
-func test_seat_pieces_are_not_listed_in_dining():
+func test_chair_is_listed_in_dining_and_the_booth_seat_is_not():
 	var ids := []
 	for bp in Catalog.search("", "Dining"):
 		ids.append(bp.id)
-	assert_false(ids.has("chair"))
+	assert_true(ids.has("chair"))
 	assert_false(ids.has("booth_seat"))
 
 

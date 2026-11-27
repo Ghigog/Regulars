@@ -372,20 +372,6 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 				Build.ball(holder, Vector3(0.05, 0.015, 0.03), 0.012, Build.TRIM)
 			Build._add(n, Build.bevel_mesh(Vector3(0.88, 0.06, 0.66), 0.02), Vector3(0, 1.45, 0), Color(Build.CABINET), 0.0, Build.R_WOOD)
 			Build.box(n, Vector3(0, 1.42, 0.0), Vector3(0.5, 0.02, 0.3), "#fff1c4", 1.0)
-		"stool":
-			# A counter stool (PRD 7): a small round high table on a pedestal, and one
-			# chrome stool with a coral cushion on its seat cell (+x, like a chair).
-			Build.lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.2, 0.0], [0.22, 0.02], [0.22, 0.06], [0.2, 0.08], [0.06, 0.08], [0.06, 0.66], [0.0, 0.66]], Build.STEEL_DARK, 0.0, Build.R_WOOD)
-			Build.lathe(n, Vector3(0, 0.66, 0), [[0.0, 0.0], [0.38, 0.0], [0.4, 0.02], [0.4, 0.07], [0.38, 0.08], [0.0, 0.08]], "#ecc88f", 0.0, Build.R_WOOD)
-			var stool := Node3D.new()
-			stool.position = Vector3(1, 0, 0)
-			n.add_child(stool)
-			Build.lathe(stool, Vector3.ZERO, [[0.0, 0.0], [0.18, 0.0], [0.2, 0.02], [0.18, 0.04], [0.04, 0.05], [0.0, 0.05]], "#c9d0d1", 0.0, Build.R_WOOD)
-			Build.cyl(stool, Vector3(0, 0.04, 0), 0.035, 0.32, "#c9d0d1", 0.0, Build.R_WOOD)
-			Build.lathe(stool, Vector3(0, 0.16, 0), [[0.15, 0.0], [0.17, 0.0], [0.17, 0.02], [0.15, 0.02]], "#c9d0d1", 0.0, Build.R_WOOD)
-			Build.lathe(stool, Vector3(0, 0.33, 0), [[0.0, 0.0], [0.23, 0.0], [0.26, 0.03], [0.26, 0.08], [0.22, 0.11], [0.0, 0.11]], Build.CORAL)
-			Build.cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
-			Build.ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
 		"dish_rack":
 			# A worktop with a wooden rack; the dishes drying in it are `BuildStations.rack_load`.
 			BuildStations._counter(n, Build.CABINET, Build.WORKTOP)
@@ -399,32 +385,6 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			BuildStations._chair(n, Vector2i(1, 0), Build.CORAL, true)
 		"booth_seat":
 			_booth_seat(n, joined)
-		"table4":
-			# Four-seat table (sheet 10): a square plank top on four square legs, two coral
-			# chairs and two wooden ones, one on each side.
-			Build._add(n, Build.bevel_mesh(Vector3(1.0, 0.1, 1.0), 0.035), Vector3(0, 0.69, 0), Color("#c98f58"), 0.0, Build.R_WOOD)
-			for lx: float in [-0.4, 0.4]:
-				for lz: float in [-0.4, 0.4]:
-					Build._add(n, Build.bevel_mesh(Vector3(0.09, 0.64, 0.09), 0.025), Vector3(lx, 0.32, lz), Color(Build.WOOD), 0.0, Build.R_WOOD)
-			for i in 4:
-				var d: Vector2i = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)][i]
-				BuildStations._chair(n, d, Build.CORAL if i < 2 else Build.WOOD)
-			Build.cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
-			Build.ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
-		"booth":
-			# Booth (sheet 10): teal benches with coral cushions facing across a narrow
-			# wooden table on a dark pedestal. One guest per bench, so it fits one cell.
-			Build.lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.24, 0.0], [0.26, 0.02], [0.26, 0.07], [0.24, 0.09], [0.07, 0.09], [0.07, 0.63], [0.0, 0.63]], Build.STEEL_DARK, 0.0, Build.R_WOOD)
-			Build._add(n, Build.bevel_mesh(Vector3(0.72, 0.1, 1.0), 0.035), Vector3(0, 0.68, 0), Color("#c98f58"), 0.0, Build.R_WOOD)
-			for sx: float in [-1.0, 1.0]:
-				Build._add(n, Build.bevel_mesh(Vector3(0.66, 0.08, 0.98), 0.025), Vector3(sx * 1.02, 0.04, 0), Color(Build.WOOD_DARK), 0.0, Build.R_WOOD)
-				Build._add(n, Build.bevel_mesh(Vector3(0.62, 0.3, 0.96)), Vector3(sx * 1.02, 0.23, 0), Color(Build.CABINET), 0.0)
-				Build._add(n, Build.bevel_mesh(Vector3(0.5, 0.08, 0.88), 0.035), Vector3(sx * 0.98, 0.41, 0), Color(Build.CORAL), 0.0)
-				Build._add(n, Build.bevel_mesh(Vector3(0.16, 0.86, 0.96)), Vector3(sx * 1.27, 0.51, 0), Color(Build.CABINET), 0.0)
-				for cz: float in [-0.22, 0.22]:
-					Build._add(n, Build.bevel_mesh(Vector3(0.07, 0.4, 0.42), 0.03), Vector3(sx * 1.16, 0.66, cz), Color(Build.CORAL), 0.0)
-			Build.cyl(n, Vector3(0, 0.73, 0), 0.05, 0.085, "#ffd98a", 1.3)
-			Build.ball(n, Vector3(0, 0.83, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
 	if tier > 1:
 		for i in tier - 1:
 			Build.box(n, Vector3(0, 0.05 + i * 0.1, 0), Vector3(1.02, 0.04, 1.02), Build.WARN, 0.6)

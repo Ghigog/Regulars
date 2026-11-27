@@ -186,19 +186,23 @@ func _axis(axis: int, value: float, device := 0) -> void:
 
 
 
-## Sells the table at (6, 5) and puts `id` there instead.
-func _swap_front_table(id: String, facing := 0) -> Station:
-	_to_build()
-	game.ledger.money = 500
-	game.ledger.xp = 500
-	assert_true(game.placing.pick_up(Vector3(6.5, 0, 5.5)))
-	assert_true(game.placing.sell_hand())
-	assert_true(game.placing.pick_catalog(id))
-	for i in facing:
-		game.placing.rotate_hand()
-	assert_true(game.placing.place(Vector3i(6, 5, 0)))
-	game.placing.cancel_hand()
-	return game.stations[Vector2i(6, 5)]
+## Takes every Table tile and seat piece out of the room.
+func _clear_dining() -> void:
+	for st: Station in game.stations.values().duplicate():
+		if Station.is_table(st.type) or Station.is_seat(st.type):
+			game.world._unregister(st)
+			st.queue_free()
+
+
+## Puts one table of Table tiles at `cells` with a chair on each of `chairs`, turned to face
+## the tile beside it. Returns the tiles.
+func _add_table(cells: Array, chairs: Array) -> Array[Station]:
+	var out: Array[Station] = []
+	for c: Vector2i in cells:
+		out.append(game.world.add_station("table", c))
+	for c: Vector2i in chairs:
+		game.world.add_station("chair", c, 1, TableJoins.face_toward(c, cells))
+	return out
 
 
 

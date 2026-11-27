@@ -213,7 +213,9 @@ func test_everyone_in_line_has_their_own_place_and_the_line_moves_up():
 
 func test_a_group_comes_in_single_file_not_stacked():
 	game.arrivals.assign([{"time": 99999.0, "idx": 13}])
-	game.world.add_station("table", Vector2i(6, 2))   # pushed against (6, 1): a table for four
+	game.world.add_station("table", Vector2i(6, 2))   # pushed against (6, 1)
+	game.world.add_station("chair", Vector2i(5, 2), 1, 2)
+	game.world.add_station("chair", Vector2i(7, 2), 1, 0)   # a table of four chairs
 	for i in 6:
 		game.seating.spawn_group([i], true)    # the tables fill, so the four have to queue too
 	var four: Array[Guest] = game.seating.spawn_group([6, 7, 8, 9], true)

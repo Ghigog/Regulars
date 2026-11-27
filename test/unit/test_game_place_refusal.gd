@@ -55,21 +55,6 @@ func test_own_spot_is_always_accepted_and_put_back_in_the_held_facing():
 	assert_true(game.hand.is_empty())
 
 
-func test_own_spot_falls_back_to_the_old_facing_when_the_turn_does_not_pass():
-	_to_build()
-	_lift_table()
-	var from: Vector3i = game.hand.from
-	var was: int = game.hand.from_facing
-	game.hand.facing = (was + 1) % 4
-	# Block the turned seat so only the old way round passes.
-	var turned := Station.seats_for("table", Vector2i(from.x, from.y), int(game.hand.facing))
-	for s in turned:
-		if not Station.seats_for("table", Vector2i(from.x, from.y), was).has(s):
-			game.grid.blocked[s] = true
-	assert_true(game.placing.place(from))
-	assert_eq(game.stations[Vector2i(from.x, from.y)].facing, was)
-
-
 func test_cutting_off_a_seat_says_so():
 	_to_build()
 	game.ledger.money = 500
@@ -126,3 +111,16 @@ func test_chilled_box_over_bare_floor_needs_a_fridge():
 func test_frozen_box_over_bare_floor_needs_a_freezer():
 	_to_build()
 	assert_eq(_refusal_holding("box_ice_cream"), "That box needs a freezer")
+
+
+## A station stays usable across a corner (T-84): the last orthogonal side may be filled.
+func test_piece_on_the_last_orthogonal_side_is_fine_when_the_diagonal_stays_open():
+	_to_build()
+	game.ledger.money = 500
+	var at := Vector2i(9, 5)   # open floor by the pavement wall, clear of every seat
+	game.world.add_station("fridge", at)
+	game.world.add_station("tray_stack", at + Vector2i(0, -1))
+	game.world.add_station("till", at + Vector2i(0, 1))
+	var cups: Station = game.world.add_station("cups", Vector2i(3, 6))
+	assert_true(game.placing.pick_up(Grid.center(cups.cell)), "the cup stack comes up")
+	assert_eq(game.placing.place_refusal(Vector3i(at.x - 1, at.y, 0)), "", "the corners still reach the fridge")

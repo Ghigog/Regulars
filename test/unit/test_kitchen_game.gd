@@ -197,9 +197,10 @@ func test_tree_keys_for_kitchen_pieces_and_tiered_pieces():
 	assert_eq(Upgrades.key_of("fountain"), "fountain")
 	assert_eq(Upgrades.key_of("stove", 1, "range"), "range", "a station's own node wins")
 	assert_eq(Upgrades.key_of("plant", 2), "plant@2")
-	assert_eq(Upgrades.key_of("table"), "table@1")
+	assert_eq(Upgrades.key_of("chair"), "chair@1")
+	assert_eq(Upgrades.key_of("table"), "", "a table tile has one tier")
 	assert_eq(Upgrades.key_of("bin"), "", "a bin has no tree")
-	for key: String in ["board", "stove", "counter", "fountain", "wine_barrel", "plant@1", "jukebox@2", "booth@1", "hood"]:
+	for key: String in ["board", "stove", "counter", "fountain", "wine_barrel", "plant@1", "jukebox@2", "chair@1", "hood"]:
 		assert_true(Upgrades.has_tree(key), key)   # the hood grows into an extractor (PRD 9.5)
 	for key: String in ["", "cabinet"]:
 		assert_false(Upgrades.has_tree(key), key + " has nowhere to go")

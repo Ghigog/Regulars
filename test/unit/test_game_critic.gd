@@ -250,7 +250,8 @@ func test_a_day_ending_on_a_new_level_says_what_is_new_in_the_shop():
 	assert_eq(int(rec.level), 2)
 	assert_eq(int(rec.level_was), 1)
 	var fresh := Catalog.unlocked_at(2, "diner").map(func(bp: Dictionary) -> String: return str(bp.id))
-	assert_true(fresh.has("table") and fresh.has("bin"), "tables and the bin open at level 2")
+	assert_true(fresh.has("bin"), "the bin opens at level 2")
+	assert_false(fresh.has("table"), "tables and chairs are there from level 1")
 	assert_false(fresh.has("sink"), "the sink waits for level 3")
 
 
