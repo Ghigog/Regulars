@@ -440,14 +440,19 @@ static func icon(id: String) -> Array:
 				o.append([ell(sx, -0.05, 0.25, 0.2, 0, 180, 8), stripe])
 			o.append([rect(0, 0.65, 1.7, 0.7), INK])
 			o.append([rect(0, 0.7, 1.46, 0.5), CREAM])
-		"dishes":  # a plate with a fork beside it
-			o.append([ell(0.3, 0, 0.62), INK])
-			o.append([ell(0.3, 0, 0.5), CREAM])
-			o.append([ell(0.3, 0, 0.28), INK])
-			o.append([rect(-0.78, -0.2, 0.2, 1.2), INK])
-			for dx in [-0.97, -0.78, -0.59]:
-				o.append([rect(dx, 0.65, 0.13, 0.5), INK])
-			o.append([rect(-0.78, 0.42, 0.5, 0.14), INK])
+		"flyer":  # menu: an opened bi-fold flyer, two panels tilted apart at a fold, coral bands, dish lines
+			for side in [-1, 1]:
+				var t: float = side * 0.1
+				var c := Vector2(side * 0.5, 0.0)
+				var at := func(x: float, y: float, w: float, h: float) -> PackedVector2Array:
+					var p := c + Vector2(x, y).rotated(t)
+					return rect(p.x, p.y, w, h, t)
+				o.append([at.call(0, 0, 1.0, 1.9), INK])
+				o.append([at.call(0, 0, 0.82, 1.72), CREAM])
+				o.append([at.call(0, -0.58, 0.82, 0.36), CORAL])
+				for i in 3:
+					o.append([at.call(0, -0.08 + i * 0.3, 0.5, 0.1), INK])
+			o.append([rect(0, 0, 0.1, 1.9), INK])
 		"cog":  # options: a toothed wheel with a hub hole
 			o.append([star(0, 0, 0.98, 8, 0.78, PI / 8), INK])
 			o.append([ell(0, 0, 0.7), INK])
