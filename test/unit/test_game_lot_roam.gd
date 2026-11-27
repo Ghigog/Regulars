@@ -49,6 +49,7 @@ func test_chef_left_outside_is_moved_when_the_day_starts():
 
 func test_lot_edge_has_no_strip_along_floored_cells():
 	game.phase = Game.Phase.BUILD
+	game.player.position = Grid.center(Vector2i(-4, 1))   # outside, so the overlay shows
 	game.lot_view._redraw()
 	var mids := []
 	for m: MeshInstance3D in game.lot_view._root.find_children("*", "MeshInstance3D", true, false):
