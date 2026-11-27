@@ -87,6 +87,8 @@ func saving() -> bool:
 
 
 func quit_label() -> String:
+	if hud.game.practice:
+		return "End practice"
 	return "Save and quit" if saving() else "Quit to title"
 
 
@@ -241,7 +243,10 @@ func press_id(id: String) -> void:
 		"options":
 			hud.options_ui.toggle_options()
 		"quit":
-			show_confirm()
+			if hud.game.practice:
+				hud.game.session.quit_to_title()   # nothing was kept, so nothing to confirm
+			else:
+				show_confirm()
 		"no":
 			show_main()
 		"yes":
