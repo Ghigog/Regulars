@@ -112,6 +112,7 @@ var seat_taken := {}             # Vector2i -> Guest
 var arrivals: Array[Dictionary] = []
 var perfect_streak := 0   # perfect trays served in a row today (review, item 6)
 var clock := 0.0
+var practice := false   # a practice day from the title: no guests, nothing kept; the pause menu ends it
 var last_day := {}
 var catalog: Catalog
 var menu := Menu.new()
@@ -446,6 +447,8 @@ func step(delta: float) -> void:
 	for g in guests.duplicate():
 		g.tick(delta)
 	paying._tick_paying(delta)
+	if practice:
+		return
 	if ledger.is_closed_down():
 		day._close_down()
 	elif arrivals.is_empty() and guests.is_empty():
