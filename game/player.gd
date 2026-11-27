@@ -201,6 +201,16 @@ func boost(kind: String) -> void:
 	Build.on_top(_boost_fx)
 
 
+## Ends a burst or penalty at once: back to normal speed, upright, effects gone.
+func end_boost() -> void:
+	boost_left = 0.0
+	boost_speed = 1.0
+	_body.rotation.z = 0.0
+	if _boost_fx:
+		_boost_fx.queue_free()
+		_boost_fx = null
+
+
 ## Runs down a burst or penalty. Called every step of service.
 func tick(delta: float) -> void:
 	if boost_left <= 0.0:
@@ -208,12 +218,7 @@ func tick(delta: float) -> void:
 	boost_left -= delta
 	_boost_age += delta
 	if boost_left <= 0.0:
-		boost_left = 0.0
-		boost_speed = 1.0
-		_body.rotation.z = 0.0
-		if _boost_fx:
-			_boost_fx.queue_free()
-			_boost_fx = null
+		end_boost()
 		return
 	if _boost_fx == null:
 		return
