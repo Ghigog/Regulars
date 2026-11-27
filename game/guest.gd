@@ -286,6 +286,7 @@ func _set_meal(kind: String, quality: float) -> void:
 	_meal = BuildFood.meal(_meal_tray, kind == "tray_bitten") if kind.begins_with("tray") else BuildFood.item(kind, quality)
 	_meal.position = to_table * 0.5 + Vector3(0, 0.74, 0)
 	_meal.rotation.y = atan2(to_table.x, to_table.z)
+	_meal.scale = Vector3.ONE * BuildFood.SIZE
 	add_child(_meal)
 
 
