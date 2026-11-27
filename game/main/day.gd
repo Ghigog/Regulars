@@ -260,7 +260,7 @@ func door_action(ch: Player = null) -> String:
 		return ""
 	if game.phase == Game.Phase.BUILD and ch.hand.is_empty() and game.shopper != ch:
 		return "Open up"
-	if game.phase == Game.Phase.SERVICE and game.door_open and not game.arrivals.is_empty() and day_progress() >= Game.CLOSE_EARLY_FROM:
+	if game.phase == Game.Phase.SERVICE and game.door_open and day_progress() >= Game.CLOSE_EARLY_FROM:
 		return "Close early"
 	return ""
 
