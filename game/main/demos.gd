@@ -340,6 +340,15 @@ func _apply_demo(demo: String) -> void:
 	elif demo == "closed":
 		game.best_path = "user://regulars_best_demo.json"
 		game.ledger.reputation = 0.0   # the meter at the bottom: closed down
+	elif demo == "won":   # shoot at 2 for the receipt, 7 for the card; a town nudged to a B and a 5-star review
+		game.best_path = "user://regulars_best_demo.json"
+		game.ledger.day = 9
+		game.ledger.record_sale(Game.DEMO_BILL, 5)
+		for i in game.town.people.size():
+			game.town.people[i].affinity = 0.5
+		game.arrivals.clear()
+		game._critic_rated = {"walked": false, "ratings": {"speed": 5, "clean": 5, "quality": 5, "variety": 5}}
+		game.get_tree().create_timer(4.0).timeout.connect(game.session.open_build)   # the day ends on its own; confirm the receipt
 	elif demo in ["critic", "critic_bad", "critic_known", "critic_town"]:
 		_demo_critic(demo)
 	elif demo == "summary" or demo == "town" or demo == "town_person":

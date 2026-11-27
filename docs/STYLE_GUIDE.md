@@ -57,6 +57,8 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- Won card (T-118): the closed-down tent card with a coral "FIVE STARS" ribbon, the same ornament rules and centred lines, and the town grade as a 64 px coral-dark letter over "TOWN RATING: n"; the closed-down card shows the same grade.
+
 - **Service runs into night (T-114).** The day's light follows `day_progress()` through morning, noon (0.3), sunset (done at 0.75) and dusk, and is fully the build phase's moonlit night at 1.0 (`GameAudio.night_amount`, shared by the lights and `Game._night`, so the hand-over to build and the next morning ease have no jump). The HUD clock now runs 8:00 to 23:00 and its window turns to the moon from 0.88 of the day.
 - **Reach lean (T-101).** While Reach is held (RT, Alt, the touch button) the chef tips back 9 degrees (`Player.REACH_LEAN`, whole body, eased in about 0.2 s and out the same way), standing, aiming or walking; walking it replaces the forward run lean and the stride bob stays. The fall and help poses win over it.
 - **Hand tools, one size (T-98).** A sponge, scourer, grease scraper or spill kit is drawn at one world size, `BuildClean.HAND_TOOL_SIZE` (1.2), on a wall shelf, in a wall cabinet, on a counter, pass or sink, so it does not change size when moved (`BuildFood.item` divides it by `SIZE`, which the station then applies). The starter sponge is kept on the jar shelf over the sink (else in a starter wall cabinet), never on the sink. Prompts say "Put sponge down" everywhere; a hand tool has no home.

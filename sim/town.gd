@@ -26,6 +26,9 @@ const REGULAR_STREAK := 3   # good visits in a row that make someone a regular
 const REGULAR_TIP := 1.25
 const GRUDGE_DAYS := 2      # full days a guest stays away after walking out
 const FLYER_PRICE := 15
+## Town rating (the secondary objective): the town's mean affinity as 0 to 100 points, graded.
+## tunable: the least points for each tier, best first; anything under the last is an F.
+const TIERS := [["S", 60], ["A", 45], ["B", 35], ["C", 25], ["D", 15], ["E", 5]]
 const FLYER_GUESTS := 2    # tunable: extra guests a batch of flyers brings, on top of the crowd floor
 ## Turnout (review, item 1). Everyone rolls to come from their own affinity, so a liked
 ## place fills up; a thin day is topped up to `crowd_floor`, which grows slowly.
@@ -107,6 +110,23 @@ static func new_person(person_name: String, i: int) -> Dictionary:
 
 ## After loading an older save: adds every person key (and opinion/tolerance topic) the
 ## save predates, with the new-town default. Saved values are never overwritten.
+## How the whole town feels about the restaurant, 0 to 100: the mean affinity, floored at 0.
+func sentiment_points() -> int:
+	if people.is_empty():
+		return 0
+	var total := 0.0
+	for p in people:
+		total += float(p.affinity)
+	return roundi(clampf(total / people.size(), 0.0, 1.0) * 100.0)
+
+
+static func tier_for(points: int) -> String:
+	for t in TIERS:
+		if points >= int(t[1]):
+			return t[0]
+	return "F"
+
+
 func fill_missing_keys() -> void:
 	for i in people.size():
 		var p: Dictionary = people[i]

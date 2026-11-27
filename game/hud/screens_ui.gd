@@ -221,7 +221,7 @@ func show_person(i: int) -> void:
 
 
 ## Game over: a folded, coral-trimmed menu card.
-func show_closed(days: int, earned: int, best: Dictionary, is_record: bool) -> void:
+func show_closed(days: int, earned: int, best: Dictionary, is_record: bool, tier := , points := 0) -> void:
 	hud.receipt_ui.hide_card()
 	var menu := HudWidgets.Sheet.new("menu").pad(40, 34, 40, 40)
 	menu.custom_minimum_size = Vector2(480, 0)
@@ -238,6 +238,40 @@ func show_closed(days: int, earned: int, best: Dictionary, is_record: bool) -> v
 	hud.receipt_ui._ornament(box, "coin")
 	hud.receipt_ui._centred(box, "TOTAL EARNED: $%d" % earned)
 	hud.receipt_ui._ornament(box, "star")
+	_town_rating(box, tier, points)
 	hud.receipt_ui._centred(box, "NEW BEST RUN!" if is_record else "BEST RUN: %d %s" % [best.days, "DAY" if best.days == 1 else "DAYS"])
 	hud.receipt_ui._button(box, "Try again" + hud.hints_ui._key_note("confirm"), hud.game.day.restart)
+	hud.receipt_ui._pop_in(menu)
+
+
+## The grade as a big centred letter over the points.
+func _town_rating(box: VBoxContainer, tier: String, points: int) -> void:
+	var letter := hud.receipt_ui._centred(box, tier, 64)
+	letter.add_theme_color_override("font_color", Color(Build.CORAL_DARK))
+	hud.receipt_ui._centred(box, "TOWN RATING: %d" % points, 22)
+
+
+## The run won: the critic's five stars. Same folded card as the closed-down one, in coral.
+func show_won(days: int, earned: int, tier: String, points: int, best: Dictionary, is_record: bool) -> void:
+	hud.receipt_ui.hide_card()
+	var menu := HudWidgets.Sheet.new("menu").pad(40, 34, 40, 40)
+	menu.custom_minimum_size = Vector2(480, 0)
+	hud.center.add_child(menu)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	menu.add_child(box)
+	hud.receipt_ui._ribbon(box, "FIVE STARS", Hud.CORAL)
+	var why := hud._label(box, 17, "The critic gave you five stars: the town's best table is yours.")
+	why.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	why.modulate.a = 0.75
+	hud.receipt_ui._ornament(box, "day")
+	hud.receipt_ui._centred(box, "DAYS TO FIVE STARS: %d" % days)
+	hud.receipt_ui._ornament(box, "coin")
+	hud.receipt_ui._centred(box, "TOTAL EARNED: $%d" % earned)
+	hud.receipt_ui._ornament(box, "star")
+	_town_rating(box, tier, points)
+	var won: Dictionary = best.get("won", {})
+	hud.receipt_ui._centred(box, "NEW BEST RUN!" if is_record else "BEST RUN: %s, %d  (%d %s)" % [won.tier, int(won.points), int(won.days), "DAY" if int(won.days) == 1 else "DAYS"], 22)
+	hud.receipt_ui._button(box, "Play again" + hud.hints_ui._key_note("confirm"), hud.game.day.restart)
 	hud.receipt_ui._pop_in(menu)
