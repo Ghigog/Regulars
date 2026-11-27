@@ -25,13 +25,13 @@ func _counter() -> Station:
 	return game.world.add_station("counter", C)
 
 
-func test_the_sponge_is_put_back_on_a_shelf_centred_and_taken_with_its_wear():
+func test_the_sponge_is_put_down_on_a_shelf_centred_and_taken_with_its_wear():
 	_counter()
 	var shelf: Station = game.world.add_high("shelf", C)
 	_face_wall_cell()
 	_reach()
 	CleanKit.hold(game.player, "sponge", 2)
-	assert_eq(game.cooking.use_station(shelf, true, game.player), "Put sponge back")
+	assert_eq(game.cooking.use_station(shelf, true, game.player), "Put sponge down")
 	game.cooking.use_station(shelf, false, game.player)
 	assert_eq(CleanKit.held_tool(game.player), "", "the hands are free")
 	assert_eq(shelf.kit_tool, "sponge")
