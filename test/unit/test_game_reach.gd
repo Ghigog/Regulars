@@ -108,6 +108,26 @@ func test_reach_targets_the_shelf_over_a_bin_not_the_grill_beside_it():
 	assert_eq(game.card.reach_action(game.player), "Take bun")
 
 
+## Two shelves side by side, each hung with its own box: reaching takes from the one the
+## chef faces, whichever way they look along the wall.
+func test_reach_aims_between_two_shelves():
+	var a := Vector2i(0, 4)
+	var b := Vector2i(0, 5)
+	for c in [a, b]:
+		game.world.add_station("counter", c)
+		game.world.add_high("shelf", c)
+	game.kitchen.cells[a].stock.high.assign(["box_bun"])
+	game.kitchen.cells[b].stock.high.assign(["box_cheese"])
+	_reach(true)
+	game.player.position = Grid.center(Vector2i(1, 4))
+	game.player.look(Vector2i(-1, 0))
+	assert_eq(game.player.target_cell(), a, "facing the wall at the first shelf")
+	game.player.position = Grid.center(Vector2i(1, 5))
+	assert_eq(game.player.target_cell(), b, "facing the wall at the second shelf")
+	game.player.position = Grid.center(Vector2i(1, 4))
+	assert_eq(game.player.target_cell(), a, "back at the first, it follows the chef along the wall")
+
+
 func _frames(n: int) -> void:
 	for i in n:
 		game.player.move(Vector2.ZERO, 0.05)
