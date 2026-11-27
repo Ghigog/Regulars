@@ -5,6 +5,8 @@ extends RefCounted
 ## layer's high pieces (PRD 8.5).
 
 var game: Game
+var flood_runs := 0   # how often the door flood ran, for the perf test
+var _flood_key := 0   # what the last flood saw
 
 
 func _init(game_: Game) -> void:
@@ -192,6 +194,7 @@ func _rebuild_room() -> void:
 	game._sconces.append_array(game._room_lights)
 	game._openings = r.openings
 	game._opening_ok.clear()
+	_flood_key = 0
 	_refresh_openings()
 	# The camera keeps the whole floor in view as it grows back and to the left.
 	var b := game.plan.bounds()
@@ -203,6 +206,11 @@ func _rebuild_room() -> void:
 ## Greys out each door and archway nobody can get through: one with bare
 ## ground or furniture on a side, or none of it reachable from the front door.
 func _refresh_openings() -> void:
+	var key := [game.grid.walls.hash(), game.grid.doors.hash(), game.grid.blocked.hash(), game.grid.outside.hash(), game._openings.size()].hash()
+	if key == _flood_key:
+		return   # nothing the flood reads has changed
+	_flood_key = key
+	flood_runs += 1
 	var seen := game.grid.flood(Game.DOOR)
 	for e: Vector3i in game._openings:
 		var ok := opening_usable(e, seen)
