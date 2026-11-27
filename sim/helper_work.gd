@@ -122,11 +122,16 @@ static func steps(task: Dictionary, duties: Array, dest_duty := "") -> Array:
 	match str(task.get("type", "")):
 		"fetch":
 			var kind := str(task.kind)
-			var hold := hold_for(kind)
+			var make := str(task.get("make", kind))
+			var hold := hold_for(make)
 			var out: Array = [{"do": "take", "at": task.cell, "kind": str(task.get("source", kind)),
 				"ready": task.get("ready", false)}]
 			var job := str(task.get("job", ""))
-			if job == "" or job == "none":
+			if task.has("make"):   # chopped at its tool and left there for the fryer
+				if dest_duty != "" and duties.has(dest_duty):
+					out.append({"do": "cook", "at": task.dest, "job": job, "kind": make, "hold": hold, "ticket": task.ticket})
+				out.append({"do": "leave", "at": task.dest})
+			elif job == "" or job == "none":
 				out.append({"do": "deliver", "ticket": task.ticket, "assemble": may_assemble})
 			elif dest_duty != "" and duties.has(dest_duty):
 				out.append({"do": "cook", "at": task.dest, "job": job, "kind": kind, "hold": hold, "ticket": task.ticket})
@@ -136,16 +141,19 @@ static func steps(task: Dictionary, duties: Array, dest_duty := "") -> Array:
 			return out
 		"prep":
 			var at: Vector2i = task.get("station", task.cell)
-			var hold := str(task.get("hold", hold_for(str(task.kind))))
+			var make := str(task.get("make", task.kind))
+			var hold := str(task.get("hold", hold_for(make)))
 			var deliver := {"do": "deliver", "ticket": task.ticket, "assemble": may_assemble}
+			if task.has("make"):
+				deliver = {"do": "leave", "at": at}
 			if str(task.get("job", "")) == "pour" and task.get("item") == null:
 				# Drinks go out in cups: the ticket's cup is fetched, filled, and set back out.
 				return [{"do": "get_cup", "ticket": task.ticket, "kind": task.kind},
 					{"do": "pour", "at": at, "kind": task.kind}, {"do": "set_out", "ticket": task.ticket}]
 			if task.cell == at:
-				return [{"do": "cook", "at": at, "job": task.job, "kind": task.kind, "hold": hold, "in_place": true, "ticket": task.ticket}, deliver]
-			return [{"do": "pick", "at": task.cell, "kind": task.kind, "hold": hold},
-				{"do": "cook", "at": at, "job": task.job, "kind": task.kind, "hold": hold, "ticket": task.ticket}, deliver]
+				return [{"do": "cook", "at": at, "job": task.job, "kind": make, "hold": hold, "in_place": true, "ticket": task.ticket}, deliver]
+			return [{"do": "pick", "at": task.cell, "kind": make, "hold": hold},
+				{"do": "cook", "at": at, "job": task.job, "kind": make, "hold": hold, "ticket": task.ticket}, deliver]
 		"assemble":
 			return [{"do": "assemble", "ticket": task.ticket}]
 		"plates":
@@ -177,12 +185,20 @@ static func steps(task: Dictionary, duties: Array, dest_duty := "") -> Array:
 	return []
 
 
+## Whether `kind` is made on a heat tool from a source that must be prepped first: a heat
+## tool refuses the raw source (fries: chop the potato, then fry the cut potato). A press
+## tool (juicer, blender, steamer) takes its source as it comes from the box.
+static func two_step(kind: String) -> bool:
+	return Pantry.is_derived(kind) and Pantry.needs_prep(Pantry.source_of(kind)) \
+		and Pantry.tool_of(kind) in ["grill", "fry", "boil"]
+
+
 ## What a helper holds to make `kind` at its tool (PRD 10.7): its own raw form, or for a
 ## kind made from another's stock that stock as it comes out of the box (a raw lemon for
 ## lemonade, a scoop of ice cream, which needs no prep, for a milkshake).
 static func hold_for(kind: String) -> String:
 	var src := Pantry.source_of(kind)
-	if src != kind and not Pantry.needs_prep(src):
+	if src != kind and (not Pantry.needs_prep(src) or two_step(kind)):
 		return Tray.kind("prep", src)
 	return Tray.kind("raw", src)
 

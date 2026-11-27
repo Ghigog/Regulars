@@ -178,7 +178,7 @@ func _ingredient_tasks(world: Dictionary) -> void:
 			var item := _take_item(items, kind)
 			if not item.is_empty():
 				if item.state == "raw":
-					_prep_task("prep:%s" % str(item.id), kind, job, t, wait, item)
+					_prep_item_task(kind, job, t, wait, item)
 				continue
 			if job == "pour":
 				_prep_task("pour:%s:%d" % [str(t.id), i], kind, job, t, wait, {})
@@ -187,16 +187,24 @@ func _ingredient_tasks(world: Dictionary) -> void:
 			var from := _storage_with(storage, src, src == kind)
 			if from.is_empty():
 				continue   # nothing to fetch: stuck until restocked
+			var make := ""   # a source that needs prep of its own is made at its tool first
 			if from.ready:
 				job = "none"
+			elif _two_step(kind):
+				make = src
+				job = Pantry.tool_of(src)
+				if _options(Pantry.tool_of(kind), kind).is_empty():
+					continue   # nothing to fry it on
 			var dest: Variant = t.cell
 			if job != "" and job != "none":
 				var st := _best_station(job, kind)
 				if st.is_empty():
 					continue   # no tool in the room can do it
 				dest = st.cell
-			_add("fetch:%s:%d" % [str(t.id), i], "fetch", from.cell, wait,
-				{"ticket": t.id, "kind": kind, "source": src, "ready": from.ready, "job": job, "dest": dest})
+			var fetch := {"ticket": t.id, "kind": kind, "source": src, "ready": from.ready, "job": job, "dest": dest}
+			if make != "":
+				fetch.make = make
+			_add("fetch:%s:%d" % [str(t.id), i], "fetch", from.cell, wait, fetch)
 
 
 ## The item that covers a lack of `kind`: one being made into it, else (for a kind made
@@ -210,13 +218,38 @@ func _take_item(items: Array, kind: String) -> Dictionary:
 				return it
 	if Pantry.is_derived(kind):
 		var src := Pantry.source_of(kind)
+		var two := _two_step(kind)
 		for i in items.size():
-			if items[i].kind == src and not items[i].has("station") and items[i].state == "raw":
+			if items[i].kind == src and items[i].state == "raw" and (two or not items[i].has("station")):
 				var it: Dictionary = items[i].duplicate()
 				items.remove_at(i)
 				it.form = str(it.get("form", HelperWork.hold_for(src)))
 				return it
 	return {}
+
+
+## Whether `kind` is made from a source that needs prep of its own (fries: chop the potato,
+## then fry it), so it takes two tools, not one (see `HelperWork.two_step`).
+static func _two_step(kind: String) -> bool:
+	return HelperWork.two_step(kind)
+
+
+## The task for a raw item covering a lack of `kind`. For a two-step kind the raw source is
+## chopped at its own tool and left there; the chopped source is then fried for the ticket.
+func _prep_item_task(kind: String, job: String, t: Dictionary, wait: float, item: Dictionary) -> void:
+	var key := "prep:%s" % str(item.id)
+	if not _two_step(kind):
+		_prep_task(key, kind, job, t, wait, item)
+		return
+	var src := Pantry.source_of(kind)
+	if str(item.get("form", "")) == Tray.kind("prep", src):
+		_prep_task(key, kind, job, t, wait, item)
+		return
+	if _options(job, kind).is_empty():
+		return   # nothing to fry it on
+	_prep_task(key, kind, Pantry.tool_of(src), t, wait, item)
+	if tasks.has(key):
+		tasks[key].make = src
 
 
 ## The storage holding `kind`: {cell, ready}, a ready-made box first where `ready_ok`;
