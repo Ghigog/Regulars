@@ -114,3 +114,45 @@ func test_night_pick_up_offers_nothing_out_of_reach():
 	var ch := _stand(Vector2i(9, 6))
 	assert_eq(game.room_edit._piece_in_front(ch), Vector3.INF)
 	assert_ne(game.room_edit.build_action(), "Pick up")
+
+
+## A stick angle `deg` clockwise from screen-up, as a move input.
+func _stick(deg: float) -> Vector2:
+	return Vector2(sin(deg_to_rad(deg)), cos(deg_to_rad(deg)))
+
+
+func _grid_way(screen_deg: float) -> Vector3:
+	var d := Vector3(1, 0, -1) * sin(deg_to_rad(screen_deg)) + Vector3(-1, 0, -1) * cos(deg_to_rad(screen_deg))
+	return d.normalized()
+
+
+func test_an_off_angle_stick_snaps_aim_to_a_grid_way():
+	var ch: Player = game.player
+	ch.position = Grid.center(Vector2i(6, 3))
+	ch.move(_stick(10), 0.1, true)
+	assert_almost_eq(ch.aim, _grid_way(0), Vector3.ONE * 0.001, "10 degrees off up: straight up")
+	ch.move(_stick(35), 0.1, true)
+	assert_almost_eq(ch.aim, _grid_way(45), Vector3.ONE * 0.001, "35 degrees: the diagonal")
+
+
+func test_walking_off_angle_moves_along_the_stick_but_faces_a_grid_way():
+	var ch: Player = game.player
+	ch.position = Grid.center(Vector2i(6, 3))
+	var at := ch.position
+	for i in 3:
+		ch.move(_stick(60), 0.05)
+	var moved := (ch.position - at).normalized()
+	assert_almost_eq(moved, _grid_way(60), Vector3.ONE * 0.05, "walks the raw way")
+	assert_almost_eq(ch.aim, _grid_way(45), Vector3.ONE * 0.001, "faces the nearest way")
+
+
+func test_a_stick_wobbling_on_a_boundary_keeps_one_heading():
+	var ch: Player = game.player
+	ch.position = Grid.center(Vector2i(6, 3))
+	ch.move(_stick(0), 0.05, true)
+	var first := ch.aim
+	for deg in [22.0, 23.5, 22.5, 24.0, 21.0, 23.0]:
+		ch.move(_stick(deg), 0.05, true)
+		assert_almost_eq(ch.aim, first, Vector3.ONE * 0.001, "no flicker at %s" % deg)
+	ch.move(_stick(30), 0.05, true)
+	assert_almost_eq(ch.aim, _grid_way(45), Vector3.ONE * 0.001, "well past: turns")
