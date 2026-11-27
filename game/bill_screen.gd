@@ -9,6 +9,8 @@ extends Control
 
 const DIRS := {"up": Vector2.UP, "down": Vector2.DOWN, "left": Vector2.LEFT, "right": Vector2.RIGHT}
 
+const CARD_W := 400.0
+
 var game
 var hud
 var chef: Player            # who is writing
@@ -16,6 +18,7 @@ var bill := Bill.new()      # the slip so far; it carries no table
 var _card: Control
 var _content: VBoxContainer
 var _frame: Control
+var _scroll: ScrollContainer
 var _targets: Array[Control] = []
 var _sel := 0
 var _sel_key := ""
@@ -28,19 +31,18 @@ func setup(game_, hud_, chef_: Player) -> void:
 	if chef.held == "bill":
 		bill = Bill.new(-1, chef.bill.items.duplicate())   # fix the wrong lines, not start over
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	mouse_filter = Control.MOUSE_FILTER_STOP
-	var dim := ColorRect.new()
-	dim.color = Color(Hud.SHADOW, 0.35)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(dim)
-	var mid := CenterContainer.new()
-	mid.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(mid)
-	_card = HudWidgets.Sheet.new("paper", 34, 26)
-	_card.custom_minimum_size = Vector2(900, 0)
-	mid.add_child(_card)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE   # the room around the slip stays playable
+	_card = HudWidgets.Sheet.new("paper", 16, 12)
+	_card.mouse_filter = Control.MOUSE_FILTER_STOP
+	_card.anchor_left = 1.0
+	_card.anchor_right = 1.0
+	_card.offset_right = -22.0   # the cork board's and guest card's margin
+	_card.offset_left = -22.0 - CARD_W
+	_card.offset_top = Hud.BOARD_Y
+	_card.custom_minimum_size = Vector2(CARD_W, 0)
+	add_child(_card)
 	_content = VBoxContainer.new()
-	_content.add_theme_constant_override("separation", 12)
+	_content.add_theme_constant_override("separation", 8)
 	_card.add_child(_content)
 	_frame = Control.new()
 	_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -49,6 +51,7 @@ func setup(game_, hud_, chef_: Player) -> void:
 	add_child(_frame)
 	render()
 	hud.receipt_ui._pop_in(_card)
+	_card.pivot_offset = Vector2(CARD_W, 0)   # grow out of the top-right corner
 
 
 func _process(_delta: float) -> void:
@@ -61,30 +64,32 @@ func render() -> void:
 		c.queue_free()
 	_targets.clear()
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 14)
+	top.add_theme_constant_override("separation", 10)
 	_content.add_child(top)
 	_ribbon(top, "THE BILL")
-	top.add_child(HudWidgets.Icon.new("bill", 40, false))
+	top.add_child(HudWidgets.Icon.new("bill", 24, false))
 	var waiting := []
 	for t: Dictionary in game.paying.bill_tables():
 		waiting.append("Table %d  ·  %d%s" % [t.number, t.size, "  ·  at the till" if t.till else ""])
 	if waiting.is_empty():
-		_label(_content, 20, "Nobody is waiting to pay").modulate.a = 0.6
+		_label(_content, 16, "Nobody is waiting to pay").modulate.a = 0.6
 	else:
-		_label(_content, 20, "Waiting:  " + "     ".join(waiting))
+		var w := _label(_content, 16, "Waiting:  " + "     ".join(waiting))
+		w.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		w.custom_minimum_size.x = CARD_W - 32
 	_rule()
-	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 22)
-	_content.add_child(cols)
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_content.add_child(_scroll)
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override("separation", 4)
+	_scroll.add_child(col)
 	var tonight := {}
 	for it: Dictionary in game.menu_stock.tonight_menu():
 		tonight[int(it.id)] = true
 	for course in Menu.COURSES:
-		var col := VBoxContainer.new()
-		col.custom_minimum_size = Vector2(270, 0)
-		col.add_theme_constant_override("separation", 6)
-		cols.add_child(col)
-		_label(col, 26, Menu.COURSE_NAMES[course])
+		_label(col, 18, Menu.COURSE_NAMES[course])
 		var shown := 0
 		for it: Dictionary in game.menu.in_course(course):
 			if not tonight.has(int(it.id)):
@@ -92,20 +97,21 @@ func render() -> void:
 			shown += 1
 			var n := bill.count(int(it.id))
 			var b := _button(col, "item:%d" % it.id, _add.bind(int(it.id), 1),
-				"%s    x%d" % [it.name, n] if n > 0 else it.name, 20, n > 0)
+				"%s    x%d" % [it.name, n] if n > 0 else it.name, 16, n > 0)
 			b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			b.gui_input.connect(_item_input.bind(int(it.id)))
 		if shown == 0:
-			_label(col, 18, "Nothing tonight").modulate.a = 0.5
+			_label(col, 15, "Nothing tonight").modulate.a = 0.5
 	_rule()
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 14)
 	_content.add_child(foot)
-	var total := _label(foot, 22, "%d on the slip   ·   $%d" % [bill.total_count(), Bill.price(bill, game.menu)])
+	var total := _label(foot, 17, "%d on the slip   ·   $%d" % [bill.total_count(), Bill.price(bill, game.menu)])
 	total.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var pr := _button(foot, "print", _print, "Print", 24, true)
+	var pr := _button(foot, "print", _print, "Print", 20, true)
 	pr.disabled = bill.is_empty()
 	_keys_line()
+	_cap_height()
 	_sel = 0
 	for i in _targets.size():
 		if _targets[i].get_meta("key") == _sel_key:
@@ -114,6 +120,14 @@ func render() -> void:
 		select_first_item()
 	if not _targets.is_empty():
 		_sel_key = _targets[_sel].get_meta("key")
+
+
+## Caps the item list so the slip never runs past the bottom of the screen; the list scrolls.
+func _cap_height() -> void:
+	var other := _content.get_combined_minimum_size().y + 24.0
+	var list_h: float = _scroll.get_child(0).get_combined_minimum_size().y
+	var room := get_viewport_rect().size.y - Hud.BOARD_Y - 16.0 - other
+	_scroll.custom_minimum_size.y = minf(list_h, maxf(room, 120.0))
 
 
 func select_first_item() -> void:
@@ -132,7 +146,9 @@ func _keys_line() -> void:
 			text = "D-pad choose     A add one     X take one off     B close"
 		"touch":
 			text = "Tap to add one     Sell takes one off     Back closes"
-	var l := _label(_content, 16, text)
+	var l := _label(_content, 13, text)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = CARD_W - 32
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.modulate.a = 0.7
 
@@ -243,11 +259,11 @@ func _label(parent: Node, px: int, text := "") -> Label:
 
 
 func _ribbon(parent: Container, text: String) -> void:
-	var ribbon := HudWidgets.Sheet.new("ribbon", 30, 6)
+	var ribbon := HudWidgets.Sheet.new("ribbon", 18, 4)
 	ribbon.tint = Hud.CORAL
 	ribbon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	parent.add_child(ribbon)
-	var l := _label(ribbon, 26, text)
+	var l := _label(ribbon, 20, text)
 	l.add_theme_color_override("font_color", Hud.CREAM)
 
 
