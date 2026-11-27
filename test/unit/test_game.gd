@@ -989,19 +989,25 @@ func test_patty_passes_through_five_looks():
 
 
 
-func test_a_group_takes_a_whole_table_and_singles_do_not_share():
-	var pair: Array[Guest] = game.seating.spawn_group([0, 1])
-	var solo_a: Guest = game.seating.spawn_guest(5)
-	var solo_b: Guest = game.seating.spawn_guest(9)
-	var pin := RandomNumberGenerator.new()   # a seed whose roll joins the line (QueueChoice)
+func _spawn_joining(idx: int) -> Guest:
+	var pin := RandomNumberGenerator.new()   # a seed whose first roll joins the line
 	var seed_ := 0
 	while true:
 		pin.seed = seed_
-		if pin.randf() < 0.5:
+		if pin.randf() < QueueChoice.FLOOR:   # under the lowest chance, so it joins whatever the line
 			break
 		seed_ += 1
 	game.order_rng.seed = seed_
-	var late: Guest = game.seating.spawn_guest(11)
+	return game.seating.spawn_guest(idx)
+
+
+
+func test_a_group_takes_a_whole_table_and_singles_do_not_share():
+	var pair: Array[Guest] = game.seating.spawn_group([0, 1])
+	# Every guest who meets a line rolls to join it (QueueChoice): pin each roll to "joins".
+	var solo_a: Guest = _spawn_joining(5)
+	var solo_b: Guest = _spawn_joining(9)
+	var late: Guest = _spawn_joining(11)
 	_run(14.0)
 	assert_eq(pair[0].table, pair[1].table, "the pair sits together")
 	assert_ne(solo_a.table, solo_b.table, "two singles do not share")
