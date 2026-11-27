@@ -289,6 +289,11 @@ func carrying_something_gross() -> bool:
 	return GROSS_ITEMS.has(held) or held.begins_with("burnt:")
 
 
+## Carrying dirty dishes is ordinary service: mild clutter, not rubbish.
+func carrying_dirty_dishes() -> bool:
+	return held == "dirty_dishes"
+
+
 func cell() -> Vector2i:
 	return Grid.to_cell(position)
 

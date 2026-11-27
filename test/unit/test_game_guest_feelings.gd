@@ -17,8 +17,8 @@ func test_a_dirty_plate_is_recorded_as_the_cause_and_faced():
 	other.refresh()
 	g.mood.disgust = 0.2   # just short of Disgusted
 	_run(1.0)
-	assert_eq(g.disgust_from.get("kind"), "plate")
-	assert_eq(g.disgust_from.get("cell"), other.cell)
+	assert_true(g.disgust_from.is_empty(), "a plate is only mild clutter")
+	g.note_disgust(other.cell, "plate")
 	g.mood.disgust = 0.9
 	g._refresh(0.1)
 	assert_gt(g._glance_time, 0.0, "they glance at it")
