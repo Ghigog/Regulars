@@ -57,6 +57,8 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- *Wainscot meets a knee-high wall*: a dining wall's wainscot (or seaside clapboard) and rail stop at the room face of a knee-high wall that meets them, instead of sinking into its cap; at a tall corner or an opening they run as before.
+
 - *Wall hook removed*: the sponge and other small tools are no longer drawn on a hook at the wall; they sit centred (x = 0, z = 0) in their cell on a wall shelf, in a wall cabinet, or on a counter, pass or sink, turned with the piece.
 - *Dispensers on the plain counter*: the soda and two-tap fountains, coffee machine, wine barrel, wine rack and beer tap stand on the same teal-cabinet counter as every other tool, not a coral or wooden cabinet of their own. The machines are unchanged.
 
