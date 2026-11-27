@@ -264,7 +264,7 @@ func test_shop_filters_as_you_search_and_browses_with_the_keys():
 func test_buying_in_the_shop_puts_the_piece_in_hand_and_shuts_it():
 	_to_build()
 	game.session.open_shop()
-	assert_false(game.placing.buy({"id": "table4", "tier": 1}), "level 3 and $90")
+	assert_false(game.placing.buy({"id": "jukebox", "tier": 1}), "level 4 and $120")
 	assert_true(game.shopping)
 	assert_true(game.placing.buy({"id": "counter", "tier": 1}))
 	assert_false(game.shopping)
@@ -397,7 +397,7 @@ func test_closing_early_turns_new_guests_away_but_keeps_those_inside():
 
 func test_catalog_piece_is_paid_for_when_placed_and_gated_by_level():
 	_to_build()
-	assert_false(game.placing.pick_catalog("table4"), "level 3 and $90")
+	assert_false(game.placing.pick_catalog("jukebox"), "level 4 and $120")
 	assert_true(game.placing.pick_catalog("counter"))
 	assert_eq(game.ledger.money, 150, "picking is free")
 	assert_false(game.placing.place(Vector3i(9, 4, 0)), "that would block the doorway")
@@ -452,25 +452,20 @@ func test_carried_piece_goes_back_when_the_day_opens():
 
 
 
-func test_turned_table_has_seats_above_and_below():
+func test_a_chair_moved_beside_a_table_seats_guests_there():
 	_to_build()
 	var table: Station = game.stations[Vector2i(8, 3)]
-	assert_true(game.placing.pick_up(Vector3(8.5, 0, 3.5)))
-	assert_false(game.grid.reserved.has(Vector2i(7, 3)), "its seats come up with it")
-	game.placing.rotate_hand()
-	assert_true(game.placing.place(Vector3i(8, 3, 0)))
-	assert_eq(table.seats, [Vector2i(8, 2), Vector2i(8, 4)] as Array[Vector2i])
-	assert_true(game.grid.reserved.has(Vector2i(8, 4)))
-	game.day.start_day()
-	var cells: Array = []
-	var all: Array[Guest] = []
-	for n in 3:
-		all.append_array(game.seating.spawn_group([n * 2, n * 2 + 1], true))   # critics always join the line
-	_run(14.0)
-	for g in all:
-		cells.append(g.cell)
-	assert_true(cells.has(Vector2i(8, 2)) and cells.has(Vector2i(8, 4)), "guests use the turned seats")
-
+	assert_true(game.placing.pick_up(Vector3(7.5, 0, 3.5)))   # the chair on its left
+	assert_false(game.grid.reserved.has(Vector2i(7, 3)), "its seat comes up with it")
+	assert_eq(table.seats, [Vector2i(9, 3)] as Array[Vector2i])
+	while int(game.hand.facing) != 1:   # turned to face the table below it
+		game.placing.rotate_hand()
+	assert_true(game.placing.place(Vector3i(8, 2, 0)))
+	assert_true(game.stations.has(Vector2i(8, 2)))
+	assert_eq(game.stations[Vector2i(8, 2)].facing, 1)
+	assert_has(table.seats, Vector2i(8, 2))
+	assert_true(game.grid.reserved.has(Vector2i(8, 2)))
+	assert_false(game.grid.is_blocked(Vector2i(8, 2)), "guests walk onto a chair")
 
 
 func test_selling_refunds_half_of_anything_the_last_stove_and_the_fixtures_too():
@@ -521,10 +516,10 @@ func test_new_table_seats_guests():
 	game.ledger.money = 100
 	game.ledger.xp = 100
 	assert_true(game.placing.pick_catalog("table"))
-	assert_false(game.placing.place(Vector3i(9, 5, 0)), "no room for the right-hand seat")
 	assert_true(game.placing.place(Vector3i(2, 5, 0)))
-	assert_true(game.grid.reserved.has(Vector2i(1, 5)))
-	assert_eq(game.ledger.money, 60)
+	assert_true(game.grid.is_blocked(Vector2i(2, 5)))
+	assert_true(game.stations[Vector2i(2, 5)].seats.is_empty(), "a bare tile seats no one")
+	assert_eq(game.ledger.money, 80)
 
 
 
@@ -1000,7 +995,7 @@ func test_a_group_takes_a_whole_table_and_singles_do_not_share():
 	assert_ne(solo_a.table, solo_b.table, "two singles do not share")
 	assert_ne(solo_a.table, pair[0].table)
 	assert_eq(late.state, "queue", "three tables, three groups: the fourth waits outside")
-	assert_eq(game.seating.max_party(), 4, "groups of four come whatever the room holds")
+	assert_eq(game.seating.max_party(), 2, "no group is bigger than the biggest table")
 
 
 

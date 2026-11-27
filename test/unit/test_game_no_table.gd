@@ -2,17 +2,17 @@ extends "res://test/helpers/game_case.gd"
 ## A group no table in the room could ever seat turns away at the door.
 
 
-func _room(cells: Array) -> Array[Station]:
-	for st: Station in game.paying.dining_tables():
-		game.world._unregister(st)
-		st.queue_free()
-	var out: Array[Station] = []
-	for c in cells:
-		out.append(game.world.add_station("table", c))
-	return out
+## One table of two tiles for each of `cells`, each with two chairs; `pair` pushes two
+## tiles together instead, with four chairs.
+func _room(cells: Array, pair := false) -> void:
+	_clear_dining()
+	for c: Vector2i in cells:
+		_add_table([c], [c + Vector2i(-1, 0), c + Vector2i(1, 0)])
+	if pair:
+		_add_table([Vector2i(6, 1), Vector2i(6, 2)], [Vector2i(5, 1), Vector2i(5, 2), Vector2i(7, 1), Vector2i(7, 2)])
 
 
-func test_four_turn_away_when_only_separate_tables_for_two_exist():
+func test_four_turn_away_when_no_table_seats_four():
 	_room([Vector2i(6, 1), Vector2i(9, 4)])
 	var before := float(game.town.people[0].affinity)
 	var party: Array[Guest] = game.seating.spawn_group([0, 1, 2, 3])
@@ -29,7 +29,7 @@ func test_four_turn_away_when_only_separate_tables_for_two_exist():
 
 
 func test_four_wait_in_line_for_a_combined_table_that_is_taken():
-	_room([Vector2i(6, 1), Vector2i(6, 2)])
+	_room([], true)
 	game.seating.spawn_group([0, 1, 2, 3])
 	_run(12.0)
 	var next: Array[Guest] = game.seating.spawn_group([4, 5, 6, 7])

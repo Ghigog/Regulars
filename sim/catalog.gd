@@ -17,9 +17,9 @@ const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## PRD 10: the desk was kept out of the shop until helpers could work; since 10.6 it is
 ## on sale. The one switch that puts every "staff" piece on sale.
 const STAFF_ON_SALE := true
-## EPIC-85: the single seat pieces (chair, booth seat) stay off sale until the sets are
+## EPIC-85: the single seat pieces (chair, booth seat) are on sale since the sets were
 ## retired. The one switch that puts every "seat" piece on sale.
-const SEAT_PIECES_ON_SALE := false
+const SEAT_PIECES_ON_SALE := true
 const TIER_JOY := 0.1   # joy a decor piece gains for each tier above the first
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
 ## A "tool" builds the room itself and is priced per tile or per wall; a "finish"
@@ -94,14 +94,8 @@ const ITEMS := {
 		"up": "Cheers guests more, and further away"},
 	"rug": {"name": "Woven rug", "price": 25, "level": 1, "category": "Decor", "tiers": 1,
 		"joy": 0.15, "blurb": "Cheers guests seated on it, a little those near"},
-	"table": {"name": "Table for two", "price": 40, "level": 2, "category": "Dining", "tiers": 3,
-		"blurb": "Two more seats", "up": "Two comfier seats"},
-	"booth": {"name": "Booth", "price": 60, "level": 2, "category": "Dining", "tiers": 3,
-		"blurb": "Two cosy bench seats", "up": "Two cosier bench seats"},
-	"table4": {"name": "Table for four", "price": 90, "level": 3, "category": "Dining", "tiers": 3,
-		"blurb": "Seats a group of four", "up": "Four comfier seats"},
-	"stool": {"name": "Counter stool", "price": 25, "level": 1, "category": "Dining", "tiers": 3,
-		"blurb": "One seat, for guests who come alone", "up": "A comfier seat"},
+	"table": {"name": "Table", "price": 20, "level": 1, "category": "Dining", "tiers": 1,
+		"blurb": "One tile of table. Tiles that touch make one table; chairs beside it seat guests"},
 	"chair": {"name": "Chair", "price": 10, "level": 1, "category": "Dining", "tiers": 3, "seat": true,
 		"blurb": "One seat, for a table beside it", "up": "A comfier seat"},
 	"booth_seat": {"name": "Booth seat", "price": 20, "level": 1, "category": "Dining", "tiers": 3,

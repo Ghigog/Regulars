@@ -55,21 +55,6 @@ func test_own_spot_is_always_accepted_and_put_back_in_the_held_facing():
 	assert_true(game.hand.is_empty())
 
 
-func test_own_spot_falls_back_to_the_old_facing_when_the_turn_does_not_pass():
-	_to_build()
-	_lift_table()
-	var from: Vector3i = game.hand.from
-	var was: int = game.hand.from_facing
-	game.hand.facing = (was + 1) % 4
-	# Block the turned seat so only the old way round passes.
-	var turned := Station.seats_for("table", Vector2i(from.x, from.y), int(game.hand.facing))
-	for s in turned:
-		if not Station.seats_for("table", Vector2i(from.x, from.y), was).has(s):
-			game.grid.blocked[s] = true
-	assert_true(game.placing.place(from))
-	assert_eq(game.stations[Vector2i(from.x, from.y)].facing, was)
-
-
 func test_cutting_off_a_seat_says_so():
 	_to_build()
 	game.ledger.money = 500

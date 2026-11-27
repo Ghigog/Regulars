@@ -12,10 +12,13 @@ func _init(game_: Game) -> void:
 
 # ---------------------------------------------------------------- guests
 
-## The biggest group that comes: four, whatever the room holds. A group the room can
-## never seat turns away at the door.
+## The biggest group that comes: the most seats on any one table, up to Town.MAX_PARTY.
+## A group the room can never seat turns away at the door.
 func max_party() -> int:
-	return TableJoins.PAIR_SEATS
+	var most := 0
+	for t: Dictionary in game.tables.list:
+		most = maxi(most, int(t.seats))
+	return mini(most, Town.MAX_PARTY)
 
 
 ## A lone guest: a group of one.
@@ -227,10 +230,10 @@ func _seat_waiting_guests() -> void:
 
 
 func on_seated(g: Guest) -> void:
-	var half := game.tables.half_of_seat(g.table, g.seat)   # tier and booth are the guest's own half's
-	if half.tier > 1:
-		g.mood.delight(0.05 * (half.tier - 1), "What a lovely table")
-	if half.type == "booth":
+	var seat: Station = game.stations.get(g.seat)   # comfort is the guest's own seat's
+	if seat != null and seat.tier > 1:
+		g.mood.delight(0.05 * (seat.tier - 1), "What a lovely table")
+	if seat != null and seat.type == "booth_seat":
 		g.mood.delight(Game.BOOTH_DELIGHT, "A booth! How cosy")
 	for other in game.tables.seats_of(g.table):
 		if other != g.seat and game.seat_taken.has(other):

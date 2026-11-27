@@ -457,7 +457,7 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 	var c := Catalog.new(1)
 	assert_eq(Catalog.price_of("stove", 2), 100)
 	assert_eq(Catalog.price_of("plant", 3), 80)
-	assert_eq(Catalog.level_of("table", 3), 4)
+	assert_eq(Catalog.level_of("chair", 3), 3)
 	assert_true(c.can_buy("plant", 40, 2, 2))
 	assert_false(c.can_buy("plant", 40, 1, 2), "tier 2 needs level 2")
 	assert_false(c.can_buy("plant", 39, 2, 2))
@@ -468,7 +468,7 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 func test_catalog_search_by_word_and_category():
 	assert_eq(Catalog.search().size(), _roots(Catalog.search()).size(), "only roots: a step up a tree is bought on the piece, lifted")
-	assert_eq(_roots(Catalog.search()).size(), 69, "one entry a piece, the cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); seven boxes of PRD 8.6; two cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
+	assert_eq(_roots(Catalog.search()).size(), 67, "one entry a piece, the cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); seven boxes of PRD 8.6; two cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
 	var ferns := _roots(Catalog.search("FERN"))
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
@@ -486,7 +486,7 @@ func test_catalog_search_by_word_and_category():
 	assert_eq(pantry[0].id, "box_bun", "boxes are free to take: by name")
 	assert_eq(Catalog.search("", "Kitchen", "seaside").filter(func(bp: Dictionary) -> bool:
 		return Catalog.ITEMS[bp.id].get("theme", "seaside") != "seaside").size(), 0, "only the run's theme")
-	assert_eq(Catalog.search("two more seats").size(), 1, "matches what a piece does")
+	assert_eq(Catalog.search("tiles that touch").size(), 1, "matches what a piece does")
 	assert_eq(Catalog.search("stove ++").size(), 0, "tiers are steps in the trees now")
 	assert_eq(Catalog.search("fern", "Kitchen").size(), 0)
 	assert_eq(Catalog.search("partition")[0].id, "screen")

@@ -347,7 +347,7 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			if not dry_run and act in ["Scrape off", "Throw away"]:
 				st.count += 1
 				st.refresh()
-		"table", "booth", "table4":
+		"table":
 			var g := game.seating._waiting_guest_at(st)
 			var to_order := game.seating._guests_to_order(st)
 			var fed: Array[Guest] = []

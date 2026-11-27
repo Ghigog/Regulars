@@ -10,19 +10,22 @@ func _init(game_: Game) -> void:
 	game = game_
 
 
-## EPIC 28: the room cleared of dining pieces, then a pair pushed together and a lone table
-## (cards 4 and 2) and a run of three (a pair and a leftover: cards 4 and 2 again). From 5 s (after the 1 s start) one
-## of the pair is lifted and, at 7 s, put back (shoot at 4, 6.5 and 8.5).
+## EPIC 28: the room cleared of dining pieces, then a pair of Table tiles with four chairs
+## (card 4), a lone tile with two (card 2) and a run of three with four (card 4). From 5 s
+## one tile of the pair is lifted (the card halves) and, at 7 s, put back (shoot at 4, 6.5 and 8.5).
 func _demo_seat_cards() -> void:
-	for st: Station in game.paying.dining_tables():
+	for st: Station in game.stations.values().filter(func(o: Station) -> bool: return Station.is_table(o.type) or Station.is_seat(o.type)):
 		game.world._unregister(st)
 		st.queue_free()
-	for spot: Array in [[5, 5, 0], [5, 6, 0], [8, 5, 1], [5, 1, 1], [6, 1, 1], [7, 1, 1]]:   # pair, lone, run of three
-		game.world.add_station("table", Vector2i(spot[0], spot[1]), 1, spot[2])
+	for c: Vector2i in [Vector2i(6, 5), Vector2i(6, 6), Vector2i(9, 6), Vector2i(5, 1), Vector2i(6, 1), Vector2i(7, 1)]:
+		game.world.add_station("table", c)
+	# x, y, facing: the pair's four, the lone tile's two, the run's four
+	for spot: Array in [[5, 5, 2], [5, 6, 2], [7, 5, 0], [7, 6, 0], [8, 6, 2], [9, 5, 1], [4, 1, 2], [8, 1, 0], [6, 2, 3], [6, 0, 1]]:
+		game.world.add_station("chair", Vector2i(spot[0], spot[1]), 1, spot[2])
 	game.player.position = Grid.center(Vector2i(3, 3))
-	# From 5 s a table of the pair is lifted (4 splits into 2 and 2), and put back at 7 s (clack).
+	# From 5 s a tile of the pair is lifted (4 becomes 2), and put back at 7 s (clack).
 	game.get_tree().create_timer(5.0).timeout.connect(func() -> void:
-		var st: Station = game.stations.get(Vector2i(5, 6))
+		var st: Station = game.stations.get(Vector2i(6, 6))
 		if st != null:
 			game.world._unregister(st)
 			st.visible = false
@@ -41,7 +44,7 @@ func _demo_build(demo: String) -> void:
 		var small := "gumball" if not Scenery.seaside() else "lantern"
 		for spot: Array in [["dish_rack", 3, 3, 0], ["sink", 3, 6, 0], ["bin", 1, 6, 0],
 				["floor_lamp", 5, 0, 0], [show, 7, 0, 0], [small, 8, 0, 0], ["flower_stand", 9, 2, 0],
-				["coat_stand", 5, 6, 0], ["stool", 5, 3, 0]]:
+				["coat_stand", 5, 6, 0], ["chair", 5, 3, 0]]:
 			game.world.add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3])
 		return
 	for step: Array in [["counter", 2, 4, 0], ["screen", 8, 5, 0], ["screen", 9, 5, 0], ["table", 8, 6, 0], [GameWorld.fern(), 9, 2, 0]]:
@@ -87,12 +90,12 @@ func _demo_build(demo: String) -> void:
 			game.placing.pick_catalog("floor_planks")
 			game.player.drag = {"from": Vector3(-0.5, 0, -1.5), "remove": false}
 			game._demo_hover = Vector3(3.5, 0, 1.5)
-	elif demo == "build_dining" or demo == "build_dining_shop":  # a booth and a table for four, in the room or the shop
-		for spot: Array in [[Vector3(6.5, 0, 1.5), "table4", Vector3i(6, 1, 0)], [Vector3(6.5, 0, 5.5), "booth", Vector3i(6, 5, 0)]]:
+	elif demo == "build_dining" or demo == "build_dining_shop":  # a booth seat and a top-tier chair, in the room or the shop
+		for spot: Array in [[Vector3(7.5, 0, 1.5), "booth_seat", 1, Vector3i(7, 1, 0)], [Vector3(7.5, 0, 5.5), "chair", 3, Vector3i(7, 5, 0)]]:
 			game.placing.pick_up(spot[0])
 			game.placing.sell_hand()
-			game.placing.pick_catalog(spot[1], 1)
-			game.placing.place(spot[2])
+			game.placing.pick_catalog(spot[1], spot[2])
+			game.placing.place(spot[3])
 			game.placing.cancel_hand()   # a bought piece stays in hand for the next one
 		if demo == "build_dining_shop":
 			game.session.open_shop()

@@ -29,8 +29,8 @@ func test_queue_line_doorway_board_kerb_and_road_are_refused():
 		assert_ne(_refusal("plant", cell), "", "refused at %s" % cell)
 
 
-func test_table_with_a_seat_on_the_queue_line_is_refused():
-	assert_ne(_refusal("table", STREET, 0), "", "its seats would be on the queue line and the kerb")
+func test_chair_on_the_queue_line_is_refused():
+	assert_ne(_refusal("chair", Vector2i(Game.W, 1), 0), "", "a seat on the queue line")
 
 
 func test_piece_that_shuts_the_street_end_off_is_refused():
@@ -49,11 +49,14 @@ func test_guest_goes_through_seat_order_serve_pay_at_an_outdoor_table():
 	_to_build()
 	# Take the indoor tables away so the pavement is the only seating.
 	for st: Station in game.stations.values().duplicate():
-		if not st.seats.is_empty():
+		if Station.is_table(st.type) or Station.is_seat(st.type):
 			game.world._unregister(st)
 			st.queue_free()
-	_hold("table", 1)
+	_hold("table")
 	assert_true(game.placing.place(Vector3i(STREET.x, STREET.y, 0)))
+	game.placing.cancel_hand()
+	_hold("chair", 3)   # below the table, facing it
+	assert_true(game.placing.place(Vector3i(STREET.x, STREET.y + 1, 0)))
 	game.placing.cancel_hand()
 	game.phase = Game.Phase.SERVICE   # the door opens on the new layout
 	game.tables.rebuild()

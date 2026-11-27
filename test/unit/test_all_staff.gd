@@ -94,6 +94,8 @@ func _chores() -> Dictionary:
 	var mess: FloorMess = game.floor_dirt.mess
 	for c: Vector2i in mess.dirt:
 		if mess.level(c) >= 1 and mess.can_clean(c) and game.grid.in_bounds(c):
+			if game.grid.find_path(game.ENTRANCE_CELL, c).is_empty():
+				continue   # shut in by furniture (the corner behind two counters): nobody can reach it
 			out["dirt at %s" % str(c)] = true
 	for st: Station in game.stations.values():
 		if Station.is_table(st.type) and st.dirty > 0:
@@ -180,7 +182,7 @@ func test_every_piece_in_the_all_staff_room_can_be_reached():
 		if is_failing():
 			return
 		for st: Station in game.stations.values():
-			if st.type in ["table", "fern", "desk"] or Station.is_table(st.type):
+			if st.type in ["fern", "desk"] or Station.is_table(st.type) or Station.is_seat(st.type):
 				continue
 			var ok := false
 			for d: Vector2i in Grid.DIRS:
@@ -224,16 +226,21 @@ func test_the_crew_covers_every_duty_the_room_gives():
 		assert_eq(game.menu_stock.treat_boxed().size(), 3, "%s: cleaner, primer and finish boxed apart from food" % theme)
 
 
-## A group of four at two tables pushed together: the helpers take one order, serve all four,
-## bring one bill and clear the plates on both halves.
+## A group of four at one table of two tiles: the helpers take one order, serve all four,
+## bring one bill and clear the plates on every tile.
 func test_helpers_serve_bill_and_clear_a_combined_table():
 	_start("diner", 11)
 	if is_failing():
 		return
-	for st: Station in game.paying.dining_tables():
-		game.world._unregister(st)
-		st.queue_free()
+	for st: Station in game.stations.values().duplicate():
+		if Station.is_table(st.type) or Station.is_seat(st.type):
+			game.world._unregister(st)
+			st.queue_free()
 	var halves: Array[Station] = [game.world.add_station("table", Vector2i(6, 1)), game.world.add_station("table", Vector2i(6, 2))]
+	for c: Vector2i in [Vector2i(5, 1), Vector2i(5, 2)]:
+		game.world.add_station("chair", c, 1, 2)
+	for c: Vector2i in [Vector2i(7, 1), Vector2i(7, 2)]:
+		game.world.add_station("chair", c, 1, 0)
 	game.phase = game.Phase.SERVICE
 	game.door_open = true
 	var party: Array[Guest] = game.seating.spawn_group([0, 1, 2, 3])
@@ -251,7 +258,7 @@ func test_helpers_serve_bill_and_clear_a_combined_table():
 	assert_true(paid, "all four were served, billed and left (%.0f s)" % t)
 	assert_eq(game.tickets.size(), 0, "no ticket left on the rail")
 	for g: Guest in party:
-		assert_false(game.seat_taken.get(g.seat) == g, "the party gave up its chairs on both halves")
+		assert_false(game.seat_taken.get(g.seat) == g, "the party gave up its chairs on every tile")
 	var open := t
 	while t < open + 120.0 and (halves[0].dirty > 0 or halves[1].dirty > 0):
 		game.step(STEP)

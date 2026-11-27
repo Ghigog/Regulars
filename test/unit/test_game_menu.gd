@@ -386,21 +386,6 @@ func test_a_new_decor_piece_cheers_by_its_reach_and_shows_it_while_carried():
 
 
 
-func test_a_counter_stool_seats_one_guest_and_never_a_pair():
-	assert_eq(Station.seats_for("stool", Vector2i(8, 5), 0), [Vector2i(9, 5)] as Array[Vector2i])
-	assert_eq(Station.seats_for("stool", Vector2i(8, 5), 1).size(), 1)
-	var stool: Station = game.world.add_station("stool", Vector2i(8, 5))
-	assert_eq(game.seating.max_party(), 4, "a stool does not change who comes")
-	var solo: Guest = game.seating.spawn_guest(5)
-	_run(14.0)
-	assert_eq(solo.table, stool, "a single takes the stool before a table for two")
-	var pair: Array[Guest] = game.seating.spawn_group([0, 1])
-	_run(14.0)
-	assert_ne(pair[0].table, stool)
-	assert_eq(pair[0].table, pair[1].table)
-
-
-
 func test_a_dish_rack_beside_the_sink_takes_more_dishes():
 	var sink: Station = game.world.find_station("sink")
 	assert_true(sink.racked, "the starting rack is beside the sink")

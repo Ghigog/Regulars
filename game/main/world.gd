@@ -114,7 +114,9 @@ func _build_layout() -> void:
 		# The kitchen starts empty but for the sink, the bin, the dish rack and the
 		# counters: the player buys the first stations and writes the menu on night zero.
 		["dish_rack", 2, 2], ["sink", 3, 2], ["bin", 0, 5, 1],
-		["table", 6, 1], ["table", 8, 3], ["table", 6, 5], [fern(), 9, 0],
+		["table", 6, 1], ["chair", 5, 1, 2], ["chair", 7, 1, 0],
+		["table", 8, 3], ["chair", 7, 3, 2], ["chair", 9, 3, 0],
+		["table", 6, 5], ["chair", 5, 5, 2], ["chair", 7, 5, 0], [fern(), 9, 0],
 	]:
 		add_station(spot[0], Vector2i(spot[1], spot[2]), 1, spot[3] if spot.size() > 3 else 0)
 	# The pass: four real counters drawn as the frame's long teal run, each sellable,
@@ -278,9 +280,10 @@ func _stacks_on(cell: Vector2i, h: Dictionary) -> bool:
 
 func _register(st: Station) -> void:
 	game.stations[st.cell] = st
-	game.grid.blocked[st.cell] = true
-	for s in st.seats:
-		game.grid.reserved[s] = true
+	if Station.is_seat(st.type):   # guests walk onto a seat, but nothing else is built there
+		game.grid.reserved[st.cell] = true
+	else:
+		game.grid.blocked[st.cell] = true
 	if st.base != "":
 		game.kitchen.set_cell(st.cell, st.base, st.node if Kitchen.is_top(st.type) else "")
 	st.set_wall(false)
@@ -413,8 +416,7 @@ func _unregister(st: Station) -> void:
 	game.stations.erase(st.cell)
 	game.kitchen.set_cell(st.cell, "")
 	game.grid.blocked.erase(st.cell)
-	for s in st.seats:
-		game.grid.reserved.erase(s)
+	game.grid.reserved.erase(st.cell)
 	_refresh_wall(st.cell)
 	_show_boxes(st.cell)
 	_update_racks()

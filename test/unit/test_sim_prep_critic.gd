@@ -150,7 +150,8 @@ func test_a_themed_search_lists_untagged_pieces_and_that_themes_own():
 			if not Catalog.ITEMS[id].has("theme") and (node == "" or (Kitchen.is_root(node) and not Kitchen.TOP_LINKS.has(node))) \
 					and (treat == "" or (Treatments.ON_SALE and Treatments.is_box(id) and Treatments.is_root(treat))) \
 					and (Catalog.STAFF_ON_SALE or not Catalog.ITEMS[id].get("staff", false)) \
-					and (Catalog.SEAT_PIECES_ON_SALE or not Catalog.ITEMS[id].get("seat", false)):
+					and (Catalog.SEAT_PIECES_ON_SALE or not Catalog.ITEMS[id].get("seat", false)) \
+					and not Catalog.ITEMS[id].get("tree_only", false):
 				assert_true(ids.has(id), "%s is sold everywhere" % id)
 	assert_true(Catalog.sold_in("jukebox", "diner"))
 	assert_false(Catalog.sold_in("jukebox", "seaside"))
