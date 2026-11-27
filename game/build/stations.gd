@@ -72,11 +72,14 @@ static func bin_load(n: Node3D, fill: int, holds: int) -> void:
 ## two posts holding a low back panel, so the legs read below the seat and the
 ## back stays low enough to show faces (0.9 m). `centred` stands a lone chair on its
 ## own cell, its back toward `away` (a chair piece, which turns to face its table).
-static func _chair(n: Node3D, away: Vector2i, col: String, centred := false) -> void:
+static func _chair(n: Node3D, away: Vector2i, col: String, centred := false, path := "", steps := 0) -> void:
 	var c := Node3D.new()
 	c.position = Vector3.ZERO if centred else Vector3(away.x, 0, away.y)
 	c.rotation.y = atan2(-float(away.y), float(away.x))
 	n.add_child(c)
+	if path == "fast":
+		_chair_fast(c, steps)
+		return
 	var legs := Build.WOOD_DARK
 	var rough := Build.R_MATTE if col == Build.CORAL else Build.R_WOOD
 	for lz: float in [-0.22, 0.22]:
@@ -86,9 +89,29 @@ static func _chair(n: Node3D, away: Vector2i, col: String, centred := false) -> 
 		Build._add(c, Build.bevel_mesh(Vector3(0.075, 0.92, 0.075), 0.025), Vector3(0.22, 0.46, lz), Color(legs), 0.0, Build.R_WOOD)
 		Build._add(c, Build.bevel_mesh(Vector3(0.44, 0.04, 0.04), 0.015), Vector3(0, 0.13, lz), Color(legs), 0.0, Build.R_WOOD)
 	Build._add(c, Build.bevel_mesh(Vector3(0.54, 0.05, 0.54), 0.02), Vector3(0, 0.355, 0), Color(legs), 0.0, Build.R_WOOD)
-	Build._add(c, Build.bevel_mesh(Vector3(0.52, 0.07, 0.52), 0.03), Vector3(-0.01, 0.41, 0), Color(col), 0.0, rough)
+	# Comfortable seats are plumper: a thicker seat cushion, and from the second step a
+	# second, higher back cushion (the back stays under 0.9 m so faces show).
+	var plump := 0.03 * float(steps) if path == "comfortable" else 0.0
+	Build._add(c, Build.bevel_mesh(Vector3(0.52, 0.07 + plump, 0.52), 0.03), Vector3(-0.01, 0.41 + plump / 2.0, 0), Color(col), 0.0, rough)
 	Build._add(c, Build.bevel_mesh(Vector3(0.07, 0.3, 0.4), 0.03), Vector3(0.23, 0.72, 0), Color(col), 0.0, rough)
+	if path == "comfortable" and steps > 1:
+		Build._add(c, Build.bevel_mesh(Vector3(0.09, 0.14, 0.4), 0.04), Vector3(0.17, 0.5, 0), Color(_tint(col, 0.1)), 0.0, rough)
 	Build._add(c, Build.bevel_mesh(Vector3(0.09, 0.05, 0.52), 0.02), Vector3(0.22, 0.9, 0), Color(legs), 0.0, Build.R_WOOD)
+
+
+## A Fast seat (EPIC-87): bare light wood, no cushion, hard and plain. Step 1 is a
+## ladder-back chair with a plank seat; step 2 a backless stool, so it reads as the
+## harder of the two and guests stay in plain view.
+static func _chair_fast(c: Node3D, steps: int) -> void:
+	var wood := Build.WOOD
+	for lz: float in [-0.2, 0.2]:
+		for lx: float in [-0.2, 0.2]:
+			var tall := lx > 0.0 and steps < 2
+			Build._add(c, Build.bevel_mesh(Vector3(0.06, 0.88 if tall else 0.38, 0.06), 0.02), Vector3(lx, 0.44 if tall else 0.19, lz), Color(wood), 0.0, Build.R_WOOD)
+		Build._add(c, Build.bevel_mesh(Vector3(0.44, 0.03, 0.03), 0.01), Vector3(0, 0.14, lz), Color(wood), 0.0, Build.R_WOOD)
+	Build._add(c, Build.bevel_mesh(Vector3(0.5, 0.05, 0.5), 0.015), Vector3(0, 0.395, 0), Color(wood), 0.0, Build.R_WOOD)
+	if steps < 2:   # one thin top rail on the posts: no panel, no cushion
+		Build._add(c, Build.bevel_mesh(Vector3(0.05, 0.07, 0.46), 0.015), Vector3(0.2, 0.78, 0), Color(wood), 0.0, Build.R_WOOD)
 
 
 static func _shade(col: String, amount := 0.13) -> String:
