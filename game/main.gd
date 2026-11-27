@@ -642,6 +642,10 @@ func _paint_held(p: int) -> void:
 	if not held or shopper == ch or (hud.typing() and controls.owner_of("keys") == p) or ch.hand.is_empty() \
 			or GamePlacing.floor_kind(ch.hand.id) == "" or ch.aim_mouse:
 		ch.last_paint = Vector3i(-999, -999, -1)
+		if not held:
+			ch.paint_wait = false
+		return
+	if ch.paint_wait:   # the press that took the tile from the shop is still down
 		return
 	var spot := placing.snap(room_edit._hover_point(ch), ch)
 	if spot != ch.last_paint:

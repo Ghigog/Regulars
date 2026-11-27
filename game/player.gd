@@ -42,6 +42,7 @@ var drag := {}                    # a mouse drag with a build tool: {"from": Vec
 var aim_mouse := false            # build phase: the mouse, not the chef, says where things go
 var aiming := false               # Shift (a trigger, the touch Aim button) held: standing still, turning
 var mouse_point := Vector3.INF
+var paint_wait := false   # a floor tool was taken while Use was held: no paving until it is let go
 var last_paint := Vector3i(-999, -999, -1)   # the spot Use last built on while held
 var demo_hover := Vector3.INF     # demos and tests: where the hand is held
 var ghost: Node3D                 # the piece in hand, held over its spot
