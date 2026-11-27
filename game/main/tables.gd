@@ -38,7 +38,7 @@ func _redraw_joins() -> void:
 	var pieces := []
 	var by_number := {}
 	for st: Station in game.stations.values():
-		if st.type in ["table", "booth_seat", "chair"]:
+		if st.type in ["table", "booth_seat", "chair", "chair_fast"]:
 			by_number[pieces.size() + 1] = st
 			pieces.append({"type": st.type, "cell": st.cell, "facing": st.facing, "number": pieces.size() + 1})
 	var candles := {}   # tile -> where its candle stands, for the tiles that hold one
