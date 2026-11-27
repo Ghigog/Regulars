@@ -138,6 +138,8 @@ func _apply_demo(demo: String) -> void:
 		game.player.take_dish(Dish.make(Dish.PLATE))
 		for a in game.arrivals:
 			a.time = 1.0
+	elif demo == "hob_fry":   # fries part-way cooked in the hob's pan, the dial in its green window; shoot at about 3
+		game.demo_scenes._demo_hob_fry()
 	elif demo in ["aim", "aim_reach"]:   # the faint aim mark on a bare counter, or at shelf height while reaching; shoot at about 3
 		var c := Vector2i(0, 6)
 		if not game.stations.has(c):

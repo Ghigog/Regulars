@@ -404,9 +404,10 @@ Win by earning five stars from the critic; lose when the reputation meter hits 0
   plays as before; a stand-in (0.6) has a narrower chop notch and faster marker, less
   time to slice and less slack, a narrower pour band and a faster cup, and a grill or
   fry window and slide to burnt 0.6 as long; a specialist (1.6) the reverse; a pot boils
-  in `BOIL_TIME / q`. Stand-ins work: a board slices, a slicer chops, a stove fries and
-  boils (working as a fryer or pot while that is on it), a pot or fryer grills at 0.4,
-  and the menu counts them as tools. The auto slicer plays itself: always good, no burst.
+  in `BOIL_TIME / q`. Stand-ins work: a board slices, a slicer chops, and the
+  hob (the starting stove, T-117) grills, fries and boils at base in its own pan, never
+  turning into a fryer or pot; its upgrades each keep one job (char grill, fryer, stock
+  pot) at the specialist's quality and refuse the others. The menu counts them as tools. The auto slicer plays itself: always good, no burst.
   `REGULARS_DEMO=tree`, `tree_stove`, `tree_counter`, `tree_fern`, `upgraded`.
 - **New jobs (PRD 8.6).** Five more jobs, each a specialist branch of an existing tree
   with a short press minigame (`Prep`, `PrepWidget`): grate (grater off the slicer, then

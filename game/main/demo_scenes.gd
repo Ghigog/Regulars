@@ -10,6 +10,18 @@ func _init(game_: Game) -> void:
 	game = game_
 
 
+## The starting hob with fries part-way cooked in its own pan (hob_fry; shoot at about 3).
+func _demo_hob_fry() -> void:
+	var hob: Station = game.world.find_station("stove")
+	hob.set_item("raw:potato")
+	hob.cook = 3.8
+	hob._update_cooking_visuals()
+	game.player.position = Grid.center(Vector2i(1, 3))
+	game.player.look(Vector2i(-1, 0))
+	for a in game.arrivals:
+		a.time = 1.0
+
+
 ## EPIC 28: the room cleared of dining pieces, then a pair of Table tiles with four chairs
 ## (card 4), a lone tile with two (card 2) and a run of three with four (card 4). From 5 s
 ## one tile of the pair is lifted (the card halves) and, at 7 s, put back (shoot at 4, 6.5 and 8.5).
