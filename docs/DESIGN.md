@@ -394,6 +394,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   the fryer, pot and slicer are reached from the stove and board. Selling pays half the
   piece's whole price, as before. A counter bought into a double in its tree lifts off
   whole. A counter can no longer be put on a counter (refused as taken); the tree is the only way to a double counter. Only a double counter stacked by hand in an old save still comes apart one at a time.
+  A fridge already owned, carried whole and put down on a bare under-counter fridge (wall above clear, no tool on it) merges with it into a tall fridge, free, in the target's place and facing; undo is cleared and the tall fridge never comes apart: it can only be sold. A fridge new from the shop still cannot go on a fridge.
 - **Quality is difficulty (PRD 8.3).** The tools' three tiers are gone; each tool does
   its jobs at a quality from its tree node, and the minigames read it (`Prep`): 1.0
   plays as before; a stand-in (0.6) has a narrower chop notch and faster marker, less
