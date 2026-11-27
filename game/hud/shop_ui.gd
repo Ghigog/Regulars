@@ -177,8 +177,7 @@ func _shop_info(bp: Dictionary) -> Dictionary:
 	elif Treatments.is_laying_tool(id):
 		price = "Free to lay"
 	elif Catalog.is_box(id):   # a box is free to take; its kind costs a fee each night (PRD 8.4)
-		var b := Pantry.station_ingredient(id)
-		price = "$%d a night" % Pantry.fee_of(b.id, b.ready)
+		price = "$%d a night" % Pantry.box_fee(id)
 	return {"name": Catalog.label(bp), "blurb": Catalog.bp_blurb(bp), "locked": locked,
 		"price": "Level %d" % need if locked else price,
 		"can": not locked and hud.game.catalog.can_buy(id, l.money, hud.game.placing.buy_level(id), tier) and l.money >= Catalog.bp_price(bp)}
@@ -191,7 +190,7 @@ func _storage_info(bp: Dictionary) -> Dictionary:
 		return _card_act_info(bp)
 	var b := Pantry.station_ingredient(bp.id)
 	var fee := Treatments.fee_words(Treatments.key_of(bp.id)) if Treatments.is_box(bp.id) \
-		else ("Free" if b.is_empty() else "$%d a night" % Pantry.fee_of(b.id, b.ready))
+		else ("Free" if b.is_empty() else "$%d a night" % Pantry.box_fee(bp.id))
 	if bp.get("stored", false):
 		return {"name": Catalog.label(bp), "blurb": "Stored here. Take it out", "locked": false,
 			"price": "Take out", "can": true}
