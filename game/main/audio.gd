@@ -110,17 +110,36 @@ func set_tilt_shift(on: bool) -> void:
 	game._env.adjustment_contrast = 1.06 if on else 1.0
 
 
-## Morning light drifts to a warm, low evening sun as the day goes on.
+## How far into the night the light is, 0 to 1. Service runs morning, noon, sunset, then dusk into night, so
+## the dusk part of the day's progress reaches 1 as service ends; the build phase keeps the night, and the next
+## morning eases out of it through `_night`. The lights and the clock read this one value.
+const DUSK_FROM := 0.75
+func night_amount() -> float:
+	var dusk := 0.0
+	if game.phase == Game.Phase.SERVICE:
+		dusk = clampf((game.day.day_progress() - DUSK_FROM) / (1.0 - DUSK_FROM), 0.0, 1.0)
+	return smoothstep(0.0, 1.0, maxf(dusk, game._night))
+
+
+## Morning light climbs to a high noon sun, drifts to a warm, low orange sunset, then dusk falls into the
+## moonlit night that the build phase keeps.
 func _update_daylight() -> void:
-	var t := smoothstep(0.35, 1.0, game.day.day_progress())
-	game._sun.light_color = Color("#fff3e2").lerp(Color("#ffb27c"), t)  # ends in an orange sunset
-	var p := game.day.day_progress()
+	var p: float = game.day.day_progress()
+	var t := smoothstep(0.45, DUSK_FROM, p)   # 0 by day, 1 in the orange evening
+	game._sun.light_color = Color("#fff3e2").lerp(Color("#ffb27c"), t)
+	var dt: float = game.get_process_delta_time()
+	if game.phase == Game.Phase.SERVICE:   # dusk carries the night in, so the hand-over to build has no jump
+		var dusk := clampf((p - DUSK_FROM) / (1.0 - DUSK_FROM), 0.0, 1.0)
+		game._night = maxf(move_toward(game._night, 0.0, dt * 0.7), dusk)
+	else:
+		game._night = move_toward(game._night, 1.0, dt * 0.7)
+	var n := night_amount()  # 0 by day, 1 in the calm of the night: moonlight and lamps
 	# East is the right of the screen and west is the left, so shadows run across
-	# the picture: leftward in the morning, rightward by evening. The arc leans a
+	# the picture: leftward in the morning, rightward by evening. Overhead at noon
+	# (about 0.3 of the day), low in the west when the sunset is done. The arc leans a
 	# little toward the camera so the faces we see are lit at midday.
-	game._night = move_toward(game._night, 1.0 if game.phase == Game.Phase.BUILD else 0.0, game.get_process_delta_time() * 0.7)
-	var n := smoothstep(0.0, 1.0, game._night)  # 0 by day, 1 in the calm of the night: moonlight and lamps
-	var arc := deg_to_rad(lerpf(lerpf(24.0, 156.0, p), 128.0, n))
+	var day_arc := lerpf(24.0, 90.0, p / 0.3) if p < 0.3 else lerpf(90.0, 156.0, minf((p - 0.3) / (DUSK_FROM - 0.3), 1.0))
+	var arc := deg_to_rad(lerpf(day_arc, 128.0, n))
 	var east := Vector3(1, 0, -1).normalized()
 	var over := Vector3(0, 1, 0).rotated(east, deg_to_rad(Game.SUN_LEAN))
 	var from := east * cos(arc) + over * sin(arc)
