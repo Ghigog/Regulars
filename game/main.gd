@@ -223,6 +223,7 @@ var serving := GameServing.new(self)   # orders, tickets, trays, serving and dea
 var paying := GamePaying.new(self)   # bills, the till line and guests leaving
 var cooking := GameCooking.new(self)   # using stations: cooking, carrying, storage, washing
 var prep_games := GamePrepGames.new(self)   # the prep minigames and stove loops
+var aim_mark := GameAimMark.new(self)   # the faint mark where a chef points while Aim or Reach is held
 var coop := GameCoop.new(self)   # co-op: joining, leaving, readiness and act()
 var _sfx := {}
 var music_id := ""               # which MUSIC track is playing
@@ -488,6 +489,7 @@ func _process(delta: float) -> void:
 	_update_camera(delta)
 	for ch in chefs:
 		_update_cursor(ch)
+		aim_mark.update(ch)
 		room_edit._update_ghost(ch)
 		decor._update_range(ch)
 	audio._update_daylight()
