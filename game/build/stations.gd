@@ -127,9 +127,10 @@ const FRIDGE_WHITE := "#eef3f4"
 
 
 ## A counter-based piece whose base is a fridge (marked by `_station_body`) has the
-## white fridge body on every side in place of the teal cabinet: one place decides it.
+## white fridge body on every side in place of the teal cabinet or an appliance's steel
+## body (a stove on a fridge too): one place decides it.
 static func _is_fridge_body(n: Node3D, body: String) -> bool:
-	return body == Build.CABINET and n.has_meta("fridge_base")
+	return (body == Build.CABINET or body == Build.STEEL) and n.has_meta("fridge_base")
 
 
 ## A 0.9 m counter: darker toe-kick, body with two doors and brass handles on the

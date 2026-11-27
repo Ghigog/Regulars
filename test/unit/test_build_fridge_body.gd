@@ -49,3 +49,12 @@ func test_a_plain_counter_keeps_its_teal_body():
 	var n := _build("counter", "")
 	assert_true(_has_colour(n, Color(Build.CABINET)))
 	assert_false(_white_body_spans_cell(n))
+
+
+func test_a_steel_bodied_tool_on_a_fridge_is_white_not_steel():
+	for type in ["stove", "fryer"]:
+		var n := _build(type, "fridge")
+		assert_true(_white_body_spans_cell(n), "%s has the white body" % type)
+		assert_false(_meshes(n).any(func(m: MeshInstance3D) -> bool:
+			var size := m.mesh.get_aabb().size * m.scale
+			return _colour(m).is_equal_approx(Color(Build.STEEL)) and size.x >= 0.9 and size.y >= 0.69), "%s keeps no steel body" % type)
