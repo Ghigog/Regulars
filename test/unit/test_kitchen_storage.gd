@@ -273,9 +273,11 @@ func test_first_room_hangs_its_fixtures_as_pieces_in_both_themes():
 		for at: Vector2i in [Vector2i(0, 5), Vector2i(0, 6)]:
 			assert_eq(game.kitchen.get_piece(at, "high"), "cabinet", theme)
 		assert_eq(game.kitchen.get_piece(Vector2i(3, 2), "high"), "shelf", theme + ": the jar shelf over the sink")
-		assert_eq(game.highs.size(), 6, "and a sponge's hook")
-		assert_eq(game.highs.values().filter(func(h: Station) -> bool: return h.kit_tool == "sponge").size(), 1,
-			theme + ": a sponge to wipe the first spills with")
+		assert_eq(game.highs.size(), 5, "and no wall hook")
+		assert_eq(game.highs.values().filter(func(h: Station) -> bool: return h.node == "hook").size(), 0)
+		var sponges: Array = game.stations.values().filter(func(st: Station) -> bool: return st.item == "tool:sponge")
+		assert_eq(sponges.size(), 1, theme + ": a sponge to wipe the first spills with")
+		assert_true((sponges[0] as Station).type in ["sink", "counter", "pass"], "set on the sink or a counter beside it")
 		assert_eq(game.highs[Vector2i(0, 3)].facing, 1, "faces off the left wall")
 		assert_eq(game.highs[Vector2i(3, 2)].facing, 0, "faces off the back wall")
 		assert_true(game.placing.pick_up(_at(0, 4), game.player, true, "high"), "the hood over the starter's bread counter")
@@ -722,3 +724,59 @@ func test_turned_fridge_lifted_with_its_card_keeps_its_turn():
 	game.placing.rotate_hand()
 	assert_true(game.placing.place(Vector3i(2, 5, 0)))
 	assert_eq(f.facing, 1)
+
+
+# ---------- a tool kept on a shelf or in a cabinet (PRD 9.5) ----------
+
+func test_a_kept_tool_makes_the_cell_hold_chemicals_and_food_is_refused():
+	var k := _kitchen()
+	k.set_cell(W, "counter")
+	k.hang(W, "shelf")
+	assert_false(k.holds_cleaning(W))
+	assert_true(k.keep_tool(W, "sponge"))
+	assert_true(k.holds_cleaning(W))
+	assert_eq(k.tool_at(W), "sponge")
+	assert_eq(k.store_refusal(W, "bun"), "No food with chemicals")
+	assert_false(k.store(W, "bun"))
+
+
+func test_a_tool_is_refused_in_a_cell_that_stores_food():
+	var k := _kitchen()
+	k.set_cell(W, "counter")
+	k.hang(W, "shelf")
+	assert_true(k.store(W, "bun"), "food on the counter below")
+	assert_eq(k.tool_refusal(W), "No chemicals with food")
+	assert_false(k.keep_tool(W, "sponge"))
+
+
+func test_a_tool_takes_one_slot_so_a_wide_shelf_keeps_it_and_one_treatment_box():
+	var k := _kitchen()
+	k.hang(W, "wide_shelf")
+	assert_true(k.keep_tool(W, "sponge"))
+	assert_true(k.store(W, Treatments.box_id("cleaner")), "a chemical box shares the cell")
+	assert_false(k.store(W, Treatments.box_id("finish")), "the wide shelf's two slots are full")
+	var one := _kitchen()
+	one.hang(W, "shelf")
+	assert_true(one.keep_tool(W, "sponge"))
+	assert_false(one.store(W, Treatments.box_id("cleaner")), "a one-slot shelf is full with its tool")
+
+
+func test_a_cabinet_keeps_a_tool_and_a_fridge_or_counter_never_does():
+	var k := _kitchen()
+	k.set_cell(W, "fridge")
+	k.hang(W, "cabinet")
+	assert_true(k.keep_tool(W, "scourer"))
+	assert_eq(k.tool_refusal(W), "No free slot", "one tool a cell")
+	var bare := _kitchen()
+	bare.set_cell(W, "fridge")
+	assert_ne(bare.tool_refusal(W), "", "a fridge takes no tool")
+	assert_eq(k.take_tool(W), "scourer")
+	assert_false(k.holds_cleaning(W))
+
+
+func test_lifting_the_shelf_forgets_its_tool():
+	var k := _kitchen()
+	k.hang(W, "shelf")
+	k.keep_tool(W, "sponge")
+	k.remove(W, "high")
+	assert_eq(k.tool_at(W), "")

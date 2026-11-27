@@ -34,7 +34,7 @@ func _demo_slip() -> void:
 	game.floor_dirt.slip(g, c)
 
 
-## The cleaning demos (PRD 9.4). "mop": in service, a mop bucket and a sponge on its hook,
+## The cleaning demos (PRD 9.4). "mop": in service, a mop bucket and a sponge on a wall shelf,
 ## the chef mid-clean along a trail of dirt with a mop gone dirty (shoot at 3). "robot":
 ## the robot sweeper drifting from its dock to a puddle (shoot at about 4).
 ## "mop_night": at night a table moved off the dirt under it, the chef mopping it (shoot at 3).
@@ -51,8 +51,8 @@ func _demo_mop(demo: String) -> void:
 	var bucket := game.world.add_station("mop_bucket", at)
 	game.clean_kit.on_built(bucket, "mop_bucket")
 	for c: Vector2i in game.kitchen.wall_cells:
-		if not game.stations.has(c) and game.kitchen.can_hang(c, "hook"):
-			game.clean_kit.on_built(game.world.add_high("hook", c), "sponge")
+		if not game.stations.has(c) and game.kitchen.can_hang(c, "shelf"):
+			game.clean_kit.shelve(c, "sponge")
 			break
 	match demo:
 		"mop":
@@ -94,7 +94,7 @@ func _demo_mop(demo: String) -> void:
 
 ## PRD 9.6: the mop bucket's tree in a row along the front, each with its own mop (plain,
 ## sponge-head, flat, wringer, the scrubber parked by its pail, a little dirty where it
-## shows), the robot's dock; the small tools on hooks; a hood beside an extractor over the
+## shows), the robot's dock; the small tools on wall shelves and cabinets; a hood beside an extractor over the
 ## stoves; the chef pushing a scrubber through a trail of dirt (shoot at 3).
 func _demo_mop_line() -> void:
 	game.arrivals.assign([{"time": 99999.0, "idx": 0}])   # keeps the day open, nobody comes
@@ -112,12 +112,7 @@ func _demo_mop_line() -> void:
 		game.clean_kit.keep(st, st.kit_tool, b[1])
 	if not game.stations.has(Vector2i(x, 6)) and game.plan.floors.has(Vector2i(x, 6)):
 		game.world.add_station("robot_dock", Vector2i(x, 6))
-	var hooks := 0
-	for c: Vector2i in game.kitchen.wall_cells:
-		if hooks >= 4 or game.stations.has(c) or game.highs.has(c) or not game.kitchen.can_hang(c, "hook"):
-			continue
-		game.clean_kit.keep(game.world.add_high("hook", c), ["sponge", "scourer", "grease_scraper", "spill_kit"][hooks], 0)
-		hooks += 1
+	_shelve_small_tools()
 	var hood := Vector2i(0, 4)
 	if game.highs.has(hood) and game.kitchen.hood_at(hood) == "hood":   # the second hood, up its tree
 		game.kitchen.remove(hood, "high")
@@ -672,11 +667,21 @@ func _demo_tree(demo: String) -> void:
 			game.get_tree().create_timer(0.4 + 0.2 * i).timeout.connect(game.hud.screens_ui.tree_move.bind("down"))
 
 
+## The four small tools on wall cells without a piece: three on shelves, the last in a cabinet.
+func _shelve_small_tools() -> void:
+	var n := 0
+	for c: Vector2i in game.kitchen.wall_cells:
+		if n >= 4 or game.stations.has(c) or game.highs.has(c) or not game.kitchen.can_hang(c, "shelf"):
+			continue
+		game.clean_kit.shelve(c, ["sponge", "scourer", "grease_scraper", "spill_kit"][n], "cabinet" if n == 3 else "shelf")
+		n += 1
+
+
 ## The floor treatment and cleaning tree demos (PRD 9.5). "treat": at night, a strip of
 ## each treatment's sheen, a little dirt on some, the boxes on a counter by the wall with
-## their chemical tags, the small tools on their hooks, the chef laying primer (shoot at 3).
+## their chemical tags, the small tools on wall shelves and cabinets, the chef laying primer (shoot at 3).
 ## "treat_day": the same laid for service, the sheens in force (shoot at 3). "tree_box",
-## "tree_bucket", "tree_sponge": the tree of a cleaner's box, a mop bucket, a sponge's hook.
+## "tree_bucket", "tree_sponge": the tree of a cleaner's box, a mop bucket, a sponge's shelf.
 func _demo_treat(demo: String) -> void:
 	game.session.open_build()
 	game.ledger.money = 600
@@ -687,12 +692,7 @@ func _demo_treat(demo: String) -> void:
 	var keys: Array = Treatments.ITEMS.keys()
 	for k: String in ["cleaner", "finish"]:
 		game.placing._store_box(shelf, Treatments.box_id(k))
-	var hooks := 0
-	for c: Vector2i in game.kitchen.wall_cells:
-		if hooks >= 4 or game.stations.has(c) or game.highs.has(c) or not game.kitchen.can_hang(c, "hook"):
-			continue
-		game.clean_kit.keep(game.world.add_high("hook", c), ["sponge", "scourer", "grease_scraper", "spill_kit"][hooks], 0)
-		hooks += 1
+	_shelve_small_tools()
 	if demo.begins_with("tree_"):
 		var at := Vector2i(5, 4)
 		game.player.position = Grid.center(at + Vector2i(0, 1))
@@ -707,7 +707,11 @@ func _demo_treat(demo: String) -> void:
 				game.placing.pick_up(Grid.center(at))
 			"tree_sponge":
 				var w: Vector2i = game.highs.keys().filter(func(c: Vector2i) -> bool: return (game.highs[c] as Station).kit_tool == "sponge")[0]
-				game.placing.pick_up(Grid.center(w))
+				game.player.set_meta("reach", true)
+				game.card.open_storage(w)   # the shelf's card: its tool's tree
+				game.card.storage_upgrades()
+				game.player.set_meta("reach", false)
+				return
 		game.session.open_shop()
 		return
 	var row: Array = game.plan.floors.keys().filter(func(c: Vector2i) -> bool:

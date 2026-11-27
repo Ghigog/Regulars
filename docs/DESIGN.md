@@ -323,7 +323,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   straight up the screen and all eight cells around can be picked up or built on without
   a step; in service the station turned to wins over a nearer one. **Reach** (held: Left Alt, Cmd on a Mac, RT, or
   the touch Reach button) is the high layer: E alone is always what stands below (till, tool, counter,
-  bin, sink), Reach+E always what hangs above (wall shelf, cabinet, hook); a second keycap chip
+  bin, sink), Reach+E always what hangs above (wall shelf, cabinet); a second keycap chip
   "Alt + E: Take cheese" shows while something hangs there, and the Reach button on touch only then. Taps on the room work as clicks (pick a guest,
   place a piece, drag floors), and a touch on a control never reaches the room. Keys,
   pad buttons and touch buttons all become the same actions (use, back, turn, sell,
@@ -435,7 +435,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     On getting up a guest may walk out: 90% for one who hates the place, 10% for one
     who loves it.
   - *Cleaning tools (9.4).* A mop bucket comes with a mop (a level a press, dirty after
-    4); a sponge comes on its own wall hook (fast, dirty after 2). Hold E on a dirty cell
+    4); a sponge is a hand tool bought in the Tools tab, kept on a wall shelf or in a wall cabinet or set on a counter, pass or sink, drawn centred (fast, dirty after 2); a stored tool makes its cell count as holding cleaning things (no food there). Hold E on a dirty cell
     with the tool in hand; with bare hands, hold E to scrub (a level every 1.8 s, slower
     than any tool; owner's review). Every dirty cell sends dusty motes up to about 1.8 m,
     more the dirtier it is, so dirt behind a counter or under a table shows from above.
@@ -445,9 +445,9 @@ Survive as many days as you can; three walkouts in one day ends the run.
     moved at night. The robot sweeper (a dock) drifts to the nearest dirt at 0.7 m/s and
     clears a level every 3 s. Rules in `sim/clean_tools.gd`, the scene in
     `game/clean_kit.gd`.
-  - *One cleaning tree (owner's review of night zero).* Night zero hangs a sponge on a
-    hook. Lifted, the sponge's strip offers its hook tools and the **mop bucket** ($20
-    step): the hook comes off the wall and a bucket with its mop is in hand. The bucket
+  - *One cleaning tree (owner's review of night zero).* Night zero sets a sponge on the
+    starter sink. The shelf or cabinet that keeps a small tool offers its tools and the **mop bucket** ($20
+    step): the tool comes off the shelf and a bucket with its mop is in hand. The bucket
     branches into the mops below or a **liquid in its pail**: Floor cleaner (a whole cell
     a press, dirty after 4) and then Strong cleaner (never dirty). The mop bucket is no
     longer sold on its own. *Parked:* the tile-laid treatments below
@@ -553,7 +553,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
     only and the spill kit level 4 only, helpers wipe with the room's tool (the flat mop
     a whole cell a press) and floor cleaner's one press counts; the cleaning trees bring
     their line's duty to the desk (flat mop and wringer bucket: mop; scourer: sponge;
-    tools on hooks counted); food is never set down on treatment boxes or a tall fridge.
+    tools kept on shelves counted); food is never set down on treatment boxes or a tall fridge.
   - *Demos:* `tolerance`, `desk_line`, `desk_post`, `desk_cvs`, `desk_haggle`,
     `desk_staff`, `desk_raise`, `desk_fire`, `desk_restock`, `desk_wages`, `helpers`,
     `helpers_break`, `helpers_slip`, `staff_only` (see `CLAUDE.md`).
