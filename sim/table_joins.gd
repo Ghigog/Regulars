@@ -7,6 +7,7 @@ extends RefCounted
 
 ## A seat turned f faces cell + FACE[f].
 const FACE: Array[Vector2i] = [Vector2i(-1, 0), Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1)]
+const TABLE_TYPES := ["table", "table_fast", "table_comfy"]
 const SEAT_TYPES := ["chair", "chair_fast", "booth_seat"]
 
 
@@ -17,7 +18,7 @@ static func tables(pieces: Array) -> Array[Dictionary]:
 	var tiles := {}  # cell -> number
 	var numbers: Array = []
 	for p in pieces:
-		if p.type == "table":
+		if p.type in TABLE_TYPES:
 			tiles[p.cell] = int(p.number)
 			numbers.append(int(p.number))
 	numbers.sort()
@@ -25,7 +26,7 @@ static func tables(pieces: Array) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var by_number := {}
 	for p in pieces:
-		if p.type == "table":
+		if p.type in TABLE_TYPES:
 			by_number[int(p.number)] = p.cell
 	for n in numbers:
 		var start: Vector2i = by_number[n]
@@ -68,7 +69,7 @@ static func face_toward(cell: Vector2i, tile_cells: Array) -> int:
 static func unseated(pieces: Array) -> Array:
 	var cells := []
 	for p in pieces:
-		if p.type == "table":
+		if p.type in TABLE_TYPES:
 			cells.append(p.cell)
 	var out := []
 	for p in pieces:
