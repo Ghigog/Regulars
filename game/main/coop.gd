@@ -294,6 +294,8 @@ func _build_act(action: String, ch: Player = null) -> void:
 		"buy":
 			game.upgrades.strip_buy(ch)
 		"shop":
+			if game.lot_view.block_for(ch) != Vector2i.MAX:
+				return   # held at a buyable block, shop buys it (GameLotView)
 			if game.upgrades.strip_open(game.chefs.find(ch)) and game.controls and game.controls.players[game.chefs.find(ch)].mode == "pad":
 				game.upgrades.strip_buy(ch)   # Y on a pad buys the chosen upgrade
 			else:
