@@ -63,8 +63,11 @@ func test_tools_do_nothing_on_clean_or_covered_cells():
 func test_where_each_tool_lives():
 	assert_true(CleanTools.fits("bucket", "mop"))
 	assert_false(CleanTools.fits("bucket", "sponge"))
-	assert_true(CleanTools.fits("hook", "sponge"))
-	assert_false(CleanTools.fits("hook", "mop"))
+	assert_true(CleanTools.fits("store", "sponge"))
+	assert_false(CleanTools.fits("store", "mop"))
+	for piece in ["shelf", "wide_shelf", "cabinet"]:
+		assert_eq(CleanTools.home_kind(piece), "store", piece)
+	assert_eq(CleanTools.home_kind("hook"), "", "no wall hooks any more")
 	assert_true(CleanTools.rinses("mop_bucket"))
 	assert_true(CleanTools.rinses("sink"))
 	for used in 5:
@@ -102,13 +105,16 @@ func test_the_robot_or_a_tool_in_the_way_feels_like_level_two():
 
 
 func test_the_shop_sells_the_cleaning_pieces():
-	for id in ["mop_bucket", "hook", "sponge", "robot_dock"]:
+	for id in ["mop_bucket", "sponge", "robot_dock"]:
 		assert_eq(Catalog.ITEMS[id].category, "Kitchen", id)
 		assert_true(Catalog.sold_in(id, "diner") and Catalog.sold_in(id, "seaside"), id)
 	assert_eq(Catalog.price_of("mop_bucket"), 35, "the sponge's whole way up to it")
 	assert_eq(Catalog.price_of("sponge"), 15)
 	assert_eq(Catalog.price_of("robot_dock"), 315)
-	assert_lt(Catalog.price_of("hook"), Catalog.price_of("sponge"), "a hook is cheap")
+	assert_false(Catalog.ITEMS.has("hook"), "no wall hook for sale")
+	assert_false(Kitchen.NODES.has("hook"))
+	assert_false(Catalog.TOOLS_TAB.has("hook"))
+	assert_false("hook" in Catalog.ITEMS.sponge.blurb.to_lower(), "the sponge's blurb has no hook")
 
 
 
@@ -225,60 +231,48 @@ func test_dirt_straight_ahead_beats_putting_the_mop_back():
 
 
 
-func test_a_sponge_hangs_on_its_hook():
+func test_a_sponge_is_kept_on_a_shelf():
 	var game = _game()
 	var w := _wall_cell(game)
 	assert_ne(w, Vector2i(-99, -99), "the test needs a free wall cell")
-	var h: Station = game.world.add_high("hook", w)
-	game.clean_kit.on_built(h, "sponge")
+	var h: Station = game.clean_kit.shelve(w, "sponge")
 	assert_eq(h.kit_tool, "sponge")
-	assert_null(game.clean_kit.home_at(w, game.player), "a hook is reached, not walked up to")
+	assert_null(game.clean_kit.home_at(w, game.player), "a shelf is reached, not walked up to")
 	game.player.set_meta("reach", true)   # holding Reach
 	assert_eq(game.clean_kit.home_at(w, game.player), h)
 	assert_eq(game.cooking.use_station(h, true), "Take sponge")
 	game.cooking.use_station(h)
 	assert_eq(game.player.held, "tool:sponge")
 	CleanKit.hold(game.player, "mop", 0)
-	assert_eq(game.cooking.use_station(h, true), "", "a mop does not hang on a hook")
+	assert_eq(game.cooking.use_station(h, true), "", "a mop is not kept on a shelf")
 	CleanKit.hold(game.player, "sponge", 2)
 	game.cooking.use_station(h)
 	assert_eq(h.kit_tool, "sponge")
-	assert_eq(h.kit_used, 2, "a hook does not rinse")
+	assert_eq(h.kit_used, 2, "a shelf does not rinse")
 
 
-func test_at_night_e_on_a_hook_moves_the_hook_and_keeps_its_sponge():
+func test_a_shelf_keeping_a_sponge_moves_with_it_at_night():
 	var game = _game()
 	game.arrivals.clear()
 	game.step(0.1)
 	game.session.open_build()
 	game.step(0.01)
 	var w := _wall_cell(game)
-	var h: Station = game.world.add_high("hook", w)
-	game.clean_kit.on_built(h, "sponge")
+	var h: Station = game.clean_kit.shelve(w, "sponge")
 	h.kit_used = 1
-	var dir := Vector2i.ZERO
-	for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
-		if not game.grid.is_blocked(w - d):
-			dir = d
-	assert_ne(dir, Vector2i.ZERO, "the test needs open floor beside the hook")
-	_stand(game, w - dir, dir)
-	assert_eq(game.room_edit.build_action(), "Pick up")
-	assert_ne(game.card.lift_name(), "")
-	assert_true(game.clean_kit.station_use(h, true, game.player) == "", "no Take sponge at night")
-	game.room_edit.build_interact()
-	assert_eq(CleanKit.held_tool(game.player), "", "the sponge stays on the hook")
-	assert_false(game.player.hand.is_empty(), "the hook is in hand")
+	assert_true(game.placing.pick_up(Grid.center(w), null, false, "high"))
 	assert_false(game.highs.has(w), "the old wall cell is empty")
+	assert_eq(game.kitchen.tool_at(w), "", "the kitchen no longer counts the tool there")
 	var to := Vector2i(-99, -99)
 	for c: Vector2i in game.kitchen.wall_cells:
-		if c != w and not game.stations.has(c) and not game.highs.has(c) and game.kitchen.can_hang(c, "hook"):
+		if c != w and not game.stations.has(c) and not game.highs.has(c) and game.kitchen.can_hang(c, "shelf"):
 			to = c
 			break
 	assert_true(game.placing.place(Vector3i(to.x, to.y, 0)))
 	var moved: Station = game.highs[to]
 	assert_eq(moved.kit_tool, "sponge")
 	assert_eq(moved.kit_used, 1)
-
+	assert_eq(game.kitchen.tool_at(to), "sponge")
 
 
 func test_a_tool_put_down_elsewhere_lies_in_the_way():
@@ -363,20 +357,18 @@ func test_the_robot_goes_home_at_the_end_of_the_day():
 
 
 
-func test_bought_at_night_a_sponge_hangs_on_its_own_hook_and_a_bucket_holds_a_mop():
+func test_bought_at_night_a_sponge_goes_into_the_hands_and_a_bucket_holds_a_mop():
 	var game = _game()
 	game.arrivals.clear()
 	game.step(0.1)
 	game.session.open_build()
 	game.ledger.money = 200
-	var w := _wall_cell(game)
 	assert_true(game.placing.pick_catalog("sponge"))
-	assert_true(game.placing.can_place(Vector3i(w.x, w.y, 0)), "a sponge goes on a wall")
-	assert_true(game.placing.place(Vector3i(w.x, w.y, 0)))
-	var h: Station = game.highs[w]
-	assert_eq(h.type, "hook")
-	assert_eq(h.kit_tool, "sponge")
-	game.placing.cancel_hand()
+	assert_eq(CleanKit.held_tool(game.player), "sponge", "a tool in hand, not a placed piece")
+	assert_true(game.player.hand.is_empty())
+	assert_eq(game.ledger.money, 185)
+	CleanKit.hold(game.player, "sponge", 0)
+	game.player.set_held("")
 	var spot := Vector2i(7, 2)
 	assert_true(game.placing.pick_catalog("mop_bucket"))
 	assert_true(game.placing.place(Vector3i(spot.x, spot.y, 0)))

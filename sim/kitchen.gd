@@ -21,12 +21,12 @@ const SPECIALIST_STEP := "specialist"
 ## "shelf": storage, no top; a high piece on a wall cell only (a low open box is a counter).
 ## "tall": a base that also fills the high layer; no top.
 ## "cabinet", "hood": high layer only, on a wall cell.
-## "hook": a wall hook (PRD 9.4), high layer only; holds one small cleaning tool.
+## "hand": a small cleaning tool the chef carries (the sponge and its tree, PRD 9.4); no cell.
 ## "floor": stands on the floor outside the kitchen's cells (the mop bucket, the robot's
 ## dock, PRD 9.5); in the trees only.
 const FITS := {
 	"top": ["top"], "counter": ["base"], "shelf": ["high"], "tall": ["base"],
-	"cabinet": ["high"], "hood": ["high"], "hook": ["high"], "floor": [],
+	"cabinet": ["high"], "hood": ["high"], "hand": [], "floor": [],
 }
 
 ## The upgrade trees. A node with no "parent" is a root, bought in the shop; every other
@@ -107,10 +107,9 @@ const NODES := {
 		"blurb": "Hangs over a stove and cuts the grease it drops"},
 	"extractor": {"name": "Extractor", "fit": "hood", "price": 90, "parent": "hood", "step": EFFICIENT,
 		"blurb": "Cuts the stove's grease by more, and kitchen grease smells less far"},
-	"hook": {"name": "Wall hook", "fit": "hook", "price": 5},   # PRD 9.4: a sponge's home (tunable price)
 	# The cleaning tree (PRD 9.5, as changed in the owner's review of night zero): one tree
 	# from the sponge. Each home names the tool it keeps ("tool", a CleanTools.TOOLS id);
-	# upgrading the home swaps that tool for the new one. The sponge on its hook grows into
+	# upgrading the home swaps that tool for the new one. The sponge, kept on a shelf or in a cabinet, grows into
 	# the mop bucket (off the wall, onto the floor), which branches into better mops or a
 	# liquid in the pail.
 	"mop_bucket": {"name": "Mop bucket", "fit": "floor", "price": 35, "parent": "sponge", "step": EFFICIENT,
@@ -131,14 +130,14 @@ const NODES := {
 		"step": SPECIALIST_STEP, "tool": "wringer_mop", "blurb": "Rinses itself: the mop is never dirty. A level a press"},
 	"robot_dock": {"name": "Robot sweeper", "fit": "floor", "price": 315, "parent": "wringer_bucket",
 		"step": SPECIALIST_STEP, "blurb": "A dock. The robot drifts to the nearest dirt and slowly cleans it. Anyone can trip on it"},
-	"sponge": {"name": "Sponge", "fit": "hook", "price": 15, "tool": "sponge",
-		"blurb": "On its own wall hook. Clears a level fast, dirty after 2"},
-	"scourer": {"name": "Scourer", "fit": "hook", "price": 25, "parent": "sponge", "step": EFFICIENT,
+	"sponge": {"name": "Sponge", "fit": "hand", "price": 15, "tool": "sponge",
+		"blurb": "A hand tool. Clears a level fast, dirty after 2"},
+	"scourer": {"name": "Scourer", "fit": "hand", "price": 25, "parent": "sponge", "step": EFFICIENT,
 		"tool": "scourer", "blurb": "Clears a level fast, dirty after 4"},
-	"grease_scraper": {"name": "Grease scraper", "fit": "hook", "price": 40, "parent": "sponge",
+	"grease_scraper": {"name": "Grease scraper", "fit": "hand", "price": 40, "parent": "sponge",
 		"step": SPECIALIST_STEP, "tool": "grease_scraper",
 		"blurb": "Kitchen grease only: a whole cell a press, never dirty. No use on guest mess"},
-	"spill_kit": {"name": "Spill kit", "fit": "hook", "price": 30, "parent": "sponge", "step": SPECIALIST_STEP,
+	"spill_kit": {"name": "Spill kit", "fit": "hand", "price": 30, "parent": "sponge", "step": SPECIALIST_STEP,
 		"tool": "spill_kit", "blurb": "A covered cell down to a puddle at once, three times a day. Helps a fallen guest up faster"},
 }
 
@@ -158,6 +157,8 @@ var wall_cells := {}
 ## A box is a kind ("patty") or a box id ("box_patty", "ready_cheese"); one of a kind a cell.
 ## Empty layers are "".
 var cells := {}
+## The small cleaning tool kept in a cell's wall shelf or cabinet: Vector2i -> tool id (PRD 9.5).
+var tools := {}
 
 
 # ---------- Tree data ----------
@@ -247,7 +248,7 @@ static func freezes(id: String) -> bool:
 	return NODES.has(id) and NODES[id].get("frozen", false)
 
 
-## A piece that hangs in the high layer only (wall shelf, wall cabinet, hood, hook).
+## A piece that hangs in the high layer only (wall shelf, wall cabinet, hood).
 static func is_high_only(id: String) -> bool:
 	return NODES.has(id) and FITS[fit_of(id)] == ["high"]
 
@@ -441,6 +442,8 @@ func remove(cell: Vector2i, layer: String) -> Dictionary:
 		return {}
 	var c: Dictionary = cells[cell]
 	c[layer] = ""
+	if layer == "high":
+		tools.erase(cell)
 	var held: Array = []
 	if c.stock.has(layer):
 		held = c.stock[layer]
@@ -506,12 +509,48 @@ static func is_cleaning(box: String) -> bool:
 	return Treatments.is_box(box)
 
 
-## Whether a cell holds chemicals: a treatment box in any of its slots.
+## Whether a cell holds chemicals: a treatment box in any of its slots, or a cleaning
+## tool kept on its shelf or in its cabinet.
 func holds_cleaning(cell: Vector2i) -> bool:
+	if tools.has(cell):
+		return true
 	for b: String in stock(cell):
 		if is_cleaning(b):
 			return true
 	return false
+
+
+## The small cleaning tool kept in this cell's shelf or cabinet ("" for none).
+func tool_at(cell: Vector2i) -> String:
+	return str(tools.get(cell, ""))
+
+
+## Why a small tool cannot be kept in this cell, or "" if it can: it needs a wall shelf
+## or cabinet with a free slot (the tool takes one), and never shares a cell with food.
+func tool_refusal(cell: Vector2i) -> String:
+	var id := get_piece(cell, "high")
+	if id == "" or CleanTools.home_kind(id) != "store":
+		return "Nowhere to keep it here"
+	if holds_food(cell):
+		return "No chemicals with food"
+	if tools.has(cell) or cells[cell].stock.high.size() >= slots_of(id):
+		return "No free slot"
+	return ""
+
+
+## Keeps a small tool in the cell's shelf or cabinet. Returns whether it went in.
+func keep_tool(cell: Vector2i, tool: String) -> bool:
+	if tool_refusal(cell) != "":
+		return false
+	tools[cell] = tool
+	return true
+
+
+## Takes the kept tool out (""): the piece stays.
+func take_tool(cell: Vector2i) -> String:
+	var t := tool_at(cell)
+	tools.erase(cell)
+	return t
 
 
 ## Whether a cell holds an ingredient in any of its slots.
@@ -579,7 +618,7 @@ func store_layer(cell: Vector2i, kind: String) -> String:
 	var best := ""
 	for layer: String in ["base", "high"]:
 		var id := get_piece(cell, layer)
-		if id == "" or cells[cell].stock[layer].size() >= slots_of(id):
+		if id == "" or cells[cell].stock[layer].size() + (1 if layer == "high" and tools.has(cell) else 0) >= slots_of(id):
 			continue
 		if cleaning and chills(id):
 			continue

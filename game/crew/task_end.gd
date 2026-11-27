@@ -192,7 +192,7 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 
 
 ## The room's cleaning tool a helper wipes `cell` with: of the tools kept in homes here
-## (the mop line in a bucket, the sponge line on a hook, PRD 9.5) one their duties cover
+## (the mop line in a bucket, the sponge line on a shelf, PRD 9.5) one their duties cover
 ## that works on this dirt, the one clearing most a press; else `fallback`.
 func _room_clean_tool(duties: Array, cell: Vector2i, fallback: String) -> String:
 	var mess: FloorMess = crew.game.floor_dirt.mess
