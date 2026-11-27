@@ -311,3 +311,49 @@ func test_each_players_prompt_uses_their_own_device():
 	_to_build()
 	assert_false(game.hud.hints_ui.has_method("_build_tip"), "no build slip of key words")
 	assert_false(game.hud.hints_ui.has_method("_hint_text"), "no corner key line")
+
+
+# ---------------------------------------------------------------- a second pad
+
+func _stick_pad(axis: int, value: float, device: int) -> void:
+	var e := InputEventJoypadMotion.new()
+	e.device = device
+	e.axis = axis
+	e.axis_value = value
+	game.controls._input(e)
+
+
+func test_a_second_pad_does_not_drive_chef_one_and_offers_to_join():
+	_tap_pad(JOY_BUTTON_A, 0)
+	_stick_pad(JOY_AXIS_LEFT_X, 1.0, 1)
+	_tap_pad(JOY_BUTTON_A, 1)
+	assert_eq(game.controls.input_of(0).source, "pad:0", "player one stays on pad 0")
+	assert_eq(game.controls.move(0), Vector2.ZERO, "pad 1 does not walk chef one")
+	assert_eq(game.hud.toast.text, "Press Start to join as Chef 2")
+
+
+func test_start_on_the_last_moved_second_pad_joins_not_options():
+	_tap_pad(JOY_BUTTON_A, 0)
+	_stick_pad(JOY_AXIS_LEFT_X, 1.0, 1)
+	_tap_pad(JOY_BUTTON_START, 1)
+	assert_eq(game.chefs.size(), 2)
+	assert_eq(game.controls.owner_of("pad:1"), 1)
+	assert_eq(game.controls.owner_of("pad:0"), 0)
+	assert_false(game.hud.options_ui.pause_open())
+	assert_eq(game.hud.toast.text, "Chef 2 joined.")
+
+
+func test_a_pad_still_drives_chef_one_when_they_are_on_the_keyboard():
+	game.controls._use("keys")
+	_stick_pad(JOY_AXIS_LEFT_X, 1.0, 0)
+	assert_eq(game.controls.input_of(0).source, "pad:0")
+	assert_gt(game.controls.move(0).x, 0.5)
+
+
+func test_no_join_note_when_the_diner_is_full():
+	_tap_pad(JOY_BUTTON_A, 0)
+	_tap_pad(JOY_BUTTON_START, 1)
+	game.hud.toast.text = ""
+	_tap_pad(JOY_BUTTON_A, 2)
+	assert_eq(game.hud.toast.text, "")
+	assert_eq(game.chefs.size(), 2)
