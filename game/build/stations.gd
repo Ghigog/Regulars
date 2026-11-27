@@ -297,12 +297,19 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 		"sack":
 			if not as_box:
 				_counter(n, Build.WOOD, Build.WORKTOP, false)
-			Build.ball(n, Vector3(0, 1.12, -0.05), 0.33, "#c8a56e").scale = Vector3(1, 0.8, 0.85)
-			Build.lathe(n, Vector3(0, 1.3, -0.05), [[0.0, 0.0], [0.24, 0.0], [0.27, 0.05], [0.0, 0.05]], "#b48c56")
+			# A slumped burlap sack: a squat body bulging at the belly, a rolled-down folded rim,
+			# a rope tying the gathered neck, and its own raw food spilling over the mouth.
+			Build.lathe(n, Vector3(0, 0.9, -0.05), [[0.0, 0.0], [0.3, 0.0], [0.36, 0.14], [0.34, 0.3], [0.27, 0.38], [0.0, 0.38]], "#c8a56e", 0.0, Build.R_MATTE)
+			Build.lathe(n, Vector3(0, 1.26, -0.05), [[0.25, 0.0], [0.32, 0.0], [0.34, 0.04], [0.3, 0.09], [0.22, 0.09], [0.22, 0.0]], "#b48c56", 0.0, Build.R_MATTE)
+			Build.cyl(n, Vector3(0, 1.2, -0.05), 0.27, 0.03, "#8a6a3a", 0.0, Build.R_MATTE)   # the tie
+			Build.ball(n, Vector3(0.0, 1.3, -0.05), 0.1, "#9a7440").scale = Vector3(1.4, 0.5, 1.0)   # tied neck bunched at the back
+			Build.ball(n, Vector3(0.0, 1.31, -0.19), 0.06, "#9a7440").scale = Vector3(1.5, 0.6, 0.8)
+			Build.box(n, Vector3(0.0, 1.0, 0.27), Vector3(0.16, 0.12, 0.012), "#e8dcc0")   # a stitched label patch
 			for k in 3:
 				var at := Node3D.new()
-				at.position = Vector3(-0.16 + k * 0.16, 1.3, -0.05 + (k % 2) * 0.08)
-				at.scale = Vector3.ONE * 0.75
+				at.position = Vector3(-0.14 + k * 0.14, 1.33, 0.0 + (k % 2) * 0.1)
+				at.rotation.y = k * 1.7
+				at.scale = Vector3.ONE * 0.85
 				n.add_child(at)
 				BuildFood.ingredient(at, id, "raw", "raw")
 		"drink":

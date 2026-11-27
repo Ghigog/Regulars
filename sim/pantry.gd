@@ -36,7 +36,7 @@ const ITEMS := {
 	"cheese": {"name": "Cheese", "theme": "diner", "tool": "slice", "tags": ["dairy"], "chilled": true, "worth": 2, "fee": 3,
 		"colour": "#f2c53d", "prepped": "#f2c53d", "shape": "slab"},
 	"potato": {"name": "Potato", "theme": "diner", "tool": "chop", "tags": ["vegetable"], "worth": 1, "fee": 4,
-		"colour": "#e8d9a8", "prepped": "#f0b545", "shape": "sticks"},
+		"colour": "#9a6b3f", "prepped": "#efe0a8", "shape": "spud"},
 	"fries": {"name": "Fries", "theme": "diner", "tool": "fry", "tags": ["vegetable", "fried"], "from": "potato",
 		"worth": 4, "fee": 0, "colour": "#e8d9a8", "prepped": "#f0b545", "shape": "sticks"},
 	"corn": {"name": "Corn cob", "theme": "diner", "tool": "boil", "tags": ["vegetable"], "worth": 3, "fee": 3,
