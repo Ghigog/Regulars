@@ -30,6 +30,8 @@ func prompt_for(st: Station, ch: Player = null) -> String:
 ## works as the tool of what is cooking on it, or of the raw thing in hand when it can
 ## cook that at all (a stove that fries works as a fryer). Others as themselves.
 func _use_as(st: Station, held_ing: Dictionary) -> String:
+	if Station.is_table(st.type):
+		return "table"   # a fast or comfortable table is used as a table
 	if not st.is_heat_tool():
 		return st.type
 	if st.heat != "":

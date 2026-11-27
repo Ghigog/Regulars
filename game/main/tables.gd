@@ -38,7 +38,7 @@ func _redraw_joins() -> void:
 	var pieces := []
 	var by_number := {}
 	for st: Station in game.stations.values():
-		if st.type in ["table", "booth_seat", "chair", "chair_fast"]:
+		if Station.is_table(st.type) or Station.is_seat(st.type):
 			by_number[pieces.size() + 1] = st
 			pieces.append({"type": st.type, "cell": st.cell, "facing": st.facing, "number": pieces.size() + 1})
 	var candles := {}   # tile -> where its candle stands, for the tiles that hold one
@@ -59,7 +59,7 @@ func _redraw_joins() -> void:
 		var mask := 0
 		for f in 4:
 			var nb: Station = game.stations.get(st.cell + TableJoins.FACE[f])
-			if nb != null and nb.type == st.type and (st.type == "table" or nb.facing == st.facing):
+			if nb != null and nb.type == st.type and (Station.is_table(st.type) or nb.facing == st.facing):
 				mask |= 1 << f
 		st.set_joined(mask, candles.get(st, Vector2.INF))
 
@@ -70,7 +70,7 @@ func pieces() -> Array:
 	var out := []
 	var dining := game.paying.dining_tables()
 	for i in dining.size():
-		out.append({"type": "table", "cell": dining[i].cell, "facing": 0, "number": i + 1})
+		out.append({"type": dining[i].type, "cell": dining[i].cell, "facing": 0, "number": i + 1})
 	var seat_stations := _seat_stations()
 	for i in seat_stations.size():
 		var st := seat_stations[i]

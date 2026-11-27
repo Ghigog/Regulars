@@ -518,7 +518,7 @@ func _update_cooking_visuals() -> void:
 ## Redraws stacks, racks and dirty dishes.
 ## Pieces guests sit at: a table tile has the seats facing it (set by GameTables.rebuild)
 ## and takes dirty plates; a seat piece's own cell is the guest's seat.
-const TABLES: Array[String] = ["table"]
+const TABLES: Array[String] = ["table", "table_fast", "table_comfy"]
 const SEATS: Array[String] = ["chair", "chair_fast", "booth_seat"]
 
 
@@ -552,9 +552,9 @@ func place_at(cell_: Vector2i, facing_: int) -> void:
 
 ## A table with plates on it, a sink piled with washing-up, an overflowing bin.
 func messy() -> bool:
+	if is_table(type):
+		return dirty > 0
 	match type:
-		"table":
-			return dirty > 0
 		"sink":
 			return dirty >= piled_at(racked)
 		"bin":
