@@ -14,8 +14,12 @@ const TOOL_NAMES := {"grill": "grill", "fry": "fryer", "boil": "pot", "chop": "c
 	"grate": "grater", "saw": "bread knife", "juice": "juicer", "blend": "blender", "steam": "steamer"}
 const THEMES: Array[String] = ["diner", "seaside"]
 const READY_FEE := 1.5   # tunable: a ready-made station costs this many times the fee to stock
-## tunable: which ingredients can be bought ready-made (prepped, always plain).
-const READY_MADE: Array[String] = ["lettuce", "tomato", "onion", "cheese", "courgette", "pepper"]
+const MARINATE_FEE := 1.3   # tunable: a marinated box costs this many times the fee to stock
+const MARINATE_BONUS := 0.1   # tunable: what marinating adds to each ingredient's quality (see Prep.marinate)
+const PREPARED_PRICE := 30    # tunable: the one-off step from a box to its Prepared node
+const MARINATE_PRICE := 40    # tunable: the one-off step from a box to its Marinated node
+## The cold prep tools: a kind with one and a box can be bought Prepared (EPIC-132).
+const COLD_TOOLS: Array[String] = ["chop", "slice", "grate", "saw"]
 
 ## worth: what it adds to an item's price. fee: what it costs to stock a night (tunable).
 ## colour/prepped: how it looks raw and after prep. shape: how the food models draw it.
@@ -165,8 +169,14 @@ static func for_theme(theme: String) -> Array[String]:
 	return out
 
 
+## Whether a kind's box has a Prepared node: it has a box and a cold prep tool.
 static func can_be_ready(id: String) -> bool:
-	return READY_MADE.has(id)
+	return has_box(id) and COLD_TOOLS.has(str(ITEMS[id].tool))
+
+
+## Whether a kind's box has a Marinated node: every kind with a box but a drink.
+static func can_be_marinated(id: String) -> bool:
+	return has_box(id) and not is_drink(id)
 
 
 ## What stocking this ingredient for a night costs, ready-made or not.
@@ -175,20 +185,31 @@ static func fee_of(id: String, ready := false) -> int:
 	return roundi(fee * READY_FEE) if ready else fee
 
 
-## The catalog id of the box of this ingredient (PRD 8.4): "box_patty", or "ready_cheese"
-## for the ready-made one.
-static func box_id(id: String, ready := false) -> String:
-	return ("ready_" if ready else "box_") + id
+## What stocking a box (a box id or a kind) costs for a night: plain, Prepared or Marinated.
+static func box_fee(box: String) -> int:
+	var s := station_ingredient(box)
+	if s.is_empty():
+		return 0
+	var fee: int = ITEMS[s.id].fee
+	if s.ready:
+		return roundi(fee * READY_FEE)
+	return roundi(fee * MARINATE_FEE) if s.marinated else fee
 
 
-## The ingredient a box (or a plain kind) holds and whether it is ready-made, or {}
-## if it is neither.
+## The catalog id of the box of this ingredient (PRD 8.4): "box_patty", "ready_cheese" for
+## the Prepared one, "marinated_cheese" for the Marinated one.
+static func box_id(id: String, ready := false, marinated := false) -> String:
+	return ("marinated_" if marinated else ("ready_" if ready else "box_")) + id
+
+
+## The ingredient a box (or a plain kind) holds and whether it is Prepared or Marinated,
+## or {} if it is neither.
 static func station_ingredient(box: String) -> Dictionary:
 	if ITEMS.has(box):
-		return {"id": box, "ready": false}
-	for prefix in ["box_", "ready_"]:
+		return {"id": box, "ready": false, "marinated": false}
+	for prefix in ["box_", "ready_", "marinated_"]:
 		if box.begins_with(prefix) and ITEMS.has(box.trim_prefix(prefix)):
-			return {"id": box.trim_prefix(prefix), "ready": prefix == "ready_"}
+			return {"id": box.trim_prefix(prefix), "ready": prefix == "ready_", "marinated": prefix == "marinated_"}
 	return {}
 
 
