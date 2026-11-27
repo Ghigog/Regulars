@@ -4,6 +4,8 @@ extends RefCounted
 
 
 static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "", joined := 0, candle := Vector2.ZERO) -> void:
+	if base == "fridge":
+		n.set_meta("fridge_base", true)   # BuildStations._counter/_pass then draw the white fridge body
 	if base == "double_counter":
 		BuildStations._double(n, type == "counter", BuildStations.PASS_FRONT if pass_look else 0.0)
 	if Treatments.is_box(type):
