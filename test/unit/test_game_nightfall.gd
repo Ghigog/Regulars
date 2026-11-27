@@ -140,3 +140,21 @@ func test_nightfall_silences_the_cooking_loops():
 	assert_eq(_playing_loops(), [] as Array[String])
 	assert_eq(stove.item, "")
 	assert_false(stove.is_cooking())
+
+
+func test_a_prep_burst_ends_at_nightfall():
+	game.player.boost("burst")
+	_end_day_now()
+	game.session.open_build()
+	assert_eq(game.player.boost_speed, 1.0)
+	assert_eq(game.player.boost_left, 0.0)
+	assert_null(game.player._boost_fx)
+
+
+func test_a_prep_penalty_ends_at_nightfall():
+	game.player.boost("penalty")
+	_end_day_now()
+	assert_eq(game.player.boost_speed, 1.0)
+	assert_eq(game.player.boost_left, 0.0)
+	assert_eq(game.player._body.rotation.z, 0.0)
+	assert_null(game.player._boost_fx)
