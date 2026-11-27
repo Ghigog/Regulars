@@ -153,6 +153,8 @@ func _finish(h: Helper, s: Dictionary) -> Variant:
 			if h.held == "dishes":
 				return [{"do": "restack"}]
 		"wash":
+			if st == null:
+				return null   # the sink was sold under them: the task ends
 			# A washed plate goes on the nearest rack with room, a washed cup on the cup stack.
 			var cup := st.dirty_cups >= st.dirty
 			var home: Station = crew.room_view._nearest("cups", st.cell) if cup else crew.room_view.rack_near(st.cell, true)
