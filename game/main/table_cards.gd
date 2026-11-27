@@ -62,17 +62,17 @@ func is_up(lead: Station) -> bool:
 ## its tiles), or {}. A tile shows only when it joins a table; a seat when it faces one.
 func join_preview(ch: Player) -> Dictionary:
 	var id: String = ch.hand.get("id", "")
-	if game.phase != Game.Phase.BUILD or not (id == "table" or Station.is_seat(id)) or ch.ghost == null or not ch.ghost.visible:
+	if game.phase != Game.Phase.BUILD or not (Station.is_table(id) or Station.is_seat(id)) or ch.ghost == null or not ch.ghost.visible:
 		return {}
 	var cell := Grid.to_cell(ch.ghost.position)
 	if game.stations.has(cell) and not ch.hand.get("moving", false):
 		return {}
 	var pieces: Array = game.tables.pieces()
-	var mine := GameTables.SEAT_BASE + 999 if id != "table" else game.paying.dining_tables().size() + 1
+	var mine := GameTables.SEAT_BASE + 999 if Station.is_seat(id) else game.paying.dining_tables().size() + 1
 	pieces = pieces.filter(func(p: Dictionary) -> bool: return p.cell != cell)   # the one being moved
 	pieces.append({"type": id, "cell": cell, "facing": int(ch.hand.facing), "number": mine})
 	for t in TableJoins.tables(pieces):
-		if not (mine in t.pieces or mine in t.chairs) or (id == "table" and t.pieces.size() < 2):
+		if not (mine in t.pieces or mine in t.chairs) or (Station.is_table(id) and t.pieces.size() < 2):
 			continue
 		var sum := Vector3.ZERO
 		var mate: Station = null
