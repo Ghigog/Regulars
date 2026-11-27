@@ -26,3 +26,23 @@ func test_a_guest_below_ick_who_never_reached_it_is_not_pinned():
 	assert_false(m.reached_ick)
 	m.fade(100.0)
 	assert_lt(m.disgust, 0.01)
+
+
+func test_seat_tolerance_scales_anger_and_disgust_only():
+	var m := GuestMood.new()
+	var service := m.scale_for("service")
+	var clean := m.scale_for("clean")
+	var food := m.scale_for("food")
+	m.seat_tolerance = 1.2
+	assert_almost_eq(m.scale_for("service"), service * 1.2, 0.0001)
+	assert_almost_eq(m.scale_for("clean"), clean * 1.2, 0.0001)
+	assert_eq(m.scale_for("food"), food)
+
+
+func test_seat_tip_scales_the_tip():
+	var m := GuestMood.new()
+	m.savour = 1.0
+	m.joy = 1.0
+	var base := m.tip_for(100)
+	m.seat_tip = 1.3
+	assert_eq(m.tip_for(100), roundi(base / 1.0 * 1.3), "tip rises with seat_tip")
