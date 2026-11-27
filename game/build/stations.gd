@@ -230,8 +230,9 @@ static func _store_kind(id: String) -> String:
 
 ## An ingredient station (sheet 8's kitchen units, one per ingredient): a counter
 ## whose top shows what it hands out, raw, so it reads at 20 px; a ready-made tub
-## shows the ingredient prepped, in a steel tub with a green tag.
-static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := false) -> void:
+## shows the ingredient prepped, in a steel tub with a green tag. A marinated box is its
+## kind's own box with a dark glazed tray under the food and a herb-fleck tag.
+static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := false, marinated := false) -> void:
 	var kind := "ready" if ready else _store_kind(id)
 	if as_box:
 		# A box of stock (PRD 8.4): the old station's top, lifted off its counter onto a
@@ -246,6 +247,8 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 			Build.box(n, Vector3(0, 0.6, 0), Vector3(0.84, 0.3, 0.8), body[kind])
 		if kind == "cold":   # a frost-blue band: kept cold, by shape as well as colour
 			Build.box(n, Vector3(0, 0.75, 0.41), Vector3(0.6, 0.08, 0.02), "#8fc3cf")
+	if marinated and as_box:
+		_marinated_trim(n)
 	match kind:
 		"cold":
 			if not as_box:
@@ -365,6 +368,19 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 				at.scale = Vector3.ONE * 0.85
 				n.add_child(at)
 				BuildFood.ingredient(at, id, "raw", "raw")
+
+
+## A marinated box's marks: a dark glazed tray (glossy, with a low rim) laid over the box top,
+## where the food sits, and a paper tag on the front flecked with herbs.
+static func _marinated_trim(n: Node3D) -> void:
+	Build.box(n, Vector3(0, 0.915, 0), Vector3(0.72, 0.03, 0.62), Build.TRIM, 0.0, Build.R_GLOSS)
+	for sz: float in [-1.0, 1.0]:
+		Build.box(n, Vector3(0, 0.945, sz * 0.3), Vector3(0.72, 0.03, 0.03), Build.WOOD_DARK, 0.0, Build.R_GLOSS)
+	for sx: float in [-1.0, 1.0]:
+		Build.box(n, Vector3(sx * 0.345, 0.945, 0), Vector3(0.03, 0.03, 0.6), Build.WOOD_DARK, 0.0, Build.R_GLOSS)
+	Build.box(n, Vector3(0.3, 0.6, 0.42), Vector3(0.22, 0.22, 0.02), Build.PAPER)
+	for k in 5:
+		Build.box(n, Vector3(0.23 + (k % 3) * 0.06, 0.55 + (k / 3) * 0.08 + (k % 2) * 0.04, 0.435), Vector3(0.04, 0.04, 0.012), Build.LEAF)
 
 
 ## The frame's long teal counter (the starting counters). Each piece runs a little past
