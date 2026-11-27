@@ -369,29 +369,59 @@ func _end_day() -> void:
 		game.last_day["rep_change"] = float(game.last_day.get("rep_change", 0.0)) + game.ledger.reputation - before
 		game.last_day["reputation"] = game.ledger.reputation
 		game.ledger.today.rep_change = 0.0   # counted on tonight's receipt
+	game.last_day["points"] = game.town.sentiment_points()
+	game.last_day["tier"] = Town.tier_for(int(game.last_day.points))
 	game.hud.receipt_ui.show_summary(game.last_day)
 	game.audio.sfx("coin")
 
 
-func _close_down() -> void:
+## Everything a run's end stops: preps, loops, crew, boosts; the run is over, so no save.
+func _end_run() -> void:
 	game.prep_games._cancel_all_preps()
 	game.prep_games.stop_loops()
 	game.crew.clear()
 	for ch in game.chefs:
 		ch.end_boost()
-	game.audio.play_music("closed")
 	game.phase = Game.Phase.CLOSED
 	SaveGame.delete(game.save_path)   # the run is over: nothing to continue
+
+
+func _close_down() -> void:
+	_end_run()
+	game.audio.play_music("closed")
 	var days := game.ledger.day
 	var earned := game.ledger.lifetime_earnings()
 	var best := load_best()
 	var is_record: bool = days > int(best.days) or (days == int(best.days) and earned > int(best.earned))
 	if is_record:
-		var f := FileAccess.open(game.best_path, FileAccess.WRITE)
-		if f:
-			f.store_string(JSON.stringify({"days": days, "earned": earned}))
-	game.hud.screens_ui.show_closed(days, earned, best, is_record)
+		best_written({"days": days, "earned": earned, "won": best.get("won", {})})
+	var points := game.town.sentiment_points()
+	game.hud.screens_ui.show_closed(days, earned, best, is_record, Town.tier_for(points), points)
 	game.audio.sfx("fail")
+
+
+## The critic's five stars end the run as won (the receipt has been read first).
+func win() -> void:
+	_end_run()
+	game.audio.play_music("title")
+	var days := game.ledger.day
+	var earned := game.ledger.lifetime_earnings()
+	var points := game.town.sentiment_points()
+	var tier := Town.tier_for(points)
+	var best := load_best()
+	var old: Dictionary = best.get("won", {})
+	var is_record: bool = old.is_empty() or points > int(old.points) or (points == int(old.points) and days < int(old.days))
+	if is_record:
+		best["won"] = {"points": points, "tier": tier, "days": days}
+		best_written(best)
+	game.hud.screens_ui.show_won(days, earned, tier, points, best, is_record)
+	game.audio.sfx("perfect")
+
+
+func best_written(data: Dictionary) -> void:
+	var f := FileAccess.open(game.best_path, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(data))
 
 
 func load_best() -> Dictionary:

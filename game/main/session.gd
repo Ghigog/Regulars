@@ -204,6 +204,10 @@ func quit_game() -> void:
 func open_build() -> void:
 	if game.phase != Game.Phase.SUMMARY:
 		return
+	if int(game.last_day.get("review", {}).get("stars", 0)) == 5:   # the critic's five stars win the run
+		game.hud.receipt_ui.hide_card()
+		game.day.win()
+		return
 	game.phase = Game.Phase.BUILD
 	game.undo.clear()
 	game.ready_chefs.clear()

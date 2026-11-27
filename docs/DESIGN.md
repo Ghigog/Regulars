@@ -11,7 +11,7 @@ lost while the core loop is polished. Sections are ordered roughly by when to bu
 An endless run. Each night you build the kitchen and write the menu; each day guests
 arrive, read the menu, order, and you prep, assemble, plate and serve their orders, then write
 their bill at the till and take the money.
-Survive as many days as you can; three walkouts in one day ends the run.
+Win by earning five stars from the critic; lose when the reputation meter hits 0. The town's mean opinion grades the run S, A, B, C, D, E or F.
 
 - Direct control of one chef (WASD, E/Space).
 - **Practice.** The title's Practice button opens the starter kitchen in service with no
@@ -719,7 +719,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   nothing marks them, but their own thoughts ("Making a note of that sink") are on the
   guest card. Written lines, picked by the simulation. `REGULARS_DEMO=critic`,
   `critic_bad`, `critic_known`, `critic_town`.
-- End-of-day summary, game-over screen, best run saved to `user://regulars_best.json`.
+- End-of-day summary (with the TOWN RATING row), game-over screen (CLOSED DOWN, or FIVE STARS when the critic's review wins the run), both showing the town grade; best run and best won run saved to `user://regulars_best.json`.
 - **Local co-op, chef 2** (PRD 4): two chefs, one restaurant, one wallet, on one screen.
   Everything a chef has is theirs (`Player`): position and what they carry, the build
   hand and its drag, mouse aim (the keyboard-and-mouse player only), the ghost and its

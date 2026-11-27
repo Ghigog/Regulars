@@ -201,6 +201,8 @@ func show_summary(rec: Dictionary, animate := true) -> void:
 	if rec.has("reputation"):   # review, item 9: the meter, and how today moved it
 		var ch := float(rec.get("rep_change", 0.0))
 		_row(box, "", "REPUTATION:", "%d  (%s%d)" % [roundi(float(rec.reputation)), "+" if ch >= 0.0 else "-", absi(roundi(ch))])
+	if rec.has("tier"):   # the secondary objective: how the whole town feels
+		_row(box, "", "TOWN RATING:", "%s  (%d)" % [rec.tier, int(rec.points)])
 	if int(rec.get("perfect", 0)) > 0:   # review, item 6: good prep shows on the books
 		_row(box, "", "PERFECT PLATES:", "%d   (best run %d)" % [int(rec.perfect), int(rec.get("best_streak", 0))])
 	var unpaid_bills := int(rec.get("unpaid_bills", 0))
