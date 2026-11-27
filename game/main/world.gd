@@ -349,13 +349,28 @@ func _sync_walls() -> void:
 ## Whether taking away these wall edges (laying floor behind them, opening them up)
 ## would leave a hung piece with no wall to hang on.
 func _strands_high(edges: Array[Vector3i]) -> bool:
+	return _stranded_high(edges) != null
+
+
+## The first hung piece that taking away these wall edges would leave with no wall, or null.
+func _stranded_high(edges: Array[Vector3i]) -> Station:
 	for c: Vector2i in game.highs:
 		var left := _back_walls(c)
 		for e in edges:
 			left.erase(e)
 		if left.is_empty():
-			return true
-	return false
+			return game.highs[c]
+	return null
+
+
+## "Take the wall shelf down first": the refusal naming the hung piece that holds these
+## edges, or "" when none does.
+func strand_refusal(edges: Array[Vector3i]) -> String:
+	var st := _stranded_high(edges)
+	if st == null:
+		return ""
+	var nm := str(Catalog.ITEMS[st.type].name)
+	return "Take the %s down first" % (nm.substr(0, 1).to_lower() + nm.substr(1))
 
 
 ## The kitchen node of a piece in hand: the counter's node for a counter (a fridge, a
