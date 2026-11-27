@@ -329,12 +329,13 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 		"sink":
 			# Plates and cups soak until they are washed: one press washes the whole sink, each
 			# back onto its own stack (review, item 11: three stacks, less upkeep).
-			if held == "dirty_dishes":
+			if held == "dirty_dishes" and st.sink_room() <= 0:
+				why = "The sink is full. Wash some up"
+			elif held == "dirty_dishes":
 				act = "Put in sink"
 				if not dry_run:
-					st.dirty += ch.dishes.size()
-					st.dirty_cups += ch.dishes.filter(func(d: Dish) -> bool: return d.vessel == Dish.CUP).size()
-					ch.set_held("dirty_dishes", 1.0, [], ch.on_tray)
+					var rest := st.put_in_sink(ch.dishes)
+					ch.set_held("dirty_dishes", 1.0, rest, ch.on_tray)
 					st.refresh()
 			elif held == "" and st.dirty > 0:
 				act = "Wash"   # a hold (`_tick_wash`): one dish a hold, into the hands
