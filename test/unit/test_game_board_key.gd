@@ -29,7 +29,11 @@ func test_refused_open_says_nothing_and_swells_the_key():
 	assert_false(game.hud.toast.text.contains("board by the door"))
 	assert_false(game.hud.toast.text.contains("N, or"))
 	assert_eq(game.menu_stock.night_hint(), "")
-	await wait_seconds(0.06)
+	# Step the swell by hand rather than waiting real frames: sampling the tween
+	# mid-flight after a 0.06s wait flaked when CI starved the window of frames.
+	var swell: Tween = game.hud.board_key_ui._swell
+	assert_true(swell != null, "a swell tween started")
+	swell.custom_step(0.06)
 	assert_gt(game.hud.board_key_ui.cap.scale.x, 1.05, "the key swells")
 
 
@@ -77,9 +81,9 @@ func test_board_glows_in_build_only_and_key_is_prompt_sized():
 	_frame()
 	var k: HudBoardKey = game.hud.board_key_ui
 	assert_true(game.menu_board.glow.visible, "halo in build")
-	game.hud.day_ui.show_prompt(Vector2(300, 300), "Cook")
-	var key: Control = game.hud._prompts[0].key
-	assert_almost_eq(k.cap.size.y, key.size.y, 6.0, "no bigger than the chef prompt's key")
+	# The chef prompt's key is about half size since T-103; the board key keeps its old,
+	# prompt-sized cap (about 42 px tall).
+	assert_almost_eq(k.cap.size.y, 42.0, 6.0, "no bigger than the chef prompt's old key")
 	game.phase = game.Phase.SERVICE
 	_frame()
 	await wait_seconds(0.6)

@@ -37,7 +37,7 @@ func reach_action(ch: Player) -> String:
 	ch.set_meta("reach", service)   # in service the cell is picked as if reaching: the shelf's, not the floor piece's
 	var cell := ch.target_cell() if game.phase == Game.Phase.SERVICE else Grid.to_cell(game.room_edit._piece_in_front(ch))
 	var out := ""
-	if not game.highs.has(cell):
+	if not game.highs.has(cell) and not (service and _tall_with_two_kinds(cell)):
 		pass
 	elif service:
 		var st: Station = game.world.station_at(cell, ch)
@@ -47,6 +47,14 @@ func reach_action(ch: Player) -> String:
 		out = "Pick up %s" % lift_name(ch)
 	ch.set_meta("reach", false)
 	return out
+
+
+## A tall fridge holding two or more food kinds: Reach takes the second.
+func _tall_with_two_kinds(cell: Vector2i) -> bool:
+	if not game.world.is_tall_at(cell):
+		return false
+	var base: Array = game.kitchen.take_stock(cell).get("base", [])
+	return base.filter(func(b: String) -> bool: return not Kitchen.is_cleaning(b)).size() >= 2
 
 
 ## The piece a card would open for on a cell: reaching, what hangs on the wall (or nothing);
