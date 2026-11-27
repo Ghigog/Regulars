@@ -193,9 +193,19 @@ static func ingredient(n: Node3D, id: String, state: String, look := "", y := 0.
 				Build.box(n, Vector3(0, y, 0), Vector3(0.24, 0.14, 0.16), col, 0.0, Build.R_GLOSS)
 			else:
 				Build.box(n, Vector3(0, y, 0), Vector3(0.22, 0.02, 0.22), col, 0.0, Build.R_GLOSS).rotation.y = PI / 4
+		"spud":
+			if state == "raw":   # a lumpy, matte brown spud: three merged balls and a few dark eyes
+				for b: Array in [[Vector3(-0.045, 0.075, 0.0), 0.085, Vector3(1.1, 0.85, 1.0)], [Vector3(0.05, 0.07, 0.015), 0.08, Vector3(1.0, 0.85, 0.95)], [Vector3(0.0, 0.085, -0.04), 0.065, Vector3.ONE]]:
+					Build.ball(n, Vector3(b[0].x, y + b[0].y, b[0].z), b[1], col, 0.0, Build.R_MATTE).scale = b[2]
+				for e: Vector3 in [Vector3(-0.07, 0.115, 0.055), Vector3(0.06, 0.105, 0.06), Vector3(0.0, 0.15, 0.0)]:
+					Build.ball(n, Vector3(e.x, y + e.y, e.z), 0.014, "#5e3d20")
+			else:   # a heap of pale cut sticks lying on the board, no carton
+				for k in 8:
+					Build.box(n, Vector3(-0.07 + (k % 4) * 0.045, y + 0.015 + (k / 4) * 0.03, -0.03 + (k % 3) * 0.03), Vector3(0.16, 0.028, 0.028), col, 0.0, Build.R_GLOSS).rotation.y = 0.3 + k * 0.55
 		"sticks":
-			if state == "raw" and id == "potato":
-				Build.ball(n, Vector3(0, y + 0.07, 0), 0.1, col).scale = Vector3(1.3, 0.75, 0.9)
+			if state == "raw":   # pale sticks, as in the basket
+				for k in 6:
+					Build.box(n, Vector3(-0.06 + (k % 3) * 0.06, y + 0.015 + (k / 3) * 0.03, -0.03 + (k % 2) * 0.04), Vector3(0.17, 0.026, 0.026), col, 0.0, Build.R_GLOSS).rotation.y = 0.3 + k * 0.5
 			else:
 				Build._add(n, Build.lathe_mesh([[0.0, 0.0], [0.05, 0.0], [0.09, 0.14], [0.0, 0.14]], 12), Vector3(0, y, 0), Color(Build.CORAL), 0.0)
 				for k in 6:
@@ -421,6 +431,10 @@ static func _layer(n: Node3D, id: String, y: float, first: bool, last: bool, coa
 			Build.cyl(n, Vector3(0, y + 0.045, 0), 0.045, 0.22, col, 0.0, Build.R_GLOSS).rotation.z = PI / 2
 			return 0.09
 		"sticks":
+			for k in 7:
+				Build.box(n, Vector3(-0.08 + (k % 4) * 0.05, y + 0.015 + (k / 4) * 0.025, -0.03 + (k % 3) * 0.03), Vector3(0.12, 0.025, 0.025), col, 0.0, Build.R_GLOSS).rotation.y = k * 0.7
+			return 0.05
+		"spud":
 			for k in 7:
 				Build.box(n, Vector3(-0.08 + (k % 4) * 0.05, y + 0.015 + (k / 4) * 0.025, -0.03 + (k % 3) * 0.03), Vector3(0.12, 0.025, 0.025), col, 0.0, Build.R_GLOSS).rotation.y = k * 0.7
 			return 0.05
