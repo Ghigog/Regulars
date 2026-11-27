@@ -76,13 +76,15 @@ func test_shop_open_close_returns_to_baseline():
 	game.session.open_shop()
 	await wait_frames(2)
 	game.session.close_shop()
-	await wait_seconds(0.4)
+	_step_tweens(0.4)
+	await wait_frames(1)   # the queue_free lands
 	var base := _counts()
 	for i in 10:
 		game.session.open_shop()
 		await wait_frames(2)
 		game.session.close_shop()
-		await wait_seconds(0.4)
+		_step_tweens(0.4)
+		await wait_frames(1)   # the queue_free lands
 	var now := _counts()
 	assert_lte(now[0], base[0], "no nodes left behind")
 	assert_eq(now[1], base[1], "no SubViewports left behind")

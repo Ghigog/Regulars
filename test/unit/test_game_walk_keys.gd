@@ -25,7 +25,7 @@ func test_three_keys_do_not_hide_it_the_fourth_does() -> void:
 	_key(KEY_D)
 	assert_true(_shown())   # popping
 	assert_true(game.hud.options_ui.options.walk_learned)
-	await wait_seconds(0.6)
+	_step_tweens(0.6)
 	assert_false(_shown())
 
 

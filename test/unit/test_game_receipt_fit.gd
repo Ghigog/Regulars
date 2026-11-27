@@ -30,6 +30,7 @@ func test_long_day_fits_the_screen_and_scrolls() -> void:
 	await _screen_900()
 	game.hud.receipt_ui.show_summary(_long_day(), false)
 	await wait_frames(2)
+	_step_tweens(1.0)   # settle the panel's pop-in before measuring
 	var clip: Control = game.hud._summary_clip
 	var view := Rect2(Vector2.ZERO, get_viewport().get_visible_rect().size)
 	assert_true(view.encloses(clip.get_global_rect()), "clip %s inside %s" % [clip.get_global_rect(), view])
