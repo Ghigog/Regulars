@@ -60,7 +60,10 @@ func _demo_seating() -> void:
 			g.seat = cell
 			g.table = table
 			g.party = [g]
-			g.state = "ordering"
+			g.state = "ordering" if person != 5 else "reading"   # one guest mid-read, card in hand
+			if g.state == "reading":
+				g.timer = 99.0
+				g._hold_card()
 			g.mood.patience = 1.0
 			g._body.position.y = Guest.SEAT_HEIGHT
 			g._body.rotation.y = 0.0 if seat[3] == 2 else PI
