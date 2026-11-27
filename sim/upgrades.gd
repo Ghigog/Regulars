@@ -60,6 +60,12 @@ static func is_tiered(key: String) -> bool:
 	return key.contains(TIER_SEP)
 
 
+## A food box or one of its two upgrade nodes (EPIC-132): "box_lettuce", "ready_lettuce"
+## (Prepared), "marinated_lettuce". Its tree: the plain box, then Prepared or Marinated.
+static func is_food_box(key: String) -> bool:
+	return Catalog.ITEMS.has(key) and Catalog.is_box(key) and Catalog.ITEMS[key].has("ingredient")
+
+
 ## A floor treatment's box (PRD 9.5).
 static func is_treatment(key: String) -> bool:
 	return Treatments.is_box(key)
@@ -69,7 +75,7 @@ static func is_treatment(key: String) -> bool:
 static func catalog_id(key: String) -> String:
 	if is_tiered(key):
 		return key.get_slice(TIER_SEP, 0)
-	if is_treatment(key):
+	if is_treatment(key) or is_food_box(key):
 		return key
 	return Kitchen.family_of(key)
 
@@ -92,6 +98,8 @@ static func parent(key: String) -> String:
 			BOOTH: return "chair@3"
 			TABLE_FAST, TABLE_COMFY: return "table@1"
 		return ""
+	if is_food_box(key):
+		return Pantry.box_id(Pantry.kind_of(key)) if Catalog.is_box_node(key) else ""
 	if is_treatment(key):
 		var up := Treatments.parent(Treatments.key_of(key))
 		return Treatments.box_id(up) if up != "" else ""
@@ -115,6 +123,15 @@ static func children(key: String) -> Array[String]:
 				out.append(_tier_key(TABLE_COMFY, 1))
 				out.append(_tier_key(TABLE_FAST, 1))
 		return out
+	if is_food_box(key):
+		var nodes: Array[String] = []
+		if parent(key) != "":
+			return nodes
+		var kind := Pantry.kind_of(key)
+		for id: String in [Pantry.box_id(kind, true), Pantry.box_id(kind, false, true)]:
+			if Catalog.ITEMS.has(id):
+				nodes.append(id)
+		return nodes
 	if is_treatment(key):
 		var kids: Array[String] = []
 		for k: String in Treatments.children(Treatments.key_of(key)):
@@ -142,6 +159,8 @@ static func has_tree(key: String) -> bool:
 static func step(key: String) -> String:
 	if is_tiered(key):
 		return Kitchen.EFFICIENT if tier_of(key) > 1 or catalog_id(key) == BOOTH else ""
+	if is_food_box(key):
+		return ""
 	if is_treatment(key):
 		return Treatments.step(Treatments.key_of(key))   # the same words as Kitchen's steps
 	return Kitchen.step_of(key)
@@ -151,6 +170,9 @@ static func step(key: String) -> String:
 static func price(key: String) -> int:
 	if is_tiered(key):
 		return Catalog.price_of(catalog_id(key), tier_of(key))
+	if is_food_box(key):
+		var item: Dictionary = Catalog.ITEMS[key]
+		return Pantry.PREPARED_PRICE if item.get("ready", false) else (Pantry.MARINATE_PRICE if item.get("marinated", false) else 0)
 	if is_treatment(key):
 		return Treatments.unlock(Treatments.key_of(key))
 	return Kitchen.price_of(key)
@@ -169,6 +191,8 @@ static func step_price(key: String) -> int:
 static func level(key: String) -> int:
 	if is_tiered(key):
 		return Catalog.level_of(catalog_id(key), tier_of(key))
+	if is_food_box(key):
+		return int(Catalog.ITEMS[key].level)
 	var id := catalog_id(root(key))
 	return int(Catalog.ITEMS[id].level) if Catalog.ITEMS.has(id) else 1
 
@@ -180,6 +204,8 @@ static func name_of(key: String) -> String:
 		return "Chair %d" % tier_of(key)
 	if is_tiered(key):
 		return Catalog.label({"id": catalog_id(key), "tier": tier_of(key)})
+	if is_food_box(key):
+		return str(Catalog.ITEMS[key].name)
 	if is_treatment(key):
 		return Treatments.name_of(Treatments.key_of(key))
 	return str(Kitchen.NODES[key].name)
@@ -187,13 +213,16 @@ static func name_of(key: String) -> String:
 
 ## Quality per job ({} for a tiered piece, which does no prep).
 static func jobs(key: String) -> Dictionary:
-	return {} if is_tiered(key) or is_treatment(key) else Kitchen.jobs_of(key)
+	return {} if is_tiered(key) or is_treatment(key) or is_food_box(key) else Kitchen.jobs_of(key)
 
 
 ## A short line on what the node is: its trade for a specialist, its gain for a step.
 static func blurb(key: String) -> String:
 	if is_tiered(key):
 		return Catalog.blurb_of(catalog_id(key), tier_of(key))
+	if is_food_box(key):
+		var item: Dictionary = Catalog.ITEMS[key]
+		return "%s.  Its box: $%d a night" % [item.blurb, Pantry.box_fee(key)]
 	if is_treatment(key):
 		var k := Treatments.key_of(key)
 		return "%s.  Its box: %s, laying free" % [Treatments.ITEMS[k].blurb, Treatments.fee_words(k)]

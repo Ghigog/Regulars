@@ -6,8 +6,8 @@ extends "res://test/helpers/kitchen_case.gd"
 func test_box_ids_name_a_kind_and_whether_it_is_ready():
 	assert_eq(Pantry.box_id("patty"), "box_patty")
 	assert_eq(Pantry.box_id("cheese", true), "ready_cheese")
-	assert_eq(Pantry.station_ingredient("ready_cheese"), {"id": "cheese", "ready": true})
-	assert_eq(Pantry.station_ingredient("box_fish"), {"id": "fish", "ready": false})
+	assert_eq(Pantry.station_ingredient("ready_cheese"), {"id": "cheese", "ready": true, "marinated": false})
+	assert_eq(Pantry.station_ingredient("box_fish"), {"id": "fish", "ready": false, "marinated": false})
 	assert_eq(Pantry.kind_of("patty"), "patty", "a plain kind is its own box")
 	assert_eq(Pantry.kind_of("box_nothing"), "")
 

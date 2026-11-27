@@ -376,7 +376,8 @@ func test_seaside_ingredients_are_complete():
 	assert_eq(Catalog.tool_of("wine_barrel"), "pour", "wine is poured at its own barrel")
 	for id in ["courgette", "pepper"]:
 		assert_eq(Catalog.ITEMS[Pantry.box_id(id, true)].theme, "seaside")
-	assert_false(Pantry.can_be_ready("lemon"), "only the chopped ones and cheese come ready-made")
+	assert_true(Pantry.can_be_ready("lemon"), "a kind with a cold prep tool and a box comes Prepared")
+	assert_false(Pantry.can_be_ready("fish"), "a grilled kind does not")
 
 
 

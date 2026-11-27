@@ -148,7 +148,7 @@ static func night_cost(stations: Array) -> int:
 	var total := 0
 	for s: Dictionary in stations:
 		if s.get("stocked", true):
-			total += Pantry.fee_of(s.ingredient, s.get("ready", false))
+			total += Pantry.box_fee(Pantry.box_id(s.ingredient, s.get("ready", false), s.get("marinated", false)))
 	return total
 
 
