@@ -8,6 +8,7 @@ const REACH := 1.3   # how far from a station's centre (or a seated guest) the c
 const GROSS_ITEMS: Array[String] = ["dirty_dishes", "rubbish_bag"]   # and anything burnt
 const HANDS := 2      # plates or cups carried in the hands
 const ON_TRAY := 4    # plates or cups carried on a tray
+const REACH_LEAN := deg_to_rad(-9.0)   # tips back while Reach is held; positive x is the forward run lean
 
 var game
 var held := ""
@@ -455,8 +456,9 @@ func move(input: Vector2, delta: float, hold := false) -> void:
 	if floori(_stride / PI) != before and pace > 0.3:
 		game.audio.sfx("step", 0.15)
 	_body.position.y = absf(sin(_stride)) * 0.07 * pace
-	# Lean into a run, and tip whatever is carried so its top faces the camera.
-	_body.rotation.x = lerpf(_body.rotation.x, 0.3 * pace, 1.0 - exp(-10.0 * delta))
+	# Lean into a run (or back while reaching up), and tip whatever is carried so its top faces the camera.
+	var lean := REACH_LEAN if game.card.reaching(self) else 0.3 * pace
+	_body.rotation.x = lerpf(_body.rotation.x, lean, 1.0 - exp(-10.0 * delta))
 	if _held_node:
 		_held_node.global_basis = Basis(Vector3(1, 0, -1).normalized(), deg_to_rad(25.0)).scaled(Vector3.ONE * _held_size)
 	_body.rotation.y = lerp_angle(_body.rotation.y, atan2(aim.x, aim.z), 1.0 - exp(-18.0 * delta))

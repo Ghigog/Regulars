@@ -106,3 +106,27 @@ func test_reach_targets_the_shelf_over_a_bin_not_the_grill_beside_it():
 	game.player.position = Grid.center(Vector2i(1, 4))
 	_reach(false)
 	assert_eq(game.card.reach_action(game.player), "Take bun")
+
+
+func _frames(n: int) -> void:
+	for i in n:
+		game.player.move(Vector2.ZERO, 0.05)
+
+
+func test_reaching_leans_the_chef_back_and_release_straightens():
+	_reach(true)
+	_frames(10)
+	var x: float = game.player._body.rotation.x
+	assert_lt(x, deg_to_rad(-5.0))
+	assert_gt(x, deg_to_rad(-10.0))
+	_reach(false)
+	_frames(30)
+	assert_almost_eq(game.player._body.rotation.x, 0.0, 0.02)
+
+
+func test_reaching_while_down_keeps_the_fall_tilt():
+	game.floor_dirt.slip(game.player, Vector2i(1, 6))
+	var before: float = game.player._body.rotation.x
+	_reach(true)
+	_frames(10)
+	assert_eq(game.player._body.rotation.x, before)
