@@ -70,10 +70,11 @@ static func bin_load(n: Node3D, fill: int, holds: int) -> void:
 ## A dining chair standing `away` from the cell centre, its back on the far side.
 ## Sheet 10: a coral seat and back on dark wooden legs. The back legs run on up as
 ## two posts holding a low back panel, so the legs read below the seat and the
-## back stays low enough to show faces (0.9 m).
-static func _chair(n: Node3D, away: Vector2i, col: String) -> void:
+## back stays low enough to show faces (0.9 m). `centred` stands a lone chair on its
+## own cell, its back toward `away` (a chair piece, which turns to face its table).
+static func _chair(n: Node3D, away: Vector2i, col: String, centred := false) -> void:
 	var c := Node3D.new()
-	c.position = Vector3(away.x, 0, away.y)
+	c.position = Vector3.ZERO if centred else Vector3(away.x, 0, away.y)
 	c.rotation.y = atan2(-float(away.y), float(away.x))
 	n.add_child(c)
 	var legs := Build.WOOD_DARK
@@ -356,11 +357,11 @@ static func hinge(n: Node3D, at: Vector3) -> Node3D:
 ## Furniture visuals centred on a cell, front facing +z. Tier adds a gold trim.
 ## Shapes and heights are shared by every theme (sheets 8 and 10). `node` is the
 ## piece's place in its upgrade tree (PRD 8.3): a step adds its own marks.
-static func station(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "") -> void:
+static func station(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "", joined := 0, candle := Vector2.ZERO) -> void:
 	if type == "till":   # its own piece, drawn at worktop height as it stands on a counter
 		register(n)
 		return
-	BuildStationBody._station_body(n, type, tier, base, pass_look, node)
+	BuildStationBody._station_body(n, type, tier, base, pass_look, node, joined, candle)
 	_base_marks(n, base, PASS_FRONT if pass_look and not Kitchen.is_tall(base) else 0.0)
 	if node != "" and node != base:
 		_node_marks(n, node)
