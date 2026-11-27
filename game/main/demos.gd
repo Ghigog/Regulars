@@ -180,7 +180,7 @@ func _apply_demo(demo: String) -> void:
 		_demo_mop(demo)
 	elif demo == "mop_line":  # PRD 9.6: see _demo_mop_line
 		_demo_mop_line()
-	elif demo in ["treat", "treat_day", "tree_box", "tree_bucket", "tree_sponge"]:  # PRD 9.5: see _demo_treat
+	elif demo in ["treat", "treat_day", "tree_box", "tree_bucket", "tree_sponge", "tree_food_box"]:  # PRD 9.5: see _demo_treat
 		game.ledger.record_sale(Game.DEMO_BILL, 5)
 		game.arrivals.clear()
 		game.get_tree().create_timer(1.0).timeout.connect(_demo_treat.bind(demo))
@@ -710,7 +710,7 @@ func _shelve_small_tools() -> void:
 ## each treatment's sheen, a little dirt on some, the boxes on a counter by the wall with
 ## their chemical tags, the small tools on wall shelves and cabinets, the chef laying primer (shoot at 3).
 ## "treat_day": the same laid for service, the sheens in force (shoot at 3). "tree_box",
-## "tree_bucket", "tree_sponge": the tree of a cleaner's box, a mop bucket, a sponge's shelf.
+## "tree_food_box", "tree_bucket", "tree_sponge": the tree of a cleaner's box, a lettuce box, a mop\n## bucket, a sponge's shelf.
 func _demo_treat(demo: String) -> void:
 	game.session.open_build()
 	game.ledger.money = 600
@@ -731,6 +731,16 @@ func _demo_treat(demo: String) -> void:
 				game.kitchen.unstore(shelf, "box_finish")
 				game.placing.pick_up(Grid.center(shelf))   # the cleaner's box
 				game.placing._store_box(shelf, "box_finish")
+			"tree_food_box":   # EPIC-132: a lettuce box in hand, its whole tree open: the plain box, Prepared and Marinated
+				game.shopper = game.player
+				game.player.hand = {"id": "box_lettuce", "tier": 1, "price": 0, "facing": 0, "moving": true, "in_place": true,
+					"from": Vector3i(shelf.x, shelf.y, 0), "from_facing": 0}
+				game.upgrading = true
+				game.hud.screens_ui.show_tree("box_lettuce")
+				var t: TreeScreen = game.hud._tree   # three rows are taller than the usual paper: open it to full height so the root shows too
+				t.view = Vector2(TreeScreen.VIEW.x, t._content.size.y)
+				t._clip.custom_minimum_size = t.view
+				return
 			"tree_bucket":
 				game.clean_kit.on_built(game.world.add_station("mop_bucket", at), "mop_bucket")
 				game.placing.pick_up(Grid.center(at))

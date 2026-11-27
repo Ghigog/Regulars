@@ -70,8 +70,15 @@ Win by earning five stars from the critic; lose when the reputation meter hits 0
   the player's level show as dimmed silhouettes marked "Level N" in the shop and on the
   trees (review, item 10), and cannot be bought; a day
   that ends on a new level says "LEVEL N: NEW IN THE SHOP" on the receipt. There is a box per food kind of the run's theme (free to take; its kind costs
-  its nightly fee) and, from level 2, ready-made boxes of the chopped kinds and cheese
-  (prepped, always plain, 1.5x the fee: `READY_FEE`). A box goes into a free slot: a
+  its nightly fee) and each box has its own upgrade tree (bought in the box's tree
+  with the box in hand, from level 2): the plain box at the root, then two branches.
+  *Prepared* (chopped kinds and cheese; `Pantry.PREPARED_PRICE`, $30) hands the kind out
+  already prepped, so it skips its prep tool, always plain, at 1.5x the fee
+  (`READY_FEE`). *Marinated* (every kind; `Pantry.MARINATE_PRICE`, $40) makes it more
+  delicious: each ingredient from it adds `MARINATE_BONUS` (0.1) to its quality, so every
+  dish it goes into scores slightly higher, at 1.3x the fee (`MARINATE_FEE`). A box is
+  one or the other, not both, and the tree shows each step's price and nightly fee. The
+  shop no longer sells ready-made tubs. Shoot `REGULARS_DEMO=tree_food_box` to see the tree. A box goes into a free slot: a
   counter holds one kind, a double counter two, a long counter three (`Kitchen.NODES`
   "slots"); chilled kinds (patty, cheese, fish, calamari, and ready cheese) only in a
   fridge slot, the under-counter fridge reached through the counter's tree. One box of a
@@ -487,7 +494,7 @@ Win by earning five stars from the critic; lose when the reputation meter hits 0
     speed, a little joy, dirt shows x1.25), high gloss ($15: x1.2, more joy, x1.5). The
     turn key with a laying tool in hand switches one off. Rules in `sim/treatments.gd`.
   - *Demos:* `dirt`, `slip`, `mop`, `robot`, `mop_night`, `mop_line`, `treat`,
-    `treat_day`, `tree_box`, `tree_bucket`, `tree_sponge` (see `CLAUDE.md`).
+    `treat_day`, `tree_box`, `tree_food_box`, `tree_bucket`, `tree_sponge` (see `CLAUDE.md`).
 - **Art pass (PRD 9.6).** Every PRD 9 visual checked in both themes. Changes: each mop
   on the bucket's tree has its own head (it all drew as the plain mop before), a mop
   stands head up in its bucket so its kind and dirt show, the wringer bucket has a coral
@@ -561,7 +568,7 @@ Win by earning five stars from the critic; lose when the reputation meter hits 0
     (`staff_only` and `test_all_staff.gd`, which fails if any ticket, table or chore
     sits unchanged for 120 s). What it changed: kinds made from another's stock
     (lemonade, milkshake, steamed corn) are fetched as their source and worked at their
-    tool, and ready-made boxes go straight to the ticket; a *plates* task (the
+    tool, and Prepared boxes go straight to the ticket; a *plates* task (the
     assemble duty) sets out a plate or cup for each of a ticket's items first so food
     goes straight on it, never more than free worktops (the oldest waiting ticket sets
     out what fits); a drink is poured into the ticket's cup and set back out; finished
@@ -912,7 +919,7 @@ placed. (Floors, walls and doors are built; ceilings are not planned.)
 - **Investments**: flyers (built, section 1), loans, supplier stakes (cheaper or
   better ingredients), equipment leases.
 - **Costs**: *built* (PRD 1): a nightly stock fee per stocked ingredient station
-  (ready-made at 1.5x), on the restock note and the receipt's STOCK line; prices come
+  (Prepared at 1.5x, Marinated at 1.3x), on the restock note and the receipt's STOCK line; prices come
   from ingredient worth and a cheap/fair/dear level. **To add**: wages, rent that rises
   with the location.
 - **Starting money**: $150 on night zero, enough for one simple main with change
@@ -987,8 +994,8 @@ Not built yet, except where marked; this is the agreed direction for future sess
 - **Recipes, ingredients and a menu the player designs.** Every dish is data: a recipe
   is a list of ingredients (burger: bun, patty, salad, cheese; salad: lettuce, tomato,
   onion). Each ingredient comes from a station in the room dedicated to it, so a
-  bigger menu needs a bigger kitchen. Some ingredients can be bought ready-made
-  (prefab salad) as shop upgrades that save prep. The player picks which ingredient
+  bigger menu needs a bigger kitchen. Some ingredients can be upgraded to a Prepared box
+  (prefab salad) that saves prep, or a Marinated one that lifts quality. The player picks which ingredient
   stations to stock and writes their own menu from what they can make (only
   cheeseburgers, say), and guests order from it. Every restaurant type has mains, a
   sides system and a drinks system: the diner is burgers, fries and soda; the seaside
@@ -1007,7 +1014,7 @@ Not built yet, except where marked; this is the agreed direction for future sess
   - *At most one prep step per ingredient*, and some need none (used as they are).
   - *Each townsperson likes and dislikes ingredients*, so a varied menu pays off.
   - *Decided while building (13 November 2026)*: each tool is its own station; the
-    ready-made ingredients are the chopped ones plus cheese; an empty tray put down
+    Prepared boxes (since EPIC-132 an upgrade, not a shop tub) are of the chopped kinds plus cheese; an empty tray put down
     takes the oldest ticket without one; boiling never gives the burst; a group walks
     on only if nobody has a main; every station can be sold, the last stove included.
 - **The critic**: built (PRD 2), see section 1.
