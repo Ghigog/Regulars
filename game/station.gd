@@ -15,7 +15,8 @@ const RACK_HOLDS := 4      # a dish rack beside a sink: this many more dishes be
 const RACK_CAPACITY := PLATES   # clean plates a dish rack holds
 const BIN_HOLDS := 4       # scraps a bin takes before it overflows
 
-## A heat tool's behaviour for each heat job: a stove that fries works as a fryer.
+## A heat tool's behaviour for each heat job. A hob (the stove's own line) never changes:
+## it cooks every job in its one pan. A fryer or pot works as itself.
 const HEAT_MODE := {"grill": "stove", "fry": "fryer", "boil": "pot"}
 const HEAT_TOOLS: Array[String] = ["stove", "fryer", "pot"]
 
@@ -132,12 +133,19 @@ func q(job: String) -> float:
 
 ## How a heat tool behaves right now: as the tool of what is cooking on it.
 func mode() -> String:
+	if type == "stove":
+		return "stove"
 	return str(HEAT_MODE[heat]) if heat != "" else type
+
+
+## Boiling here: a pot always, a hob while it has a pot's food (a ring gauge, a timer, no dial).
+func _boils() -> bool:
+	return mode() == "pot" or (type == "stove" and heat == "boil")
 
 
 ## Shows the gauge the current heat job uses (a fryer's rack, a pot's ring), hidden.
 func _heat_widget() -> void:
-	var want: String = {"fryer": "rack", "pot": "boil"}.get(mode(), "")
+	var want: String = "boil" if _boils() else {"fryer": "rack"}.get(mode(), "")
 	if want == "":
 		if widget != null and widget.kind in ["rack", "boil"]:
 			widget.visible = false
@@ -215,7 +223,7 @@ func _show_item(kind: String) -> void:
 		_item_node.position = Vector3(0, 0.9, 0)
 		add_child(_item_node)
 	elif kind != "":
-		var on_heat := is_heat_tool() and mode() == "stove"
+		var on_heat := is_heat_tool() and mode() == "stove" and not _boils()
 		_shown_look = _look(cook) if on_heat else BuildFood.look_for(kind, quality)
 		_item_node = BuildFood.item(kind, quality, _shown_look)
 		match mode():
@@ -247,7 +255,7 @@ func set_item(kind: String, q := 1.0) -> void:
 			_make_cook_bar()
 			_heat_widget()
 		var state: String = Tray.parse(kind).get("state", "")
-		cook = {"prep": _times()[2], "burnt": _times()[3]}.get(state, 0.0) if mode() != "pot" else (Prep.boil_time(q("boil")) if state == "prep" else 0.0)
+		cook = {"prep": _times()[2], "burnt": _times()[3]}.get(state, 0.0) if not _boils() else (Prep.boil_time(q("boil")) if state == "prep" else 0.0)
 		rest = 0.0
 		result = ""
 	_show_item(kind)
@@ -285,17 +293,18 @@ func show_dish() -> void:
 func current_quality() -> float:
 	if not is_heat_tool():
 		return quality
-	if mode() == "stove":
-		return float(Prep.grill(cook, q("grill")).quality)
-	if mode() == "pot":
+	if _boils():
 		return float(Prep.boil(cook, q("boil")).quality)
+	if mode() == "stove":
+		var job := "fry" if heat == "fry" else "grill"
+		return float((Prep.fry if job == "fry" else Prep.grill).call(cook, q(job)).quality)
 	return quality
 
 
 ## [raw until, done from, good until, burnt at] for this heat tool and what is on it,
 ## stretched by the tool's quality at the job (PRD 8.3).
 func _times() -> Array:
-	var job := "fry" if mode() == "fryer" else "grill"
+	var job := "fry" if heat == "fry" or mode() == "fryer" else "grill"
 	return Prep.heat_times(job, q(job) if q(job) > 0.0 else 1.0)
 
 
@@ -365,7 +374,7 @@ func tick_cooking(delta: float) -> String:
 	if not is_cooking():
 		return ""
 	cook += delta
-	if mode() == "pot":
+	if _boils():
 		_update_cooking_visuals()
 		if cook >= Prep.boil_time(q("boil")):
 			item = Tray.kind("prep", Tray.parse(item).id)
@@ -438,7 +447,7 @@ func _make_smoke() -> void:
 func sizzle_stage() -> String:
 	if not is_cooking():
 		return ""
-	if mode() != "stove":
+	if mode() != "stove" or _boils():
 		return "sizzle"
 	var tt := _times()
 	if cook < tt[0]:
@@ -455,7 +464,7 @@ func is_cooking() -> bool:
 		return false
 	match mode():
 		"stove":
-			return true
+			return not _boils() or item.begins_with("raw")
 		"fryer":
 			return not on_rack()
 		"pot":
@@ -491,7 +500,7 @@ func hide_widget() -> void:
 
 
 func _update_cooking_visuals() -> void:
-	if mode() == "pot":
+	if _boils():
 		widget.visible = item != ""
 		widget.show_state({"t": cook / Prep.boil_time(q("boil")), "done": item.begins_with("prep")})
 		_bar.visible = false
@@ -503,7 +512,7 @@ func _update_cooking_visuals() -> void:
 	if mode() == "fryer" and widget != null and widget.kind == "rack":
 		widget.visible = rest > 0.0
 		widget.show_state({"left": rest / Prep.FRY_REST})
-	_bar.visible = is_cooking() or (mode() == "stove" and item.begins_with("prep"))
+	_bar.visible = is_cooking() or (mode() == "stove" and not _boils() and item.begins_with("prep"))
 	_needle.rotation.z = -deg_to_rad(_dial_angle(cook))
 	if _ring:
 		_ring.material_override = Build.mat(Color("#ff8a3c") if is_cooking() else Color(Build.STEEL_DARK), 1.6 if is_cooking() else 0.0)

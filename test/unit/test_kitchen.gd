@@ -55,7 +55,7 @@ func test_children_and_upgrades_only_from_the_parent():
 func test_base_tools_and_stand_ins():
 	assert_eq(Kitchen.quality("board", "chop"), Kitchen.BASE)
 	assert_eq(Kitchen.quality("board", "slice"), Kitchen.STAND_IN)
-	assert_eq(Kitchen.quality("stove", "boil"), Kitchen.STAND_IN)
+	assert_eq(Kitchen.quality("stove", "boil"), Kitchen.BASE, "a hob boils at base")
 	assert_eq(Kitchen.quality("board", "grill"), 0.0, "cannot do it at all")
 
 
@@ -311,3 +311,16 @@ func test_set_cell_keeps_stock_and_clears():
 	assert_eq(k.stock(C), ["bun"])
 	k.set_cell(C, "")
 	assert_false(k.cells.has(C))
+
+
+func test_a_hob_does_every_heat_job_at_base():
+	for job in ["grill", "fry", "boil"]:
+		assert_eq(Kitchen.quality("stove", job), Kitchen.BASE)
+	assert_eq(Kitchen.quality("range", "fry"), Kitchen.BASE + Kitchen.EFFICIENT_STEP)
+	assert_eq(Kitchen.NODES.stove.name, "Hob")
+
+
+func test_specialists_do_only_their_one_job():
+	assert_eq(Kitchen.jobs_of("char_grill"), {"grill": Kitchen.SPECIALIST})
+	assert_eq(Kitchen.jobs_of("fryer"), {"fry": Kitchen.SPECIALIST})
+	assert_eq(Kitchen.jobs_of("pot"), {"boil": Kitchen.SPECIALIST})

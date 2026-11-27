@@ -687,7 +687,7 @@ func test_a_raw_item_at_a_station_is_a_prep_and_items_in_hand_cover_their_lack()
 	assert_eq(prep.cell, Vector2i(1, 0))
 
 
-func test_prep_lists_stand_ins_and_their_duties():
+func test_prep_lists_only_tools_that_do_the_job():
 	var b := _board({
 		"stations": [{"id": "pot", "cell": Vector2i(2, 0), "tool": "pot"},
 			{"id": "stove", "cell": Vector2i(1, 0), "tool": "stove"},
@@ -696,10 +696,9 @@ func test_prep_lists_stand_ins_and_their_duties():
 		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["patty"]}],
 	})
 	var prep: Dictionary = b.tasks["prep:3"]
-	assert_eq(prep.duties, ["grill", "pot"], "the stove, then the stock pot standing in")
-	assert_almost_eq(float(prep.options[1].quality), Kitchen.STAND_IN_FAR, 0.001)
-	var only_pot := b.best_for(["pot"], Vector2i(0, 0))
-	assert_eq(only_pot.station, "pot", "a pot cook grills at the stock pot")
+	assert_eq(prep.duties, ["grill"], "the hob; a stock pot only boils")
+	assert_eq(prep.options.size(), 1)
+	assert_eq(b.best_for(["pot"], Vector2i(0, 0)), {}, "a pot cook cannot grill")
 	assert_eq(b.best_for(["board"], Vector2i(0, 0)), {}, "a board cannot grill")
 
 

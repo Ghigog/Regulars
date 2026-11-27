@@ -213,7 +213,7 @@ func test_post_duties_come_from_the_room():
 	_night()
 	var room: Dictionary = game.desk.room_duties()
 	assert_true((room.food as Array).has("grill"), "the test kitchen has stoves")
-	assert_true((room.food as Array).has("fryer"), "a stove stands in for frying (PRD 8.3)")
+	assert_true((room.food as Array).has("fryer"), "a hob fries at base (PRD 8.3)")
 	assert_false((room.food as Array).has("board"), "nothing in the room chops")
 	assert_true((room.clean as Array).has("wash_up"))
 	game.world.add_station("counter", Vector2i(1, 6))
