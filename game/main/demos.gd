@@ -710,7 +710,8 @@ func _shelve_small_tools() -> void:
 ## each treatment's sheen, a little dirt on some, the boxes on a counter by the wall with
 ## their chemical tags, the small tools on wall shelves and cabinets, the chef laying primer (shoot at 3).
 ## "treat_day": the same laid for service, the sheens in force (shoot at 3). "tree_box",
-## "tree_food_box", "tree_bucket", "tree_sponge": the tree of a cleaner's box, a lettuce box, a mop\n## bucket, a sponge's shelf.
+## "tree_food_box", "tree_bucket", "tree_sponge": the tree of a cleaner's box, a lettuce box, a mop
+## bucket, a sponge's shelf.
 func _demo_treat(demo: String) -> void:
 	game.session.open_build()
 	game.ledger.money = 600
