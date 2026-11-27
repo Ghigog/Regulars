@@ -138,6 +138,18 @@ func _apply_demo(demo: String) -> void:
 		game.player.take_dish(Dish.make(Dish.PLATE))
 		for a in game.arrivals:
 			a.time = 1.0
+	elif demo in ["aim", "aim_reach"]:   # the faint aim mark on a bare counter, or at shelf height while reaching; shoot at about 3
+		var c := Vector2i(0, 6)
+		if not game.stations.has(c):
+			game.world.add_station("counter", c)
+		if demo == "aim_reach" and not game.highs.has(c):
+			game.world.add_high("shelf", c)
+			game.kitchen.cells[c].stock.high.assign(["box_cheese"])
+		game.player.position = Grid.center(Vector2i(1, 6))
+		game.player.look(Vector2i(-1, 0))
+		game.player.set_meta("reach" if demo == "aim_reach" else "aim", true)   # headless stand-ins for the held button
+		for a in game.arrivals:
+			a.time = 1.0
 	elif demo in ["helpers", "helpers_break", "helpers_slip"]:   # PRD 10.6/10.8: staff at work; see Crew.crew_demos.demo
 		game.crew.crew_demos.demo(demo)
 	elif demo.begins_with("pay_"):   # PRD 11: paying the bill; see _demo_pay
