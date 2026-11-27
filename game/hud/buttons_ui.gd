@@ -8,9 +8,9 @@ extends RefCounted
 ## to hit-test fingers, so touch and clicks share one set of discs.
 
 const HOLD := ["use", "aim", "reach"]   ## held by a finger, not pressed once
-const ORDER := ["use", "aim", "reach", "turn", "sell", "shop", "menu", "back", "options"]
+const ORDER := ["use", "aim", "reach", "turn", "sell", "shop", "menu", "undo", "back", "options"]
 const ICONS := {"use": "use", "aim": "aim", "reach": "reach", "turn": "turn", "sell": "sell", "shop": "shop",
-	"menu": "flyer", "back": "back", "options": "cog"}
+	"menu": "flyer", "undo": "undo", "back": "back", "options": "cog"}
 
 var hud
 var game: Game
@@ -88,6 +88,9 @@ func specs() -> Array[Dictionary]:
 		y -= step
 		if hand.is_empty():
 			want.append({"id": "menu", "centre": Vector2(x, y)})
+			y -= step
+			if game.undo.has_steps():
+				want.append({"id": "undo", "centre": Vector2(x, y)})
 	var top := 18.0 + r
 	var back: bool = (free and not hand.is_empty()) or shop or ((card or options) and not touch)
 	if back:

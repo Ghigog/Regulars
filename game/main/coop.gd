@@ -300,9 +300,13 @@ func _build_act(action: String, ch: Player = null) -> void:
 				game.session.open_shop(ch)
 		"menu":
 			game.menu_stock.open_menu(ch)
+		"undo":
+			game.undo.undo(ch)
 		"sell":
 			if not ch.hand.is_empty() and Catalog.is_build_tool(ch.hand.id):
+				var before := game.undo.plan_snapshot()
 				if game.room_edit._hover_point(ch) != Vector3.INF and game.room_edit.remove_at(game.placing.snap(game.room_edit._hover_point(ch), ch), ch):
+					game.undo.record_plan(before)
 					game.room_edit._plan_changed()
 					game.audio.sfx("coin")
 				else:

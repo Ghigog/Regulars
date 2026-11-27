@@ -44,6 +44,7 @@ func start_day() -> void:
 		if ch.held == "dishes" or not Tray.parse(ch.held).is_empty():
 			ch.set_held("")   # yesterday's food does not carry into the new day
 	game.phase = Game.Phase.SERVICE
+	game.undo.clear()
 	game.clock = 0.0
 	game.shopper = null
 	game.upgrading = false

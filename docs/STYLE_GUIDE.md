@@ -57,9 +57,12 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- *Undo disc* (`HudButtons`, id `undo`, icon `undo` in `game/icons.gd`): a paper-and-wood disc exactly like Shop and Dishes (same size, same slide-in rustle and tick out), stacked in the right column above the menu (flyer) disc and Shop. It shows only in the build phase, with nothing in hand, while the undo stack (`GameUndo`) has a step. The glyph is a counter-clockwise curved arrow, an open arc with the head at the upper left, so it differs from Back (U-turn band) and Turn (three-quarter ring). Keycap: `Ctrl+Z` (`⌘Z` on a Mac), `LS` on a pad (provisional), none on touch.
+
 - *Wainscot meets a knee-high wall*: a dining wall's wainscot (or seaside clapboard) and rail stop at the room face of a knee-high wall that meets them, instead of sinking into its cap; at a tall corner or an opening they run as before.
 
 - *Wall hook removed*: the sponge and other small tools are no longer drawn on a hook at the wall; they sit centred (x = 0, z = 0) in their cell on a wall shelf, in a wall cabinet, or on a counter, pass or sink, turned with the piece.
+
 - *Dispensers on the plain counter*: the soda and two-tap fountains, coffee machine, wine barrel, wine rack and beer tap stand on the same teal-cabinet counter as every other tool, not a coral or wooden cabinet of their own. The machines are unchanged.
 
 - *Glowing menu board* (`MenuBoard.glow`, `HudBoardKey`, `hud.board_key_ui`): the A-frame's slate wears a breathing `Build.WARN` halo built like the door card's (radial quad, unshaded, additive, 0.5 s fade in, 1 s sine breathing, 0.4 s fade out), in the build phase only. Just above the board sits a prompt-sized keycap (the "E OPEN UP" prompt's key sheet and 24 px label) holding `controls.glyph("menu")` (N, a pad button or the touch word). Halo and key breathe brighter while tonight's menu has no main and dimmer once it has one, and the key swells once, hard, when the door card refuses for want of a main. It replaces the two "board by the door" notes on night zero.
