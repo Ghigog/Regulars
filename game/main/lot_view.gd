@@ -75,7 +75,8 @@ func buy(b: Vector2i) -> bool:
 func _redraw() -> void:
 	var show := game.phase == Game.Phase.BUILD
 	var glyph: String = game.controls.glyph("shop") if game.controls else "Tab"
-	var key := "%s|%s|%d|%s|%s" % [show, JSON.stringify(game.lot.to_dict()), game.lot.next_price(), game.ledger.money >= game.lot.next_price(), glyph]
+	var price := game.lot.next_price()
+	var key := "%s|%d|%d|%d|%s|%s" % [show, game.lot.blocks.hash(), game.lot.bought, price, game.ledger.money >= price, glyph]
 	if key == _key:
 		return
 	_key = key
