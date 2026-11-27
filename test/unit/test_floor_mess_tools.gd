@@ -231,6 +231,60 @@ func test_dirt_straight_ahead_beats_putting_the_mop_back():
 
 
 
+func _fridge_ahead(game, c: Vector2i) -> Station:
+	var f: Station = game.world.add_station("fridge", c + Vector2i(0, 1))
+	game.step(0.01)
+	_stand(game, c)
+	return f
+
+
+func test_dirt_underfoot_beats_the_fridge_for_a_mop():
+	var game = _game()
+	var c := Vector2i(7, 2)
+	_fridge_ahead(game, c)
+	game.floor_dirt.mess.add_dirt(c)
+	CleanKit.hold(game.player, "mop", 0)
+	assert_eq(game.clean_kit.floor_cell(game.player), c)
+	assert_eq(game.clean_kit.floor_action(game.player), "Mop")
+	game.coop.act(0, "use")
+	assert_eq(game.floor_dirt.mess.level(c), 0)
+	assert_eq(game.player.held, "tool:mop")
+
+
+func test_dirt_underfoot_is_scrubbed_by_hand_beside_a_station():
+	var game = _game()
+	var c := Vector2i(7, 2)
+	_fridge_ahead(game, c)
+	game.floor_dirt.mess.add_dirt(c)
+	assert_true(game.clean_kit.floor_first(game.player))
+	game.coop.act(0, "use")
+	assert_eq(game.clean_kit.floor_action(game.player), "Scrubbing 0%")
+	game.clean_kit.hold_use(game.player, true, CleanTools.HAND_TIME + 0.1)
+	assert_eq(game.floor_dirt.mess.level(c), 0)
+	assert_eq(game.player.held, "")
+
+
+func test_dirt_ahead_still_beats_dirt_underfoot():
+	var game = _game()
+	var c := Vector2i(7, 2)
+	var front := _stand(game, c)
+	game.floor_dirt.mess.add_dirt(front)
+	game.floor_dirt.mess.add_dirt(c)
+	CleanKit.hold(game.player, "mop", 0)
+	game.coop.act(0, "use")
+	assert_eq(game.floor_dirt.mess.level(front), 0)
+	assert_gt(game.floor_dirt.mess.level(c), 0)
+
+
+func test_food_in_hand_ignores_dirt_underfoot():
+	var game = _game()
+	var c := Vector2i(7, 2)
+	_fridge_ahead(game, c)
+	game.floor_dirt.mess.add_dirt(c)
+	game.player.set_held("raw_meat")
+	assert_false(game.clean_kit.floor_first(game.player))
+
+
 func test_a_sponge_is_kept_on_a_shelf():
 	var game = _game()
 	var w := _wall_cell(game)
