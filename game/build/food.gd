@@ -622,7 +622,7 @@ static func item(kind: String, quality := 1.0, look := "") -> Node3D:
 			if kind == "tool:scrubber":
 				m.position = Vector3(0.5, -0.55, 0.35)
 		"tool:sponge", "tool:scourer", "tool:grease_scraper", "tool:spill_kit":
-			BuildClean.hand_tool(n, kind.trim_prefix("tool:"), quality).scale = Vector3.ONE * 1.4
+			BuildClean.hand_tool(n, kind.trim_prefix("tool:"), quality).scale = Vector3.ONE * BuildClean.HAND_TOOL_SIZE / SIZE   # drawn at SIZE by its holder
 		"bill":  # a printed bill (PRD 11): a paper slip held up, inked lines, a coral total
 			var slip := Node3D.new()
 			slip.rotation.x = -1.0   # tipped up to the camera, so it reads as paper

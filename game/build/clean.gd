@@ -83,6 +83,10 @@ static func sponge(parent: Node3D, clean := 1.0) -> Node3D:
 ## A small cleaning tool (PRD 9.5), each its own silhouette at 20 px: the sponge; the
 ## scourer, a sponge under a steel-wool pad; the grease scraper, a wide steel blade on
 ## a wooden handle; the spill kit, a coral pouch with a white band and cross.
+## The one world size of a hand tool wherever it sits (shelf, cabinet, counter, pass, sink, hand).
+const HAND_TOOL_SIZE := 1.2
+
+
 static func hand_tool(parent: Node3D, tool: String, clean := 1.0) -> Node3D:
 	match tool:
 		"scourer":
