@@ -85,6 +85,23 @@ func test_holding_use_with_a_floor_tool_paves_ahead_on_any_device():
 
 
 
+func test_a_floor_taken_with_a_held_confirm_lays_nothing_until_pressed_again():
+	_to_build()
+	game.ledger.money = 100
+	game.player.position = Grid.center(Vector2i(5, 0))
+	game.player.look(Vector2i(0, -1))
+	_pad(JOY_BUTTON_A, true)
+	assert_true(game.placing.pick_catalog("floor_planks"))
+	game._paint_held(0)
+	assert_false(game.plan.has_floor(Vector2i(5, -1)), "the confirming press lays nothing")
+	assert_eq(game.ledger.money, 100, "and costs nothing")
+	_pad(JOY_BUTTON_A, false)
+	game._paint_held(0)
+	_pad(JOY_BUTTON_A, true)
+	assert_true(game.plan.has_floor(Vector2i(5, -1)), "a fresh press lays the first tile")
+	assert_lt(game.ledger.money, 100, "and pays for it")
+
+
 func test_each_device_is_routed_to_the_player_it_is_seated_to():
 	var c: Controls = game.controls
 	assert_eq(c.owner_of("pad:3"), 0, "with one chef, every device is player one's")
