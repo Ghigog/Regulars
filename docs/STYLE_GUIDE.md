@@ -166,7 +166,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   pass, 8.7, because each reads at 20 px and keeps the family look): a brass stud on the
   worktop edge per efficient step, grill bars on the char grill, a second pan on the
   two-hob range, a second basket handle on the twin fryer, a motor on the auto slicer,
-  an end-grain block for the butcher block, a white fridge body on all four sides under the worktop, with a white door seamed in grey, for the under-counter fridge,
+  an end-grain block for the butcher block, a white fridge body on all four sides under the worktop (a steel-bodied tool such as the stove or fryer is whitened too, so no side reads as steel), with a white door seamed in grey, for the under-counter fridge,
   a second tap on the two-tap fountain and the wine rack, and on the rotary grater a
   steel drum with a long crank and a coral knob standing clear of the grater's top.
 - A tool on a counter is framed closer on its tree card than the shop's default (camera
