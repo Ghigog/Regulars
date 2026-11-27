@@ -468,7 +468,7 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 func test_catalog_search_by_word_and_category():
 	assert_eq(Catalog.search().size(), _roots(Catalog.search()).size(), "only roots: a step up a tree is bought on the piece, lifted")
-	assert_eq(_roots(Catalog.search()).size(), 67, "one entry a piece, the cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); seven boxes of PRD 8.6; two cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6)")
+	assert_eq(_roots(Catalog.search()).size(), 68, "one entry a piece, the cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); seven boxes of PRD 8.6; two cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6); the window")
 	var ferns := _roots(Catalog.search("FERN"))
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
@@ -490,7 +490,7 @@ func test_catalog_search_by_word_and_category():
 	assert_eq(Catalog.search("stove ++").size(), 0, "tiers are steps in the trees now")
 	assert_eq(Catalog.search("fern", "Kitchen").size(), 0)
 	assert_eq(Catalog.search("partition")[0].id, "screen")
-	assert_eq(Catalog.search("", "Build").size(), 11, "four floors, wall, three finishes, door, archway and the partition")
+	assert_eq(Catalog.search("", "Build").size(), 12, "four floors, wall, three finishes, door, archway, window and the partition")
 	assert_eq(Catalog.search("build", "Dining").size(), 0, "matches the category name")
 	# The shop's tabs (owner's review of night zero).
 	assert_eq(Catalog.tab_of("counter"), "Furniture")

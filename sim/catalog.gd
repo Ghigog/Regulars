@@ -52,6 +52,8 @@ const ITEMS := {
 		"blurb": "A way through that hides the view"},
 	"arch": {"name": "Archway", "price": 15, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "An open way through"},
+	"window": {"name": "Window", "price": 15, "level": 1, "category": "Build", "tiers": 1, "tool": true,
+		"blurb": "Lets the light in  $15 a length"},
 	"screen": {"name": "Partition wall", "price": 10, "level": 1, "category": "Build", "tiers": 1,
 		"blurb": "Blocks guests' view"},
 	"counter": {"name": "Counter", "price": 15, "level": 1, "category": "Kitchen", "tiers": 1,

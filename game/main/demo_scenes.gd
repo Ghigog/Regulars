@@ -94,6 +94,15 @@ func _demo_build(demo: String) -> void:
 	if demo == "door":  # at the doorway, about to flip the card
 		game.player.position = Grid.center(Vector2i(Game.W - 1, Game.DOOR.y))
 		game.player.look(Vector2i(1, 0))
+	elif demo == "build_window":   # two windows side by side and one alone, a cabinet hung between them, the tool over a street-side wall (refused); shoot at 3
+		game.ledger.money = 500
+		game.placing.pick_catalog("window")
+		for x in [4, 5, 8]:
+			game.placing.place(Vector3i(x, 0, 0))
+		game.placing.pick_catalog("cabinet")
+		game.placing.place(Vector3i(6, 0, 0))
+		game.placing.pick_catalog("window")
+		game._demo_hover = Vector3(10, 0, 2.5)
 	elif demo == "build_tools":   # the shop's Build tab: floors, walls and ways through
 		game.session.open_shop()
 		game.hud._set_category("Build")
