@@ -8,7 +8,7 @@ const WALL_H := 2.4
 const WALL_T := 0.3
 const CUT_H := 0.55
 const KITCHEN_W := 4
-const WIN_W := 1.3
+const WIN_W := 0.8   # a window is bought per 1 m wall length: frame and all, it stays inside its own length
 const WIN_Y0 := 1.0
 const WIN_Y1 := 2.0
 const DOOR_X := 1.5    # the back doorway's centre line
@@ -70,16 +70,15 @@ static func build_ground(root: Node3D, w: int, h: int) -> Array[OmniLight3D]:
 static func build_room(root: Node3D, plan: Floorplan, door: Vector2i) -> Dictionary:
 	var lights: Array[OmniLight3D] = []
 	var openings := {}
-	var glass := {}
 	_floors(root, plan)
 	var entrance := Vector3i(door.x, door.y, 1)
 	for axis in 2:
 		for run: Dictionary in _runs(plan, axis, "tall"):
-			_tall_run(root, plan, run, lights, openings, glass)
+			_tall_run(root, plan, run, lights, openings)
 		for run: Dictionary in _runs(plan, axis, "low"):
 			_low_run(root, plan, run, openings, entrance)
 	_fixtures(root, plan, lights)
-	return {"lights": lights, "openings": openings, "glass": glass}
+	return {"lights": lights, "openings": openings}
 
 
 ## How a wall edge is drawn: "tall", "low" or "" (not drawn).
@@ -162,7 +161,7 @@ static func _lx(axis: int, k: float) -> float:
 	return k if axis == 0 else -k
 
 
-static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Array[OmniLight3D], openings: Dictionary, glass := {}) -> void:
+static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Array[OmniLight3D], openings: Dictionary) -> void:
 	var axis: int = run.axis
 	var line: int = run.line
 	var from: int = run.from
@@ -176,7 +175,7 @@ static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Ar
 	var b: float = maxf(ends[0], ends[1])
 	var top := WALL_H
 	var bot := -0.2
-	# Holes: doors and archways on their edges, then windows where there is room.
+	# Holes: doors and archways on their edges, then the windows the player bought.
 	var holes: Array = []   # [x0, x1, y0, y1]
 	var planks := 0
 	for k in range(from, to):
@@ -193,25 +192,14 @@ static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Ar
 				_arch_header(holder, c, DOOR_R, 1.55, 2.2, -WALL_T + 0.004, -0.004)
 				openings[e] = {"holder": _opening_holder(holder, c), "kind": "arch", "tall": true}
 	var dining := planks * 2 > to - from
-	var windows: Array[float] = []
 	var length := to - from
-	if dining and length >= 3:
-		var n := int((length + 0.2) / 3.0)
-		for i in n:
-			var c := _lx(axis, from + length * (i + 0.5) / n)
-			var clear := true
-			for hole: Array in holes:
-				if c + WIN_W / 2 + 0.1 > hole[0] and c - WIN_W / 2 - 0.1 < hole[1]:
-					clear = false
-			if clear:
-				windows.append(c)
-				for k in range(from, to):   # the wall cells behind the glass take no high piece
-					var u0 := minf(_lx(axis, k), _lx(axis, k + 1))
-					var u1 := maxf(_lx(axis, k), _lx(axis, k + 1))
-					if u1 > c - WIN_W / 2 and u0 < c + WIN_W / 2:
-						glass[_edge(axis, line, k)] = true
-				if not seaside():
-					holes.append([c - WIN_W / 2, c + WIN_W / 2, WIN_Y0, WIN_Y1])
+	var windows: Array[float] = []
+	for k in range(from, to):   # one window centred on each bought length
+		if plan.windows.has(_edge(axis, line, k)):
+			var c := _lx(axis, k + 0.5)
+			windows.append(c)
+			if not seaside():
+				holes.append([c - WIN_W / 2, c + WIN_W / 2, WIN_Y0, WIN_Y1])
 	# The wall itself: one slab per stretch between hole edges, overlapping a
 	# little so the joins never show.
 	var cuts: Array[float] = [a, b]
@@ -261,10 +249,10 @@ static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Ar
 					spans = [[y0, minf(top, hole[2])], [maxf(y0, hole[3]), top]]
 			for sp: Array in spans:
 				_finish_panel(holder, f, stops[i], stops[i + 1], sp[0], sp[1], 0.006)
+	for c in windows:
+		_window(holder, c)
 	if dining:
 		_wainscot(holder, plan, axis, line, from, to, r0, r1)
-		for c in windows:
-			_window(holder, c)
 		# Sconces near each end of a back wall, where nothing is in the way.
 		for k: float in ([from + 0.5, to - 0.45] if length >= 3 and axis == 0 else []):
 			var x := _lx(axis, k)
@@ -538,9 +526,9 @@ static func _sconce(root: Node3D, at: Vector3, out: Vector3, lights: Array[OmniL
 
 static func _window(root: Node3D, x: float) -> void:
 	if seaside():  # a round brass porthole on the same wall socket
-		var ring := Build.lathe(root, Vector3(x, 1.5, 0.02), [[0.36, 0.0], [0.5, 0.0], [0.52, 0.03], [0.5, 0.09], [0.36, 0.09]], BRASS, 0.0, Build.R_WOOD)
+		var ring := Build.lathe(root, Vector3(x, 1.5, 0.02), [[0.3, 0.0], [0.42, 0.0], [0.44, 0.03], [0.42, 0.09], [0.3, 0.09]], BRASS, 0.0, Build.R_WOOD)
 		ring.rotation.x = PI / 2
-		var glass := Build.lathe(root, Vector3(x, 1.5, 0.02), [[0.0, 0.05], [0.37, 0.05], [0.0, 0.051]], "#bfe6ea", 0.15, Build.R_GLOSS)
+		var glass := Build.lathe(root, Vector3(x, 1.5, 0.02), [[0.0, 0.05], [0.31, 0.05], [0.0, 0.051]], "#bfe6ea", 0.15, Build.R_GLOSS)
 		glass.rotation.x = PI / 2
 		return
 	# A rounded coral frame lining a real opening: no glass, no sill (sheet 1).

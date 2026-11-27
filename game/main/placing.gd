@@ -403,7 +403,7 @@ func snap(p: Vector3, ch: Player = null) -> Vector3i:
 
 ## Pieces that sit on a cell edge rather than in a cell.
 static func on_edge(id: String) -> bool:
-	return id == "screen" or id == "wall" or id == "door" or id == "arch" or Catalog.is_finish(id)
+	return id == "screen" or id == "wall" or id == "door" or id == "arch" or id == "window" or Catalog.is_finish(id)
 
 
 ## Groups the build tools: "floor" for every floor, "finish" for paint and paper,
@@ -529,6 +529,9 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 			if not game.plan.can_build(spot):
 				return WONT_GO
 			return _grid_words(game.grid.wall_refusal(spot, game.lot, Game.DOOR, reach, touch))
+		"window":
+			var ok: bool = game.plan.can_glaze(spot) and not game.world._strands_high([spot])
+			return "" if ok else WONT_GO
 		"door", "arch":
 			var ok: bool = game.plan.can_open(spot, ch.hand.id) and not game.world._strands_high([spot])
 			return "" if ok else WONT_GO

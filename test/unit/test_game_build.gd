@@ -210,3 +210,48 @@ func test_pass_piece_shows_which_way_it_faces():
 	assert_almost_eq(piece._vis.rotation.y, PI / 2, 0.001, "the marked front turns with the piece")
 	plain.free()
 	marked.free()
+
+
+
+func test_windows_are_bought_and_take_their_cell_off_the_wall_layer():
+	_to_build()
+	game.ledger.money = 100
+	var e := Vector3i(6, 0, 0)
+	var cell := Vector2i(6, 0)
+	assert_true(game.kitchen.is_wall(cell), "no window by itself")
+	assert_true(game.placing.pick_catalog("window"))
+	assert_false(game.placing.can_place(Vector3i(6, 1, 0)), "no wall there")
+	assert_true(game.placing.place(e))
+	assert_eq(game.ledger.money, 85)
+	assert_true(game.plan.windows.has(e))
+	assert_eq(game.room_edit.build_action(), "Add window")
+	assert_false(game.kitchen.is_wall(cell), "nothing hangs in front of the glass")
+	assert_false(game.placing.can_place(e), "one window a length")
+	game.placing.pick_catalog("cabinet")
+	assert_false(game.placing.can_place(Vector3i(6, 0, 0)), "a cabinet is refused there")
+	game.placing.pick_catalog("door")
+	assert_false(game.placing.can_place(e), "and a door")
+	assert_true(game.grid.is_blocked(cell + Vector2i(0, -1)), "nobody walks through it")
+	game.placing.pick_catalog("window")
+	assert_true(game.room_edit.remove_at(e))
+	assert_eq(game.ledger.money, 100, "paid back")
+	game.room_edit._plan_changed()
+	assert_true(game.kitchen.is_wall(cell), "high pieces hang there again")
+
+
+func test_undo_takes_a_window_back_and_floor_behind_refunds_it():
+	_to_build()
+	game.ledger.money = 100
+	var e := Vector3i(6, 0, 0)
+	game.placing.pick_catalog("window")
+	assert_true(game.placing.place(e))
+	game.player.hand = {}
+	assert_true(game.undo.undo(game.player))
+	assert_false(game.plan.windows.has(e))
+	assert_eq(game.ledger.money, 100)
+	game.placing.pick_catalog("window")
+	game.placing.place(e)
+	game.placing.pick_catalog("floor_planks")
+	assert_true(game.placing.place(Vector3i(6, -1, 0)))
+	assert_false(game.plan.windows.has(e), "floor behind takes it away")
+	assert_eq(game.ledger.money, 95, "the window is paid back; only the $5 floor is spent")

@@ -32,6 +32,8 @@ func _build_at(spot: Vector3i, ch: Player = null) -> bool:
 			var was := game.plan.finish(spot, ch.hand.id)
 			if was != "":   # papering over paint: the old finish is paid back
 				game.ledger.refund(Catalog.price_of(was))
+		"window":
+			game.plan.windows[spot] = true
 		"door", "arch":
 			var had := game.plan.strip(spot)
 			if had != "":
@@ -89,6 +91,11 @@ func remove_at(spot: Vector3i, ch: Player = null) -> bool:
 			var had := game.plan.unbuild(spot)
 			if had != "":
 				game.ledger.refund(Catalog.price_of(had))
+		"window":
+			if not game.plan.windows.has(spot):
+				return false
+			game.plan.windows.erase(spot)
+			game.ledger.refund(Catalog.price_of("window"))
 		"door", "arch":
 			var what: String = game.plan.openings.get(spot, "")
 			if what != "door" and what != "arch":
@@ -340,6 +347,8 @@ func build_action(ch: Player = null) -> String:
 				return "Add door"
 			"arch":
 				return "Add archway"
+			"window":
+				return "Add window"
 			"treat":
 				return "Lay %s" % Treatments.name_of(Treatments.key_of(ch.hand.id)).to_lower()
 		if Catalog.is_box(ch.hand.id):   # where it will not go, why: chemicals and food (PRD 9.5)

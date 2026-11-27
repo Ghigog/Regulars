@@ -296,10 +296,8 @@ func test_wall_cells_are_back_wall_cells_without_a_window():
 	assert_true(game.kitchen.is_wall(Vector2i(2, 2)), "the kitchen's back wall")
 	assert_false(game.kitchen.is_wall(Vector2i(2, 4)), "the middle of the floor")
 	assert_false(game.kitchen.is_wall(Vector2i(9, 4)), "the street side is cut low")
-	var glass := 0
 	for x in range(4, 10):
-		glass += 0 if game.kitchen.is_wall(Vector2i(x, 0)) else 1
-	assert_gt(glass, 0, "the dining room's windows take no wall piece")
+		assert_true(game.kitchen.is_wall(Vector2i(x, 0)), "the dining back wall is bare at x=%d" % x)
 
 
 
