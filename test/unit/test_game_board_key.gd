@@ -29,7 +29,11 @@ func test_refused_open_says_nothing_and_swells_the_key():
 	assert_false(game.hud.toast.text.contains("board by the door"))
 	assert_false(game.hud.toast.text.contains("N, or"))
 	assert_eq(game.menu_stock.night_hint(), "")
-	await wait_seconds(0.06)
+	# Step the swell by hand rather than waiting real frames: sampling the tween
+	# mid-flight after a 0.06s wait flaked when CI starved the window of frames.
+	var swell: Tween = game.hud.board_key_ui._swell
+	assert_true(swell != null, "a swell tween started")
+	swell.custom_step(0.06)
 	assert_gt(game.hud.board_key_ui.cap.scale.x, 1.05, "the key swells")
 
 
