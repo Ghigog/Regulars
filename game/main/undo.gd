@@ -361,11 +361,12 @@ func _undo_upgraded(s: Dictionary) -> String:
 	var price := int(s.paid)
 	var cell := Vector2i(s.spot.x, s.spot.y)
 	var up: Station = null
-	if Upgrades.is_treatment(to):   # a box in its slot
+	if Upgrades.is_box_key(to):   # a box in its slot
 		if not game.kitchen.unstore(cell, to):
 			return "It has changed since"
 		game.kitchen.store(cell, from)
-		game.upgrades._swap_treatment(Treatments.key_of(to), Treatments.key_of(from))
+		if Upgrades.is_treatment(to):
+			game.upgrades._swap_treatment(Treatments.key_of(to), Treatments.key_of(from))
 	else:
 		if not _stands(s.node):
 			return "It has changed since"
@@ -415,7 +416,7 @@ func _redo_upgraded(s: Dictionary, ch: Player) -> String:
 	var to: String = s.to
 	if game.ledger.money < int(s.paid):
 		return "Not enough to buy that again"
-	if Upgrades.is_treatment(to):
+	if Upgrades.is_box_key(to):
 		ch.hand = {"id": s.from, "tier": 1, "price": 0, "facing": 0, "moving": true, "in_place": true,
 			"from": Vector3i(cell.x, cell.y, 0), "from_facing": 0}
 	else:

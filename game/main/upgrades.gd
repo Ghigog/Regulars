@@ -31,8 +31,8 @@ func pick_tree(bp: Dictionary, ch: Player = null) -> bool:
 ## in a tiered piece's short tree, or "" (nothing picked up, or a piece with no tree).
 func hand_key(ch: Player = null) -> String:
 	ch = game._me(ch)
-	if ch.hand.get("moving", false) and Treatments.is_box(ch.hand.get("id", "")):
-		return ch.hand.id   # a treatment's box, picked up from storage (PRD 9.5)
+	if ch.hand.get("moving", false) and Upgrades.is_box_key(ch.hand.get("id", "")):
+		return ch.hand.id   # a treatment's or food box, picked up from storage (PRD 9.5, EPIC-132)
 	if not ch.hand.get("moving", false) or not (ch.hand.get("node") is Station):
 		return ""
 	var st: Station = ch.hand.node
@@ -101,14 +101,17 @@ func _buy(to: String, ch: Player, from: String) -> Variant:
 		game.menu_stock.menu_changed()
 		game.audio.sfx("coin")
 		return top
-	if Upgrades.is_treatment(to):   # a box: it is the new treatment's now (PRD 9.5)
+	if Upgrades.is_box_key(to):   # a box: it is the new treatment's or food box's now (PRD 9.5)
 		if ch.hand.get("in_place", false):   # still in its slot, upgraded from the card
 			var cell := Vector2i(ch.hand.from.x, ch.hand.from.y)
 			game.kitchen.unstore(cell, from)
 			game.kitchen.store(cell, to)
 			game.world._show_boxes(cell)
 		ch.hand.id = to
-		_swap_treatment(Treatments.key_of(from), Treatments.key_of(to))
+		if Upgrades.is_treatment(to):
+			_swap_treatment(Treatments.key_of(from), Treatments.key_of(to))
+		else:
+			game.menu_stock.menu_changed()   # the kind's fee changes with its box
 		game.audio.sfx("coin")
 		game.hud.hints_ui.show_build()
 		return "box"

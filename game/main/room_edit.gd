@@ -407,9 +407,8 @@ func held_prompt(ch: Player, action: String) -> Dictionary:
 		if action == "Put in":
 			text = "%s %s" % [action, Treatments.fee_words(Treatments.key_of(hand.id))]
 	elif Catalog.is_box(hand.id):
-		var b := Pantry.station_ingredient(hand.id)
 		if action == "Put in":
-			text = "%s $%d a night" % [action, Pantry.fee_of(b.id, b.ready)]
+			text = "%s $%d a night" % [action, Pantry.box_fee(hand.id)]
 	else:
 		if not hand.get("moving", false) and action in ["Put down", "Hang"]:
 			text = "%s $%d" % [action, int(hand.price)]

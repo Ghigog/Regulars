@@ -147,7 +147,7 @@ func card_actions() -> Array[Dictionary]:
 		out.append(look.merged({"act": "upgrades"}))
 	if card_keeps_boxes():
 		for box: String in game.kitchen.stock(game.storing_cell):
-			if Treatments.is_box(box) and Upgrades.has_tree(box):
+			if Upgrades.is_box_key(box) and Upgrades.has_tree(box):
 				out.append({"id": box, "tier": 1, "act": "box_tree", "box": box})
 	out.append(look.merged({"act": "move"}))
 	if game.card_layer != "high":
@@ -396,6 +396,10 @@ func fridge_offer(id: String) -> int:
 ## that needs a fridge, on a counter that can become one, makes it one first.
 func _storage_buy(bp: Dictionary) -> bool:
 	var ok := false
+	var node_price := Upgrades.price(bp.id) if not bp.get("stored", false) and Catalog.is_box_node(bp.id) else 0
+	if game.ledger.money < node_price:   # a node bought outright is paid for whole (EPIC-132)
+		game.audio.sfx("fail")
+		return false
 	if not bp.get("stored", false) and fridge_offer(bp.id) > 0:
 		var ch := game.shopper
 		var st := card_station()
@@ -412,6 +416,7 @@ func _storage_buy(bp: Dictionary) -> bool:
 	if not ok:
 		game.audio.sfx("fail")
 		return false
+	game.ledger.spend(node_price)
 	game.world._show_boxes(game.storing_cell)
 	var st := game.world.station_at(game.storing_cell)
 	if st:

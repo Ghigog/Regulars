@@ -76,6 +76,7 @@ func test_a_storage_card_shows_boxes_first_and_dims_what_needs_a_fridge():
 	assert_true(game.placing.buy({"id": "box_bun", "tier": 1}))
 	assert_true(game.kitchen.stock(c).has("box_bun"), "put straight in, the card still open")
 	assert_true(game.card.storing())
+	acts = game.card.card_actions().size()   # a stored food box adds its tree to the actions
 	assert_true(game.session.shop_items("", "Ingredients")[acts].get("stored", false), "what is stored is listed first")
 	assert_true(game.placing.buy({"id": "box_bun", "tier": 1, "stored": true}))
 	assert_false(game.kitchen.stock(c).has("box_bun"), "and taken out again")
