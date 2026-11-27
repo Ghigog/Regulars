@@ -31,7 +31,7 @@ const TIER_JOY := 0.1   # joy a decor piece gains for each tier above the first
 ## A tiered piece gains TIER_JOY a tier. "reach" (decor that stands on a cell) is how
 ## many cells off it is seen at its first tier; each tier above sees one further.
 ## "theme" limits a piece to one theme's shop (none: sold in every theme).
-const ITEMS := {
+const BASE_ITEMS := {
 	"floor_tile": {"name": "Tiled floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"blurb": "Grows the room  $5 a tile"},
 	"floor_planks": {"name": "Plank floor", "price": 5, "level": 1, "category": "Build", "tiers": 1, "tool": true,
@@ -203,18 +203,6 @@ const ITEMS := {
 		"ingredient": "soda", "blurb": "Pours soda. Goes on a counter, no slot needed"},
 	"wine_barrel": {"name": "Wine barrel", "price": 45, "level": 1, "category": "Kitchen", "tiers": 1, "theme": "seaside",
 		"ingredient": "wine", "blurb": "Pours white wine. Goes on a counter, no slot needed"},
-	"ready_lettuce": {"name": "Chopped lettuce tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "diner",
-		"ingredient": "lettuce", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
-	"ready_tomato": {"name": "Sliced tomato tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "diner",
-		"ingredient": "tomato", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
-	"ready_onion": {"name": "Onion rings tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "diner",
-		"ingredient": "onion", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
-	"ready_cheese": {"name": "Cheese slices", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "diner",
-		"ingredient": "cheese", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A fridge slot only"},
-	"ready_courgette": {"name": "Chopped courgette tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "seaside",
-		"ingredient": "courgette", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
-	"ready_pepper": {"name": "Chopped pepper tub", "price": 0, "level": 2, "category": "Pantry", "tiers": 1, "theme": "seaside",
-		"ingredient": "pepper", "box": true, "ready": true, "blurb": "Ready to use, no prep. Always plain. A counter slot, or a fridge"},
 	# Floor treatments (PRD 9.5). A box of each is kept in storage, never with food and
 	# never in a fridge; only the cleaner's is sold, the rest are steps in its tree. While
 	# a box is stored its laying tool is in the Build tab: free to lay, paid at the door each
@@ -244,6 +232,33 @@ const ITEMS := {
 	"treat_high_gloss": {"name": "High gloss", "price": 0, "level": 1, "category": "Build", "tiers": 1, "tool": true,
 		"treatment": "high_gloss", "joy": 0.1, "blurb": "Faster still and more joy. Dirt shows a lot more"},
 }
+
+## Every piece: the table above plus each food box's two upgrade nodes (EPIC-132), made from
+## Pantry.ITEMS so a new kind with a box and a cold prep tool gets a Prepared node, and every
+## kind with a box gets a Marinated one. Both are bought in the box's tree (Upgrades).
+static var ITEMS: Dictionary = _with_box_nodes()
+
+const PREP_VERBS := {"chop": "Chopped", "slice": "Sliced", "grate": "Grated", "saw": "Sliced"}
+
+
+static func _with_box_nodes() -> Dictionary:
+	var out: Dictionary = BASE_ITEMS.duplicate()
+	for id: String in Pantry.ITEMS:
+		var plain := Pantry.box_id(id)
+		if not BASE_ITEMS.has(plain) or not Pantry.has_box(id):
+			continue
+		var theme: String = Pantry.ITEMS[id].theme
+		var lower := Pantry.name_of(id).to_lower()
+		if Pantry.can_be_ready(id):
+			out[Pantry.box_id(id, true)] = {"name": "%s %s" % [PREP_VERBS[Pantry.tool_of(id)], lower], "price": 0,
+				"level": 2, "category": "Pantry", "tiers": 1, "theme": theme, "ingredient": id, "box": true,
+				"ready": true, "blurb": "Comes out ready, no prep. Always plain"}
+		if not Pantry.can_be_marinated(id):
+			continue
+		out[Pantry.box_id(id, false, true)] = {"name": "Marinated " + lower, "price": 0, "level": 2,
+			"category": "Pantry", "tiers": 1, "theme": theme, "ingredient": id, "box": true, "marinated": true,
+			"blurb": "A little tastier: every dish with it scores higher"}
+	return out
 
 var shelf: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
@@ -281,6 +296,8 @@ static func sells_node(key: String) -> bool:
 ## tool or wall piece built as its node ("up"). A tool whose tree grows from a counter
 ## (a stove's line, Kitchen.TOP_LINKS) comes on its own counter ("counter"), priced with it.
 static func tree_blueprint(key: String) -> Dictionary:
+	if is_box_node(key):
+		return {"id": key, "tier": 1, "tree": key}
 	if Upgrades.is_tiered(key):
 		return {"id": Upgrades.catalog_id(key), "tier": Upgrades.tier_of(key), "tree": key}
 	var fit := Kitchen.fit_of(key)
@@ -301,6 +318,8 @@ static func tree_blueprint(key: String) -> Dictionary:
 
 ## What a blueprint costs: a catalog piece at its tier, or a shop node's full price.
 static func bp_price(bp: Dictionary) -> int:
+	if is_box_node(bp.id):
+		return Upgrades.price(bp.id)
 	if bp.get("up", "") != "":
 		return Kitchen.price_of(bp.up) + (Kitchen.price_of("counter") if bp.get("counter", false) else 0)
 	if bp.get("base", "") != "":
@@ -309,6 +328,8 @@ static func bp_price(bp: Dictionary) -> int:
 
 
 static func bp_blurb(bp: Dictionary) -> String:
+	if is_box_node(bp.id):
+		return Upgrades.blurb(bp.id)
 	if bp.get("up", "") != "":
 		return Upgrades.blurb(bp.up)
 	if bp.get("base", "") != "":
@@ -352,6 +373,11 @@ static func ingredient_of(id: String) -> String:
 ## A box of one ingredient kind, stocked by placing it in a storage slot (PRD 8.4).
 static func is_box(id: String) -> bool:
 	return ITEMS.has(id) and ITEMS[id].get("box", false)
+
+
+## A food box's upgrade node: Prepared ("ready_lettuce") or Marinated ("marinated_lettuce").
+static func is_box_node(id: String) -> bool:
+	return ITEMS.has(id) and (ITEMS[id].get("ready", false) or ITEMS[id].get("marinated", false))
 
 
 static func tool_of(id: String) -> String:
@@ -445,6 +471,9 @@ static func search(query := "", category := "", theme := "", level := 0, show_lo
 			continue   # reached only through its tree (PRD 8.3), or a counter's (a stove)
 		if Treatments.is_laying_tool(id) or (Treatments.is_box(id) and (not Treatments.ON_SALE or not Treatments.is_root(Treatments.key_of(id)))):
 			continue   # a laying tool is listed by the game while its box is stored (PRD 9.5)
+		if is_box_node(id):
+			offered.append(tree_blueprint(id))   # listed as a buy-outright tree entry, priced the whole way
+			continue
 		offered.append({"id": id, "tier": 1})
 		# The steps up a tree are bought on the piece itself, lifted (owner's review of
 		# night zero): the shop sells the roots only.
