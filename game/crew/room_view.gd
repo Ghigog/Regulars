@@ -64,7 +64,11 @@ func world() -> Dictionary:
 					it.station = c
 				items.append(it)
 			elif p.state == "prep":
-				made.append(p.id)
+				if is_tool and Pantry.needs_prep(p.id) and not Pantry.made_from(p.id).is_empty():
+					# A cut source lying on its tool, waiting to be cooked into a kind made from it.
+					items.append({"id": "c:%d,%d" % [c.x, c.y], "kind": p.id, "cell": c, "state": "raw", "form": st.item})
+				else:
+					made.append(p.id)
 		if Station.is_table(st.type):
 			var tid := "%d,%d" % [c.x, c.y]
 			var waiting: Array = crew.game.seating._guests_to_order(st)
@@ -90,7 +94,8 @@ func world() -> Dictionary:
 		# A helper fetching or working for a ticket holds what it will be made into.
 		var task: Dictionary = (hand as Helper).task if hand is Helper else {}
 		if str(task.get("type", "")) in ["fetch", "prep"] and task.has("kind") and str(task.get("job", "none")) != "none" \
-				and hand.held == str(task.get("hold", HelperWork.hold_for(str(task.kind)))):
+				and hand.held in [str(task.get("hold", HelperWork.hold_for(str(task.get("make", task.kind))))),
+				Tray.kind("prep", str(task.get("make", "")))]:
 			items.append({"id": "h:%d" % hand.get_instance_id(), "kind": str(task.kind), "cell": hand.cell(), "state": "held"})
 		elif p.state == "raw":
 			items.append({"id": "h:%d" % hand.get_instance_id(), "kind": p.id, "cell": hand.cell(), "state": "held"})
