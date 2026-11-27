@@ -57,6 +57,8 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
+- *Wainscot meets a knee-high wall*: a dining wall's wainscot (or seaside clapboard) and rail stop at the room face of a knee-high wall that meets them, instead of sinking into its cap; at a tall corner or an opening they run as before.
+
 - *Dispensers on the plain counter*: the soda and two-tap fountains, coffee machine, wine barrel, wine rack and beer tap stand on the same teal-cabinet counter as every other tool, not a coral or wooden cabinet of their own. The machines are unchanged.
 
 - *Glowing menu board* (`MenuBoard.glow`, `HudBoardKey`, `hud.board_key_ui`): the A-frame's slate wears a breathing `Build.WARN` halo built like the door card's (radial quad, unshaded, additive, 0.5 s fade in, 1 s sine breathing, 0.4 s fade out), in the build phase only. Just above the board sits a prompt-sized keycap (the "E OPEN UP" prompt's key sheet and 24 px label) holding `controls.glyph("menu")` (N, a pad button or the touch word). Halo and key breathe brighter while tonight's menu has no main and dimmer once it has one, and the key swells once, hard, when the door card refuses for want of a main. It replaces the two "board by the door" notes on night zero.
