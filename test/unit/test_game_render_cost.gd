@@ -90,5 +90,20 @@ func test_shop_open_close_returns_to_baseline():
 
 func test_3d_scale_caps_pixels_on_large_windows():
 	assert_eq(Game.scale_3d_for(Vector2i(1440, 900)), 1.0)
-	var s := Game.scale_3d_for(Vector2i(3182, 1956))
-	assert_lte(3182.0 * 1956.0 * s * s, 1440.0 * 900.0 * 1.001)
+	assert_eq(Game.scale_3d_for(Vector2i(2880, 1800)), 1.0, "a Retina default window is full scale")
+	var s := Game.scale_3d_for(Vector2i(5120, 2880))
+	assert_lt(s, 1.0)
+	assert_lte(5120.0 * 2880.0 * s * s, float(Game.BASE_3D_PIXELS) * 1.001)
+
+
+func test_3d_mode_is_fsr_below_full_scale_and_bilinear_at_full():
+	var win := get_window()
+	var old := win.size
+	win.size = Vector2i(5120, 2880)
+	game._fit_3d()
+	assert_eq(game.get_viewport().scaling_3d_mode, Viewport.SCALING_3D_MODE_FSR)
+	win.size = Vector2i(1280, 720)
+	game._fit_3d()
+	assert_eq(game.get_viewport().scaling_3d_scale, 1.0)
+	assert_eq(game.get_viewport().scaling_3d_mode, Viewport.SCALING_3D_MODE_BILINEAR)
+	win.size = old

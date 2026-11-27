@@ -232,7 +232,7 @@ var _shot_path := ""
 var _shot_time := 0.0
 
 
-const BASE_3D_PIXELS := 1440 * 900   # the room's 3D is drawn at no more than this many pixels
+const BASE_3D_PIXELS := 2880 * 1800   # the room's 3D is drawn at no more than this many pixels (a default window on a 2x display is full scale)
 
 
 ## Scale for the main viewport's 3D so a large window does not pay for 3D at full size.
@@ -242,7 +242,11 @@ static func scale_3d_for(window: Vector2i) -> float:
 
 
 func _fit_3d() -> void:
-	get_viewport().scaling_3d_scale = scale_3d_for(get_window().size)
+	var vp := get_viewport()
+	var s := scale_3d_for(get_window().size)
+	vp.scaling_3d_scale = s
+	# Below full size FSR 1 upscales with sharpening; at full size bilinear is a no-op.
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if s < 1.0 else Viewport.SCALING_3D_MODE_BILINEAR
 
 
 ## The two open pavement rows, which chefs walk: they run the length of the lot.
