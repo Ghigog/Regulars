@@ -342,7 +342,7 @@ func close_early() -> void:
 func _end_day() -> void:
 	game.prep_games._cancel_all_preps()
 	game.prep_games.stop_loops()
-	game.crew.clear()   # the staff go home
+	game.crew.end_day()   # the staff finish cleaning, collect their things and go home
 	game.floor_dirt.clear_slips()   # a chef still down gets up for the night
 	for ch in game.chefs:
 		ch.end_boost()   # a prep burst or penalty does not carry into the night

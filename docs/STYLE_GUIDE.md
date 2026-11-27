@@ -275,7 +275,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   `desk_restock` already existed and are now listed in `CLAUDE.md`.
 - Screenshots: `tolerance`, `desk_line`, `desk_post`, `desk_cvs`, `desk_haggle`,
   `desk_staff`, `desk_raise`, `desk_fire`, `desk_restock`, `desk_wages`, `helpers`,
-  `helpers_break`, `helpers_slip`, `staff_only` (run each once per theme).
+  `helpers_break`, `helpers_slip`, `helpers_home`, `staff_only` (run each once per theme).
 
 **Paying the bill (PRD 11)**
 - No sheet draws paying. The bill bubble is a cream paper slip with a torn zigzag foot,
@@ -420,7 +420,7 @@ or a later sheet, they win. What changed:
 | Tools on counters (PRD 8.2) | A tool is a top on a counter and keeps its own body, so a stove, fryer or pot on a counter turns it steel and a board or slicer keeps the teal cupboard. A tool set on the pass replaces that length of the teal run; lifted off, the pass look comes back. | The tool replaces the counter's look rather than sitting on a separate worktop. |
 | Double counter (PRD 8.2) | One cell, same height: a column of three drawers with brass pulls down each side (one side shows from any turn), and a bare one swaps its two front doors for two rows of drawers. A tool on it keeps the side drawers. | More storage, said by drawers, not by height, so items still sit at worktop level. |
 | Boxes and storage tags (PRD 8.4) | A box of stock is the old ingredient station's top lifted onto a low body of its own: a wooden crate, a white cold box with a frost-blue band (patty, cheese), the sea-blue icebox (fish, calamari), a sack or bread basket, or an open steel tub heaped with the prepped food and a green tag (ready-made). Placed, it is not drawn; a row of camera-facing tags over the cell names what it holds, each a cream card with the raw food in front: round with an ink rim for plain kinds, square with a frost-blue rim for chilled ones, a green dot for ready-made. In the shop a box is shown at about twice its size. | Storage reads by its tags rather than a model per box, so a counter with a tool on it still shows its stock. |
-| Hired helpers (PRD 10.6) | A townsperson in their own look with a white work apron wrapped round the barrel, a coral waist tie and a small bib, so they read as staff from any side at 60 px. A cream speech balloon with three dots when two chat; a coral mug when alone on a break. | No sheet draws staff; the apron is ours. |
+| Hired helpers (PRD 10.6) | A townsperson in their own look with a white work apron wrapped round the barrel, a coral waist tie and a small bib, so they read as staff from any side at 60 px. A cream speech balloon with three dots when two chat; a coral mug when alone on a break. At night they collect their things at a desk: a small bag (a box in their own outfit colour) in the hand, kept until they have walked out. | No sheet draws staff; the apron is ours. |
 
 **Not yet done:** Blender kit, co-op chefs 3 and 4 (trim colours exist in
 `Peg.PLAYER_TRIM`), sheet 9's future dishes (steak, eggs, pasta), title screen, colour-blind

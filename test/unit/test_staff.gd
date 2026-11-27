@@ -792,7 +792,7 @@ func test_staff_walk_in_as_the_door_opens_and_go_home_as_the_day_ends():
 	assert_eq(h.cell(), game.DOOR, "in through the front door")
 	assert_true(game.serving.hands().has(h))
 	game.arrivals.clear()
-	_run(0.5)
+	_run(60.0)   # they see the night out and walk home
 	assert_true(game.crew.helpers.is_empty(), "the day ended and they went home")
 
 
