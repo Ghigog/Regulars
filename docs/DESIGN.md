@@ -605,6 +605,12 @@ Survive as many days as you can; three walkouts in one day ends the run.
   Guests holding a grudge are not used to top up a thin crowd.
 - **Flyers.** In the shop's Extras tab, $15 buys +25% visit chance for everyone tomorrow. One
   batch a night. 
+- **The line decides.** There is no cap on the line. A party reaching its end rolls once to join:
+  `QueueChoice.join_chance` = clamp(1 - groups_ahead x `PER_GROUP_DROP` x (1 - `AFFINITY_WEIGHT` x like),
+  `FLOOR`, 1), where groups_ahead counts parties, and like is the party's mean affinity plus the
+  critic's visit boost, -1..1. An empty line always joins; strangers are put off well before
+  regulars. A party that declines reads the line, says "Line's too long" and walks on, like
+  "No table": no affinity change, no grudge, no warning to friends. The critic always joins.
 - **Mood drives pay and stay.** When the food reaches the table the guest's comfort is
   read once and kept: `0.6 joy + 0.4 patience - felt disgust`, 0 to 1 (savour is left
   out: comfort is about the room and the service). It scales the bill from x0.90 to
@@ -630,7 +636,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   bell rings once. After 42 s ready with no slip printed for them (`TILL_AFTER`), the one
   who called (else the first) stands and queues at the till, on the room side of the
   pass, bubble always up; the line follows the till if the pass moves. A chef facing the
-  till with empty hands (and nothing on that counter top) gets "Write the bill": the
+  till with empty hands (and nothing on that counter top) gets "Write the bill" (holding a slip with nobody queued at the till, "Write a new bill": the screen opens filled in from the slip, Print replaces it, Esc keeps it): the
   bill screen, a paper slip with a read-only line of the waiting tables by number and party
   size (at the till marked; there is no table to pick, the slip is for the table it is
   handed to), then tonight's menu by course with a count beside each (E or click adds, Backspace, X
