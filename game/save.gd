@@ -6,7 +6,7 @@ class_name SaveGame
 ## What is not kept is whatever only matters inside a day: guests, trays, cooking.
 
 const PATH := "user://regulars_save.dat"
-const VERSION := 1
+const VERSION := 2
 
 const LEDGER := ["money", "xp", "day", "reputation", "today", "history"]
 const MENU := ["items", "retired", "_next"]
@@ -39,9 +39,58 @@ static func read(path := PATH) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
 	var data = str_to_var(FileAccess.get_file_as_string(path))
-	if data is Dictionary and int(data.get("version", 0)) == VERSION and data.has("ledger") and data.has("plan"):
-		return data
+	if data is Dictionary and data.has("ledger") and data.has("plan"):
+		var version := int(data.get("version", 0))
+		if version == 1:
+			return _from_v1(data)
+		if version == VERSION:
+			return data
 	return {}
+
+
+## What a piece keeps when it is new: a seat made from an old set starts from this.
+const _BLANK := {"tier": 1, "facing": 0, "base": "", "pass_look": false, "node": "", "stacked": false, "count": 0,
+	"dirty": 0, "dirty_cups": 0, "dirty_age": 0.0, "tap": 0, "kit_tool": "", "kit_used": 0, "high": false, "till": false}
+
+
+## A version 1 save turned into version 2: each seating set (table, booth, table4, stool) becomes
+## a Table tile on its cell, keeping its dirty plates, and its seats as pieces of their own at its tier.
+static func _from_v1(data: Dictionary) -> Dictionary:
+	var out := data.duplicate()
+	var pieces: Array = []
+	for p: Dictionary in data.pieces:
+		if p.type in ["table", "booth", "table4", "stool"]:
+			pieces.append_array(_set_to_pieces(p))
+		else:
+			pieces.append(p)
+	out["pieces"] = pieces
+	out["version"] = VERSION
+	return out
+
+
+## Where a set's seats were (Station.seats_for in version 1): either side of a table or booth, all
+## four sides of a table for four, the one cell at a counter stool's +x side turning with it.
+static func _v1_seat_cells(type_: String, cell: Vector2i, facing: int) -> Array[Vector2i]:
+	if type_ == "table4":
+		return [cell + Vector2i(-1, 0), cell + Vector2i(1, 0), cell + Vector2i(0, -1), cell + Vector2i(0, 1)]
+	if type_ == "stool":
+		return [cell + [Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 1)][posmod(facing, 4)]]
+	var side := Vector2i(1, 0) if facing % 2 == 0 else Vector2i(0, 1)
+	return [cell - side, cell + side]
+
+
+static func _set_to_pieces(p: Dictionary) -> Array[Dictionary]:
+	var cell: Vector2i = p.cell
+	var tile := _BLANK.duplicate()
+	tile.merge({"type": "table", "cell": cell, "dirty": int(p.get("dirty", 0)),
+		"dirty_cups": int(p.get("dirty_cups", 0)), "dirty_age": float(p.get("dirty_age", 0.0))}, true)
+	var out: Array[Dictionary] = [tile]
+	for seat_cell in _v1_seat_cells(p.type, cell, int(p.get("facing", 0))):
+		var seat := _BLANK.duplicate()
+		seat.merge({"type": "booth_seat" if p.type == "booth" else "chair", "cell": seat_cell,
+			"tier": int(p.get("tier", 1)), "facing": TableJoins.face_toward(seat_cell, [cell])}, true)
+		out.append(seat)
+	return out
 
 
 ## What the title screen says about a save: "Day 4, theme name, $120".
