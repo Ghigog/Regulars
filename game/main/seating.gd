@@ -280,9 +280,12 @@ func _piece_effect(st: Station) -> Dictionary:
 ## Everything a seated guest can see changes how they feel.
 func apply_surroundings(g: Guest, delta: float) -> void:
 	var saw_gross := false
+	var in_view := {}
 	for s in game._gross:
 		var c: Vector2i = s.cell
 		if GameDecor._near(g.cell, c, int(s.get("range", Game.SIGHT_RANGE))) and game.grid.has_los(g.cell, c):
+			if s.has("key"):
+				in_view[s.key] = true
 			var age: float = s.get("age", -1.0)
 			if age < 0.0:   # no age of its own: count how long this guest has looked at it
 				age = g.seen.get(s.key, 0.0)
@@ -295,6 +298,9 @@ func apply_surroundings(g: Guest, delta: float) -> void:
 			if g == game.critic_guest and rate >= GuestMood.NOTICE:
 				g.mood.think(Critic.thought("gross"))
 			saw_gross = saw_gross or rate >= GuestMood.NOTICE
+	for k in g.seen.keys():   # out of view: starts again from the base rate next time
+		if not in_view.has(k):
+			g.seen.erase(k)
 	saw_gross = game.floor_dirt.disgust(g, delta, Game.SIGHT_RANGE) or saw_gross
 	if not saw_gross:
 		g.mood.fade(delta)   # before the stove show below, which also sets saw_gross
@@ -339,7 +345,9 @@ func _collect_gross() -> void:
 		elif (st.type == "stove" or st.type == "fryer") and st.item.begins_with("burnt:"):
 			game._gross.append({"cell": st.cell, "kind": "burning", "age": st.cook - Station.BURN_TIME, "thought": "Something is burning in there"})
 	for ch in game.serving.hands():
-		if ch.carrying_something_gross():
+		if ch.carrying_dirty_dishes():
+			game._gross.append({"cell": ch.cell(), "kind": "plate", "key": "carried_plate", "thought": "Somebody is clearing up"})
+		elif ch.carrying_something_gross():
 			game._gross.append({"cell": ch.cell(), "kind": "rubbish", "key": "rubbish", "thought": "I just watched the chef carry rubbish past me"})
 
 

@@ -160,7 +160,11 @@ Win by earning five stars from the critic; lose when the reputation meter hits 0
 - **A dirty kitchen.** Six or more dishes soaking pile up in suds (ten with a dish rack). Every patty thrown
   away or burger scraped off goes in the bin; at four it overflows (it still takes more).
   "Empty bin" hands the chef a bag, which is carried out to the bin on the back tile of the three-tile pavement outside (the two open rows are walkable by the chef) ("Take out rubbish", offered only beside it), in service and at night. Helpers walk it out too;
-  carried, it counts as rubbish. Both are disgust sources (table below).
+  carried, it counts as rubbish. Both are disgust sources (table below). A dirty plate, on a table or
+  carried to the sink, is only mild clutter (`Game.GROSS.plate`: flat 0.0002 a second, a level-1 floor
+  cell's rate, under `GuestMood.NOTICE`); burnt food and the bag stay on the harsh rubbish curve. A guest's
+  time-in-view for rubbish and the bin starts again once it leaves their view, and floor dirt is
+  recorded against the cell that contributes most.
 - **Night cleaning.** Mess carries over: plates on tables, the sink and the bin open the
   next day as they closed, and so does how old the mess is, so guests notice it at once.
   Mess does not age at night. In the build phase, with empty hands, E at a messy piece

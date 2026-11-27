@@ -47,16 +47,15 @@ func test_the_door_opens_with_dirt_left():
 	assert_eq(game.phase, game.Phase.SERVICE)
 
 
-func test_a_carried_over_dirty_table_still_disgusts():
-	game.stations.erase(Vector2i(0, 5))
+func test_a_carried_over_overflowing_bin_still_disgusts():
 	var g: Guest = game.seating.spawn_guest(2)
 	_run(12.0)
-	var other: Station = game.stations[Vector2i(6, 5)] if g.table.cell != Vector2i(6, 5) else game.stations[Vector2i(6, 1)]
-	other.dirty = 1
-	other.dirty_age = 40.0
-	other.refresh()
+	var bin: Station = game.stations[Vector2i(0, 5)]
+	bin.count = Station.BIN_HOLDS
+	bin.dirty_age = 40.0
+	bin.refresh()
 	_run(2.0)
-	assert_true(g.mood.thoughts.has("Nobody has cleared that table"))
+	assert_true(g.mood.thoughts.has("The bin is overflowing"))
 
 
 func test_grime_motes_cast_no_shadow():
