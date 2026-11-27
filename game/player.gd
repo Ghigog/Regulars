@@ -22,6 +22,7 @@ var give_at: Node3D               # the table (or the till) it is being handed o
 var demo_giving := -1.0           # demos: the hand-over bar frozen this full (-1: off)
 var _give_bar: Node3D
 var facing := Vector2i(0, 1)      # nearest grid direction to `aim`
+const SNAP_HOLD := 5.0   # degrees past a slice edge before the heading changes
 var aim := Vector3(0, 0, 1)       # the way the chef is really looking (any of 8 ways)
 var _velocity := Vector3.ZERO
 var _held_node: Node3D
@@ -332,6 +333,17 @@ static func aim_dir(dir: Vector3) -> Vector2i:
 	return Vector2i(signi(roundi(dir.x)) if absf(dir.x) > s else 0, signi(roundi(dir.z)) if absf(dir.z) > s else 0)
 
 
+## `dir` snapped to the nearest of the 8 grid ways. The way already faced is kept until
+## `dir` is SNAP_HOLD past its slice, so a stick on a boundary does not flicker.
+func _snapped_aim(dir: Vector3) -> Vector3:
+	var held := aim_dir(aim)
+	var held_v := Vector3(held.x, 0, held.y).normalized()
+	if held != Vector2i.ZERO and aim.dot(held_v) > 0.999 and dir.dot(held_v) > cos(deg_to_rad(22.5 + SNAP_HOLD)):
+		return held_v
+	var d := aim_dir(dir)
+	return Vector3(d.x, 0, d.y).normalized()
+
+
 ## Turns the chef to look along a grid direction (used by tests and demos).
 func look(dir: Vector2i) -> void:
 	facing = dir
@@ -426,7 +438,7 @@ func move(input: Vector2, delta: float, hold := false) -> void:
 	var dir := Vector3.ZERO
 	if input != Vector2.ZERO:
 		dir = (Vector3(1, 0, -1) * input.x + Vector3(-1, 0, -1) * input.y).normalized()
-		aim = dir  # always turn to face the way we are going
+		aim = _snapped_aim(dir)   # turn to face the way we are going, onto one of the 8 grid ways
 		if absf(dir.x) > absf(dir.z) + 0.01:
 			facing = Vector2i(signi(roundi(dir.x)), 0)
 		elif absf(dir.z) > absf(dir.x) + 0.01:
