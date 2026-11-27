@@ -21,6 +21,7 @@ const CHAT_TIME := 3.0    # tunable: seconds of chat after the meal before askin
 var calling := false      # PRD 11: this guest has a hand up with the bill bubble
 ## browse: reading the menu at the door, having found no main; they walk on after.
 const BROWSE_TIME := 2.2
+const CARD_SNAP := 0.1   # seconds for the menu card to scale away when the reading ends
 var hint_tag := ""        # a liked tag the menu is full of, which they remarked on
 var liked_meal := false   # their meal had something they like
 ## What they asked for once the chef took their order: {main, side, drink} (menu
@@ -57,6 +58,7 @@ var _fill: MeshInstance3D
 var _order: Node3D
 var _meal: Node3D
 var _meal_kind := ""
+var _card: Node3D   # the menu card in their hands while they read
 var _label: Label3D
 var _gross_time := 0.0
 var _heart_time := 0.0
@@ -213,6 +215,8 @@ func _sit() -> void:
 	_body.create_tween().tween_property(_body, "position:y", SEAT_HEIGHT, 0.2) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	game.seating.on_seated(self)   # sets seat_fx
+	_hold_card()
+	game.audio.sfx("page")
 	timer = Seating.reading_time(game.menu_stock.tonight_menu().size(), Seating.order_scale([seat_fx.order]))
 
 
@@ -292,8 +296,42 @@ func _set_meal(kind: String, quality: float) -> void:
 	add_child(_meal)
 
 
+## A small folded menu card held up in front of the chest, tilted toward the face.
+func _hold_card() -> void:
+	_free_card()
+	var to_table := (Grid.center(table.cell) - position).normalized()
+	_card = Node3D.new()
+	_card.position = to_table * 0.4 + Vector3(0, 1.05, 0)
+	_card.rotation.y = atan2(to_table.x, to_table.z)
+	_card.rotation.x = -0.5
+	Build.box(_card, Vector3(0, -0.25, 0), Vector3(0.5, 0.5, 0.03), Build.PAPER)
+	Build.box(_card, Vector3(0, -0.25, 0.012), Vector3(0.05, 0.5, 0.03), Build.TRIM)   # the fold
+	for i in 3:   # lines of print on each leaf
+		for side in [-1.0, 1.0]:
+			Build.box(_card, Vector3(side * 0.12, -0.1 - i * 0.13, 0.03), Vector3(0.15, 0.045, 0.01), Build.TRIM)
+	add_child(_card)
+
+
+## The card snaps away: a quick scale-out, then it is gone.
+func _drop_card() -> void:
+	if _card == null:
+		return
+	var card := _card
+	_card = null
+	var tw := card.create_tween()
+	tw.tween_property(card, "scale", Vector3.ZERO, CARD_SNAP).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tw.tween_callback(card.queue_free)
+
+
+func _free_card() -> void:
+	if _card:
+		_card.queue_free()
+		_card = null
+
+
 func stand_up() -> void:
 	state = "leaving"
+	_free_card()
 	if _meal:
 		_meal.queue_free()
 		_meal = null
@@ -381,7 +419,8 @@ func tick(delta: float) -> void:
 			timer -= delta
 			game.seating.apply_surroundings(self, delta)
 			if timer <= 0.0:
-				state = "ordering"
+				state = "ordering"   # _refresh below pops the notepad in this same frame
+				_drop_card()
 		"ordering", "waiting":
 			_face(Grid.center(table.cell) - position, delta)
 			mood.wait(delta, game.day.table_patience(party.size()) * (game.ORDER_PATIENCE_SCALE if state == "ordering" else 1.0))
@@ -461,6 +500,8 @@ func _glance(delta: float) -> void:
 
 
 func _refresh(delta: float) -> void:
+	if _card and state != "reading":
+		_drop_card()   # however they left the menu behind
 	var p := mood.patience
 	var on_bill: bool = paying() and game.paying.ready_to_pay(table)
 	if on_bill:
@@ -478,7 +519,9 @@ func _refresh(delta: float) -> void:
 		("wave" if (calling and state == "to_pay") else "idle"))
 	# Bored guests slump; guests about to snap lean in; disgust pitches them back.
 	var lean := 0.0
-	if seated_waiting():
+	if state == "reading":
+		lean = 0.3   # head down over the card
+	elif seated_waiting():
 		lean = -0.2 if mood.disgust_level() >= 2 else (0.14 if p < 0.25 else (0.07 if p < 0.5 else 0.0))
 	elif state == "leaving" and stormed:
 		lean = 0.3
