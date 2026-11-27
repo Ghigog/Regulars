@@ -64,6 +64,17 @@ func test_bought_block_survives_a_save():
 	assert_eq(other.lot.bought, 1)
 
 
+func test_a_window_survives_a_save():
+	var edge := Vector3i(7, 4, 0)
+	game.plan.windows[edge] = true
+	var data := SaveGame.capture(game)
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = data
+	add_child_autofree(other)
+	other.set_process(false)
+	assert_true(other.plan.windows.has(edge), "the window is still in the wall")
+
+
 func test_save_without_a_lot_loads_the_default():
 	var data := SaveGame.capture(game)
 	data.erase("lot")
