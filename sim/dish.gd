@@ -11,7 +11,8 @@ const CUP := "cup"
 
 var vessel := ""                  # PLATE, CUP, or "" for a loose stack
 var ings: Array[String] = []      # ingredient ids, in the order they went on
-var qs: Array[float] = []         # each one's quality
+var qs: Array[float] = []         # each one's quality (a marinated piece's already has its bonus)
+var marks: Array[bool] = []       # each one came from a Marinated box (it keeps a glaze on the plate)
 var dirty := false
 var ticket := -1                  # helpers: the ticket this dish is being built for (-1: none)
 var line := -1                    # and which of its lines
@@ -31,6 +32,7 @@ static func stack(first: String, q1: float, second: String, q2: float) -> Dish:
 	d.qs.append(q1)
 	d.ings.append(Tray.parse(second).id)
 	d.qs.append(q2)
+	d.marks.assign([false, false])
 	return d
 
 
@@ -126,23 +128,37 @@ func _menu_refusal(ids: Array, items: Array) -> String:
 	return "Nothing on the menu has %s with %s" % [", ".join(names.slice(0, -1)), names[-1]]
 
 
-func add(k: String, q: float) -> void:
+## `marinated`: the piece came from a Marinated box, so it scores the bonus on top (clamped).
+func add(k: String, q: float, marinated := false) -> void:
 	ings.append(Tray.parse(k).id)
-	qs.append(q)
+	qs.append(Prep.marinate(q) if marinated else q)
+	marks.append(marinated)
+
+
+## Whether the piece at `i` came from a Marinated box.
+func is_marinated(i: int) -> bool:
+	return i < marks.size() and marks[i]
+
+
+func any_marinated() -> bool:
+	return marks.has(true)
 
 
 ## Moves everything on `other` onto this dish.
 func take_all(other: Dish) -> void:
 	ings.append_array(other.ings)
 	qs.append_array(other.qs)
+	marks.append_array(other.marks)
 	other.ings.clear()
 	other.qs.clear()
+	other.marks.clear()
 
 
 ## Empties it into the bin. A plate or cup keeps its vessel.
 func scrape() -> void:
 	ings.clear()
 	qs.clear()
+	marks.clear()
 
 
 ## The menu item this dish is, exactly, or {}. A loose stack can be one but is never served.
@@ -218,6 +234,7 @@ func duplicate_dish() -> Dish:
 	d.vessel = vessel
 	d.ings = ings.duplicate()
 	d.qs = qs.duplicate()
+	d.marks = marks.duplicate()
 	d.dirty = dirty
 	d.ticket = ticket
 	d.line = line

@@ -1047,3 +1047,15 @@ func test_a_post_draws_applicants_only_after_the_day_it_went_up():
 	for i in 40:
 		s.roll_applicants(cands, 4)
 	assert_eq(s.cvs.size(), 1, "some the day after")
+
+
+func test_a_marinated_box_is_the_plain_box_to_a_helper():
+	# room_view lists a Marinated box under "kinds" (needs the tool), a Prepared one under "ready".
+	var b := _board({
+		"stations": [{"id": "b", "cell": Vector2i(1, 0), "tool": "board"}],
+		"storage": [{"cell": Vector2i(0, 0), "kinds": ["lettuce"], "ready": []}],
+		"tickets": [{"id": 1, "cell": Vector2i(3, 0), "lacks": ["lettuce"]}],
+	})
+	var f: Dictionary = b.tasks["fetch:1:0"]
+	assert_false(f.ready)
+	assert_eq(f.dest, Vector2i(1, 0), "to the board, as from a plain box")
