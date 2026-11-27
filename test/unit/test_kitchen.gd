@@ -281,6 +281,13 @@ func test_a_counter_cannot_go_on_a_counter():
 	assert_eq(Kitchen.unstacked("counter"), "")
 
 
+func test_two_fridges_stack_into_a_tall_fridge_that_does_not_unstack():
+	assert_eq(Kitchen.stacks_into("fridge"), "tall_fridge")
+	assert_eq(Kitchen.stacks_into("counter"), "")
+	assert_eq(Kitchen.stacks_into("tall_fridge"), "")
+	assert_eq(Kitchen.unstacked("tall_fridge"), "", "a tall fridge never comes apart")
+
+
 
 func test_catalog_pieces_map_to_tops_and_counters():
 	for id in ["stove", "fryer", "pot", "board", "slicer", "fountain", "wine_barrel"]:
