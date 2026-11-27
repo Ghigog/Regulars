@@ -230,8 +230,8 @@ func _show_item(kind: String) -> void:
 		if kind.begins_with("tool:"):
 			_item_node.rotation.y = facing * PI / 2   # a small tool sits centred, turned with the piece
 		add_child(_item_node)
-		_item_node.scale = Vector3.ONE * 0.4
-		_item_node.create_tween().tween_property(_item_node, "scale", Vector3.ONE, 0.18) \
+		_item_node.scale = Vector3.ONE * 0.4 * BuildFood.SIZE
+		_item_node.create_tween().tween_property(_item_node, "scale", Vector3.ONE * BuildFood.SIZE, 0.18) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 

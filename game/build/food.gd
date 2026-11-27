@@ -4,6 +4,12 @@ extends RefCounted
 ## ingredient raw, prepped or burnt; plates, cups, stacks, trays and anything carried.
 
 
+## How much bigger than modelled every loose item in play is drawn (T-87): food, plates,
+## cups, stacks and trays on a station, in a chef's hands, on a table or in flight.
+## Stations, furniture and pegs keep their own size.
+const SIZE := 1.2
+
+
 ## The five patty looks from sheet 9: raw, nearly, perfect, dry, burnt.
 static func patty(n: Node3D, look: String, y := 0.0) -> void:
 	match look:

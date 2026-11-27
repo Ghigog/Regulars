@@ -99,6 +99,7 @@ func _fly(m: Dictionary, to: Station, delay: float) -> void:
 	else:
 		piece = BuildFood.carried([Dish.make(Dish.CUP if m.kind == "cups" else Dish.PLATE)], false)
 	piece.top_level = true
+	piece.scale = Vector3.ONE * BuildFood.SIZE
 	piece.visible = false
 	game.add_child(piece)
 	var from: Vector3 = m.from + Vector3(0, 0.9, 0)
