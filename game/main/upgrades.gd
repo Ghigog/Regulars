@@ -38,6 +38,8 @@ func hand_key(ch: Player = null) -> String:
 	var st: Station = ch.hand.node
 	if ch.hand.get("in_place", false) and keeps_tool(st):
 		return st.kit_tool   # a shelf that keeps a tool offers the tool's tree: sponge, scourer and on (PRD 9.5)
+	if st.type == "table":
+		return "table@1"   # one tier, but it branches into the fast and comfortable tables
 	return Upgrades.key_of(st.type, st.tier, st.base if st.type == "counter" else st.node)
 
 
@@ -99,8 +101,8 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		game.hud.hints_ui.show_build()
 		return true
 	var st: Station = ch.hand.node
-	if Station.is_seat(st.type) and Upgrades.catalog_id(to) != st.type:
-		_remake_seat(st, to, ch)   # a chair is a booth seat now: same cell, same facing
+	if (Station.is_seat(st.type) or Station.is_table(st.type)) and Upgrades.catalog_id(to) != st.type:
+		_remake_seat(st, to, ch)   # a chair or table is its branch now: same cell, same facing
 		return true
 	if keeps_tool(st) and Kitchen.fit_of(to) == "floor":   # the sponge grows into a mop bucket
 		# The tool leaves the shelf, which stays; the bucket (with its mop) is a new piece in
@@ -190,7 +192,8 @@ func _remake_in_place(st: Station, to: String, ch: Player) -> void:
 	ch.hand.id = up.type
 
 
-## A chair bought into a booth seat: a booth seat on the same cell and facing, in hand or in place.
+## A chair or table bought into its branch (a booth seat, a fast table): the branch piece on the
+## same cell and facing, in hand or in place. A table keeps its dirty plates.
 func _remake_seat(st: Station, to: String, ch: Player) -> void:
 	var in_place: bool = ch.hand.get("in_place", false)
 	if in_place:
@@ -201,6 +204,10 @@ func _remake_seat(st: Station, to: String, ch: Player) -> void:
 	up.visible = in_place
 	if in_place:
 		game.world._register(up)
+	if Station.is_table(st.type):
+		up.dirty = st.dirty
+		up.dirty_cups = st.dirty_cups
+		up.refresh()
 	game.placing._bought_tonight(up, game.placing.spent_tonight(st) + Upgrades.step_price(to))
 	st.queue_free()
 	ch.hand.node = up

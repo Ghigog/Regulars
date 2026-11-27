@@ -64,3 +64,17 @@ func test_buying_the_booth_seat_turns_a_chair_3_in_place():
 	assert_eq(game.player.hand.id, "booth_seat")
 	assert_eq(game.player.hand.node.cell, Vector2i(8, 3))
 	assert_eq(game.player.hand.node.facing, 0)
+
+
+func test_buying_a_fast_table_turns_a_lifted_table_1_in_place_and_it_still_seats():
+	var r := _room()
+	game.ledger.money = 100
+	game.ledger.xp = 100000
+	var t: Station = r.tile
+	assert_true(game.placing.pick_up(Grid.center(t.cell)))
+	assert_true(game.upgrades.buy_upgrade("table_fast@1"))
+	var up: Station = game.player.hand.node
+	assert_eq(up.type, "table_fast")
+	assert_eq(up.cell, Vector2i(7, 3))
+	assert_true(Station.is_table(up.type))
+	assert_eq(game.paying.dining_tables().size() + (1 if game.stations.get(up.cell) != up else 0), 1)

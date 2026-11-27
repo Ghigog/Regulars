@@ -552,9 +552,9 @@ func place_at(cell_: Vector2i, facing_: int) -> void:
 
 ## A table with plates on it, a sink piled with washing-up, an overflowing bin.
 func messy() -> bool:
+	if is_table(type):
+		return dirty > 0
 	match type:
-		"table":
-			return dirty > 0
 		"sink":
 			return dirty >= piled_at(racked)
 		"bin":
