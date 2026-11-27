@@ -325,3 +325,24 @@ func test_a_guest_queued_at_the_till_still_gets_the_slip_handed_over():
 	game.player.set_held("bill")
 	game.player.bill = Bill.new(-1, {1: 2})
 	assert_eq(game.cooking.prompt_for(game.paying.till_station()), "Hold to give the bill")
+
+
+func test_the_bill_is_a_small_undimmed_slip_in_the_top_right():
+	var g := _ready_to_pay()
+	game.cooking.use_station(game.paying.till_station())
+	var bs = game.hud.bill
+	for c in bs.get_children():
+		assert_false(c is ColorRect, "no dim layer over the room")
+	assert_eq(bs.mouse_filter, Control.MOUSE_FILTER_IGNORE, "clicks outside the slip reach the room")
+	assert_eq(bs._card.mouse_filter, Control.MOUSE_FILTER_STOP)
+	var view: Vector2 = bs.get_viewport_rect().size
+	var r: Rect2 = bs._card.get_global_rect()
+	assert_gt(r.position.x, view.x * 0.5, "left edge past the middle")
+	assert_lt(r.position.y, view.y * 0.25, "near the top")
+	assert_lt(r.size.x, 460.0, "narrow")
+	assert_lt(r.end.y, view.y + 1.0, "never past the bottom")
+	for t in bs._targets:
+		assert_true(bs.select(str(t.get_meta("key"))), "every button can be selected")
+	assert_true(bs.select("item:%d" % int(g.order.main.id)))
+	bs.action("use")
+	assert_eq(bs.bill.count(int(g.order.main.id)), 1)
