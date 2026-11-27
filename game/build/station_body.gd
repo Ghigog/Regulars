@@ -3,7 +3,7 @@ extends RefCounted
 ## The body of every station by type and tier (_station_body), kept in its own file for size.
 
 
-static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "") -> void:
+static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_look := false, node := "", joined := 0, candle := Vector2.ZERO) -> void:
 	if base == "double_counter":
 		BuildStations._double(n, type == "counter", BuildStations.PASS_FRONT if pass_look else 0.0)
 	if Treatments.is_box(type):
@@ -380,25 +380,66 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, 0.2), Vector3(0.03, 0.2, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
 				Build.box(n, Vector3(-0.28 + i * 0.07, 0.93, -0.2), Vector3(0.03, 0.3, 0.03), Build.WOOD, 0.0, Build.R_WOOD)
 		"table":
-			# One tile of table (sheet 1): a slab top with a small bevel on a slim pedestal and
-			# disc foot. Chairs and booth seats beside it are pieces of their own.
-			Build.lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.25, 0.0], [0.27, 0.02], [0.27, 0.08], [0.25, 0.1], [0.075, 0.1], [0.075, 0.63], [0.0, 0.63]], Build.CABINET, 0.0, Build.R_WOOD)
-			Build._add(n, Build.bevel_mesh(Vector3(1.0, 0.12, 1.0), 0.035), Vector3(0, 0.68, 0), Color("#ecc88f"), 0.0, Build.R_WOOD)
-			# A small candle in a glass, as in the sunset frame.
-			Build.cyl(n, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
-			Build.ball(n, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
+			_table_tile(n, joined, candle)
 		"chair":
-			# A dining chair on its own cell, back on the +x side (turned with the piece).
-			BuildStations._chair(n, Vector2i.ZERO, Build.CORAL)
+			BuildStations._chair(n, Vector2i(1, 0), Build.CORAL, true)
 		"booth_seat":
-			# One bench of the booth (sheet 10): a teal bench with a coral cushion and a high
-			# back on the +x side.
-			Build._add(n, Build.bevel_mesh(Vector3(0.66, 0.08, 0.98), 0.025), Vector3(0, 0.04, 0), Color(Build.WOOD_DARK), 0.0, Build.R_WOOD)
-			Build._add(n, Build.bevel_mesh(Vector3(0.62, 0.3, 0.96)), Vector3(0, 0.23, 0), Color(Build.CABINET), 0.0)
-			Build._add(n, Build.bevel_mesh(Vector3(0.5, 0.08, 0.88), 0.035), Vector3(-0.04, 0.41, 0), Color(Build.CORAL), 0.0)
-			Build._add(n, Build.bevel_mesh(Vector3(0.16, 0.86, 0.96)), Vector3(0.25, 0.51, 0), Color(Build.CABINET), 0.0)
-			for cz: float in [-0.22, 0.22]:
-				Build._add(n, Build.bevel_mesh(Vector3(0.07, 0.4, 0.42), 0.03), Vector3(0.14, 0.66, cz), Color(Build.CORAL), 0.0)
+			_booth_seat(n, joined)
 	if tier > 1:
 		for i in tier - 1:
 			Build.box(n, Vector3(0, 0.05 + i * 0.1, 0), Vector3(1.02, 0.04, 1.02), Build.WARN, 0.6)
+
+
+## Which of a piece's four sides (bit l = the neighbour at TableJoins.FACE[l], in the
+## piece's own turned frame) touch a piece it is one with.
+const SIDE_X_NEG := 1
+const SIDE_Z_POS := 2
+const SIDE_X_POS := 4
+const SIDE_Z_NEG := 8
+## How far a joined side's top runs on into the neighbour's cell: its bevel hides under
+## the neighbour's flat top, so touching pieces draw one unbroken surface.
+const JOIN_REACH := 0.06
+
+
+## A box span along one axis: open ends keep `open` half-length with their bevel, joined
+## ends run on past the cell edge. Returns [centre, length].
+static func _span(open: float, neg_joined: bool, pos_joined: bool) -> Array:
+	var lo := -(0.5 + JOIN_REACH) if neg_joined else -open
+	var hi := 0.5 + JOIN_REACH if pos_joined else open
+	return [(lo + hi) / 2.0, hi - lo]
+
+
+## One Table tile (sheet 1): a slab top with a small bevel on a slim teal pedestal. Sides
+## in `joined` (SIDE_* bits) have no bevel and reach the cell edge, so a run of tiles has
+## one continuous top; `candle` (the offset from the tile's centre, in cells) is where the
+## table's one candle stands, or Vector2.INF for none.
+static func _table_tile(n: Node3D, joined: int, candle: Vector2) -> void:
+	Build.lathe(n, Vector3.ZERO, [[0.0, 0.0], [0.25, 0.0], [0.27, 0.02], [0.27, 0.08], [0.25, 0.1], [0.075, 0.1], [0.075, 0.63], [0.0, 0.63]], Build.CABINET, 0.0, Build.R_WOOD)
+	var sx := _span(0.56, joined & SIDE_X_NEG != 0, joined & SIDE_X_POS != 0)
+	var sz := _span(0.56, joined & SIDE_Z_NEG != 0, joined & SIDE_Z_POS != 0)
+	var top := Build._add(n, Build.bevel_mesh(Vector3(sx[1], 0.12, sz[1]), 0.035), Vector3(sx[0], 0.68, sz[0]), Color("#ecc88f"), 0.0, Build.R_WOOD)
+	top.name = "top"
+	if candle != Vector2.INF:
+		var c := Node3D.new()
+		c.name = "candle"
+		c.position = Vector3(candle.x, 0, candle.y)
+		n.add_child(c)
+		Build.cyl(c, Vector3(0, 0.74, 0), 0.05, 0.085, "#ffd98a", 1.3)
+		Build.ball(c, Vector3(0, 0.84, 0), 0.022, "#fff1c4", 3.0).scale = Vector3(1, 1.5, 1)
+
+
+## One booth seat (sheet 10): a teal bench on a dark plinth with a coral cushion and a
+## tall back, its back on the +x side (the piece's turn faces it at its table). Seats
+## side by side along z share one long bench: only the open ends are capped.
+static func _booth_seat(n: Node3D, joined: int) -> void:
+	var neg := joined & SIDE_Z_NEG != 0
+	var pos := joined & SIDE_Z_POS != 0
+	var plinth := _span(0.49, neg, pos)
+	var body := _span(0.48, neg, pos)
+	var cushion := _span(0.44, neg, pos)
+	Build._add(n, Build.bevel_mesh(Vector3(0.66, 0.08, plinth[1]), 0.025), Vector3(0.08, 0.04, plinth[0]), Color(Build.WOOD_DARK), 0.0, Build.R_WOOD)
+	Build._add(n, Build.bevel_mesh(Vector3(0.62, 0.3, body[1])), Vector3(0.08, 0.23, body[0]), Color(Build.CABINET), 0.0)
+	Build._add(n, Build.bevel_mesh(Vector3(0.5, 0.08, cushion[1]), 0.035), Vector3(0.04, 0.41, cushion[0]), Color(Build.CORAL), 0.0)
+	Build._add(n, Build.bevel_mesh(Vector3(0.16, 0.86, body[1])), Vector3(0.33, 0.51, body[0]), Color(Build.CABINET), 0.0)
+	for cz: float in [-0.25, 0.25]:   # the back's cushions: evenly spaced across cells too
+		Build._add(n, Build.bevel_mesh(Vector3(0.07, 0.4, 0.42), 0.03), Vector3(0.22, 0.66, cz), Color(Build.CORAL), 0.0)

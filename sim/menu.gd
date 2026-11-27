@@ -16,6 +16,9 @@ const LIKED_BONUS_MAX := 0.3  # tunable: the most liked ingredients can add
 const HINT_ITEMS := 3         # tunable: items carrying a liked tag before a guest remarks on it
 ## What guests think. Tastes are never listed; these lines only hint at them.
 const NOTHING_THOUGHT := "Nothing I liked on the menu"
+const GO_ALONG_CHANCE := 0.75   # tunable: chance a member with no main orders one anyway, when at most one of a group of GO_ALONG_MIN_GROUP+ found one
+const GO_ALONG_MIN_GROUP := 3
+const GO_ALONG_THOUGHT := "Not my favourite, but I'll join in"
 const LIKED_THOUGHT := "Just how I like it"
 const TAG_WORDS := {"vegetable": "vegetables", "meat": "meat", "bread": "bread", "dairy": "cheese",
 	"fish": "fish", "fried": "fried food", "fruit": "fruit", "drink": "drinks"}
@@ -256,11 +259,15 @@ static func order(available: Array, likes: Array, dislikes: Array, rng: RandomNu
 
 ## What a group orders. `tastes` holds {likes, dislikes} per member. If nobody finds
 ## a main, the whole group walks on. Otherwise a member with no main stays and has
-## just a drink (any acceptable one), or nothing. Returns {walk, orders, found_nothing}
-## where found_nothing lists the members (by index) with no main.
+## just a drink (any acceptable one), or nothing. In a group of GO_ALONG_MIN_GROUP or
+## more where at most one member found a main, each member with none rolls
+## GO_ALONG_CHANCE to order the main with the fewest disliked ingredients anyway.
+## Returns {walk, orders, found_nothing, went_along} where found_nothing lists the
+## members (by index) with no main and went_along those who ordered one anyway.
 static func group_order(available: Array, tastes: Array, rng: RandomNumberGenerator) -> Dictionary:
 	var orders: Array[Dictionary] = []
 	var nothing: Array[int] = []
+	var went_along: Array[int] = []
 	for k in tastes.size():
 		var t: Dictionary = tastes[k]
 		var o := order(available, t.likes, t.dislikes, rng)
@@ -268,7 +275,54 @@ static func group_order(available: Array, tastes: Array, rng: RandomNumberGenera
 			nothing.append(k)
 			o.drink = pick("drink", available, t.likes, t.dislikes, rng)
 		orders.append(o)
-	return {"walk": nothing.size() == tastes.size(), "orders": orders, "found_nothing": nothing}
+	var walk := nothing.size() == tastes.size()
+	if tastes.size() >= GO_ALONG_MIN_GROUP and not walk and tastes.size() - nothing.size() <= 1:
+		for k in nothing.duplicate():
+			if rng.randf() < GO_ALONG_CHANCE:
+				var t: Dictionary = tastes[k]
+				var main := _least_disliked_main(available, t.likes, t.dislikes, rng)
+				if main.is_empty():
+					continue
+				orders[k].main = main
+				orders[k].side = pick("side", available, t.likes, t.dislikes, rng, true)
+				nothing.erase(k)
+				went_along.append(k)
+	return {"walk": walk, "orders": orders, "found_nothing": nothing, "went_along": went_along}
+
+
+## The main with the fewest disliked ingredients; ties are weighted as `pick` does.
+static func _least_disliked_main(available: Array, likes: Array, dislikes: Array,
+		rng: RandomNumberGenerator) -> Dictionary:
+	var best := 1 << 30
+	var pool: Array[Dictionary] = []
+	var weights: Array[float] = []
+	var total := 0.0
+	for it: Dictionary in available:
+		if it.course != "main":
+			continue
+		var n := 0
+		for ing: String in it.ingredients:
+			if dislikes.has(ing):
+				n += 1
+		if n > best:
+			continue
+		if n < best:
+			best = n
+			pool.clear()
+			weights.clear()
+			total = 0.0
+		var w := (1.0 + liked_count(it.ingredients, likes)) * float(ORDER_WEIGHT[it.get("price_level", "fair")])
+		pool.append(it)
+		weights.append(w)
+		total += w
+	if pool.is_empty():
+		return {}
+	var roll := rng.randf() * total
+	for k in pool.size():
+		roll -= weights[k]
+		if roll <= 0.0:
+			return pool[k]
+	return pool[-1]
 
 
 ## How good the meal tastes: the tray's average quality, raised for liked

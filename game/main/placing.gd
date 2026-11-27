@@ -604,6 +604,9 @@ func shut_in_line() -> String:
 		var name := str(Kitchen.NODES[st.node].name) if Kitchen.has_node(st.node) \
 			else piece_name({"id": st.type, "tier": st.tier})
 		return "The %s can't be reached" % name.to_lower()
+	for st: Station in game.stations.values():
+		if st.seats.has(c):
+			return "A %s's seat can't be reached" % piece_name({"id": st.type, "tier": st.tier}).to_lower()
 	return "You're shut in"
 
 
