@@ -50,3 +50,9 @@ func test_catalog_lists_nodes_not_tubs():
 	for id in Pantry.ITEMS:
 		if Pantry.is_drink(id) or Pantry.is_derived(id):
 			assert_false(Catalog.ITEMS.has(Pantry.box_id(id, false, true)), "%s has no Marinated node" % id)
+
+
+func test_marinated_box_fee_and_quality() -> void:
+	assert_eq(Pantry.box_fee("marinated_patty"), roundi(Pantry.fee_of("patty") * Pantry.MARINATE_FEE))
+	assert_almost_eq(Prep.marinate(Prep.PLAIN), Prep.PLAIN + Pantry.MARINATE_BONUS, 0.001)
+	assert_eq(Prep.marinate(1.0), 1.0)

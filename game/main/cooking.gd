@@ -487,7 +487,7 @@ func _use_storage(st: Station, dry_run: bool, ch: Player) -> Array:
 			_hold_from_box(ch, b)
 		return ["Take %s" % Pantry.name_of(Pantry.kind_of(b)).to_lower(), ""]
 	for i in boxes.size():
-		if held != _from_box(boxes[i]) or (held.begins_with("prep") and not is_equal_approx(ch.held_quality, Prep.PLAIN)):
+		if held != _from_box(boxes[i]) or (held.begins_with("prep") and not is_equal_approx(ch.held_quality, _box_quality(boxes[i]))):
 			continue
 		if boxes.size() == 1:
 			if not dry_run:
@@ -522,14 +522,21 @@ func _use_level(boxes: Array, level: int, dry_run: bool, ch: Player) -> Array:
 
 func _is_plain_from(ch: Player, boxes: Array) -> bool:
 	for b in boxes:
-		if ch.held == _from_box(b) and not (ch.held.begins_with("prep") and not is_equal_approx(ch.held_quality, Prep.PLAIN)):
+		if ch.held == _from_box(b) and not (ch.held.begins_with("prep") and not is_equal_approx(ch.held_quality, _box_quality(b))):
 			return true
 	return false
 
 
 func _hold_from_box(ch: Player, box: String) -> void:
 	var k := _from_box(box)
-	ch.set_held(k, Prep.PLAIN if k.begins_with("prep") else 1.0, [], false, Pantry.station_ingredient(box).marinated)
+	ch.set_held(k, _box_quality(box), [], false, Pantry.station_ingredient(box).marinated)
+
+
+## The quality of what comes out of a box: plain if prepped, full if raw, and a
+## Marinated box's bonus on top (Prep.marinate).
+static func _box_quality(box: String) -> float:
+	var q := Prep.PLAIN if _from_box(box).begins_with("prep") else 1.0
+	return Prep.marinate(q) if Pantry.station_ingredient(box).get("marinated", false) else q
 
 
 ## What comes out of a box: raw, or prepped and plain when it is ready-made or needs no prep.
