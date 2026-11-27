@@ -120,3 +120,37 @@ func test_a_reading_guest_holds_a_menu_card_that_snaps_away_with_the_notepad():
 	assert_true(g._order.visible, "the notepad pops up the frame reading ends")
 	assert_null(g._card, "the card is let go in that same frame")
 	game.step(0.3)
+
+
+func test_no_knock_on_sitting_only_when_the_notepad_pops():
+	var g := _seated("chair", 1, "table")
+	g.orders_nothing = false
+	assert_eq(g.state, "reading")
+	assert_ne(game.audio.last_sfx, "order_ready", "seated and reading: no knock")
+	_reading_seconds(g)
+	assert_eq(game.audio.last_sfx, "order_ready", "the knock comes with the notepad")
+
+
+func test_a_guest_who_orders_nothing_does_not_knock():
+	var g := _seated("chair", 1, "table")
+	g.orders_nothing = true
+	game.audio.last_sfx = ""
+	_reading_seconds(g)
+	assert_ne(game.audio.last_sfx, "order_ready")
+
+
+func test_a_second_diner_deciding_at_a_calling_table_does_not_knock_again():
+	var g := _seated("chair", 1, "table")
+	g.orders_nothing = false
+	_reading_seconds(g)
+	var mate := Guest.new()
+	mate.table = g.table
+	mate.orders_nothing = false
+	mate.state = "reading"
+	game.audio.last_sfx = ""
+	game.seating.on_decided(mate)
+	assert_eq(game.audio.last_sfx, "", "the table already knocked")
+	g.state = "waiting"   # their order was taken
+	game.seating.on_decided(mate)
+	assert_eq(game.audio.last_sfx, "order_ready", "a fresh call knocks again")
+	mate.free()
