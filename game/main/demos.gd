@@ -312,6 +312,10 @@ func _apply_demo(demo: String) -> void:
 	elif demo == "pause":  # the pause menu over the room
 		game.hud.options_ui.toggle_pause()
 		game.get_tree().paused = false   # so the screenshot timer still runs
+	elif demo == "pause_coop":  # the pause menu with two chefs, Chef 2 on a pad; shoot at 3
+		game.coop.join("pad:1")
+		game.hud.options_ui.toggle_pause()
+		game.get_tree().paused = false   # so the screenshot timer still runs
 	elif demo == "options" or demo == "options_gfx":  # the options screen, on either tab
 		game.hud.options_ui._options_tab = "graphics" if demo == "options_gfx" else "audio"
 		game.hud.options_ui.toggle_options()

@@ -742,7 +742,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   long for half the screen drops to its buttons. At night the build slip has a numbered
   row per chef. Answers to the PRD's open questions: chefs do not block each other; the
   day does not get harder with two; the other chef keeps building while the shop is
-  open (the shop tray covers only the bottom of the room). `REGULARS_DEMO=coop`,
+  open (the shop tray covers only the bottom of the room). *Paused*: the pause card has a Chefs section above Resume, one row per seat up to `MAX_CHEFS`: a filled row shows the chef's numbered disc, their device in words and (on a pad, with more than one chef) "Hold Start to leave"; an empty row shows a hollow ring and "Press Start on a controller to join", or "Controller ready: press Start to join as Chef N" once a stranger pad is plugged in or pressed. Controllers join and leave while paused as they do in play (the game stays paused, a leaver's chef walks out when play resumes); holding Start fills a ring round the disc over one second. `REGULARS_DEMO=pause_coop` (shoot at 3), `REGULARS_DEMO=coop`,
   `coop_build`, `coop_door`, `coop_ready`; add `REGULARS_INPUT=pad`.
   *Pad to pad*: once player one is on a pad, a different unseated pad no longer steers
   chef one or changes their device; only its Start does anything (joins). Pressing or

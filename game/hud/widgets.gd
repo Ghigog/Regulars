@@ -154,6 +154,7 @@ class ChefTag extends Control:
 	var p := 0
 	var px := 28.0
 	var state := ""   # "", "ready" or "waiting"
+	var progress := 0.0   # 0..1: a ring filling clockwise round the disc (Start held to leave)
 
 	func _init(p_: int, px_ := 28.0, state_ := "") -> void:
 		p = p_
@@ -170,9 +171,16 @@ class ChefTag extends Control:
 		custom_minimum_size = Vector2(px * (1.7 if state != "" else 1.0), px)
 		queue_redraw()
 
+	func set_progress(v: float) -> void:
+		if not is_equal_approx(v, progress):
+			progress = v
+			queue_redraw()
+
 	func _draw() -> void:
 		var r := px / 2.0 - 1.0
 		var c := Vector2(px / 2.0, px / 2.0)
+		if progress > 0.0:
+			draw_arc(c, r + 4.0, -PI / 2.0, -PI / 2.0 + TAU * clampf(progress, 0.0, 1.0), 32, Hud.CORAL, 3.5, true)
 		draw_circle(c + Vector2(0, 1.5), r, Hud.SHADOW)
 		draw_circle(c, r, Hud.INK)
 		draw_circle(c, r - 2.5, Color(Peg.PLAYER_TRIM[p % 4]))
@@ -189,6 +197,19 @@ class ChefTag extends Control:
 			draw_polyline(PackedVector2Array([b + Vector2(-br * 0.5, 0), b + Vector2(-br * 0.12, br * 0.42), b + Vector2(br * 0.55, -br * 0.45)]), Hud.INK, 3.0, true)
 		elif state == "waiting":   # an empty ring: not yet
 			draw_arc(b, br - 1.0, 0, TAU, 24, Color(Hud.INK, 0.55), 2.5, true)
+
+
+## An empty chef's place: a hollow ring the size of a ChefTag, so a free seat reads by shape.
+class SeatRing extends Control:
+	var px := 28.0
+
+	func _init(px_ := 28.0) -> void:
+		px = px_
+		custom_minimum_size = Vector2(px, px)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		draw_arc(Vector2(px / 2.0, px / 2.0), px / 2.0 - 2.0, 0, TAU, 32, Color(Hud.INK, 0.55), 2.5, true)
 
 
 class Pips extends Control:
