@@ -13,6 +13,7 @@ const REACH_LEAN := deg_to_rad(-9.0)   # tips back while Reach is held; positive
 var game
 var held := ""
 var held_quality := 1.0
+var held_marinated := false   # the held piece came from a Marinated box
 ## Plates, cups and loose stacks in hand: held is "dishes" (clean, with or without food)
 ## or "dirty_dishes" (eaten off) while there are any; "tray" for an empty tray in hand.
 var dishes: Array[Dish] = []
@@ -78,7 +79,7 @@ func set_trim(t: int) -> void:
 		add_child(fresh)
 		move_child(fresh, at)
 		if held != "":
-			set_held(held, held_quality, dishes, on_tray)
+			set_held(held, held_quality, dishes, on_tray, held_marinated)
 	else:
 		add_child(Peg.rigged(_body))
 
@@ -86,11 +87,12 @@ func set_trim(t: int) -> void:
 ## What is in hand. For "dishes" and "dirty_dishes", `dishes_` are the dishes and
 ## `tray_` whether they ride on a tray ("tray" alone is an empty tray). Anything else
 ## empties the hands of dishes and tray.
-func set_held(kind: String, quality := 1.0, dishes_: Array = [], tray_ := false) -> void:
+func set_held(kind: String, quality := 1.0, dishes_: Array = [], tray_ := false, marinated := false) -> void:
 	if kind in ["dishes", "dirty_dishes"] and dishes_.is_empty():
 		kind = "tray" if tray_ else ""
 	held = kind
 	held_quality = quality
+	held_marinated = marinated and kind != ""
 	var ds: Array[Dish] = []
 	if kind in ["dishes", "dirty_dishes"]:
 		ds.assign(dishes_)
@@ -104,7 +106,7 @@ func set_held(kind: String, quality := 1.0, dishes_: Array = [], tray_ := false)
 		_held_node = null
 	_body.pose = "carry" if kind != "" else "idle"
 	if kind != "":
-		_held_node = BuildFood.carried(dishes, on_tray) if kind in ["dishes", "dirty_dishes", "tray"] else BuildFood.item(kind, quality)
+		_held_node = BuildFood.carried(dishes, on_tray) if kind in ["dishes", "dirty_dishes", "tray"] else BuildFood.item(kind, quality, "", held_marinated)
 		_held_node.position = Vector3(0, 0.42, 0.34)
 		_body.add_child(_held_node)
 		_held_size = 0.4 * BuildFood.SIZE
@@ -282,7 +284,7 @@ func drop_dish(d: Dish) -> void:
 
 ## Redraws what is held after a dish in hand changed.
 func show_held() -> void:
-	set_held(held, held_quality, dishes, on_tray)
+	set_held(held, held_quality, dishes, on_tray, held_marinated)
 
 
 func carrying_something_gross() -> bool:

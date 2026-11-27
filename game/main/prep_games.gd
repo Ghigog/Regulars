@@ -20,7 +20,8 @@ func start_prep(p: int, st: Station, tool: String, ing: String, src := "", cup: 
 	var q := st.q(tool) if st.q(tool) > 0.0 else 1.0
 	game.preps[p] = {"tool": tool, "st": st, "ing": ing, "t": 0.0, "hits": [], "presses": 0, "fill": 0.0, "last": 0.0,
 		"q": q, "sweep": Prep.chop_sweep(q), "auto": Kitchen.is_auto(st.node),
-		"src": src if src != "" else Tray.kind("raw", ing), "v": 0.0, "w": 0.0, "was_held": true}
+		"src": src if src != "" else Tray.kind("raw", ing), "v": 0.0, "w": 0.0, "was_held": true,
+		"marinated": chef.held_marinated}
 	if cup != null:
 		game.preps[p].merge(hands)   # the dishes in hand wait while the cup is filled
 	if tool == "saw":
@@ -28,7 +29,7 @@ func start_prep(p: int, st: Station, tool: String, ing: String, src := "", cup: 
 	st.prep_by = p
 	chef.set_held("")
 	if tool != "pour":
-		st.set_item(game.preps[p].src)
+		st.set_item(game.preps[p].src, 1.0, game.preps[p].marinated)
 	st.show_widget(tool, q, ing if tool in ["pour", "grate", "blend", "juice"] else "")
 	chef.punch()
 	st.used()
@@ -81,7 +82,7 @@ func cancel_prep(p: int) -> void:
 	st.hide_widget()
 	if s.tool != "pour":
 		st.set_item("")
-		game.chefs[p].set_held(s.src, Prep.PLAIN if str(s.src).begins_with("prep") else 1.0)
+		game.chefs[p].set_held(s.src, Prep.PLAIN if str(s.src).begins_with("prep") else 1.0, [], false, s.marinated)
 	elif s.get("cup") != null:
 		game.chefs[p].set_held("dishes", 1.0, s.dishes, s.on_tray)
 	game.audio.sfx("putdown")
@@ -235,20 +236,20 @@ func _finish_prep(p: int, result: String) -> void:
 	if s.tool != "pour":
 		st.set_item("")
 	if s.get("cup") != null:
-		(s.cup as Dish).add(Tray.kind("prep", s.ing), Prep.quality_of(result))
+		(s.cup as Dish).add(Tray.kind("prep", s.ing), Prep.quality_of(result), s.marinated)
 		game.chefs[p].set_held("dishes", 1.0, s.dishes, s.on_tray)
 	else:
-		game.chefs[p].set_held(Tray.kind("prep", s.ing), Prep.quality_of(result))
+		game.chefs[p].set_held(Tray.kind("prep", s.ing), Prep.quality_of(result), [], false, s.marinated)
 	game.audio.sfx("pickup")
-	_prep_done(p, st, s.tool, result)
+	_prep_done(p, st, s.tool, result, s.marinated)
 
 
 ## A minigame ended: a mark over the tool, and the chef's burst or penalty.
-func _prep_done(p: int, st: Station, tool: String, result: String) -> void:
+func _prep_done(p: int, st: Station, tool: String, result: String, marinated := false) -> void:
 	if result == "" or p < 0:
 		return
 	game.floor_dirt.prep_grease(tool, result, game.chefs[p].cell(), st)
-	PrepWidget.pop(st, Vector3(0, 2.0, 0), result)
+	PrepWidget.pop(st, Vector3(0, 2.0, 0), result, marinated)
 	match Prep.reward(tool, result, Kitchen.is_auto(st.node) and tool in ["chop", "slice"]):
 		"burst":
 			game.chefs[p].boost("burst")

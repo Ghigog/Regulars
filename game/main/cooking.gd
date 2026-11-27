@@ -166,10 +166,11 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 		elif held == "":
 			act = "Take %s" % Pantry.name_of(ing).to_lower()
 			if not dry_run:
+				var marinated: bool = Catalog.ITEMS.get(st.type, {}).get("marinated", false)
 				if ready or not Pantry.needs_prep(ing):
-					ch.set_held(Tray.kind("prep", ing), Prep.PLAIN)
+					ch.set_held(Tray.kind("prep", ing), Prep.PLAIN, [], false, marinated)
 				else:
-					ch.set_held(Tray.kind("raw", ing))
+					ch.set_held(Tray.kind("raw", ing), 1.0, [], false, marinated)
 		elif held == Tray.kind("raw", ing) or (held == Tray.kind("prep", ing) and (ready or not Pantry.needs_prep(ing))):
 			act = "Put back"
 			if not dry_run:
@@ -186,7 +187,7 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			elif st.item == "" and not held_ing.is_empty() and (fry_in != "" or held_ing.state == "raw") and HOB_VERBS.has(job) and st.q(job) > 0.0:
 				act = HOB_VERBS[job]
 				if not dry_run:
-					st.set_item(fry_in if fry_in != "" else held)
+					st.set_item(fry_in if fry_in != "" else held, 1.0, ch.held_marinated)
 					st.set_meta("used_by", game.chefs.find(ch))
 					ch.set_held("")
 			elif held == "" and st.heat == "boil" and st.item.begins_with("raw"):
@@ -195,16 +196,17 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				act = "Take out" if st.heat == "boil" else "Take off the heat"
 				if not dry_run:
 					var p := Tray.parse(st.item)
+					var marinated := st.marinated
 					if st.heat == "boil":
-						ch.set_held(st.item, Prep.PLAIN)
+						ch.set_held(st.item, Prep.PLAIN, [], false, marinated)
 						game.floor_dirt.prep_grease("boil", "plain", ch.cell(), st)
 						st.set_item("")
 					else:
 						var done_job := "fry" if st.heat == "fry" else "grill"
 						var res: Dictionary = (Prep.fry if done_job == "fry" else Prep.grill).call(st.cook, st.q(done_job))
-						ch.set_held(Tray.kind(res.state, p.id), res.quality)
+						ch.set_held(Tray.kind(res.state, p.id), res.quality, [], false, marinated)
 						st.set_item("")
-						game.prep_games._prep_done(game.chefs.find(ch), st, done_job, res.result)
+						game.prep_games._prep_done(game.chefs.find(ch), st, done_job, res.result, marinated)
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go on the hob" % Pantry.name_of(held_ing.id)
 			elif not held_ing.is_empty() and game.chefs.size() > 1 and int(st.get_meta("used_by", -1)) not in [-1, game.chefs.find(ch)]:
@@ -215,7 +217,7 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			elif st.item == "" and not held_ing.is_empty() and (_fry_in(held_ing) != "" or (held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "fry")):
 				act = "Fry"
 				if not dry_run:
-					st.set_item(_fry_in(held_ing) if _fry_in(held_ing) != "" else held)
+					st.set_item(_fry_in(held_ing) if _fry_in(held_ing) != "" else held, 1.0, ch.held_marinated)
 					st.set_meta("used_by", game.chefs.find(ch))
 					ch.set_held("")
 			elif held == "" and st.on_rack():
@@ -224,33 +226,34 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 				else:
 					act = "Pick up"
 					if not dry_run:
-						ch.set_held(st.item, st.quality)
+						ch.set_held(st.item, st.quality, [], false, st.marinated)
 						st.set_item("")
 			elif held == "" and st.item != "":
 				act = "Lift basket"
 				if not dry_run:
 					var p := Tray.parse(st.item)
 					var res := Prep.fry(st.cook, st.q("fry"))
+					var marinated := st.marinated
 					if res.state == "prep":
 						st.lift_to_rack(Tray.kind("prep", p.id), res.quality, res.result)
 					else:
-						ch.set_held(Tray.kind(res.state, p.id), res.quality)
+						ch.set_held(Tray.kind(res.state, p.id), res.quality, [], false, marinated)
 						st.set_item("")
-					game.prep_games._prep_done(game.chefs.find(ch), st, "fry", res.result)
+					game.prep_games._prep_done(game.chefs.find(ch), st, "fry", res.result, marinated)
 			elif not held_ing.is_empty() and st.item == "":
 				why = "%s doesn't go in the fryer" % Pantry.name_of(held_ing.id)
 		"pot":
 			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "boil":
 				act = "Boil"
 				if not dry_run:
-					st.set_item(held)
+					st.set_item(held, 1.0, ch.held_marinated)
 					ch.set_held("")
 			elif held == "" and st.item.begins_with("raw"):
 				why = "Still boiling"
 			elif held == "" and st.item != "":
 				act = "Take out"
 				if not dry_run:
-					ch.set_held(st.item, Prep.PLAIN)
+					ch.set_held(st.item, Prep.PLAIN, [], false, st.marinated)
 					game.floor_dirt.prep_grease("boil", "plain", ch.cell(), st)
 					st.set_item("")
 			elif not held_ing.is_empty() and st.item == "":
@@ -324,7 +327,7 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 					act = "Plate it" if v == Dish.PLATE else "Pour into cup"
 					if not dry_run:
 						st.count -= 1
-						d.add(held, q)
+						d.add(held, q, ch.held_marinated)
 						ch.set_held("")
 						ch.take_dish(d)
 			elif st.count <= 0 and held in ["", "tray", "dishes"]:
@@ -526,7 +529,7 @@ func _is_plain_from(ch: Player, boxes: Array) -> bool:
 
 func _hold_from_box(ch: Player, box: String) -> void:
 	var k := _from_box(box)
-	ch.set_held(k, _box_quality(box))
+	ch.set_held(k, _box_quality(box), [], false, Pantry.station_ingredient(box).marinated)
 
 
 ## The quality of what comes out of a box: plain if prepped, full if raw, and a
@@ -560,7 +563,7 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 			if held_ing.state != "burnt":
 				act = "Put down"
 				if not dry_run:
-					st.set_item(held, q)
+					st.set_item(held, q, ch.held_marinated)
 					ch.set_held("")
 		elif here != null:
 			# Onto a plate, a cup, or a stack already started.
@@ -568,7 +571,7 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 			if why == "":
 				act = "Add %s" % Pantry.name_of(held_ing.id).to_lower()
 				if not dry_run:
-					here.add(held, q)
+					here.add(held, q, ch.held_marinated)
 					ch.set_held("")
 					st.show_dish()
 		elif not here_ing.is_empty():
@@ -576,19 +579,19 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 			var d := Dish.new()
 			why = d.refusal(st.item, items)
 			if why == "":
-				d.add(st.item, st.current_quality())
+				d.add(st.item, st.current_quality(), st.marinated)
 				why = d.refusal(held, items)
 			if why == "":
 				act = "Add %s" % Pantry.name_of(held_ing.id).to_lower()
 				if not dry_run:
-					d.add(held, q)
+					d.add(held, q, ch.held_marinated)
 					ch.set_held("")
 					st.set_dish(d)
 	elif held == "dishes":
 		var loose: Dish = here if here != null and here.vessel == "" else null
 		if loose == null and not here_ing.is_empty():
 			loose = Dish.new()
-			loose.add(st.item, st.current_quality())
+			loose.add(st.item, st.current_quality(), st.marinated)
 		if st.item == "":
 			if is_countertop_item(st):
 				why = "Plates go on a clear counter"
@@ -667,7 +670,7 @@ func _use_surface(st: Station, dry_run: bool, ch: Player) -> Array:
 	elif held == "" and st.item != "":
 		act = "Pick up"
 		if not dry_run:
-			ch.set_held(st.item, st.current_quality())
+			ch.set_held(st.item, st.current_quality(), [], false, st.marinated)
 			st.set_item("")
 	return [act, why]
 
