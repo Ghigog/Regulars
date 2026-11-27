@@ -732,6 +732,11 @@ Survive as many days as you can; three walkouts in one day ends the run.
   day does not get harder with two; the other chef keeps building while the shop is
   open (the shop tray covers only the bottom of the room). `REGULARS_DEMO=coop`,
   `coop_build`, `coop_door`, `coop_ready`; add `REGULARS_INPUT=pad`.
+  *Pad to pad*: once player one is on a pad, a different unseated pad no longer steers
+  chef one or changes their device; only its Start does anything (joins). Pressing or
+  pushing it shows "Press Start to join as Chef N" (once per few seconds per pad, never when
+  the diner is full), as does plugging one in; the Options controls list on a pad says
+  "Start on another controller: join". Keyboard and touch still switch player one freely.
 
 Code map: `sim/` is pure logic with no scene dependencies (unit-tested with GUT).
 `game/` is the scene layer. `tools/make_sfx.py` regenerates the placeholder sounds.
