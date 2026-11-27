@@ -187,7 +187,7 @@ func _rebuild_room() -> void:
 	game._room = Node3D.new()
 	game.add_child(game._room)
 	var r: Dictionary = Scenery.build_room(game._room, game.plan, Game.DOOR)
-	_sync_walls(r.get("glass", {}))
+	_sync_walls()
 	game._room_lights.assign(r.lights)
 	game._sconces.append_array(game._room_lights)
 	game._openings = r.openings
@@ -317,22 +317,21 @@ func _show_boxes(cell: Vector2i) -> void:
 
 ## The back walls behind a cell that a piece can hang on: full height, with floor on
 ## this side only and no door, archway or window in them. West first, then north.
-func _back_walls(c: Vector2i, glass := {}) -> Array[Vector3i]:
+func _back_walls(c: Vector2i) -> Array[Vector3i]:
 	var out: Array[Vector3i] = []
 	for e: Vector3i in [Vector3i(c.x, c.y, 1), Vector3i(c.x, c.y, 0)]:
-		if Scenery.wall_look(game.plan, e) == "tall" and not game.plan.openings.has(e) and not glass.has(e):
+		if Scenery.wall_look(game.plan, e) == "tall" and not game.plan.openings.has(e) and not game.plan.windows.has(e):
 			out.append(e)
 	return out
 
 
 ## Marks the kitchen's wall cells from the plan, and which way a piece hung in each
 ## faces: away from its wall (1 is +x, off the left wall; 0 is +z, off the back wall).
-func _sync_walls(glass := {}) -> void:
-	game._glass = glass
+func _sync_walls() -> void:
 	game.kitchen.wall_cells.clear()
 	game.wall_facing.clear()
 	for c: Vector2i in game.plan.floors:
-		var e := _back_walls(c, glass)
+		var e := _back_walls(c)
 		if not e.is_empty():
 			game.kitchen.set_wall(c)
 			game.wall_facing[c] = 1 if e[0].z == 1 else 0
@@ -342,7 +341,7 @@ func _sync_walls(glass := {}) -> void:
 ## would leave a hung piece with no wall to hang on.
 func _strands_high(edges: Array[Vector3i]) -> bool:
 	for c: Vector2i in game.highs:
-		var left := _back_walls(c, game._glass)
+		var left := _back_walls(c)
 		for e in edges:
 			left.erase(e)
 		if left.is_empty():

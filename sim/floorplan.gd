@@ -17,6 +17,7 @@ var floors := {}      # Vector2i -> "tile" | "planks"
 var built := {}       # Vector3i edge -> true: walls the player put up between two floors
 var openings := {}    # Vector3i edge -> "door" | "arch" | "entrance"
 var finishes := {}    # Vector3i edge -> a FINISHES id: paint or wallpaper on a wall
+var windows := {}     # Vector3i edge -> true: a window bought for a full-height wall (not an opening)
 
 
 func _init(lot_) -> void:
@@ -157,6 +158,9 @@ func _tidy(c: Vector2i) -> Dictionary:
 		if openings.has(e) and not is_wall(e):
 			gone[e] = openings[e]
 			openings.erase(e)
+		if windows.has(e) and not can_glaze_shape(e):
+			gone[e] = "window"
+			windows.erase(e)
 		if finishes.has(e) and not is_wall(e):
 			gone[e] = finishes[e]
 			finishes.erase(e)
@@ -173,6 +177,17 @@ func can_build(edge: Vector3i) -> bool:
 
 func build(edge: Vector3i) -> void:
 	built[edge] = true
+
+
+## Whether an edge is a full-height wall: floor in front, none behind.
+func can_glaze_shape(edge: Vector3i) -> bool:
+	var s := sides(edge)
+	return has_floor(s[0]) and not has_floor(s[1])
+
+
+## A window can go in a full-height wall with no door, archway or window in it already.
+func can_glaze(edge: Vector3i) -> bool:
+	return can_glaze_shape(edge) and not openings.has(edge) and not windows.has(edge)
 
 
 ## Paint or paper can go on any wall without a way through it, unless it has that finish already.
@@ -205,7 +220,7 @@ func unbuild(edge: Vector3i) -> String:
 ## A door or archway can go in any wall that has nothing in it yet, as long as
 ## both sides are on the lot (one may still be bare ground, to be floored later).
 func can_open(edge: Vector3i, what: String) -> bool:
-	if not OPENINGS.has(what) or not is_wall(edge) or openings.has(edge):
+	if not OPENINGS.has(what) or not is_wall(edge) or openings.has(edge) or windows.has(edge):
 		return false
 	for c in sides(edge):
 		if not lot.has_point(c):

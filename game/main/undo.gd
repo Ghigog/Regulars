@@ -91,7 +91,7 @@ func record_sold(h: Dictionary, refund: int) -> void:
 func plan_snapshot() -> Dictionary:
 	var p: Floorplan = game.plan
 	return {"floors": p.floors.duplicate(), "built": p.built.duplicate(), "openings": p.openings.duplicate(),
-		"finishes": p.finishes.duplicate(), "treat": game.treat_laid.duplicate(), "money": game.ledger.money}
+		"finishes": p.finishes.duplicate(), "windows": p.windows.duplicate(), "treat": game.treat_laid.duplicate(), "money": game.ledger.money}
 
 
 ## A change to the plan (one tool press, or one whole drag) was made since `before`.
@@ -279,6 +279,7 @@ func _undo_plan(s: Dictionary, ch: Player, again := false) -> String:
 	p.built = s.built
 	p.openings = s.openings
 	p.finishes = s.finishes
+	p.windows = s.windows
 	game.treat_laid = s.treat
 	game.world._sync_grid()
 	game.floor_dirt.redraw()

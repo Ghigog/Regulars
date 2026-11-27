@@ -20,7 +20,7 @@ Survive as many days as you can; three walkouts in one day ends the run.
   wine. Each has a tool, tags (meat, vegetable, bread, fish, fried, drink...), a worth
   (what it adds to a price) and a fee (what stocking it costs a night).
 - **Wall layer (PRD 8.5).** A cell against a full-height back wall (no window, door or
-  archway in it) has a high layer over whatever stands below, even bare floor. Wall
+  archway in it; windows are bought in the shop's Build tab, $15 a wall length, and none are generated) has a high layer over whatever stands below, even bare floor. Wall
   pieces in the shop's Kitchen tab: a wall shelf ($10, one kind, hangs only like a
   hook; its efficient step the wide shelf, two kinds; for something low use a counter), a
   wall cabinet ($20, one kind, hangs only) and a hood ($30, hangs only; over a stove it

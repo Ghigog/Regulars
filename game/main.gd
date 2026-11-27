@@ -106,7 +106,6 @@ var stations := {}               # Vector2i -> Station
 var kitchen := Kitchen.new()     # the counters and the tools on them, kept in step with `stations` (PRD 8)
 var highs := {}   # Vector2i -> Station: the pieces hung in a wall cell's high layer (PRD 8.5)
 var wall_facing := {}   # Vector2i -> facing: a wall cell, and which way a piece hung there looks
-var _glass := {}   # the wall edges with a window in them: no high piece hangs there
 var guests: Array[Guest] = []
 var queue: Array[Guest] = []
 var seat_taken := {}             # Vector2i -> Guest
