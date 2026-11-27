@@ -47,6 +47,8 @@ func pick_catalog(id: String, tier := 1, ch: Player = null, base := "") -> bool:
 	if game.phase != Game.Phase.BUILD or Cleaning.carrying_mess(ch.held) or not game.catalog.can_buy(id, game.ledger.money, buy_level(id), tier) \
 			or game.ledger.money < Catalog.bp_price(bp) or not Catalog.sold_in(id, Scenery.theme_id):
 		return false
+	if id == "sponge":   # a tool, not a piece: bought at once, into the hands
+		return _buy_sponge(ch, bp)
 	if id == "till" and game.paying.till_station() != null:
 		game.hud.day_ui.say("One till is enough. Pick it up with E to move it.")
 		return false
@@ -55,6 +57,21 @@ func pick_catalog(id: String, tier := 1, ch: Player = null, base := "") -> bool:
 	ch.hand = {"id": id, "tier": tier, "price": Catalog.bp_price(bp), "facing": 0}
 	if base != "":
 		ch.hand.base = base
+	game.hud.hints_ui.show_build()
+	return true
+
+
+## The sponge is a hand tool (PRD 9.4): paid for at once and put in the chef's hands,
+## clean. Hands that already carry something refuse it.
+func _buy_sponge(ch: Player, bp: Dictionary) -> bool:
+	if ch.held != "":
+		game.hud.day_ui.say("Hands full: put that down first.")
+		return false
+	if ch.hand.get("moving", false):
+		cancel_hand(ch)
+	if not ch.hand.is_empty() or not game.ledger.spend(Catalog.bp_price(bp)):
+		return false
+	CleanKit.hold(ch, "sponge", 0)
 	game.hud.hints_ui.show_build()
 	return true
 
@@ -641,7 +658,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		built = game.stations[cell].get_node("till")
 		_bought_tonight(built, paid)
 	elif game.world.layer_for(cell, GameWorld.hand_node(ch.hand)) == "high":
-		var hung := game.world.add_high(GameWorld.hand_node(ch.hand) if ch.hand.id == "sponge" else str(ch.hand.get("up", ch.hand.id)), cell)
+		var hung := game.world.add_high(str(ch.hand.get("up", ch.hand.id)), cell)
 		_bought_tonight(hung, paid)
 		game.clean_kit.on_built(hung, ch.hand.id)
 		built = hung

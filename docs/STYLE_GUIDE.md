@@ -57,7 +57,11 @@ Implementers should follow these, not the individual drawings.
 
 ## As built
 
-- *Undo disc* (`HudButtons`, id `undo`, icon `undo` in `game/icons.gd`): a paper-and-wood disc exactly like Shop and Dishes (same size, same slide-in rustle and tick out), stacked in the right column above Dishes. It shows only in the build phase, with nothing in hand, while the undo stack (`GameUndo`) has a step. The glyph is a counter-clockwise curved arrow, an open arc with the head at the upper left, so it differs from Back (U-turn band) and Turn (three-quarter ring). Keycap: `Ctrl+Z` (`⌘Z` on a Mac), `LS` on a pad (provisional), none on touch.
+- *Undo disc* (`HudButtons`, id `undo`, icon `undo` in `game/icons.gd`): a paper-and-wood disc exactly like Shop and Dishes (same size, same slide-in rustle and tick out), stacked in the right column above the menu (flyer) disc and Shop. It shows only in the build phase, with nothing in hand, while the undo stack (`GameUndo`) has a step. The glyph is a counter-clockwise curved arrow, an open arc with the head at the upper left, so it differs from Back (U-turn band) and Turn (three-quarter ring). Keycap: `Ctrl+Z` (`⌘Z` on a Mac), `LS` on a pad (provisional), none on touch.
+
+- *Wainscot meets a knee-high wall*: a dining wall's wainscot (or seaside clapboard) and rail stop at the room face of a knee-high wall that meets them, instead of sinking into its cap; at a tall corner or an opening they run as before.
+
+- *Wall hook removed*: the sponge and other small tools are no longer drawn on a hook at the wall; they sit centred (x = 0, z = 0) in their cell on a wall shelf, in a wall cabinet, or on a counter, pass or sink, turned with the piece.
 
 - *Dispensers on the plain counter*: the soda and two-tap fountains, coffee machine, wine barrel, wine rack and beer tap stand on the same teal-cabinet counter as every other tool, not a coral or wooden cabinet of their own. The machines are unchanged.
 
@@ -90,7 +94,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
 - The bottom controls bar is gone: no build slip of key words at night, no corner key line
   by day (one chef or co-op). What stays at the bottom: the night cleaning note, the restock
   note, the lifted piece's strip, the co-op ready marks and the shop's own key line.
-- Icon buttons (`game/hud/icon_button.gd`): paper-and-wood buttons for the shop and the menu.
+- Icon buttons (`game/hud/icon_button.gd`): paper-and-wood buttons for the shop and the menu; the menu button wears an opened flyer (two cream panels, a fold, coral bands).
   Tapped on touch; on desktop and pad they wear their key (Tab, N, or whatever is bound).
 - Head keycaps: WASD floats over the chef until all four keys have been pressed; E already
   shows over the chef in range of something to use.
@@ -196,7 +200,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   scrubber is a coral motor on a round grey deck with a T-handle, parked beside its
   pail and pushed at the chef's side. A dirty head goes from its colour to grey-brown;
   dirty strands also droop and drip.
-- The wall hook is a wooden plate with a bent brass hook. Its tool hangs off it: the
+- There are no wall hooks: small tools sit centred on a wall shelf, in a wall cabinet, or on a counter, pass or sink. The tools: the
   sponge (yellow, green scourer on top); the scourer (a steel-wool pad on a sponge); the
   grease scraper (a wide steel blade on a wooden handle); the spill kit (a coral pouch
   with a white band and a red cross). In a closet the mop stands in the corner and a
@@ -214,7 +218,7 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   glint streaks (more on high gloss). At night a cell that will not be re-laid (switched
   off, or no box stored) is dimmed.
 - Screenshots: `dirt`, `slip`, `mop`, `robot`, `mop_night`, `mop_line` (the whole bucket
-  tree in a row, the small tools on hooks, a hood beside an extractor, the chef pushing
+  tree in a row, the small tools on shelves, a hood beside an extractor, the chef pushing
   the scrubber), `treat`, `treat_day`, `tree_box`, `tree_bucket`, `tree_sponge`.
 
 **Staff (PRD 10, art pass 10.8)**

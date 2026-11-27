@@ -184,12 +184,10 @@ static func _station_body(n: Node3D, type: String, tier: int, base := "", pass_l
 			Build.box(n, Vector3(0, 0.89, 0.04), Vector3(0.58, 0.03, 0.44), "#8fc3cf", 0.0, Build.R_GLOSS)
 			Build.cyl(n, Vector3(0, 0.9, -0.36), 0.035, 0.26, "#c9d0d1", 0.0, Build.R_WOOD)
 			Build.box(n, Vector3(0, 1.12, -0.25), Vector3(0.06, 0.05, 0.26), "#c9d0d1", 0.0, Build.R_WOOD)
-		"cabinet", "hood", "hook", "shelf", "wide_shelf":
+		"cabinet", "hood", "shelf", "wide_shelf":
 			BuildStations.wall_piece(n, type, BuildStations.HIGH_Y0 - 0.3)
-		"sponge":   # sold on its own hook (PRD 9.4): seen in hand as both; up its tree, the node's tool (9.5)
-			BuildStations.wall_piece(n, "hook", BuildStations.HIGH_Y0 - 0.3)
-			var hung := BuildClean.hand_tool(n, Kitchen.tool_of(node) if Kitchen.tool_of(node) != "" else "sponge", 1.0)
-			hung.position = BuildClean.hook_spot(BuildStations.HIGH_Y0 - 0.3)
+		"sponge":   # a hand tool, seen in the shop and in hand as itself (up its tree, the node's tool, 9.5)
+			BuildClean.hand_tool(n, Kitchen.tool_of(node) if Kitchen.tool_of(node) != "" else "sponge", 1.0).position = Vector3(0, 0.3, 0)
 		"mop_bucket":
 			BuildClean.mop_bucket(n, node)
 		"robot_dock":

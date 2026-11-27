@@ -345,8 +345,6 @@ static func hand_node(h: Dictionary) -> String:
 	if h.get("node") is Station:
 		var st: Station = h.node
 		return st.base if st.type == "counter" and st.base != "" else st.node
-	if h.get("id", "") == "sponge":
-		return "hook"   # sold hanging on its own hook (PRD 9.4)
 	if h.get("up", "") != "":
 		return h.up   # a tree node the shop sold, built already upgraded
 	if h.get("base", "") != "":
@@ -390,6 +388,8 @@ func _hang(st: Station, cell: Vector2i) -> void:
 	st.visible = true
 	st.place_at(cell, int(game.wall_facing.get(cell, 0)))
 	game.kitchen.hang(cell, st.node)
+	if st.kit_tool != "":   # a shelf carried with its tool keeps it
+		game.kitchen.tools[cell] = st.kit_tool
 	game.highs[cell] = st
 	_refresh_wall(cell)
 	_show_boxes(cell)

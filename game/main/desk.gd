@@ -27,7 +27,7 @@ func desk_in_front(ch: Player = null) -> Station:
 ## The duties a post can hold tonight, by kind, read from the room (`Staff.room_duties`).
 func room_duties() -> Dictionary:
 	var pieces := []
-	for st: Station in game.stations.values() + game.highs.values():   # a hook's sponge hangs high (PRD 9.4)
+	for st: Station in game.stations.values() + game.highs.values():   # a shelf's tool is kept high (PRD 9.4)
 		pieces.append(st.type)
 		if st.kit_tool != "":
 			pieces.append(st.kit_tool)
