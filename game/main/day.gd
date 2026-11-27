@@ -32,6 +32,24 @@ var _glow_tween: Tween
 var _glow_on := false
 
 
+## A chef left on night-only ground goes to the nearest cell they may stand on by day.
+func _return_to_legal_cell(ch: Player) -> void:
+	var here := ch.cell()
+	if not game.grid.chef_blocked(here):
+		return
+	var best := here
+	var best_d := INF
+	var g: Grid = game.grid
+	for x in range(g.origin.x, g.origin.x + g.size.x):
+		for y in range(g.origin.y, g.origin.y + g.size.y):
+			var c := Vector2i(x, y)
+			var d := (Grid.center(c) - ch.position).length()
+			if d < best_d and not g.chef_blocked(c):
+				best_d = d
+				best = c
+	ch.position = Grid.center(best)
+
+
 func start_day() -> void:
 	if game.phase == Game.Phase.CLOSED:
 		return
@@ -44,6 +62,8 @@ func start_day() -> void:
 		if ch.held == "dishes" or not Tray.parse(ch.held).is_empty():
 			ch.set_held("")   # yesterday's food does not carry into the new day
 	game.phase = Game.Phase.SERVICE
+	for ch in game.chefs:
+		_return_to_legal_cell(ch)
 	game.undo.clear()
 	game.clock = 0.0
 	game.shopper = null

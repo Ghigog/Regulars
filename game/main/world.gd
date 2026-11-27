@@ -159,6 +159,7 @@ func _sync_grid() -> void:
 	for e in game.plan.doors():
 		game.grid.doors[e] = true
 	game.grid.outside.clear()
+	game.grid.roam.clear()
 	var pave := game.pavement()
 	var from: Vector2i = game.grid.origin
 	for x in range(from.x, from.x + game.grid.size.x):   # the grid spans the largest lot the cap allows
@@ -167,9 +168,12 @@ func _sync_grid() -> void:
 			if game.lot.has_point(c):
 				if not game.plan.has_floor(c):
 					game.grid.outside[c] = true   # bare ground
+					game.grid.roam[c] = true
 			elif not pave.has_point(c):
 				game.grid.outside[c] = true   # not ours yet, or the kerb and the road
+				game.grid.roam[c] = true   # chefs walk it at night; the kerb stays shut (pavement_from)
 	game.grid.outside[Game.BOARD_CELL] = true   # the menu board stands here; people go round it
+	game.grid.roam.erase(Game.BOARD_CELL)
 
 
 ## Redraws the room from the plan and fits the camera round it.

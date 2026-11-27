@@ -97,7 +97,11 @@ var critic_guest: Guest                # the critic, while they are here on a cr
 var _critic_seen := {}                 # what the critic saw as their meal arrived: {patience, quality}
 var _critic_rated := {}                # their ratings once they leave, printed at the end of the day
 var ledger: Ledger
-var phase: int = Phase.SERVICE
+var phase: int = Phase.SERVICE:
+	set(v):
+		phase = v
+		if grid:
+			grid.roaming = (v == Phase.BUILD)   # chefs walk round the restaurant only at night
 var stations := {}               # Vector2i -> Station
 var kitchen := Kitchen.new()     # the counters and the tools on them, kept in step with `stations` (PRD 8)
 var highs := {}   # Vector2i -> Station: the pieces hung in a wall cell's high layer (PRD 8.5)

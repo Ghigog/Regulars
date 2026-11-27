@@ -5,7 +5,9 @@ extends RefCounted
 ## who holds the shop button buys it. Drawn only at night; the day shows none of it.
 
 const HOLD_TIME := 0.8            # seconds the shop button is held to buy (tunable)
-const LINE_W := 0.09
+const LINE_W := 0.05
+const EDGE_ALPHA := 0.3         # owned-lot edge
+const BLOCK_ALPHA := 0.12       # buyable-block outline
 const LINE_Y := 0.03
 
 var game: Game
@@ -88,18 +90,28 @@ func _redraw() -> void:
 	for b: Vector2i in game.lot.blocks:
 		for d: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			if not game.lot.blocks.has(b + d):
-				_side(Lot.block_rect(b), d, Color(white, 0.85))
+				_edge(Lot.block_rect(b), d, Color(white, EDGE_ALPHA))
 	var afford := game.ledger.money >= game.lot.next_price()
 	for b: Vector2i in game.lot.buyable():
 		var r := Lot.block_rect(b)
 		var inner := r.grow(-1)
 		for d: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-			_side(inner, d, Color(white, 0.3))
+			_side(inner, d, Color(white, BLOCK_ALPHA))
 		var mid := Grid.center(r.position + r.size / 2)
 		_label("+", mid + Vector3(0, 0.1, 0), 120, 0.012, white)
 		var tint := Color(Build.TRIM) if afford else Color(Build.TRIM, 0.6)
 		_label("$%d" % game.lot.next_price(), mid + Vector3(0, 0.75, 1.1), 56, 0.01, tint)
 		_label("hold %s" % glyph, mid + Vector3(0, 0.25, 1.1), 30, 0.008, tint)
+
+
+## The owned-lot edge one cell at a time, leaving out cells with floor behind them: a room
+## wall stands on that edge and the line would show over it.
+func _edge(r: Rect2i, d: Vector2i, col: Color) -> void:
+	for i in (r.size.y if d.x != 0 else r.size.x):
+		var cell := Vector2i(r.position.x + (r.size.x - 1 if d.x > 0 else 0), r.position.y + i) if d.x != 0 \
+			else Vector2i(r.position.x + i, r.position.y + (r.size.y - 1 if d.y > 0 else 0))
+		if not game.plan.has_floor(cell):
+			_side(Rect2i(cell, Vector2i.ONE), d, col)
 
 
 ## One edge of a rect (the side `d` faces) as a flat strip on the ground.
