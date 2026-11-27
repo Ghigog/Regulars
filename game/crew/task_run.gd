@@ -118,10 +118,16 @@ func _start(h: Helper, s: Dictionary) -> bool:
 			h.step_started = false
 			return _start_next(h)
 		"to_sink":
-			var sink := crew.room_view._nearest("sink", h.cell())
+			var sink := crew.room_view._nearest("sink", h.cell(), true)
 			if sink == null:
-				return false
-			s.at = sink.cell
+				# Every sink is full: the dishes go down on a free counter instead.
+				var c: Variant = crew.room_view._free_surface(h.cell(), h, false, true)
+				if c == null:
+					return false
+				s.do = "stash"
+				s.at = c
+			else:
+				s.at = sink.cell
 		"bin":
 			var b := crew.room_view._nearest("bin", h.cell())
 			if b == null:

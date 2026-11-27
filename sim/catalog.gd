@@ -119,7 +119,7 @@ const ITEMS := {
 	"dish_rack": {"name": "Dish rack", "price": 50, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Where clean plates are kept, 8 to a rack. Food goes out on them. Beside a sink, more soak before it looks piled. The kitchen needs one to open"},
 	"sink": {"name": "Sink", "price": 70, "level": 3, "category": "Kitchen", "tiers": 1,
-		"blurb": "Another place to wash up"},
+		"blurb": "Another place to wash up. Holds ten dirty dishes"},
 	"till": {"name": "Till", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1,
 		"blurb": "Where guests pay. Stands on a counter. The kitchen needs one to open"},
 	"cups": {"name": "Cup stack", "price": 20, "level": 1, "category": "Kitchen", "tiers": 1,

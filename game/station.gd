@@ -11,6 +11,7 @@ const CUPS := 6            # cups in a new cup stack
 const TRAYS := 2           # trays in a tray stack
 const DIAL_SWEEP := 150.0  # degrees either side of straight up
 const SINK_PILED := 6      # this many dishes soaking and the washing-up shows (and bothers guests)
+const SINK_HOLDS := 10     # a sink takes no more dirty dishes than this: wash some up first
 const RACK_HOLDS := 4      # a dish rack beside a sink: this many more dishes before it looks piled
 const RACK_CAPACITY := PLATES   # clean plates a dish rack holds
 const BIN_HOLDS := 4       # scraps a bin takes before it overflows
@@ -560,6 +561,23 @@ func messy() -> bool:
 		"bin":
 			return overflowing()
 	return false
+
+
+## How many more dirty dishes a sink takes.
+func sink_room() -> int:
+	return maxi(SINK_HOLDS - dirty, 0)
+
+
+## Put as many of `dishes` into the sink as fit, plates before cups. Returns those left over.
+func put_in_sink(dishes: Array) -> Array:
+	var ordered: Array = dishes.filter(func(d: Dish) -> bool: return d.vessel != Dish.CUP)
+	ordered.append_array(dishes.filter(func(d: Dish) -> bool: return d.vessel == Dish.CUP))
+	var n := mini(ordered.size(), sink_room())
+	for d: Dish in ordered.slice(0, n):
+		dirty += 1
+		if d.vessel == Dish.CUP:
+			dirty_cups += 1
+	return ordered.slice(n)
 
 
 ## How many dishes soak in a sink before it looks piled: more with a dish rack beside it.
