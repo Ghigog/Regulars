@@ -27,7 +27,7 @@ func test_a_pair_of_two_takes_the_lone_table_before_the_big_one():
 func test_a_pair_of_two_takes_the_big_table_when_nothing_else_is_free_and_it_is_all_theirs():
 	var t := _room(false)
 	var party: Array[Guest] = game.seating.spawn_group([0, 1])
-	var next: Guest = game.seating.spawn_guest(5)
+	var next: Guest = _spawn_joining(5)   # the line is not empty: pin its roll to "joins"
 	_run(14.0)
 	assert_eq(party[0].table, t[0], "the lead tile")
 	assert_eq(next.state, "queue", "nobody else sits at either tile")
