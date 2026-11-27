@@ -96,6 +96,8 @@ func _plan_orders(party: Array[Guest]) -> Dictionary:
 		g.planned = plan.orders[k]
 		if plan.walk:
 			continue   # they think it at the board (read_board)
+		if plan.get("went_along", []).has(k):
+			g.mood.think(Menu.GO_ALONG_THOUGHT)
 		if plan.found_nothing.has(k):   # stays with the group, with a drink or nothing
 			g.orders_nothing = Menu.COURSES.all(func(c: String) -> bool: return (g.planned.get(c, {}) as Dictionary).is_empty())
 			g.mood.think(Menu.NOTHING_THOUGHT)
