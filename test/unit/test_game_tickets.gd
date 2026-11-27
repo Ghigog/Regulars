@@ -214,7 +214,7 @@ func test_pouring_into_the_top_band_is_good_and_overflowing_is_bad():
 
 func test_fries_rest_on_the_rack_before_they_can_be_picked_up():
 	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
-	game.cooking.use_station(game.menu_stock.storage_of("potato"))
+	game.player.set_held("prep:potato", Prep.PLAIN)
 	assert_eq(game.cooking.use_station(fryer), "Fry")
 	_run(Prep.FRY_GOOD + 0.5)
 	assert_eq(game.cooking.use_station(fryer), "Lift basket")
@@ -223,18 +223,18 @@ func test_fries_rest_on_the_rack_before_they_can_be_picked_up():
 	assert_eq(game.cooking.use_station(fryer, true), "Still draining")
 	_run(Prep.FRY_REST + 0.1)
 	assert_eq(game.cooking.use_station(fryer), "Pick up")
-	assert_eq(game.player.held, "prep:potato")
+	assert_eq(game.player.held, "prep:fries")
 	assert_eq(game.player.held_quality, Prep.GOOD)
 
 
 
 func test_fries_left_in_burn_and_slow_the_chef():
 	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
-	game.cooking.use_station(game.menu_stock.storage_of("potato"))
+	game.player.set_held("prep:potato", Prep.PLAIN)
 	game.cooking.use_station(fryer)
 	_run(Prep.heat_times("fry", fryer.q("fry"))[3] + 0.5)   # a fryer is a specialist: slower to burn
 	game.cooking.use_station(fryer)
-	assert_eq(game.player.held, "burnt:potato")
+	assert_eq(game.player.held, "burnt:fries")
 	game.floor_dirt.mess.dirt.clear()   # a bad fry may drop grease, which slows the chef too (PRD 9)
 	assert_almost_eq(game.player.speed(), Player.SPEED * Prep.PENALTY_SPEED, 0.01)
 
@@ -315,3 +315,28 @@ func test_a_partly_served_guest_s_rail_card_fades_the_served_item():
 	var rows := card.get_child(0).get_children().filter(func(n): return n is HBoxContainer)
 	assert_lt(rows[1].modulate.a, 1.0, "the served main fades")
 	assert_eq(rows[2].modulate.a, 1.0, "the missing drink stays bright")
+
+
+func test_taking_a_potato_says_potato_and_a_whole_one_is_not_fried():
+	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
+	var sack: Station = game.menu_stock.storage_of("potato")
+	assert_eq(game.cooking.use_station(sack, true), "Take potato")
+	game.cooking.use_station(sack)
+	assert_eq(game.player.held, "raw:potato")
+	assert_eq(game.cooking.use_station(fryer), "Chop the potato first")
+	assert_eq(game.player.held, "raw:potato", "kept in hand")
+
+
+func test_a_potato_is_chopped_on_the_board_then_fried_into_fries():
+	var fryer := _tool("fryer", Vector2i(2, 5), "crate_potato")
+	var board := _tool("board", Vector2i(5, 5), "crate_potato")
+	game.cooking.use_station(game.menu_stock.storage_of("potato"))
+	assert_eq(game.cooking.use_station(board), "Chop")
+	_chop(Prep.CHOP_SWEEPS)
+	assert_eq(game.player.held, "prep:potato")
+	assert_eq(game.cooking.use_station(fryer), "Fry")
+	_run(Prep.FRY_GOOD + 0.5)
+	game.cooking.use_station(fryer)
+	_run(Prep.FRY_REST + 0.1)
+	game.cooking.use_station(fryer)
+	assert_eq(game.player.held, "prep:fries")

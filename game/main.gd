@@ -12,7 +12,7 @@ const FIXED_MAIN := {
 }
 ## What the prep demos use for each tool, per theme.
 const DEMO_PREP := {
-	"diner": {"fry": "potato", "boil": "corn", "chop": "tomato", "slice": "cheese", "pour": "soda"},
+	"diner": {"fry": "fries", "boil": "corn", "chop": "tomato", "slice": "cheese", "pour": "soda"},
 	"seaside": {"fry": "calamari", "boil": "new_potato", "chop": "courgette", "slice": "lemon", "pour": "wine"},
 }
 ## PRD 8.6: what the new jobs' demos make, per theme (the kind made; its source is held).

@@ -129,7 +129,7 @@ const ITEMS := {
 	"stove": {"name": "Hob", "price": 50, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "grill",
 		"blurb": "Grills, fries and boils in its one pan. Upgrade it in hand to focus on one job"},
 	"fryer": {"name": "Fryer", "price": 70, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "fry",
-		"blurb": "Fries potatoes and calamari"},
+		"blurb": "Fries cut potatoes and calamari"},
 	"pot": {"name": "Stock pot", "price": 60, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "boil",
 		"blurb": "Boils corn, potatoes and beans"},
 	"board": {"name": "Chopping board", "price": 25, "level": 1, "category": "Kitchen", "tiers": 1, "tool_of": "chop",

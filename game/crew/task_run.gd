@@ -264,7 +264,8 @@ func _work(h: Helper, s: Dictionary) -> float:
 			elif h.held != raw or st.item != "" or st.prep_by >= 0:
 				return -1.0
 			if not s.get("in_place", false):
-				st.set_item(raw)
+				# A heat tool cooks the made kind (raw potato goes in as raw fries); a press tool turns its held stock.
+				st.set_item(Tray.kind("raw", s.kind) if st.is_heat_tool() else raw)
 				h.set_held("")
 			h.punch()
 			st.used()
@@ -352,7 +353,7 @@ func _poll(h: Helper, s: Dictionary) -> String:
 			if st.is_heat_tool():
 				if st.item == Tray.kind("prep", s.kind):
 					return "now"
-				return "" if st.item == raw else "fail"
+				return "" if st.item in [raw, Tray.kind("raw", s.kind)] else "fail"
 			return "" if st.item == raw and st.prep_by == Crew.HELPER_PREP else "fail"
 		"help":
 			return "wait" if crew.game.floor_dirt.helping(h) != null else ""

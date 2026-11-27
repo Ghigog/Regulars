@@ -42,7 +42,7 @@ func _menu_items() -> Array:
 	var m := Menu.new()
 	m.add("main", ["bun", "patty"])
 	m.add("main", ["lettuce", "tomato"])
-	m.add("side", ["potato"])
+	m.add("side", ["fries"])
 	m.add("side", ["corn"])
 	m.add("drink", ["soda"])
 	return m.items
@@ -71,6 +71,6 @@ func _sum_parts(t: Town, i: int) -> float:
 func _burger_menu() -> Array:
 	var m := Menu.new()
 	m.add("main", ["bun", "patty"], "Burger")
-	m.add("side", ["potato"], "Fries")
+	m.add("side", ["fries"], "Fries")
 	m.add("drink", ["soda"], "Soda")
 	return m.items

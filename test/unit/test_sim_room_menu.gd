@@ -437,7 +437,7 @@ func test_course_rules():
 func test_new_item_gets_a_default_name():
 	var m := Menu.new()
 	assert_eq(m.add("main", ["bun", "patty", "cheese"]).name, "Cheese Patty Bun")
-	assert_eq(m.add("side", ["potato"]).name, "Fries")
+	assert_eq(m.add("side", ["fries"]).name, "Fries")
 	var it := m.add("main", ["patty"], "   ")
 	assert_eq(it.name, "Patty")
 	m.rename(it.id, "A very long name for a burger indeed")
@@ -506,8 +506,8 @@ func test_side_and_drink_need_a_liked_ingredient():
 		var o := Menu.order(items, [], [], rng)
 		assert_true(o.side.is_empty() and o.drink.is_empty(), "neutral sides and drinks are not added")
 	for k in 50:
-		var o := Menu.order(items, ["potato", "soda"], [], rng)
-		assert_eq(o.side.ingredients, ["potato"])
+		var o := Menu.order(items, ["fries", "soda"], [], rng)
+		assert_eq(o.side.ingredients, ["fries"])
 		assert_eq(o.drink.ingredients, ["soda"])
 
 
@@ -599,7 +599,7 @@ func test_order_counts_survive_a_rename():
 	var t := Town.new(1)
 	var m := Menu.new()
 	var a := m.add("main", ["bun", "patty"], "Burger")
-	var b := m.add("side", ["potato"], "Fries")
+	var b := m.add("side", ["fries"], "Fries")
 	t.record_order(0, a.id)
 	t.record_order(0, b.id)
 	t.record_order(0, a.id)
