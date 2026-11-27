@@ -252,11 +252,17 @@ func clean_target(ch: Player) -> Variant:
 	return null
 
 
-## Holding a tool with dirt straight ahead: cleaning it comes before any piece in reach
-## (so mopping beside the bucket does not put the mop away).
+## Dirt that comes before any piece in reach: dirt straight ahead with a tool in hand (so
+## mopping beside the bucket does not put the mop away), or dirt underfoot (nothing dirtier
+## ahead) with a tool in hand or bare hands that can scrub (so a cell wedged between the
+## fridge and the bin can be cleaned).
 func floor_first(ch: Player) -> bool:
 	var c: Variant = clean_target(ch)
-	return holding(ch) and c != null and c == ch.cell() + ch.facing
+	if c == null:
+		return false
+	if c == ch.cell():
+		return holding(ch) or can_scrub(ch)
+	return holding(ch)
 
 
 ## Where a tool in hand would be put down: the free floor cell in front. Null for none.
