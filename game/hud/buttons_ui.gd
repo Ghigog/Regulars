@@ -10,7 +10,7 @@ extends RefCounted
 const HOLD := ["use", "aim", "reach"]   ## held by a finger, not pressed once
 const ORDER := ["use", "aim", "reach", "turn", "sell", "shop", "menu", "back", "options"]
 const ICONS := {"use": "use", "aim": "aim", "reach": "reach", "turn": "turn", "sell": "sell", "shop": "shop",
-	"menu": "dishes", "back": "back", "options": "cog"}
+	"menu": "flyer", "back": "back", "options": "cog"}
 
 var hud
 var game: Game

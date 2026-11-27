@@ -262,7 +262,7 @@ static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Ar
 			for sp: Array in spans:
 				_finish_panel(holder, f, stops[i], stops[i + 1], sp[0], sp[1], 0.006)
 	if dining:
-		_wainscot(holder, plan, axis, line, from, to)
+		_wainscot(holder, plan, axis, line, from, to, r0, r1)
 		for c in windows:
 			_window(holder, c)
 		# Sconces near each end of a back wall, where nothing is in the way.
@@ -277,7 +277,10 @@ static func _tall_run(root: Node3D, plan: Floorplan, run: Dictionary, lights: Ar
 
 
 ## Painted lower wall along the dining stretches of a tall run, broken at openings.
-static func _wainscot(holder: Node3D, plan: Floorplan, axis: int, line: int, from: int, to: int) -> void:
+## A stretch that ends where a knee-high wall meets the run stops at that wall's
+## room face (r0, r1 are the run's end reaches) instead of sinking into it.
+static func _wainscot(holder: Node3D, plan: Floorplan, axis: int, line: int, from: int, to: int, r0: Array, r1: Array) -> void:
+	var dir := 1.0 if axis == 0 else -1.0   # local x per world k
 	var k := from
 	while k < to:
 		var j := k
@@ -288,6 +291,10 @@ static func _wainscot(holder: Node3D, plan: Floorplan, axis: int, line: int, fro
 			continue
 		var x0 := _lx(axis, k)
 		var x1 := _lx(axis, j)
+		if k == from and r0[1] and is_equal_approx(r0[0], WALL_T / 2):
+			x0 += dir * WALL_T / 2
+		if j == to and r1[1] and is_equal_approx(r1[0], WALL_T / 2):
+			x1 -= dir * WALL_T / 2
 		var mid := (x0 + x1) / 2
 		var span := absf(x1 - x0)
 		if seaside():   # painted clapboard: seafoam and white boards

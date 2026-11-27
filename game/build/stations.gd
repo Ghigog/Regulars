@@ -468,7 +468,7 @@ static func wall_piece(n: Node3D, node: String, drop := 0.0) -> void:
 			var planks := 2 if node == "wide_shelf" else 1
 			for i in planks:
 				var y := y0 + 0.12 + i * 0.44
-				Build.box(n, Vector3(0, y, back + 0.15), Vector3(0.94, 0.05, 0.3), Build.WOOD, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(0, y, back + 0.3), Vector3(0.94, 0.05, 0.6), Build.WOOD, 0.0, Build.R_WOOD)
 				for sx: float in [-0.36, 0.36]:   # brass brackets under each plank
 					Build.box(n, Vector3(sx, y - 0.16, back + 0.04), Vector3(0.04, 0.16, 0.08), "#d9a441", 0.0, Build.R_WOOD)
 				# Jars on the plank: the jar shelf of sheet 1.
@@ -478,11 +478,6 @@ static func wall_piece(n: Node3D, node: String, drop := 0.0) -> void:
 					var tall := 0.18 + 0.05 * ((i + j) % 2)
 					Build.cyl(n, Vector3(jx, y + 0.05, back + 0.15), 0.08, tall, jars[(i + j) % jars.size()], 0.0, Build.R_GLOSS)
 					Build.cyl(n, Vector3(jx, y + 0.05 + tall, back + 0.15), 0.065, 0.04, Build.WOOD_DARK)
-		"hook":
-			# A wooden plate on the wall with a brass hook bent up off it (PRD 9.4).
-			Build.box(n, Vector3(0, y0 + 0.08, back + 0.03), Vector3(0.3, 0.36, 0.05), Build.WOOD, 0.0, Build.R_WOOD)
-			Build.box(n, Vector3(0, y0 + 0.02, back + 0.12), Vector3(0.05, 0.05, 0.16), "#d9a441", 0.0, Build.R_WOOD)
-			Build.box(n, Vector3(0, y0 + 0.07, back + 0.19), Vector3(0.05, 0.12, 0.04), "#d9a441", 0.0, Build.R_WOOD)
 		"hood", "extractor":
 			# A sloped steel-blue canopy over the stove (sheet 1), a square frustum squashed
 			# to the wall's depth, with a duct up to the top of the wall. The extractor

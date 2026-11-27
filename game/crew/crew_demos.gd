@@ -199,14 +199,14 @@ func staff_only() -> void:
 			for y in range(r.position.y, r.end.y):
 				if crew.game.plan.has_floor(Vector2i(x, y)):
 					crew.game.treat_laid[Vector2i(x, y)] = k
-	# The cleaning trees: a flat mop's bucket; a scourer, a grease scraper and a spill kit on hooks.
+	# The cleaning trees: a flat mop's bucket; a scourer, a grease scraper and a spill kit on shelves and in a cabinet.
 	var bucket: Station = crew.game.world.add_station("flat_mop", Vector2i(8, 6))
 	crew.game.clean_kit.on_built(bucket, "flat_mop")
-	var hooks := 0
+	var shelved := 0
 	for c: Vector2i in crew.game.kitchen.wall_cells:
-		if hooks < 3 and not crew.game.highs.has(c) and crew.game.kitchen.can_hang(c, "hook"):
-			crew.game.clean_kit.keep(crew.game.world.add_high("hook", c), ["scourer", "grease_scraper", "spill_kit"][hooks], 0)
-			hooks += 1
+		if shelved < 3 and not crew.game.highs.has(c) and not crew.game.kitchen.holds_food(c) and crew.game.kitchen.can_hang(c, "shelf"):
+			crew.game.clean_kit.shelve(c, ["scourer", "grease_scraper", "spill_kit"][shelved], "cabinet" if shelved == 2 else "shelf")
+			shelved += 1
 	for c: Vector2i in [Vector2i(5, 6), Vector2i(7, 6)]:
 		if not crew.game.stations.has(c):
 			crew.game.world.add_station("desk", c)
