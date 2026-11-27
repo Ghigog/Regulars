@@ -122,6 +122,16 @@ static func _tint(col: String, amount := 0.08) -> String:
 	return Color(col).lightened(amount).to_html(false)
 
 
+## The white of a fridge body, door and tall fridge alike.
+const FRIDGE_WHITE := "#eef3f4"
+
+
+## A counter-based piece whose base is a fridge (marked by `_station_body`) has the
+## white fridge body on every side in place of the teal cabinet: one place decides it.
+static func _is_fridge_body(n: Node3D, body: String) -> bool:
+	return body == Build.CABINET and n.has_meta("fridge_base")
+
+
 ## A 0.9 m counter: darker toe-kick, body with two doors and brass handles on the
 ## front (+z), bevelled worktop. Everything that takes a carried item sits flush.
 ## A node marked "bare" (a shop preview of a counter-top piece) gets no plain counter
@@ -129,8 +139,13 @@ static func _tint(col: String, amount := 0.08) -> String:
 static func _counter(n: Node3D, body: String, top: String, doors := true, kick := "") -> void:
 	if n.has_meta("bare") and body != Build.STEEL:
 		return
+	var fridge := _is_fridge_body(n, body)
 	Build.box(n, Vector3.ZERO, Vector3(0.9, 0.15, 0.9), _shade(body) if kick == "" else kick)
-	Build.box(n, Vector3(0, 0.12, 0), Vector3(0.94, 0.7, 0.94), body)
+	if fridge:
+		Build.box(n, Vector3(0, 0.12, 0), Vector3(0.94, 0.7, 0.94), FRIDGE_WHITE, 0.0, Build.R_GLOSS)
+		doors = false   # the fridge's own door (_base_marks) is the front
+	else:
+		Build.box(n, Vector3(0, 0.12, 0), Vector3(0.94, 0.7, 0.94), body)
 	Build.box(n, Vector3(0, 0.77, 0), Vector3(1.0, 0.13, 1.0), top, 0.0, Build.R_WOOD)  # a thick slab of worktop
 	if doors:
 		for sx: float in [-1.0, 1.0]:
@@ -312,11 +327,22 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 		"ready":
 			if not as_box:
 				_counter(n, Build.STEEL, Build.WORKTOP)
-			Build.box(n, Vector3(0, 0.9, 0), Vector3(0.7, 0.14, 0.6), "#c9d0d1", 0.0, Build.R_WOOD)
-			var at := Node3D.new()
-			at.position = Vector3(0, 0.99, 0)
-			n.add_child(at)
-			BuildFood.ingredient(at, id, "prep")
+			# An open steel tub: a shallow floor, four thin walls, a paler rim, and a heap of the
+			# prepped food inside, framed by the rim but tall enough to show over the near wall.
+			Build.box(n, Vector3(0, 0.9, 0), Vector3(0.7, 0.03, 0.6), Build.STEEL_DARK, 0.0, Build.R_WOOD)
+			for sx: float in [-1.0, 1.0]:
+				Build.box(n, Vector3(sx * 0.33, 0.9, 0), Vector3(0.04, 0.17, 0.6), Build.STEEL, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(sx * 0.33, 1.07, 0), Vector3(0.05, 0.02, 0.62), "#e6ecec", 0.0, Build.R_WOOD)
+			for sz: float in [-1.0, 1.0]:
+				Build.box(n, Vector3(0, 0.9, sz * 0.28), Vector3(0.62, 0.17, 0.04), Build.STEEL, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(0, 1.07, sz * 0.28), Vector3(0.62, 0.02, 0.05), "#e6ecec", 0.0, Build.R_WOOD)
+			for k in 5:
+				var at := Node3D.new()
+				at.position = Vector3(-0.2 + (k % 3) * 0.2 - (k / 3) * 0.1, 0.93 + (k % 2) * 0.06 + (k / 3) * 0.05, -0.13 + (k % 2) * 0.1 + (k / 3) * 0.2)
+				at.rotation.y = k * 1.3
+				at.scale = Vector3.ONE * 0.8
+				n.add_child(at)
+				BuildFood.ingredient(at, id, "prep")
 			Build.box(n, Vector3(0.3, 0.6, 0.48), Vector3(0.2, 0.2, 0.02), Build.GOOD)
 		_:
 			if not as_box:
@@ -340,10 +366,13 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 ## in the next piece's body, so only an end of the run, or a turned piece, shows them.
 static func _pass(n: Node3D, front := false) -> void:
 	Build.box(n, Vector3.ZERO, Vector3(0.9, 0.15, 1.04), _shade(Build.CABINET))
-	if front:
+	if front and not _is_fridge_body(n, Build.CABINET):
 		Build.box(n, Vector3(0, 0.2, 0.545), Vector3(0.7, 0.5, 0.03), _tint(Build.CABINET, 0.07))
 		Build.box(n, Vector3(0, 0.5, 0.565), Vector3(0.3, 0.035, 0.03), "#d9a441", 0.0, Build.R_WOOD)
-	Build._add(n, Build.bevel_mesh(Vector3(0.94, 0.7, 1.08), 0.03), Vector3(0, 0.47, 0), Color(Build.CABINET), 0.0)
+	if _is_fridge_body(n, Build.CABINET):
+		Build._add(n, Build.bevel_mesh(Vector3(0.94, 0.7, 1.08), 0.03), Vector3(0, 0.47, 0), Color(FRIDGE_WHITE), 0.0, Build.R_GLOSS)
+	else:
+		Build._add(n, Build.bevel_mesh(Vector3(0.94, 0.7, 1.08), 0.03), Vector3(0, 0.47, 0), Color(Build.CABINET), 0.0)
 	Build._add(n, Build.bevel_mesh(Vector3(1.0, 0.13, 1.1), 0.03), Vector3(0, 0.835, 0), Color(Build.WORKTOP), 0.0, Build.R_WOOD)
 
 
@@ -409,6 +438,9 @@ static func _base_marks(n: Node3D, base: String, dz := 0.0) -> void:
 		"fridge":
 			# A cold dark inside, seen when the door (hinged on the left) swings open.
 			Build.box(n, Vector3(0, 0.15, 0.455 + dz), Vector3(0.84, 0.58, 0.02), "#2b4a52")
+			# A thin grey seam round the white door, so it reads against the white body.
+			for e: Array in [[0.0, 0.75, 0.94, 0.02], [0.0, 0.11, 0.94, 0.02], [-0.46, 0.11, 0.02, 0.66], [0.46, 0.11, 0.02, 0.66]]:
+				Build.box(n, Vector3(e[0], e[1], 0.47 + dz), Vector3(e[2], e[3], 0.02), "#c9d0d1")
 			var door := hinge(n, Vector3(-0.45, 0.0, 0.47 + dz))
 			Build.box(door, Vector3(0.45, 0.13, 0), Vector3(0.9, 0.62, 0.04), "#eef3f4", 0.0, Build.R_GLOSS)
 			Build.box(door, Vector3(0.45, 0.66, 0.03), Vector3(0.6, 0.045, 0.04), "#c9d0d1", 0.0, Build.R_WOOD)
