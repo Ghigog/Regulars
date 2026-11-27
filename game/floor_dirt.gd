@@ -152,14 +152,15 @@ func disgust(g: Guest, delta: float, reach: int) -> bool:
 	if mess.dirt.is_empty():
 		return false
 	var noticed := false
-	var capped := mess.capped_disgust(g.cell, seen_from(g.cell, reach))
+	var visible := seen_from(g.cell, reach)
+	var capped := mess.capped_disgust(g.cell, visible)
 	var sight: float = capped.sight
 	var smell: float = capped.smell
 	if sight > 0.0:
 		g.mood.see_gross(sight, delta, "Look at the state of the floor")
 		noticed = sight >= GuestMood.NOTICE
 		if noticed:
-			g.note_disgust(seen_from(g.cell, reach)[0], "mess")
+			g.note_disgust(_worst_of(visible), "mess")
 	if smell > 0.0:
 		g.mood.see_gross(smell, delta, "What is that smell?")
 		if smell >= GuestMood.NOTICE:
@@ -168,6 +169,18 @@ func disgust(g: Guest, delta: float, reach: int) -> bool:
 	if noticed and g == game.critic_guest:
 		g.mood.think(Critic.thought("gross"))
 	return noticed
+
+
+## The visible dirty cell that adds the most disgust.
+func _worst_of(visible: Array) -> Vector2i:
+	var best: Vector2i = visible[0]
+	var top := -1.0
+	for c: Vector2i in visible:
+		var d := FloorMess.sight_disgust_of(mess.level(c)) * Treatments.shows(mess.treat.get(c, ""))
+		if d > top:
+			top = d
+			best = c
+	return best
 
 
 # ---------------------------------------------------------------- slipping (9.3)

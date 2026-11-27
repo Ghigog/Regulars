@@ -28,9 +28,11 @@ const SIGHT_RANGE := 7
 const DEMO_BILL := 12   # a bill for the receipt demos
 ## Disgust sources: [starting rate per second, seconds to double, top rate]. See
 ## GuestMood.gross_rate. A plate and burning food age from when they appeared; the bin
-## and carried rubbish age from when each guest first had them in view.
+## and carried rubbish age from when each guest first had them in view (and start again
+## once it has been out of view). A dirty plate, on a table or carried to the sink, is mild
+## clutter: flat at a level-1 floor cell's rate, under GuestMood.NOTICE, and never ramping.
 const GROSS := {
-	"plate": [0.002, 20.0, 0.06],
+	"plate": [0.0002, 1.0, 0.0002],
 	"burning": [0.01, 5.0, 0.06],
 	"bin": [0.004, 25.0, 0.02],
 	"sink": [0.003, 20.0, 0.04],
