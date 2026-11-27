@@ -41,6 +41,8 @@ func in_bounds(c: Vector2i) -> bool:
 ## From `pavement_from` on (the kerb tile and the road) a chef cannot stand. Guests
 ## are not held to this; they use `is_blocked` alone.
 var pavement_from := 1 << 30   # the first column a chef cannot stand in
+var roam := {}      # Vector2i -> true: `outside` cells a chef may stand on at night
+var roaming := false   # true in the build phase: chefs walk the `roam` cells
 
 
 func is_blocked(c: Vector2i) -> bool:
@@ -49,7 +51,11 @@ func is_blocked(c: Vector2i) -> bool:
 
 ## Like `is_blocked`, for a chef: also the kerb tile and beyond.
 func chef_blocked(c: Vector2i) -> bool:
-	return is_blocked(c) or c.x >= pavement_from
+	if c.x >= pavement_from:
+		return true
+	if roaming and roam.has(c):
+		return not in_bounds(c) or blocked.has(c)
+	return is_blocked(c)
 
 
 func edge_open(a: Vector2i, b: Vector2i) -> bool:
