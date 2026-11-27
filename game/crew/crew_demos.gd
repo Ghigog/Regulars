@@ -47,6 +47,36 @@ func demo(which: String) -> void:
 	crew.game.arrivals.assign([{"time": t + 0.5, "group": [0, 1]}, {"time": t + 2.0, "group": [4]}, {"time": t + 5.0, "group": [6, 7]}])
 
 
+## REGULARS_DEMO=helpers_home (T-123): the day has just ended. A washer is still at the sink
+## finishing the dishes; a server stands at the desk with their bag, about to walk out.
+## Shoot at about 2.
+func demo_home() -> void:
+	var g: Game = crew.game
+	for c: Vector2i in [Vector2i(8, 6), Vector2i(9, 6)]:
+		if not g.stations.has(c):
+			g.world.add_station("desk", c)
+	var sink: Station = g.world.find_station("sink")
+	if g.world.find_station("dish_rack") == null:
+		g.world.add_station("dish_rack", sink.cell + Vector2i(0, 1))
+	sink.dirty = 4
+	sink.refresh()
+	g.arrivals.assign([{"time": 99999.0, "idx": 13}])
+	demo_hire(9, "Washer", ["wash_up", "empty_bin", "clear_tables", "mop"], sink.cell + Vector2i(1, 0))
+	var server := demo_hire(5, "Server", ["take_orders", "carry_trays"], Vector2i(8, 5))
+	for i in 40:   # the washer is at work before the day ends
+		g.step(0.1)
+	g.arrivals.clear()
+	g.day._end_day()
+	g.session.open_build()   # past the receipt, into the night
+	server.position = Grid.center(Vector2i(8, 5))
+	server.path.clear()
+	server.stand = Vector2i(8, 5)
+	server.look_at_cell(Vector2i(8, 6))
+	server.home_stage = "collect"
+	server.collect_left = 99.0
+	server.take_bag()
+
+
 ## PRD 11.4's demo: one server hired with `duties`, standing at `at`.
 func demo_hire(person: int, post: String, duties: Array, at: Vector2i) -> Helper:
 	var pid: int = crew.game.staff.add_post(post, duties, 0, 0, 99)

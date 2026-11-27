@@ -19,6 +19,11 @@ var idle := 0.0              # seconds with nothing to do
 var resting := false         # on a break (or with nothing to do and nowhere to wait)
 var chatting := false
 var bubble: Node3D
+var going_home := false      # the day is over: they finish any cleaning, collect their things and leave
+var home_stage := ""         # "", "collect" (at the desk), "out" (walking to the exit)
+var collect_left := 0.0      # seconds left at the desk collecting their things
+var desk := Vector2i(-999, -999)   # the desk they face while collecting
+var bag: MeshInstance3D      # their things, in hand once collected
 
 
 func setup_helper(game_, person_: int, start: Vector2i) -> void:
@@ -42,6 +47,14 @@ static func _apron(peg: Peg) -> void:
 	Peg._band_on(peg, 0.33, 0.242, 0.04, Build.CORAL)
 	var bib := Build.box(peg, Vector3(0, 0.42, 0.19), Vector3(0.2, 0.14, 0.04), Build.CHEF_WHITE)
 	bib.rotation.x = -0.35
+
+
+## Their things, a small bag in their own colour, held at the side.
+func take_bag() -> void:
+	if bag != null:
+		return
+	var outfit: String = Peg.look_for(str(game.town.people[person].name)).get("outfit", "cream")
+	bag = Build.box(_body, Vector3(0.2, 0.3, 0.3), Vector3(0.2, 0.22, 0.12), Peg.OUTFITS.get(outfit, Build.CORAL))
 
 
 ## A helper's own pace: their rating, slowed by the floor under them.
