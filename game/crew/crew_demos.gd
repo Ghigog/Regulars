@@ -136,7 +136,7 @@ const STAFF_ROOM := {
 const STAFF_MENU := {
 	"diner": [["main", ["bun", "patty", "cheese", "lettuce", "onion"], "Burger"],
 		["main", ["sourdough", "shredded_cheese", "tomato"], "Deli melt"],
-		["side", ["potato"], "Fries"], ["side", ["steamed_corn"], "Steamed corn"],
+		["side", ["fries"], "Fries"], ["side", ["steamed_corn"], "Steamed corn"],
 		["side", ["corn"], "Corn cob"], ["side", ["ice_cream"], "Ice cream"],
 		["drink", ["soda"], "Soda"], ["drink", ["cola"], "Cola"],
 		["drink", ["orange_juice"], "Orange juice"], ["drink", ["milkshake"], "Milkshake"]],

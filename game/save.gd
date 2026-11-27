@@ -182,7 +182,37 @@ static func lot_of(d: Dictionary) -> Lot:
 	return Lot.from_dict(d.get("lot", {}))
 
 
+## Before potatoes were chopped, "potato" meant the fried side: it is "fries" now (idempotent).
+## Menu ingredients and the town's likes, dislikes and orders are renamed; box ids stay as they are.
+static func _potato_to_fries(d: Dictionary) -> void:
+	for it: Dictionary in d.menu.get("items", []):
+		it["ingredients"] = _renamed(it.get("ingredients", []))
+	for p: Dictionary in d.town.get("people", []):
+		for k: String in ["likes", "dislikes", "orders"]:
+			if p.has(k):
+				p[k] = _renamed(p[k])
+
+
+static func _renamed(v: Variant) -> Variant:
+	if v is String:
+		return "fries" if v == "potato" else v
+	if v is Array:
+		var out: Array = []
+		for e: Variant in v:
+			var r: Variant = _renamed(e)
+			if not out.has(r) or not e is String:
+				out.append(r)
+		return out
+	if v is Dictionary:
+		var out := {}
+		for k: Variant in v:
+			out[_renamed(k)] = _renamed(v[k])
+		return out
+	return v
+
+
 static func restore_world(g: Node3D, d: Dictionary) -> void:
+	_potato_to_fries(d)
 	_put(g.ledger, LEDGER, d.ledger)
 	_put(g.menu, MENU, d.menu)
 	_put(g.staff, STAFF, d.staff)

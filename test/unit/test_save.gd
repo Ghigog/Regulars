@@ -282,3 +282,27 @@ func test_a_save_from_before_the_warning_key_still_gives_a_headline():
 	for p: Dictionary in old.town.people:
 		assert_true(p.has("warning"))
 	assert_true(old.town.headline() is String)
+
+
+func test_an_old_save_with_potato_fries_loads_as_fries():
+	var fries: Dictionary = game.menu.add("side", ["fries"], "Fries")
+	var cheesy: Dictionary = game.menu.add("side", ["fries", "cheese"], "Cheesy Fries")
+	var data := SaveGame.capture(game)
+	for it: Dictionary in data.menu.items:
+		if it.id in [fries.id, cheesy.id]:
+			it.ingredients = it.ingredients.map(func(i: String) -> String: return "potato" if i == "fries" else i)
+	data.town.people[0].likes = ["potato"]
+	data.town.people[0].dislikes = ["potato", "soda"]
+	var other = load("res://game/main.tscn").instantiate()
+	other._resume_data = data
+	add_child_autofree(other)
+	other.set_process(false)
+	var names := {}
+	for it: Dictionary in other.menu.items:
+		names[it.name] = it.ingredients
+	assert_eq(names["Fries"], ["fries"])
+	assert_eq(names["Cheesy Fries"], ["fries", "cheese"])
+	assert_eq(other.menu.items.size(), game.menu.items.size())
+	assert_eq(other.town.people[0].likes, ["fries"])
+	assert_eq(other.town.people[0].dislikes, ["fries", "soda"])
+	assert_eq(other.town.people.size(), game.town.people.size())

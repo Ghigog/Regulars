@@ -13,7 +13,7 @@ func _init(game_: Game) -> void:
 ## The starting hob with fries part-way cooked in its own pan (hob_fry; shoot at about 3).
 func _demo_hob_fry() -> void:
 	var hob: Station = game.world.find_station("stove")
-	hob.set_item("raw:potato")
+	hob.set_item("raw:fries")
 	hob.cook = 3.8
 	hob._update_cooking_visuals()
 	game.player.position = Grid.center(Vector2i(1, 3))
@@ -230,8 +230,8 @@ func _demo_menu(demo: String) -> void:
 	game.world.add_station("fountain", Vector2i(1, 2))
 	var cheese := game.menu.add("main", ["bun", "patty", "cheese"], "Cheeseburger", "dear")
 	game.menu.add("main", ["bun", "patty", "cheese", "patty", "cheese"], "Double Stack", "dear")
-	game.menu.add("side", ["potato"], "Fries", "cheap")
-	game.menu.add("side", ["potato", "cheese"], "Cheesy Fries")
+	game.menu.add("side", ["fries"], "Fries", "cheap")
+	game.menu.add("side", ["fries", "cheese"], "Cheesy Fries")
 	game.menu.add("side", ["onion"], "Onion Rings")
 	game.menu.add("drink", ["soda"], "Soda", "cheap")
 	game.menu_stock.menu_changed()

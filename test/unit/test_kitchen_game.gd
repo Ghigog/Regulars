@@ -429,7 +429,7 @@ func test_a_hob_fries_in_its_own_pan_and_never_becomes_a_fryer():
 	var stove: Station = game.world.add_station("stove", Vector2i(2, 5))
 	assert_has(game.menu_stock.kitchen_tools(), "fry")
 	assert_has(game.menu_stock.kitchen_tools(), "boil")
-	game.cooking.use_station(game.menu_stock.storage_of("potato"))
+	game.player.set_held("prep:potato", Prep.PLAIN)
 	assert_eq(game.cooking.use_station(stove), "Fry")
 	assert_eq(stove.mode(), "stove", "a hob frying is still a hob")
 	assert_eq(stove.heat, "fry")
@@ -438,10 +438,19 @@ func test_a_hob_fries_in_its_own_pan_and_never_becomes_a_fryer():
 	assert_eq(stove._item_node.position.x, Build.PAN.x, "the fries sit in the pan")
 	assert_eq(stove._item_node.position.z, Build.PAN.z)
 	assert_eq(game.cooking.use_station(stove), "Take off the heat")
-	assert_eq(game.player.held, "prep:potato")
+	assert_eq(game.player.held, "prep:fries")
 	assert_eq(game.player.held_quality, Prep.GOOD, "good fries straight away")
 	assert_eq(stove.heat, "", "an empty hob is a hob again")
 	assert_eq(stove.mode(), "stove")
+
+
+func test_a_hob_refuses_a_whole_potato():
+	_game(false)
+	game.menu_stock.stock_box("potato", Vector2i(2, 6))
+	game.world.add_station("counter", Vector2i(2, 5))
+	var stove: Station = game.world.add_station("stove", Vector2i(2, 5))
+	game.cooking.use_station(game.menu_stock.storage_of("potato"))
+	assert_eq(game.cooking.use_station(stove, true), "Chop the potato first")
 
 
 func test_a_hob_refuses_what_it_cannot_cook():
@@ -450,7 +459,7 @@ func test_a_hob_refuses_what_it_cannot_cook():
 	var cg: Station = game.world.add_station("char_grill", Vector2i(2, 5))
 	game.menu_stock.stock_box("potato", Vector2i(2, 6))
 	game.cooking.use_station(game.menu_stock.storage_of("potato"))
-	assert_eq(game.cooking.use_station(cg, true), "Fries doesn't go on the hob")
+	assert_eq(game.cooking.use_station(cg, true), "Potato doesn't go on the hob")
 
 
 func test_an_auto_slicer_plays_itself():

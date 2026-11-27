@@ -315,7 +315,7 @@ func _apply_demo(demo: String) -> void:
 			for g in game.guests:
 				if g.seated_waiting():
 					var burger: int = game.menu.items[0].id
-					var fries := game.menu.add("side", ["potato"], "Fries")
+					var fries := game.menu.add("side", ["fries"], "Fries")
 					for k in 3:
 						game.town.record_order(g.idx, burger)
 					game.town.record_order(g.idx, int(fries.id))

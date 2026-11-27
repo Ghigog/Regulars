@@ -49,6 +49,22 @@ func _use_as(st: Station, held_ing: Dictionary) -> String:
 	return st.type
 
 
+## The raw kind a held cut ingredient fries into (cut potatoes: raw fries), else "".
+static func _fry_in(held_ing: Dictionary) -> String:
+	if held_ing.is_empty() or held_ing.state != "prep":
+		return ""
+	for k: String in Pantry.made_from(held_ing.id):
+		if Pantry.tool_of(k) == "fry":
+			return Tray.kind("raw", k)
+	return ""
+
+
+## A whole raw ingredient that must be cut before it can be fried (the potato).
+static func _is_whole_potato(held_ing: Dictionary) -> bool:
+	return not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "chop" \
+		and Pantry.made_from(held_ing.id).any(func(k: String) -> bool: return Pantry.tool_of(k) == "fry")
+
+
 ## The player uses the station they are facing. Returns the name of the action taken.
 ## With dry_run, nothing changes and only the name is returned. A refusal (a plate
 ## that is not finished, food nothing on the menu combines) is returned as its
@@ -161,11 +177,16 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 	match _use_as(st, held_ing):
 		"stove":
 			# A hob: every heat job it can do cooks in its one pan (grill, fry, boil).
+			var fry_in := _fry_in(held_ing)
 			var job := Pantry.tool_of(held_ing.id) if not held_ing.is_empty() else ""
-			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and HOB_VERBS.has(job) and st.q(job) > 0.0:
+			if fry_in != "":
+				job = "fry"
+			if st.item == "" and not held_ing.is_empty() and _is_whole_potato(held_ing) and st.q("fry") > 0.0:
+				why = "Chop the potato first"
+			elif st.item == "" and not held_ing.is_empty() and (fry_in != "" or held_ing.state == "raw") and HOB_VERBS.has(job) and st.q(job) > 0.0:
 				act = HOB_VERBS[job]
 				if not dry_run:
-					st.set_item(held)
+					st.set_item(fry_in if fry_in != "" else held)
 					st.set_meta("used_by", game.chefs.find(ch))
 					ch.set_held("")
 			elif held == "" and st.heat == "boil" and st.item.begins_with("raw"):
@@ -189,10 +210,12 @@ func _use_station(st: Station, dry_run := false, ch: Player = null) -> String:
 			elif not held_ing.is_empty() and game.chefs.size() > 1 and int(st.get_meta("used_by", -1)) not in [-1, game.chefs.find(ch)]:
 				why = "Chef %d has it" % (int(st.get_meta("used_by", 0)) + 1)   # co-op: the losing press says who won
 		"fryer":
-			if st.item == "" and not held_ing.is_empty() and held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "fry":
+			if st.item == "" and _is_whole_potato(held_ing):
+				why = "Chop the potato first"
+			elif st.item == "" and not held_ing.is_empty() and (_fry_in(held_ing) != "" or (held_ing.state == "raw" and Pantry.tool_of(held_ing.id) == "fry")):
 				act = "Fry"
 				if not dry_run:
-					st.set_item(held)
+					st.set_item(_fry_in(held_ing) if _fry_in(held_ing) != "" else held)
 					st.set_meta("used_by", game.chefs.find(ch))
 					ch.set_held("")
 			elif held == "" and st.on_rack():
