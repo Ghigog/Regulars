@@ -53,6 +53,18 @@ static func keeps_tool(st: Station) -> bool:
 func buy_upgrade(to: String, ch: Player = null) -> bool:
 	ch = game.shopper if ch == null and game.shopper != null else game._me(ch)
 	var from := hand_key(ch)
+	var spot: Vector3i = ch.hand.get("from", Vector3i(0, 0, -1))
+	var node: Variant = _buy(to, ch, from)
+	if node is bool:
+		return node
+	game.undo.record_upgraded(node if node is Station else null, from, to, Upgrades.step_price(to), spot)
+	return true
+
+
+## The buying itself. Returns false when nothing was bought; true when it was and there is
+## nothing to undo (a sponge turned into a mop bucket pays itself back); else the piece
+## that stands after the upgrade ("box" for a treatment's box).
+func _buy(to: String, ch: Player, from: String) -> Variant:
 	var link := Upgrades.is_link(to)   # a stove grown on a counter
 	if link and not (ch.hand.node is Station and (ch.hand.node as Station).item == ""):
 		game.audio.sfx("fail")
@@ -76,7 +88,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		game.menu_stock.menu_changed()
 		game.audio.sfx("coin")
 		game.hud.hints_ui.show_build()
-		return true
+		return grown
 	if link:
 		var under: Station = ch.hand.node
 		var cell := under.cell
@@ -88,7 +100,7 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		game.hud.day_ui.say("The counter is a %s now. Open it with E to upgrade it further." % Upgrades.name_of(to).to_lower())
 		game.menu_stock.menu_changed()
 		game.audio.sfx("coin")
-		return true
+		return top
 	if Upgrades.is_treatment(to):   # a box: it is the new treatment's now (PRD 9.5)
 		if ch.hand.get("in_place", false):   # still in its slot, upgraded from the card
 			var cell := Vector2i(ch.hand.from.x, ch.hand.from.y)
@@ -99,11 +111,16 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		_swap_treatment(Treatments.key_of(from), Treatments.key_of(to))
 		game.audio.sfx("coin")
 		game.hud.hints_ui.show_build()
-		return true
+		return "box"
 	var st: Station = ch.hand.node
 	if (Station.is_seat(st.type) or Station.is_table(st.type)) and Upgrades.catalog_id(to) != st.type:
-		_remake_seat(st, to, ch)   # a chair or table is its branch now: same cell, same facing
-		return true
+		var seat := _remake_seat(st, to, ch.hand.get("in_place", false), Upgrades.step_price(to))   # a chair or table is its branch now: same cell, same facing
+		ch.hand.node = seat
+		ch.hand.id = seat.type
+		ch.hand.tier = seat.tier
+		game.audio.sfx("coin")
+		game.hud.hints_ui.show_build()
+		return seat
 	if keeps_tool(st) and Kitchen.fit_of(to) == "floor":   # the sponge grows into a mop bucket
 		# The tool leaves the shelf, which stays; the bucket (with its mop) is a new piece in
 		# hand, paid for when it is put down on the floor.
@@ -143,11 +160,13 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 			st.set_base(to)   # a counter or fridge a step up: the same piece, redrawn
 			game.kitchen.set_cell(st.cell, to)
 		else:   # a stove or any other tool up its tree where it stands: made anew in place
-			_remake_in_place(st, to, ch)
+			var up := _remake_in_place(st, to)
+			ch.hand.node = up
+			ch.hand.id = up.type
 		game.world._show_boxes(st.cell)
 		game.menu_stock.menu_changed()
 		game.audio.sfx("coin")
-		return true
+		return ch.hand.node
 	if Upgrades.is_tiered(to):
 		st.tier = Upgrades.tier_of(to)
 		st.set_base(st.base)   # redraws it at the new tier
@@ -167,13 +186,13 @@ func buy_upgrade(to: String, ch: Player = null) -> bool:
 		ch.hand.id = up.type
 	game.audio.sfx("coin")
 	game.hud.hints_ui.show_build()
-	return true
+	return ch.hand.node
 
 
 ## A stove (its counter upgraded) bought up its tree where it stands, its card open: it
 ## may now work as another piece (a fryer), so a new one takes its place, its counter's
 ## boxes, the till and what was paid tonight with it, and the hand holds the new one.
-func _remake_in_place(st: Station, to: String, ch: Player) -> void:
+func _remake_in_place(st: Station, to: String) -> Station:
 	var held := game.kitchen.take_stock(st.cell)
 	game.world._unregister(st)
 	var up := Station.new()
@@ -188,14 +207,13 @@ func _remake_in_place(st: Station, to: String, ch: Player) -> void:
 	game.placing._bought_tonight(up, game.placing.spent_tonight(st))
 	game.clean_kit.upgrade_home(st, up, Kitchen.tool_of(to))   # a bucket's mop goes with it (PRD 9.5)
 	st.queue_free()
-	ch.hand.node = up
-	ch.hand.id = up.type
+	return up
 
 
 ## A chair or table bought into its branch (a booth seat, a fast table): the branch piece on the
-## same cell and facing, in hand or in place. A table keeps its dirty plates.
-func _remake_seat(st: Station, to: String, ch: Player) -> void:
-	var in_place: bool = ch.hand.get("in_place", false)
+## same cell and facing, in hand or in place. A table keeps its dirty plates. What was spent
+## on the piece tonight goes with it, `step` more (or less, undoing) for the step.
+func _remake_seat(st: Station, to: String, in_place: bool, step: int) -> Station:
 	if in_place:
 		game.world._unregister(st)
 	var up := Station.new()
@@ -208,13 +226,9 @@ func _remake_seat(st: Station, to: String, ch: Player) -> void:
 		up.dirty = st.dirty
 		up.dirty_cups = st.dirty_cups
 		up.refresh()
-	game.placing._bought_tonight(up, game.placing.spent_tonight(st) + Upgrades.step_price(to))
+	game.placing.set_spent_tonight(up, game.placing.spent_tonight(st) + step)
 	st.queue_free()
-	ch.hand.node = up
-	ch.hand.id = up.type
-	ch.hand.tier = up.tier
-	game.audio.sfx("coin")
-	game.hud.hints_ui.show_build()
+	return up
 
 
 ## A treatment's box upgraded: the cells laid with the old one are the new one's now.

@@ -477,6 +477,18 @@ static func icon(id: String) -> Array:
 			var way := Vector2(-sin(deg_to_rad(150)), cos(deg_to_rad(150)))   # the way round, counter-clockwise
 			var side := Vector2(-way.y, way.x)
 			o.append([PackedVector2Array([nock + way * 0.62, nock - way * 0.3 + side * 0.55, nock - way * 0.3 - side * 0.55]), INK])
+		"redo":  # undo's arrow mirrored: a clockwise open arc with its head at the upper right
+			var arc := ell(0, 0, 0.62, 0.62, 30, 260, 16)
+			var swoop := PackedVector2Array()
+			for p: Vector2 in arc:
+				swoop.append(p * (1.0 + 0.26 / 0.62))
+			for k in range(arc.size() - 1, -1, -1):
+				swoop.append(arc[k] * (1.0 - 0.26 / 0.62))
+			o.append([swoop, INK])
+			var nock := Vector2(cos(deg_to_rad(30)), sin(deg_to_rad(30))) * 0.62
+			var way := Vector2(sin(deg_to_rad(150)), cos(deg_to_rad(150)))   # the way round, clockwise
+			var side := Vector2(-way.y, way.x)
+			o.append([PackedVector2Array([nock + way * 0.62, nock - way * 0.3 + side * 0.55, nock - way * 0.3 - side * 0.55]), INK])
 		"sell":  # a coin with a minus
 			o.append([ell(0, 0, 0.95), INK])
 			o.append([ell(0, 0, 0.74), GOLD])
