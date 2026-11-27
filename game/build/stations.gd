@@ -312,11 +312,22 @@ static func _ingredient_station(n: Node3D, id: String, ready: bool, as_box := fa
 		"ready":
 			if not as_box:
 				_counter(n, Build.STEEL, Build.WORKTOP)
-			Build.box(n, Vector3(0, 0.9, 0), Vector3(0.7, 0.14, 0.6), "#c9d0d1", 0.0, Build.R_WOOD)
-			var at := Node3D.new()
-			at.position = Vector3(0, 0.99, 0)
-			n.add_child(at)
-			BuildFood.ingredient(at, id, "prep")
+			# An open steel tub: a shallow floor, four thin walls, a paler rim, and a heap of the
+			# prepped food inside, framed by the rim but tall enough to show over the near wall.
+			Build.box(n, Vector3(0, 0.9, 0), Vector3(0.7, 0.03, 0.6), Build.STEEL_DARK, 0.0, Build.R_WOOD)
+			for sx: float in [-1.0, 1.0]:
+				Build.box(n, Vector3(sx * 0.33, 0.9, 0), Vector3(0.04, 0.17, 0.6), Build.STEEL, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(sx * 0.33, 1.07, 0), Vector3(0.05, 0.02, 0.62), "#e6ecec", 0.0, Build.R_WOOD)
+			for sz: float in [-1.0, 1.0]:
+				Build.box(n, Vector3(0, 0.9, sz * 0.28), Vector3(0.62, 0.17, 0.04), Build.STEEL, 0.0, Build.R_WOOD)
+				Build.box(n, Vector3(0, 1.07, sz * 0.28), Vector3(0.62, 0.02, 0.05), "#e6ecec", 0.0, Build.R_WOOD)
+			for k in 5:
+				var at := Node3D.new()
+				at.position = Vector3(-0.2 + (k % 3) * 0.2 - (k / 3) * 0.1, 0.93 + (k % 2) * 0.06 + (k / 3) * 0.05, -0.13 + (k % 2) * 0.1 + (k / 3) * 0.2)
+				at.rotation.y = k * 1.3
+				at.scale = Vector3.ONE * 0.8
+				n.add_child(at)
+				BuildFood.ingredient(at, id, "prep")
 			Build.box(n, Vector3(0.3, 0.6, 0.48), Vector3(0.2, 0.2, 0.02), Build.GOOD)
 		_:
 			if not as_box:
