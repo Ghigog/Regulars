@@ -65,6 +65,7 @@ func buy(b: Vector2i) -> bool:
 		return false
 	game.ledger.spend(price)
 	game.lot.buy(b)
+	game.undo.record_lot(b, price)
 	game.audio.sfx("coin")
 	game.world._sync_grid()
 	game.room_edit._plan_changed()

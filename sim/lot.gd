@@ -88,6 +88,16 @@ func buy(block: Vector2i) -> bool:
 	return true
 
 
+## Takes a bought block back (undo): drops it and the count, so the next price is what it was.
+## The default blocks are never sold. Returns whether it did.
+func unbuy(block: Vector2i) -> bool:
+	if bought <= 0 or not blocks.has(block):
+		return false
+	blocks.erase(block)
+	bought -= 1
+	return true
+
+
 func to_dict() -> Dictionary:
 	var list: Array = []
 	for b: Vector2i in blocks:

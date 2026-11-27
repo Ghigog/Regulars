@@ -628,6 +628,7 @@ func buy_flyers() -> bool:
 	if game.phase != Game.Phase.BUILD or game.flyers_out or not game.ledger.spend(Town.FLYER_PRICE):
 		return false
 	game.flyers_out = true
+	game.undo.record_flyers()
 	game.audio.sfx("coin")
 	game.hud.hints_ui.show_build()
 	return true

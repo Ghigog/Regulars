@@ -73,6 +73,7 @@ func _buy_sponge(ch: Player, bp: Dictionary) -> bool:
 	if not ch.hand.is_empty() or not game.ledger.spend(Catalog.bp_price(bp)):
 		return false
 	CleanKit.hold(ch, "sponge", 0)
+	game.undo.record_sponge(ch, Catalog.bp_price(bp))
 	game.hud.hints_ui.show_build()
 	return true
 
@@ -327,6 +328,15 @@ func _bought_tonight(n: Object, amount: int) -> void:
 		return
 	n.set_meta("fresh", spent_tonight(n) + amount)
 	n.set_meta("fresh_night", game.ledger.day)
+
+
+## Sets what was spent on a piece tonight (an undone upgrade takes its price off).
+func set_spent_tonight(n: Object, amount: int) -> void:
+	if amount > 0:
+		n.set_meta("fresh", amount)
+		n.set_meta("fresh_night", game.ledger.day)
+	elif n.has_meta("fresh"):
+		n.remove_meta("fresh")
 
 
 func spent_tonight(n: Variant) -> int:
@@ -640,7 +650,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		return false
 	if Catalog.is_box(ch.hand.id):
 		_store_box(cell, ch.hand.id)
-		game.undo.record_placed(spot, ch.hand.id, null, int(ch.hand.price))
+		game.undo.record_placed(spot, ch.hand.id, null, int(ch.hand.price), ch.hand)
 		ch.hand = {}   # one box a kind: hands are free again
 		game.audio.sfx("putdown")
 		game.hud.hints_ui.show_build()
@@ -670,7 +680,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		_bought_tonight(st, paid)
 		game.clean_kit.on_built(st, ch.hand.id)
 		built = st
-	game.undo.record_placed(spot, ch.hand.id, built, paid)
+	game.undo.record_placed(spot, ch.hand.id, built, paid, ch.hand)
 	game.audio.burst(Grid.center(cell) + Vector3(0, 1.0, 0), "stars", 0.4)
 	game.audio.sfx("putdown")
 	_after_building(ch)

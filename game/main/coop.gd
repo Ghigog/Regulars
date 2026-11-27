@@ -304,6 +304,8 @@ func _build_act(action: String, ch: Player = null) -> void:
 			game.menu_stock.open_menu(ch)
 		"undo":
 			game.undo.undo(ch)
+		"redo":
+			game.undo.redo(ch)
 		"sell":
 			if not ch.hand.is_empty() and Catalog.is_build_tool(ch.hand.id):
 				var before := game.undo.plan_snapshot()
