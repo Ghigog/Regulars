@@ -100,6 +100,7 @@ static func capture(g: Node3D) -> Dictionary:
 		stock[c] = g.kitchen.take_stock(c)
 	return {
 		"version": VERSION,
+		"seat_pieces": true,
 		"theme": Scenery.theme_id,
 		"ledger": _take(g.ledger, LEDGER),
 		"menu": _take(g.menu, MENU),
@@ -145,7 +146,10 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 	for a: Vector2i in d.rugs:
 		g.placing.add_rug(a, int(d.rugs[a]))
 	# Floor pieces first, then what hangs above them.
-	var ordered: Array = (d.pieces as Array).filter(func(p: Dictionary) -> bool: return not p.high)
+	var floor_pieces: Array = (d.pieces as Array).filter(func(p: Dictionary) -> bool: return not p.high)
+	if not d.get("seat_pieces", false):
+		floor_pieces = _split_sets(floor_pieces)   # saved before tables and chairs were single pieces
+	var ordered: Array = floor_pieces
 	ordered.append_array((d.pieces as Array).filter(func(p: Dictionary) -> bool: return p.high))
 	var strays: Array[Dictionary] = []   # cups an old rack held: {cell, n}
 	for p: Dictionary in ordered:
@@ -177,6 +181,47 @@ static func restore_world(g: Node3D, d: Dictionary) -> void:
 	g.treat_laid = d.treat_laid.duplicate(true)
 	g.treat_off = d.treat_off.duplicate(true)
 	g.flyers_out = bool(d.flyers_out)
+
+
+## An old save's sets become their pieces, in the same place: a table for two or a booth is a
+## Table tile with a chair (or booth seat) either side, a table for four a tile with four chairs,
+## a counter stool a one-tile table with a chair on its old seat cell. The tile keeps the
+## piece's mess; the seats keep its tier. Other pieces pass through.
+static func _split_sets(pieces: Array) -> Array:
+	var out: Array = []
+	for p: Dictionary in pieces:
+		var type := str(p.type)
+		if type not in ["table", "booth", "table4", "stool"]:
+			out.append(p)
+			continue
+		var cell: Vector2i = p.cell
+		var f := posmod(int(p.facing), 4)
+		var seats: Array = []   # [cell, facing] of each seat; a seat turned f faces cell + TableJoins.FACE[f]
+		if type == "table4":
+			seats = [[cell + Vector2i(-1, 0), 2], [cell + Vector2i(1, 0), 0], [cell + Vector2i(0, -1), 1], [cell + Vector2i(0, 1), 3]]
+		elif type == "stool":
+			seats = [[cell + [Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 1)][f], f]]
+		elif f % 2 == 0:
+			seats = [[cell + Vector2i(-1, 0), 2], [cell + Vector2i(1, 0), 0]]
+		else:
+			seats = [[cell + Vector2i(0, -1), 1], [cell + Vector2i(0, 1), 3]]
+		var tile := p.duplicate(true)
+		tile.type = "table"
+		tile.node = ""
+		tile.tier = 1
+		tile.facing = 0
+		out.append(tile)
+		for s: Array in seats:
+			var seat := p.duplicate(true)
+			seat.type = "booth_seat" if type == "booth" else "chair"
+			seat.node = ""
+			seat.cell = s[0]
+			seat.facing = s[1]
+			seat.dirty = 0
+			seat.dirty_cups = 0
+			seat.dirty_age = 0.0
+			out.append(seat)
+	return out
 
 
 ## Puts one saved piece back and returns how many cups it held that have no place there now.
