@@ -71,8 +71,15 @@ static func tolerance_scale(tol: int) -> float:
 	return lerpf(1.0, TOL_EASY_SCALE, (t - 3) / 2.0)
 
 
+## From the seat (Seating): anger (service) and disgust (clean) hit harder above 1.0.
+var seat_tolerance := 1.0
+## From the seat: a factor on the tip.
+var seat_tip := 1.0
+
+
 func scale_for(topic: String) -> float:
-	return tolerance_scale(_tol(topic))
+	var s := tolerance_scale(_tol(topic))
+	return s * seat_tolerance if topic == "service" or topic == "clean" else s
 
 
 ## A topic's tolerance, wealth included (poor reads as fussy, rich as easy-going).
@@ -384,4 +391,4 @@ func satisfaction_terms(tray_quality := -1.0) -> Dictionary:
 
 
 func tip_for(bill: int, bonus := 1.0) -> int:
-	return roundi(bill * clampf(satisfaction(), 0.0, 1.0) * 0.6 * bonus)
+	return roundi(bill * clampf(satisfaction(), 0.0, 1.0) * 0.6 * bonus * seat_tip)
