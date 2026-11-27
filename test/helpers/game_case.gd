@@ -417,3 +417,26 @@ func _ready_to_pay(idx := 0) -> Guest:
 func _walls_round(c: Vector2i) -> void:
 	for d: Vector2i in Grid.DIRS:
 		game.grid.walls[Grid.edge_between(c, c + d)] = true
+
+
+## Pins game.order_rng to a seed whose first roll joins the line: under the lowest
+## chance (QueueChoice.FLOOR), so it joins whatever the line.
+func _pin_join_roll() -> void:
+	var pin := RandomNumberGenerator.new()
+	var seed_ := 0
+	while true:
+		pin.seed = seed_
+		if pin.randf() < QueueChoice.FLOOR:
+			break
+		seed_ += 1
+	game.order_rng.seed = seed_
+
+
+func _spawn_joining(idx: int) -> Guest:
+	_pin_join_roll()
+	return game.seating.spawn_guest(idx)
+
+
+func _spawn_group_joining(ids: Array) -> Array[Guest]:
+	_pin_join_roll()
+	return game.seating.spawn_group(ids)
