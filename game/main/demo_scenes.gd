@@ -34,8 +34,45 @@ func _demo_seat_cards() -> void:
 				game.world._register(st)))
 
 
+## EPIC-87: the seating branches side by side, a guest at every seat. Fast on the top row
+## (a chair and a stool at a bare table), Comfortable below (Comfortable 1 and 2 at a clothed
+## table), then a Booth seat and the plain Chair 1 at a plain table. Shoot at about 3.
+func _demo_seating() -> void:
+	for st: Station in game.stations.values().filter(func(o: Station) -> bool: return Station.is_table(o.type) or Station.is_seat(o.type)):
+		game.world._unregister(st)
+		st.queue_free()
+	var rows: Array = [
+		[0, "table_fast", [["chair_fast", 1, 5, 2], ["chair_fast", 2, 6, 0]]],
+		[3, "table_comfy", [["chair", 2, 5, 2], ["chair", 3, 7, 0]]],
+		[6, "table", [["booth_seat", 1, 5, 2], ["chair", 1, 7, 0]]]]
+	var person := 0
+	for row: Array in rows:
+		var table := game.world.add_station(row[1], Vector2i(6, row[0]))
+		for seat: Array in row[2]:
+			var cell := Vector2i(seat[2], row[0])
+			game.world.add_station(seat[0], cell, seat[1], seat[3])
+			var g := Guest.new()
+			game.add_child(g)
+			g.setup(game, person % game.town.people.size(), Game.SPAWN)
+			person += 1
+			g.position = Grid.center(cell)
+			g.cell = cell
+			g.seat = cell
+			g.table = table
+			g.party = [g]
+			g.state = "ordering"
+			g.mood.patience = 1.0
+			g._body.position.y = Guest.SEAT_HEIGHT
+			g._body.rotation.y = 0.0 if seat[3] == 2 else PI
+			game.guests.append(g)
+	game.player.position = Grid.center(Vector2i(2, 6))
+
+
 func _demo_build(demo: String) -> void:
 	game.session.open_build()
+	if demo == "seating":
+		_demo_seating()
+		return
 	if demo == "seat_cards":
 		_demo_seat_cards()
 		return
