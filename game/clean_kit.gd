@@ -27,6 +27,17 @@ func setup(game_) -> void:
 	game = game_
 
 
+## Whether a sponge sits on this sink, or on a counter or pass at its side.
+func sponge_near(sink: Station) -> bool:
+	if sink.item == PREFIX + "sponge":
+		return true
+	for d: Vector2i in CleanTools.SIDES:
+		var n: Station = game.stations.get(sink.cell + d)
+		if n != null and n.type in COUNTER_TYPES and n.item == PREFIX + "sponge":
+			return true
+	return false
+
+
 # ---------------------------------------------------------------- homes
 
 ## The piece at a cell that keeps a tool: a mop bucket standing there, or, to a chef
