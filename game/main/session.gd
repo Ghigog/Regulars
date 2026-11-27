@@ -27,7 +27,7 @@ func _open_first_night() -> void:
 
 
 ## Night zero's starting goodies (review, item 7): the starting main's stove and fridge,
-## built already, its two boxes stocked, a cup stack beside the plates and a sponge by the sink. Only in a new
+## built already, its two boxes stocked, a cup stack beside the plates and a sponge kept on the jar shelf. Only in a new
 ## kitchen that has none of them yet.
 func _starter_kitchen() -> void:
 	if not game.ledger.history.is_empty() or game.world.find_station("stove") != null:
@@ -45,21 +45,15 @@ func _starter_kitchen() -> void:
 	game.menu_stock.menu_changed()
 
 
-## A sponge set centred on the starter sink, else on the first free counter beside it
-## (owner's review of night zero): something to wipe the first spills with, before a
-## mop is bought.
+## A sponge kept on the jar shelf over the sink, else in the first starter wall cabinet
+## with room: something to wipe the first spills with, before a mop is bought. Never on
+## the sink, a counter or the floor; with no room, no sponge.
 func _starter_sponge() -> void:
-	var sink: Station = game.world.find_station("sink")
-	if sink == null:
-		return
-	var spots: Array[Station] = [sink]
-	for d: Vector2i in CleanTools.SIDES:
-		var n: Station = game.stations.get(sink.cell + d)
-		if n != null and n.type in CleanKit.COUNTER_TYPES:
-			spots.append(n)
-	for st: Station in spots:
-		if st.item == "":
-			st.set_item(CleanKit.PREFIX + "sponge", CleanTools.cleanness("sponge", 0))
+	for cell: Vector2i in [Vector2i(3, 2), Vector2i(0, 5), Vector2i(0, 6)]:
+		var st: Station = game.highs.get(cell)
+		if st != null and game.clean_kit.kind_of(st) == "store" and st.kit_tool == "" \
+				and game.kitchen.tool_refusal(cell) == "":
+			game.clean_kit.keep(st, "sponge", 0)
 			return
 
 
