@@ -17,8 +17,8 @@ func day_length() -> float:
 	return Town.day_length(game.ledger.day)
 
 
-func table_patience() -> float:
-	return Town.table_patience(game.ledger.day)
+func table_patience(party_size := 1) -> float:
+	return Town.party_patience(game.ledger.day, party_size)
 
 
 func day_progress() -> float:
