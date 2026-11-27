@@ -39,13 +39,13 @@ const USE_R := 66.0
 ## What each action is called on screen, per mode.
 const GLYPHS := {
 	"keys": {"move": "WASD", "aim": "Shift", "reach": "Alt", "use": "E", "back": "Esc", "turn": "R", "sell": "C", "shop": "Tab",
-		"prev": "Z", "next": "X", "buy": "Space",
+		"prev": "Z", "next": "X", "buy": "Space", "undo": "Ctrl+Z",
 		"confirm": "Enter", "town": "T", "options": "O", "search": "F", "browse": "Arrows", "menu": "N"},
 	"pad": {"move": "Stick", "aim": "LT", "reach": "RT", "use": "A", "back": "B", "turn": "RS", "sell": "X", "shop": "Y",
-		"prev": "LB", "next": "RB", "buy": "Y",
+		"prev": "LB", "next": "RB", "buy": "Y", "undo": "LS",
 		"confirm": "A", "town": "Y", "options": "Start", "search": "", "browse": "D-pad", "menu": "Back"},
 	"touch": {"move": "Joystick", "aim": "Aim", "reach": "Reach", "use": "Use", "back": "Back", "turn": "Turn", "sell": "Sell", "shop": "Shop",
-		"prev": "", "next": "", "buy": "Tap it again",
+		"prev": "", "next": "", "buy": "Tap it again", "undo": "Undo",
 		"confirm": "Tap", "town": "Tap", "options": "Menu", "search": "", "browse": "Swipe", "menu": "Dishes"},
 }
 ## The keyboard's actions. WASD and the arrows also walk (read in move()).
@@ -59,7 +59,7 @@ const KEY_ACTIONS := {
 const PAD_ACTIONS := {
 	JOY_BUTTON_A: "use", JOY_BUTTON_B: "back", JOY_BUTTON_X: "sell", JOY_BUTTON_Y: "shop",
 	JOY_BUTTON_LEFT_SHOULDER: "prev", JOY_BUTTON_RIGHT_SHOULDER: "next", JOY_BUTTON_RIGHT_STICK: "turn", JOY_BUTTON_START: "options",
-	JOY_BUTTON_BACK: "menu",
+	JOY_BUTTON_BACK: "menu", JOY_BUTTON_LEFT_STICK: "undo",   # provisional: the pad button is still open
 	JOY_BUTTON_DPAD_UP: "up", JOY_BUTTON_DPAD_DOWN: "down",
 	JOY_BUTTON_DPAD_LEFT: "left", JOY_BUTTON_DPAD_RIGHT: "right",
 }
@@ -144,6 +144,8 @@ func joins(source: String) -> bool:
 
 
 func glyph(action: String, p := 0) -> String:
+	if action == "undo" and players[p].mode == "keys" and OS.get_name() == "macOS":
+		return "⌘Z"
 	return GLYPHS[players[p].mode].get(action, "")
 
 
@@ -291,6 +293,9 @@ func _input(event: InputEvent) -> void:
 ## search box) has had the chance to keep them.
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed) or event.physical_keycode == KEY_TAB:
+		return
+	if event.physical_keycode == KEY_Z and event.is_command_or_control_pressed():
+		press("keys", "undo", true, null, event.echo)   # Ctrl+Z, Cmd+Z on a Mac; plain Z stays "prev"
 		return
 	var action := action_for_key(event.physical_keycode)
 	if action != "":

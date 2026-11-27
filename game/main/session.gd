@@ -17,6 +17,7 @@ func _init(game_: Game) -> void:
 func _open_first_night() -> void:
 	_starter_kitchen()
 	game.phase = Game.Phase.BUILD
+	game.undo.clear()
 	game.door_open = false
 	game._door_turn.rotation.y = PI
 	game.audio.play_music("night")
@@ -65,6 +66,7 @@ func _starter_sponge() -> void:
 ## A saved game comes back on the night it was saved: the room to tend, the door closed.
 func _open_night() -> void:
 	game.phase = Game.Phase.BUILD
+	game.undo.clear()
 	game.door_open = false
 	game._door_turn.rotation.y = PI
 	game.audio.play_music("night")
@@ -193,6 +195,7 @@ func open_build() -> void:
 	if game.phase != Game.Phase.SUMMARY:
 		return
 	game.phase = Game.Phase.BUILD
+	game.undo.clear()
 	game.ready_chefs.clear()
 	game.hud.receipt_ui.hide_card()
 	if Staff.week_day(game.ledger.day) == 0:   # a new week: everyone picks their days off (PRD 10.4)
