@@ -513,6 +513,11 @@ func stack_target(cell: Vector2i, ch: Player) -> Station:
 	return st if st != null and st.base == "fridge" and not st.high else null
 
 
+## "" when no hung piece needs these wall edges, else the line naming the one to take down.
+func _strand_words(edges: Array[Vector3i]) -> String:
+	return game.world.strand_refusal(edges)
+
+
 ## Why the piece in hand cannot go at this spot, in a line for the player; "" when it fits.
 ## A moving piece always fits the spot it came from (`place` turns it back if it must), unless
 ## `strict`, which judges that spot like any other (for trying a turn there).
@@ -530,9 +535,9 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 	var touch := _touch()
 	match tool_kind(ch.hand.id):
 		"floor":   # floor laid behind a wall takes the wall away: not from under a hung piece
-			var ok: bool = game.plan.can_lay(cell, floor_kind(ch.hand.id)) \
-				and (game.plan.has_floor(cell) or not game.world._strands_high(Floorplan.cell_edges(cell)))
-			return "" if ok else WONT_GO
+			if not game.plan.can_lay(cell, floor_kind(ch.hand.id)):
+				return WONT_GO
+			return "" if game.plan.has_floor(cell) else _strand_words(Floorplan.cell_edges(cell))
 		"finish":
 			return "" if game.plan.can_finish(spot, ch.hand.id) else "Paint and paper go on a wall"
 		"treat":   # any floor, one treatment a cell: a new one replaces the old
@@ -545,11 +550,9 @@ func place_refusal(spot: Vector3i, ch: Player = null, strict := false) -> String
 				return WONT_GO
 			return _grid_words(game.grid.wall_refusal(spot, game.lot, Game.DOOR, reach, touch))
 		"window":
-			var ok: bool = game.plan.can_glaze(spot) and not game.world._strands_high([spot])
-			return "" if ok else WONT_GO
+			return _strand_words([spot]) if game.plan.can_glaze(spot) else WONT_GO
 		"door", "arch":
-			var ok: bool = game.plan.can_open(spot, ch.hand.id) and not game.world._strands_high([spot])
-			return "" if ok else WONT_GO
+			return _strand_words([spot]) if game.plan.can_open(spot, ch.hand.id) else WONT_GO
 	if ch.hand.id == "screen":
 		var why := _grid_words(game.grid.wall_refusal(spot, game.lot, Game.DOOR, reach, touch))
 		return why if why != "" else (TAKEN if game.plan.is_wall(spot) else "")
