@@ -519,7 +519,7 @@ func _update_cooking_visuals() -> void:
 ## Pieces guests sit at: a table tile has the seats facing it (set by GameTables.rebuild)
 ## and takes dirty plates; a seat piece's own cell is the guest's seat.
 const TABLES: Array[String] = ["table"]
-const SEATS: Array[String] = ["chair", "booth_seat"]
+const SEATS: Array[String] = ["chair", "chair_fast", "booth_seat"]
 
 
 static func is_table(type_: String) -> bool:

@@ -20,6 +20,9 @@ const STAFF_ON_SALE := true
 ## EPIC-85: the single seat pieces (chair, booth seat) are on sale since the sets were
 ## retired. The one switch that puts every "seat" piece on sale.
 const SEAT_PIECES_ON_SALE := true
+## What the two seating branches do, in plain words (EPIC-87).
+const FAST_WORDS := "Guests order and eat faster, tip less, and mind mess and waiting more"
+const COMFY_WORDS := "Guests order and eat more slowly, tip more, and mind mess and waiting less"
 const TIER_JOY := 0.1   # joy a decor piece gains for each tier above the first
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
 ## A "tool" builds the room itself and is priced per tile or per wall; a "finish"
@@ -97,10 +100,16 @@ const ITEMS := {
 	"table": {"name": "Table", "price": 20, "level": 1, "category": "Dining", "tiers": 1,
 		"blurb": "One tile of table. Tiles that touch make one table; chairs beside it seat guests"},
 	"chair": {"name": "Chair", "price": 10, "level": 1, "category": "Dining", "tiers": 3, "seat": true,
-		"blurb": "One seat, for a table beside it", "up": "A comfier seat"},
-	"booth_seat": {"name": "Booth seat", "price": 20, "level": 1, "category": "Dining", "tiers": 3,
-		"seat": true, "tree_only": true, "blurb": "A bench seat, for a table beside it",
-		"up": "A cosier bench seat"},
+		"blurb": "One seat, for a table beside it", "up": "A comfier seat. " + COMFY_WORDS},
+	"chair_fast": {"name": "Fast seat", "price": 20, "level": 1, "category": "Dining", "tiers": 2,
+		"seat": true, "tree_only": true, "blurb": FAST_WORDS, "up": "Harder seats still. " + FAST_WORDS},
+	"booth_seat": {"name": "Booth seat", "price": 60, "level": 3, "category": "Dining", "tiers": 1,
+		"seat": true, "tree_only": true,
+		"blurb": "The cosiest seat. " + COMFY_WORDS},
+	"table_fast": {"name": "Fast table", "price": 30, "level": 1, "category": "Dining", "tiers": 1,
+		"tree_only": true, "blurb": FAST_WORDS},
+	"table_comfy": {"name": "Comfortable table", "price": 30, "level": 1, "category": "Dining", "tiers": 1,
+		"tree_only": true, "blurb": COMFY_WORDS},
 	"desk": {"name": "Desk", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1, "staff": true,
 		"blurb": "Write job posts and read CVs. One desk per employee"},
 	"bin": {"name": "Bin", "price": 30, "level": 2, "category": "Kitchen", "tiers": 1,
@@ -368,8 +377,10 @@ static func is_finish(id: String) -> bool:
 static func sold_in(id: String, theme: String) -> bool:
 	if not ITEMS.has(id) or (ITEMS[id].get("staff", false) and not STAFF_ON_SALE):
 		return false
-	if ITEMS[id].get("seat", false) and (ITEMS[id].get("tree_only", false) or not SEAT_PIECES_ON_SALE):
-		return false   # a booth seat is bought only in the chair's tree
+	if ITEMS[id].get("tree_only", false):
+		return false   # a booth seat, a fast seat or a table branch is bought only in its tree
+	if ITEMS[id].get("seat", false) and not SEAT_PIECES_ON_SALE:
+		return false
 	return theme == "" or not ITEMS[id].has("theme") or ITEMS[id].theme == theme
 
 

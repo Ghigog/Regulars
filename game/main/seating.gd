@@ -231,7 +231,7 @@ func _seat_waiting_guests() -> void:
 
 func on_seated(g: Guest) -> void:
 	var seat: Station = game.stations.get(g.seat)   # comfort is the guest's own seat's
-	if seat != null and seat.tier > 1:
+	if seat != null and seat.type == "chair" and seat.tier > 1:
 		g.mood.delight(0.05 * (seat.tier - 1), "What a lovely table")
 	if seat != null and seat.type == "booth_seat":
 		g.mood.delight(Game.BOOTH_DELIGHT, "A booth! How cosy")
