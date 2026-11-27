@@ -17,6 +17,9 @@ const TIER_PRICE: Array[int] = [1, 2, 4]   # price multiplier for tiers 1 to 3
 ## PRD 10: the desk was kept out of the shop until helpers could work; since 10.6 it is
 ## on sale. The one switch that puts every "staff" piece on sale.
 const STAFF_ON_SALE := true
+## EPIC-85: the single seat pieces (chair, booth seat) stay off sale until the sets are
+## retired. The one switch that puts every "seat" piece on sale.
+const SEAT_PIECES_ON_SALE := false
 const TIER_JOY := 0.1   # joy a decor piece gains for each tier above the first
 ## "tiers" is how many tiers are sold; "up" says what a higher tier does.
 ## A "tool" builds the room itself and is priced per tile or per wall; a "finish"
@@ -99,6 +102,11 @@ const ITEMS := {
 		"blurb": "Seats a group of four", "up": "Four comfier seats"},
 	"stool": {"name": "Counter stool", "price": 25, "level": 1, "category": "Dining", "tiers": 3,
 		"blurb": "One seat, for guests who come alone", "up": "A comfier seat"},
+	"chair": {"name": "Chair", "price": 10, "level": 1, "category": "Dining", "tiers": 3, "seat": true,
+		"blurb": "One seat, for a table beside it", "up": "A comfier seat"},
+	"booth_seat": {"name": "Booth seat", "price": 20, "level": 1, "category": "Dining", "tiers": 3,
+		"seat": true, "tree_only": true, "blurb": "A bench seat, for a table beside it",
+		"up": "A cosier bench seat"},
 	"desk": {"name": "Desk", "price": 40, "level": 1, "category": "Kitchen", "tiers": 1, "staff": true,
 		"blurb": "Write job posts and read CVs. One desk per employee"},
 	"bin": {"name": "Bin", "price": 30, "level": 2, "category": "Kitchen", "tiers": 1,
@@ -366,6 +374,8 @@ static func is_finish(id: String) -> bool:
 static func sold_in(id: String, theme: String) -> bool:
 	if not ITEMS.has(id) or (ITEMS[id].get("staff", false) and not STAFF_ON_SALE):
 		return false
+	if ITEMS[id].get("seat", false) and (ITEMS[id].get("tree_only", false) or not SEAT_PIECES_ON_SALE):
+		return false   # a booth seat is bought only in the chair's tree
 	return theme == "" or not ITEMS[id].has("theme") or ITEMS[id].theme == theme
 
 

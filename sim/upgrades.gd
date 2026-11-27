@@ -9,6 +9,9 @@ extends RefCounted
 ## Pure: no scene dependencies.
 
 const TIER_SEP := "@"
+## The chair's tree grows to Chair 2 and 3, or branches into Booth seat 1, 2 and 3.
+const SEAT_TREE_ROOT := "chair"
+const SEAT_BRANCH := "booth_seat"
 ## What each job is called in a node's line.
 const JOB_WORDS := {"grill": "grilling", "fry": "frying", "boil": "boiling", "chop": "chopping",
 	"slice": "slicing", "grate": "grating", "saw": "sawing", "juice": "juicing", "blend": "blending",
@@ -59,7 +62,9 @@ static func _tier_key(id: String, tier: int) -> String:
 static func parent(key: String) -> String:
 	if is_tiered(key):
 		var t := tier_of(key)
-		return _tier_key(catalog_id(key), t - 1) if t > 1 else ""
+		if t > 1:
+			return _tier_key(catalog_id(key), t - 1)
+		return _tier_key(SEAT_TREE_ROOT, 1) if catalog_id(key) == SEAT_BRANCH else ""
 	if is_treatment(key):
 		var up := Treatments.parent(Treatments.key_of(key))
 		return Treatments.box_id(up) if up != "" else ""
@@ -76,6 +81,8 @@ static func children(key: String) -> Array[String]:
 		var out: Array[String] = []
 		if tier_of(key) < int(Catalog.ITEMS[catalog_id(key)].tiers):
 			out.append(_tier_key(catalog_id(key), tier_of(key) + 1))
+		if key == _tier_key(SEAT_TREE_ROOT, 1):
+			out.append(_tier_key(SEAT_BRANCH, 1))   # the chair branches into the booth seat
 		return out
 	if is_treatment(key):
 		var kids: Array[String] = []

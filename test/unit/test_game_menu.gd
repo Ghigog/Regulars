@@ -356,6 +356,8 @@ func test_every_catalog_piece_builds_a_model_in_both_themes():
 		for id: String in Catalog.ITEMS:
 			if Catalog.is_build_tool(id) or id in ["rug", "screen"]:
 				continue
+			if Catalog.ITEMS[id].get("seat", false) and not Catalog.SEAT_PIECES_ON_SALE:
+				continue   # EPIC-85: the seat pieces get their models before they go on sale
 			for tier in range(1, int(Catalog.ITEMS[id].tiers) + 1):
 				var n := Node3D.new()
 				BuildStations.station(n, id, tier)
