@@ -7,7 +7,7 @@ extends RefCounted
 
 ## A seat turned f faces cell + FACE[f].
 const FACE: Array[Vector2i] = [Vector2i(-1, 0), Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1)]
-const SEAT_TYPES := ["chair", "booth_seat"]
+const SEAT_TYPES := ["chair", "chair_fast", "booth_seat"]
 
 
 ## Tables made of "table" tiles touching edge to edge (any shape). A table is

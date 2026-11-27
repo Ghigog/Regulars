@@ -52,10 +52,12 @@ func test_a_chair_with_no_tile_beside_it_gets_a_red_disc_and_is_never_used():
 	assert_false(game.tables.seats_of(r.tile).has(lone.cell))
 
 
-func test_buying_booth_seat_1_turns_the_chair_in_place():
+func test_buying_the_booth_seat_turns_a_chair_3_in_place():
 	var r := _room()
-	game.ledger.money = 10
+	game.ledger.money = 20
+	game.ledger.xp = 100000   # the level the booth seat needs
 	var c: Station = r.chairs[1]
+	c.tier = 3
 	assert_true(game.placing.pick_up(Grid.center(c.cell)))
 	assert_true(game.upgrades.buy_upgrade("booth_seat@1"))
 	assert_eq(game.ledger.money, 0)
