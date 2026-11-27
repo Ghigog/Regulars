@@ -375,7 +375,7 @@ func tick(delta: float) -> void:
 				_sit()
 		"ordering", "waiting":
 			_face(Grid.center(table.cell) - position, delta)
-			mood.wait(delta, game.day.table_patience() * (game.ORDER_PATIENCE_SCALE if state == "ordering" else 1.0))
+			mood.wait(delta, game.day.table_patience(party.size()) * (game.ORDER_PATIENCE_SCALE if state == "ordering" else 1.0))
 			game.seating.apply_surroundings(self, delta)
 			if mood.walked_out():
 				game.paying.walk_out(self)
@@ -402,14 +402,14 @@ func tick(delta: float) -> void:
 				_advance(delta)
 				_face(Grid.center(game.paying.till_cell()) - position, delta)
 			if game.paying.ready_to_pay(table):
-				mood.wait_to_pay(delta, game.day.table_patience(), state == "to_pay")
+				mood.wait_to_pay(delta, game.day.table_patience(party.size()), state == "to_pay")
 				if mood.skipped_bill:
 					game.paying.leave_unpaid(table, self)
 		"to_till":
 			if _advance(delta):
 				state = "at_till"
 			if game.paying.ready_to_pay(table):
-				mood.wait_to_pay(delta, game.day.table_patience(), false)
+				mood.wait_to_pay(delta, game.day.table_patience(party.size()), false)
 				if mood.skipped_bill:
 					game.paying.leave_unpaid(table, self)
 		"company":   # nothing to eat: they sit with friends and go when the friends go
