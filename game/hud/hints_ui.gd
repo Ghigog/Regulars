@@ -160,8 +160,7 @@ func _fill_strip() -> void:
 func _box_fee(id: String) -> int:
 	if Treatments.is_box(id):
 		return int(Treatments.ITEMS[Treatments.key_of(id)].fee)
-	var b := Pantry.station_ingredient(id)
-	return Pantry.fee_of(b.id, b.ready)
+	return Pantry.box_fee(id)
 
 
 func _strip_chip(ch: Player, i: int, c: Dictionary, on: bool) -> Control:

@@ -71,6 +71,11 @@ static func is_treatment(key: String) -> bool:
 	return Treatments.is_box(key)
 
 
+## A box with a tree of its own: a floor treatment's or a food box (or one of its nodes).
+static func is_box_key(key: String) -> bool:
+	return is_treatment(key) or is_food_box(key)
+
+
 ## For a tiered key, the catalog id; for a node, the catalog piece it behaves as.
 static func catalog_id(key: String) -> String:
 	if is_tiered(key):

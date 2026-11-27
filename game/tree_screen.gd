@@ -461,7 +461,7 @@ class Card extends Control:
 	## What ModelView draws for this node.
 	func _blueprint() -> Dictionary:
 		var id := Upgrades.catalog_id(key)
-		if Upgrades.is_tiered(key) or Upgrades.is_treatment(key):
+		if Upgrades.is_tiered(key) or Upgrades.is_box_key(key):
 			return {"id": id, "tier": Upgrades.tier_of(key)}
 		var fit := Kitchen.fit_of(key)
 		return {"id": id, "tier": 1, "node": key, "base": key if fit == "counter" or fit == "tall" else ""}
@@ -481,6 +481,9 @@ class Card extends Control:
 			row.add_child(HudWidgets.Icon.new("heart", 34))
 			for i in Upgrades.tier_of(key):
 				row.add_child(Pip.new(Kitchen.BASE + Kitchen.EFFICIENT_STEP if i > 0 else Kitchen.BASE))
+			return
+		if Upgrades.is_food_box(key):   # a food box (EPIC-132): its node, said by one mark, and its nightly fee
+			_fill_food_box(row)
 			return
 		var jobs := Upgrades.jobs(key)
 		var order: Array = jobs.keys()
@@ -503,6 +506,21 @@ class Card extends Control:
 			var n: Label = screen._text(row, 16, "x%d" % pans, LINE)
 			n.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
+	## A food box's row: Prepared shows its prep tool crossed out (the work is done), Marinated
+	## a plus pip (better); each with the box's nightly fee.
+	func _fill_food_box(row: HBoxContainer) -> void:
+		var item: Dictionary = Catalog.ITEMS[key]
+		var kind := Pantry.kind_of(key)
+		if item.get("ready", false):
+			var tool := HudWidgets.Icon.new("job_" + Pantry.tool_of(kind), 34)
+			tool.tooltip_text = "Already %s" % Pantry.tool_of(kind)
+			row.add_child(tool)
+			row.add_child(Crossed.new())
+		elif item.get("marinated", false):
+			row.add_child(Pip.new(Kitchen.BASE + Kitchen.EFFICIENT_STEP))
+		var each: Label = screen._text(row, 16, "$%d a night" % Pantry.box_fee(key), LINE)
+		each.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		var st: String = screen.state_of(key)
@@ -521,6 +539,18 @@ class Card extends Control:
 			for e: Array in [[inner.position, Vector2(inner.end.x, inner.position.y)], [Vector2(inner.end.x, inner.position.y), inner.end],
 					[inner.end, Vector2(inner.position.x, inner.end.y)], [Vector2(inner.position.x, inner.end.y), inner.position]]:
 				draw_dashed_line(e[0], e[1], Color(LINE, 0.25), 1.5, 6.0)
+
+
+## A slash drawn over the tool icon beside it: the step is already done.
+class Crossed extends Control:
+	func _init() -> void:
+		custom_minimum_size = Vector2(0, 34)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var icon := get_parent().get_child(get_index() - 1) as Control
+		var c := icon.position + icon.size / 2.0 - position
+		draw_line(c + Vector2(-14, 14), c + Vector2(14, -14), Color("#d9534f"), 3.5, true)
 
 
 ## A quality pip, said by shape: a hollow ring for a stand-in (under 1), a dot for a

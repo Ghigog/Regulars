@@ -22,10 +22,10 @@ func kitchen_stock() -> Array:
 		if Kitchen.is_cleaning(b):
 			continue   # a treatment's box stocks no food (PRD 9.5)
 		var s := Pantry.station_ingredient(b)
-		var key := Pantry.box_id(s.id, s.ready)
+		var key := Pantry.box_id(s.id, s.ready, s.marinated)
 		if not seen.has(key):
 			seen[key] = true
-			out.append({"ingredient": s.id, "ready": s.ready, "stocked": true})
+			out.append({"ingredient": s.id, "ready": s.ready, "marinated": s.marinated, "stocked": true})
 	for st: Station in game.stations.values():
 		for d: String in dispenser_drinks(st):
 			if not seen.has(Pantry.box_id(d)):
@@ -102,8 +102,8 @@ func item_off_reason(it: Dictionary) -> String:
 ## Puts a box of an ingredient in the room for tests and demos: into the counter at
 ## `cell` (one is set there, upgraded to a fridge for a chilled kind, if the cell is
 ## free), else nowhere. Returns the station holding it, or null.
-func stock_box(kind: String, cell: Vector2i, ready := false, facing := 0) -> Station:
-	var box := Pantry.box_id(kind, ready)
+func stock_box(kind: String, cell: Vector2i, ready := false, facing := 0, marinated := false) -> Station:
+	var box := Pantry.box_id(kind, ready, marinated)
 	if not game.stations.has(cell):
 		game.world.add_station("counter", cell, 1, facing, "freezer" if Kitchen.is_frozen(box) else ("fridge" if Kitchen.is_chilled(box) else ""))
 	if not game.placing._store_box(cell, box):
@@ -114,7 +114,7 @@ func stock_box(kind: String, cell: Vector2i, ready := false, facing := 0) -> Sta
 ## The station whose storage holds a kind (or box id), for tests and demos; null if none.
 func storage_of(kind: String) -> Station:
 	for cell: Vector2i in game.kitchen.cells_with(kind if Catalog.is_box(kind) else Pantry.box_id(kind)) \
-			+ game.kitchen.cells_with(Pantry.box_id(kind, true)):
+			+ game.kitchen.cells_with(Pantry.box_id(kind, true)) + game.kitchen.cells_with(Pantry.box_id(kind, false, true)):
 		return game.stations.get(cell)
 	return null
 
@@ -217,8 +217,9 @@ func stock_lines() -> Array[Dictionary]:
 	for s: Dictionary in kitchen_stock():
 		if s.get("derived", false):
 			continue   # made from another kind's stock, which is listed
-		out.append({"name": Pantry.name_of(s.ingredient) + (" (ready)" if s.ready else ""),
-			"fee": Pantry.fee_of(s.ingredient, s.ready)})
+		var node := " (prepared)" if s.ready else (" (marinated)" if s.get("marinated", false) else "")
+		out.append({"name": Pantry.name_of(s.ingredient) + node,
+			"fee": Pantry.box_fee(Pantry.box_id(s.ingredient, s.ready, s.get("marinated", false)))})
 	var lines := Treatments.night_lines(_laid_on_floor(), game.treat_off, treat_boxed())
 	for k: String in lines:   # floor treatments, re-laid each night (PRD 9.5)
 		var l: Dictionary = lines[k]
