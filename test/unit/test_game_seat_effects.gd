@@ -108,3 +108,15 @@ func test_some_guests_think_grab_and_go_or_nice_to_sit_a_while():
 	assert_gt(grab, 0)
 	assert_gt(nice, 0)
 	assert_lt(grab, 40, "not every guest")
+
+
+func test_a_reading_guest_holds_a_menu_card_that_snaps_away_with_the_notepad():
+	var g := _seated("chair", 1, "table")
+	assert_eq(g.state, "reading")
+	assert_not_null(g._card, "a menu card in their hands")
+	assert_false(g._order.visible, "no notepad while reading")
+	_reading_seconds(g)
+	assert_eq(g.state, "ordering")
+	assert_true(g._order.visible, "the notepad pops up the frame reading ends")
+	assert_null(g._card, "the card is let go in that same frame")
+	game.step(0.3)
