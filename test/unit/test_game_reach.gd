@@ -81,3 +81,28 @@ func test_glyphs_and_the_reach_key():
 	assert_eq(Controls.GLYPHS.pad.reach, "RT")
 	assert_eq(Controls.GLYPHS.pad.aim, "LT")
 	assert_eq(Controls.GLYPHS.touch.reach, "Reach")
+
+
+## Buns on a shelf over a bin in the corner, a grill beside it: holding Reach next to the
+## shelf takes a bun from the shelf wherever the chef stands, never the grill's cell.
+func test_reach_targets_the_shelf_over_a_bin_not_the_grill_beside_it():
+	var corner := Vector2i(0, 4)   # a wall cell, free in the starter kitchen
+	var next := Vector2i(0, 5)
+	game.world.add_station("bin", corner)
+	game.world.add_station("grill", next)
+	game.world.add_high("shelf", corner)
+	game.kitchen.cells[corner].stock.high.assign(["box_bun"])
+	_reach(true)
+	for case in [[Vector2i(1, 4), Vector2i(0, -1)], [Vector2i(1, 4), Vector2i(0, 1)], [Vector2i(1, 4), Vector2i(-1, 0)]]:
+		game.player.held = ""
+		game.player.position = Grid.center(case[0])
+		game.player.look(case[1])
+		var label := "from %s facing %s" % case
+		assert_eq(game.player.target_cell(), corner, label)
+		var st: Station = game.world.station_at(game.player.target_cell(), game.player)
+		game.cooking.use_station(st, false, game.player)
+		assert_eq(game.player.held, "prep:bun", "took a bun " + label)
+	game.player.held = ""
+	game.player.position = Grid.center(Vector2i(1, 4))
+	_reach(false)
+	assert_eq(game.card.reach_action(game.player), "Take bun")

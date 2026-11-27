@@ -33,15 +33,17 @@ func reaching(ch: Player) -> bool:
 func reach_action(ch: Player) -> String:
 	if reaching(ch) or game.phase == Game.Phase.SUMMARY:
 		return ""
+	var service := game.phase == Game.Phase.SERVICE
+	ch.set_meta("reach", service)   # in service the cell is picked as if reaching: the shelf's, not the floor piece's
 	var cell := ch.target_cell() if game.phase == Game.Phase.SERVICE else Grid.to_cell(game.room_edit._piece_in_front(ch))
-	if not game.highs.has(cell):
-		return ""
-	ch.set_meta("reach", true)
 	var out := ""
-	if game.phase == Game.Phase.SERVICE:
+	if not game.highs.has(cell):
+		pass
+	elif service:
 		var st: Station = game.world.station_at(cell, ch)
 		out = game.cooking.prompt_for(st, ch) if st != null else ""
 	elif game.phase == Game.Phase.BUILD and game.shopper != ch:
+		ch.set_meta("reach", true)
 		out = "Pick up %s" % lift_name(ch)
 	ch.set_meta("reach", false)
 	return out

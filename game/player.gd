@@ -296,7 +296,7 @@ func target_cell() -> Vector2i:
 	for dx in range(-2, 3):
 		for dy in range(-2, 3):
 			var n := here + Vector2i(dx, dy)
-			var st: Station = game.world.station_at(n)   # a piece hung over bare floor too (PRD 8.5)
+			var st: Station = game.world.station_at(n, self)   # reaching: only the wall pieces. A piece hung over bare floor too (PRD 8.5)
 			if st == null:
 				continue
 			if not game.grid.reach_open(here, n):
