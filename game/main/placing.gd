@@ -599,6 +599,8 @@ func shut_in_line() -> String:
 	var c := cut[0]
 	if game.stations.has(c):
 		var st: Station = game.stations[c]
+		if Station.is_seat(st.type):
+			return "A %s's seat can't be reached" % piece_name({"id": st.type, "tier": st.tier}).to_lower()
 		var name := str(Kitchen.NODES[st.node].name) if Kitchen.has_node(st.node) \
 			else piece_name({"id": st.type, "tier": st.tier})
 		return "The %s can't be reached" % name.to_lower()
@@ -627,7 +629,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 	var cell := Vector2i(spot.x, spot.y)
 	if ch.hand.get("moving", false):
 		var back: bool = spot == ch.hand.from and place_refusal(spot, ch, true) != ""
-		var facing := int(ch.hand.from_facing) if back else int(ch.hand.facing)
+		var facing := int(ch.hand.from_facing) if back else _seat_facing(ch.hand.id, cell, int(ch.hand.facing))
 		_put_down(ch.hand, spot, facing)
 		game.undo.record_moved(ch.hand, spot, facing)
 		ch.hand = {}
@@ -664,7 +666,7 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 		game.clean_kit.on_built(hung, ch.hand.id)
 		built = hung
 	else:
-		var st := game.world.add_station(str(ch.hand.get("up", ch.hand.id)), cell, int(ch.hand.tier), int(ch.hand.facing), ch.hand.get("base", ""))
+		var st := game.world.add_station(str(ch.hand.get("up", ch.hand.id)), cell, int(ch.hand.tier), _seat_facing(ch.hand.id, cell, int(ch.hand.facing)), ch.hand.get("base", ""))
 		_bought_tonight(st, paid)
 		game.clean_kit.on_built(st, ch.hand.id)
 		built = st
@@ -673,6 +675,20 @@ func place(spot: Vector3i, ch: Player = null) -> bool:
 	game.audio.sfx("putdown")
 	_after_building(ch)
 	return true
+
+
+## A seat set down beside a Table tile turns to face it (unless it already does); any other
+## piece, or a seat with no tile beside it, keeps the way it was turned.
+func _seat_facing(id: String, cell: Vector2i, facing: int) -> int:
+	if not Station.is_seat(id):
+		return facing
+	var tiles: Array = []
+	for st: Station in game.paying.dining_tables():
+		tiles.append(st.cell)
+	if (cell + TableJoins.FACE[facing % 4]) in tiles:
+		return facing
+	var f := TableJoins.face_toward(cell, tiles)
+	return facing if f < 0 else f
 
 
 ## A new piece or tool stays in hand while there is money for another.

@@ -11,6 +11,8 @@ const TOP := 0.8   # tabletop height the card stands on
 var game: Game
 var cards := {}   # lead Station -> {node: Node3D, shown: bool, seats: int}
 var previews := {}   # Player -> {node: Node3D, seats: int}: the card of the table a carried one would join
+var discs := {}   # seat Station -> red disc under a seat that faces no table
+var ghost_discs := {}   # Player -> red disc under the carried seat's ghost
 var _started := false   # once a card has stood, a card that appears pops up with a squash
 
 
@@ -107,8 +109,58 @@ func _drop_preview(ch: Player) -> void:
 	previews.erase(ch)
 
 
+## A red disc, flat on the floor, like the reach marks.
+func _make_disc() -> Node3D:
+	var n := Node3D.new()
+	game.add_child(n)
+	var d := Build.cyl(n, Vector3(0, 0.03, 0), 0.38, 0.03, Build.DANGER, 0.6)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(Build.DANGER)
+	m.emission_enabled = true
+	m.emission = Color(Build.DANGER)
+	m.emission_energy_multiplier = 0.6
+	m.render_priority = 5
+	d.material_override = m
+	return n
+
+
+## Red discs under seats that face no table (placed, and on a carried seat's ghost).
+func _tick_discs() -> void:
+	var build := game.phase == Game.Phase.BUILD
+	var tiles: Array = []
+	for st: Station in game.paying.dining_tables():
+		tiles.append(st.cell)
+	var want := {}
+	if build:
+		for st: Station in game.stations.values():
+			if Station.is_seat(st.type) and not ((st.cell + TableJoins.FACE[st.facing % 4]) in tiles):
+				want[st] = true
+	for st in discs.keys():
+		if not want.has(st) or not is_instance_valid(st):
+			if is_instance_valid(discs[st]):
+				(discs[st] as Node3D).queue_free()
+			discs.erase(st)
+	for st: Station in want:
+		if not discs.has(st):
+			discs[st] = _make_disc()
+		(discs[st] as Node3D).position = Grid.center(st.cell)
+	for ch: Player in game.chefs:
+		var show := build and Station.is_seat(ch.hand.get("id", "")) and ch.ghost != null and ch.ghost.visible
+		if show:
+			var cell := Grid.to_cell(ch.ghost.position)
+			show = TableJoins.face_toward(cell, tiles) < 0   # beside a tile it turns to face it
+		if show and not ghost_discs.has(ch):
+			ghost_discs[ch] = _make_disc()
+		if ghost_discs.has(ch):
+			var d: Node3D = ghost_discs[ch]
+			d.visible = show
+			if show:
+				d.position = Grid.center(Grid.to_cell(ch.ghost.position))
+
+
 ## Brings the cards in line with the room; called every frame, cheap.
 func tick() -> void:
+	_tick_discs()
 	var covered := _tick_previews()
 	var leads := {}
 	for t in game.tables.list:
