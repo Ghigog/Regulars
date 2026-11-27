@@ -114,7 +114,8 @@ func stock_box(kind: String, cell: Vector2i, ready := false, facing := 0, marina
 ## The station whose storage holds a kind (or box id), for tests and demos; null if none.
 func storage_of(kind: String) -> Station:
 	for cell: Vector2i in game.kitchen.cells_with(kind if Catalog.is_box(kind) else Pantry.box_id(kind)) \
-			+ game.kitchen.cells_with(Pantry.box_id(kind, true)) + game.kitchen.cells_with(Pantry.box_id(kind, false, true)):
+			+ game.kitchen.cells_with(Pantry.box_id(kind, true)) \
+			+ game.kitchen.cells_with(Pantry.box_id(kind, false, true)):
 		return game.stations.get(cell)
 	return null
 
