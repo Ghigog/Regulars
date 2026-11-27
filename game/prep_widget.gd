@@ -336,7 +336,8 @@ func show_state(s: Dictionary) -> void:
 ## A quick mark over a tool as a minigame ends. Good: a gold star that spins up;
 ## plain: a paper dot; bad: a coral cross that wobbles. Shape and motion differ, not
 ## only colour.
-static func pop(parent: Node3D, at: Vector3, result: String) -> void:
+## `plus`: the piece was marinated, so a small plus rides beside the mark.
+static func pop(parent: Node3D, at: Vector3, result: String, plus := false) -> void:
 	var n := Node3D.new()
 	n.position = at
 	n.basis = Build.CAM_BASIS
@@ -355,7 +356,21 @@ static func pop(parent: Node3D, at: Vector3, result: String) -> void:
 				Build.flat(mark, Icons.rect(0, 0, 0.32, 0.1), Build.TRIM).rotation.z = turn
 				var bar := Build.flat(mark, Icons.rect(0, 0, 0.27, 0.06), Build.DANGER, 0.004)
 				bar.rotation.z = turn
+	var tag: Node3D = null
+	if plus:
+		tag = Node3D.new()   # does not turn with the star
+		tag.position = Vector3(0.3, 0.14, 0)
+		n.add_child(tag)
+		for fill: bool in [false, true]:
+			for turn: float in [0.0, PI / 2]:
+				var bar := Build.flat(tag, Icons.rect(0, 0, 0.2 if fill else 0.25, 0.07 if fill else 0.12), Build.GOOD if fill else Build.TRIM, 0.006 if fill else 0.0)
+				bar.rotation.z = turn
 	Build.on_top(n)
+	if tag != null:
+		tag.scale = Vector3.ONE * 0.2
+		var tg := tag.create_tween()
+		tg.tween_property(tag, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tg.tween_property(tag, "position:y", 0.14 + 0.3, 0.45)
 	mark.scale = Vector3.ONE * 0.2
 	var tw := mark.create_tween()
 	tw.tween_property(mark, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

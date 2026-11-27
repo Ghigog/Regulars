@@ -102,7 +102,7 @@ func set_down(ch: Player) -> void:
 		if ch.held == "dishes" and not ch.dishes.is_empty():
 			best.set_dish(ch.dishes[0])   # the rest go with the tray
 		elif Tray.parse(ch.held).size() > 0:
-			best.set_item(ch.held, ch.held_quality)
+			best.set_item(ch.held, ch.held_quality, ch.held_marinated)
 		game.audio.sfx("putdown")
 	ch.set_held("")
 	game.hud.day_ui.refresh_tickets()

@@ -33,6 +33,7 @@ var high := false     # hung in a wall cell's high layer (PRD 8.5): a cabinet, a
 var pass_look := false  # a counter drawn as a length of the frame's long teal pass (the starting ones)
 var lamp: OmniLight3D # a table's lamp light, owned by the game
 var item := ""        # what is sitting on a counter or stove: an ingredient kind ("raw:patty") or "dish"
+var marinated := false   # the item came from a Marinated box
 var quality := 1.0    # how well prepped that item is (0..1)
 var dish: Dish        # the plate, cup or loose stack on a counter, when item is "dish"
 var boxes: Array = []   # the boxes of stock in this cell's storage, as the kitchen holds them (PRD 8.4)
@@ -226,7 +227,7 @@ func _show_item(kind: String) -> void:
 	elif kind != "":
 		var on_heat := is_heat_tool() and mode() == "stove" and not _boils()
 		_shown_look = _look(cook) if on_heat else BuildFood.look_for(kind, quality)
-		_item_node = BuildFood.item(kind, quality, _shown_look)
+		_item_node = BuildFood.item(kind, quality, _shown_look, marinated)
 		match mode():
 			"stove":
 				_item_node.position = Vector3(Build.PAN.x, 0.93, Build.PAN.z)
@@ -244,9 +245,10 @@ func _show_item(kind: String) -> void:
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-func set_item(kind: String, q := 1.0) -> void:
+func set_item(kind: String, q := 1.0, marinated_ := false) -> void:
 	item = kind
 	quality = q
+	marinated = marinated_ and kind != ""
 	if kind != "dish":
 		dish = null
 	if is_heat_tool():
