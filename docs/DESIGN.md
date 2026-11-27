@@ -330,7 +330,11 @@ Survive as many days as you can; three walkouts in one day ends the run.
   a step; in service the station turned to wins over a nearer one. **Reach** (held: Left Alt, Cmd on a Mac, RT, or
   the touch Reach button) is the high layer: E alone is always what stands below (till, tool, counter,
   bin, sink), Reach+E always what hangs above (wall shelf, cabinet); a second keycap chip
-  "Alt + E: Take cheese" shows while something hangs there, and the Reach button on touch only then. Taps on the room work as clicks (pick a guest,
+  "Alt + E: Take cheese" shows while something hangs there, and the Reach button on touch only then.
+  A tall fridge (tall fridge, freezer, glass fridge) has two levels: E takes the lower kind (the
+  first box), Reach+E the upper (the second), each putting back or swapping per level; the chip
+  and the touch button show only when it holds two kinds, and a third kind on a glass fridge still
+  comes by the swap. Taps on the room work as clicks (pick a guest,
   place a piece, drag floors), and a touch on a control never reaches the room. Keys,
   pad buttons and touch buttons all become the same actions (use, back, turn, sell,
   shop, town, options, confirm, search and the four browse directions), sent to the
