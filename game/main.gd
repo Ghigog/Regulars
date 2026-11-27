@@ -545,7 +545,7 @@ func _update_cursor(ch: Player = null) -> void:
 	ch.cursor.visible = action != ""
 	var at := Vector2.ZERO
 	if st != null:
-		var top := BuildStations.HIGH_Y0 + 0.2 if highs.get(st.cell) == st and card.reaching(ch) else 0.9
+		var top := BuildStations.HIGH_Y0 + 0.2 if (highs.get(st.cell) == st or world.is_tall_at(st.cell)) and card.reaching(ch) else 0.9
 		ch.cursor.position = st.position + Vector3(0, top, 0)
 		var over := 2.25 if st.type in ["stove", "fryer"] else top + 0.7
 		if st.widget != null and st.widget.visible:

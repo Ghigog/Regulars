@@ -432,6 +432,12 @@ func _use_storage(st: Station, dry_run: bool, ch: Player) -> Array:
 	if boxes.is_empty():
 		return ["", ""]
 	var held := ch.held
+	if game.world.is_tall_at(st.cell):   # a tall piece has two levels: plain use is the lower, Reach the upper
+		var upper: bool = game.card.reaching(ch)
+		if upper and boxes.size() < 2:
+			return ["", ""]
+		if upper or held == "" or boxes.size() < 3 or _from_box(boxes[0]) == held or _from_box(boxes[1]) == held:
+			return _use_level(boxes, 1 if upper else 0, dry_run, ch)
 	if held == "":
 		var b: String = boxes[0]
 		if not dry_run:
@@ -449,6 +455,33 @@ func _use_storage(st: Station, dry_run: bool, ch: Player) -> Array:
 			_hold_from_box(ch, next)
 		return ["Swap for %s" % Pantry.name_of(Pantry.kind_of(next)).to_lower(), ""]
 	return ["", ""]
+
+
+## One level of a tall piece (0 lower, 1 upper): empty hands take its kind; holding it puts
+## it back, holding the other level's kind swaps. Returns [action, refusal].
+func _use_level(boxes: Array, level: int, dry_run: bool, ch: Player) -> Array:
+	var mine: String = boxes[level]
+	var my_name := Pantry.name_of(Pantry.kind_of(mine)).to_lower()
+	if ch.held == "":
+		if not dry_run:
+			_hold_from_box(ch, mine)
+		return ["Take %s" % my_name, ""]
+	if not _is_plain_from(ch, boxes.slice(0, 2)):
+		return ["", ""]
+	if ch.held == _from_box(mine):
+		if not dry_run:
+			ch.set_held("")
+		return ["Put back", ""]
+	if not dry_run:
+		_hold_from_box(ch, mine)
+	return ["Swap for %s" % my_name, ""]
+
+
+func _is_plain_from(ch: Player, boxes: Array) -> bool:
+	for b in boxes:
+		if ch.held == _from_box(b) and not (ch.held.begins_with("prep") and not is_equal_approx(ch.held_quality, Prep.PLAIN)):
+			return true
+	return false
 
 
 func _hold_from_box(ch: Player, box: String) -> void:

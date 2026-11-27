@@ -416,8 +416,15 @@ func _refresh_wall(cell: Vector2i) -> void:
 ## bare floor. A chef holding Reach (`ch`) uses only what hangs there, or nothing.
 func station_at(cell: Vector2i, ch: Player = null) -> Station:
 	if ch != null and game.card.reaching(ch):
+		if not game.highs.has(cell) and is_tall_at(cell):
+			return game.stations.get(cell)   # a tall fridge has two levels: Reach takes the upper kind
 		return game.highs.get(cell)
 	return game.stations.get(cell, game.highs.get(cell))
+
+
+## Whether a tall piece (tall fridge, freezer, glass fridge) stands on the cell with nothing hung on it.
+func is_tall_at(cell: Vector2i) -> bool:
+	return Kitchen.is_tall(game.kitchen.get_piece(cell, "base")) and not game.highs.has(cell)
 
 
 func _unregister(st: Station) -> void:
