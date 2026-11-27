@@ -103,6 +103,9 @@ func _demo_build(demo: String) -> void:
 			game.hud.set_search("o")
 		for i in 3:
 			game.get_tree().create_timer(0.3 + 0.25 * i).timeout.connect(game.hud.shop_ui.shop_move.bind(1))
+	elif demo == "build_lot":   # the lot's edge and the buyable blocks, a chef facing one; shoot at 3
+		game.player.position = Grid.center(Vector2i(-4, 1))
+		game.player.look(Vector2i(-1, 0))
 	elif demo == "build_move":  # a table picked up and turned, ready to sell or put down
 		game.placing.pick_up(Vector3(8.5, 0, 3.5))
 		game.placing.rotate_hand()

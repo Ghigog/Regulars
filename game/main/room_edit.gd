@@ -496,6 +496,8 @@ func refuse(spot: Vector3i, ch: Player) -> void:
 func _update_ghost(ch: Player = null) -> void:
 	ch = game._me(ch)
 	_update_tool_ghost(ch)
+	var who := game.chefs.find(ch)
+	game.lot_view.update(ch, game.controls != null and game.controls.holding(who, "shop"), game.get_process_delta_time())
 	var key := "%s:%s:%s:%s" % [ch.hand.get("id", ""), ch.hand.get("tier", 0), game.upgrades.hand_key(ch), ch.hand.get("up", "")] if game.phase == Game.Phase.BUILD and not ch.hand.is_empty() and not Catalog.is_build_tool(ch.hand.id) and not ch.hand.get("in_place", false) else ""
 	# A wall-layer piece (PRD 8.5) shows the layer it would take where it points.
 	var hn := GameWorld.hand_node(ch.hand) if key != "" else ""

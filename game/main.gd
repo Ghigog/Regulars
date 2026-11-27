@@ -209,6 +209,7 @@ var upgrades := GameUpgrades.new(self)   # upgrade tree buys and the lifted piec
 var card := GameCard.new(self)   # the storage card on a piece at night
 var undo := GameUndo.new(self)   # one stack of undoable room changes for the build phase
 var placing := GamePlacing.new(self)   # buying, picking up, putting down and selling pieces
+var lot_view := GameLotView.new(self)   # the lot's edge and buyable blocks at night, bought by holding shop
 var room_edit := GameRoomEdit.new(self)   # floors, walls and doors, drags, ghosts, build actions
 var seating := GameSeating.new(self)   # arrivals, the queue, seating, surroundings, gross-out and floor ticks
 var decor := GameDecor.new(self)   # decor bonuses and reach marks
