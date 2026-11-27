@@ -32,6 +32,12 @@ const FLYER_GUESTS := 2    # tunable: extra guests a batch of flyers brings, on 
 const VISIT_BASE := 0.1      # tunable: visit chance at no opinion either way
 const VISIT_LIKE := 0.45     # tunable: extra chance per point of affinity
 const BIG_GROUP_DAY := 0.025 # tunable: more people bring all their friends, a day at a time
+const MAX_PARTY := 12 # tunable: the biggest group the town ever sends
+const SMALL_PARTY := 4 # groups up to this size are the norm
+const BIG_PARTY_CHANCE := 0.03 # tunable: chance a group is bigger than SMALL_PARTY on day 0
+const BIG_PARTY_DAY := 0.004 # tunable: that chance grows by this a day
+const BIG_PARTY_CAP := 0.15 # tunable: and never passes this
+const PARTY_PATIENCE_STEP := 0.08 # tunable: each guest beyond SMALL_PARTY adds this share of patience
 const BRING_FRIENDS_DAY := 8 # tunable: from this day a friend brings a friend of their own
 ## Kindness. Half price and free meals win goodwill, and friends hear about free ones.
 ## Guests given deals often start to expect them: a full-price visit then lets them down.
@@ -365,6 +371,11 @@ static func table_patience(day: int) -> float:
 	return maxf(42.0, 55.0 - 1.0 * day)
 
 
+## How long a party of `size` waits: table_patience up to SMALL_PARTY guests, a little more per guest beyond.
+static func party_patience(day: int, size: int) -> float:
+	return table_patience(day) * (1.0 + PARTY_PATIENCE_STEP * maxi(0, size - SMALL_PARTY))
+
+
 ## The fewest guests a day brings, whatever the town thinks: grows by one every other day.
 static func crowd_floor(day: int) -> int:
 	return 2 + day / 2
@@ -405,12 +416,18 @@ func roll_guests(day: int, boost := 0.0, extra := 0) -> Array[int]:
 func make_groups(coming: Array[int], max_size: int, day := 1) -> Array[Array]:
 	var left := coming.duplicate()
 	var groups: Array[Array] = []
+	max_size = mini(max_size, MAX_PARTY)
+	var small := mini(SMALL_PARTY, max_size)
 	var all_friends := minf(0.95, 0.6 + BIG_GROUP_DAY * day)
+	var big_chance := minf(BIG_PARTY_CAP, BIG_PARTY_CHANCE + BIG_PARTY_DAY * day)
 	while not left.is_empty():
 		var first: int = left.pop_front()
 		var group: Array[int] = [first]
 		# Most people would rather bring company than eat alone.
-		var want := max_size if rng.randf() < all_friends else rng.randi_range(1, max_size)
+		var want := small if rng.randf() < all_friends else rng.randi_range(1, small)
+		# Rarely a big party, for the endgame's big tables.
+		if max_size > small and rng.randf() < big_chance:
+			want = rng.randi_range(small + 1, max_size)
 		# On later days a friend brings a friend of their own, so parties grow.
 		var reach := 1 if day < BRING_FRIENDS_DAY else group.size() + max_size
 		var k := 0
