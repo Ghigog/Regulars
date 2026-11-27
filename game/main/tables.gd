@@ -24,6 +24,40 @@ func rebuild() -> void:
 		pieces.append({"type": st.type, "cell": st.cell, "facing": st.facing, "number": i + 1})
 	list = TableJoins.runs(pieces)
 	_draw_cards()
+	_redraw_joins()
+
+
+## Tells every table tile which sides touch another tile, and the tile nearest each
+## table's middle where its one candle stands; every booth seat which sides have a
+## booth seat beside it facing the same way. Each piece redraws only when that changed.
+func _redraw_joins() -> void:
+	var pieces := []
+	var by_number := {}
+	for st: Station in game.stations.values():
+		if st.type in ["table", "booth_seat", "chair"]:
+			by_number[pieces.size() + 1] = st
+			pieces.append({"type": st.type, "cell": st.cell, "facing": st.facing, "number": pieces.size() + 1})
+	var candles := {}   # tile -> where its candle stands, for the tiles that hold one
+	for t in TableJoins.tables(pieces):
+		var mid := Vector2.ZERO
+		for n in t.pieces:
+			mid += Vector2((by_number[n] as Station).cell)
+		mid /= t.pieces.size()
+		var best: Station = null
+		for n in t.pieces:
+			var st: Station = by_number[n]
+			if best == null or Vector2(st.cell).distance_to(mid) < Vector2(best.cell).distance_to(mid):
+				best = st
+		candles[best] = (mid - Vector2(best.cell)).clampf(-0.5, 0.5)
+	for st: Station in by_number.values():
+		if st.type == "chair":
+			continue
+		var mask := 0
+		for f in 4:
+			var nb: Station = game.stations.get(st.cell + TableJoins.FACE[f])
+			if nb != null and nb.type == st.type and (st.type == "table" or nb.facing == st.facing):
+				mask |= 1 << f
+		st.set_joined(mask, candles.get(st, Vector2.INF))
 
 
 ## One card per table, at the middle of its pieces, saying how many it seats.
