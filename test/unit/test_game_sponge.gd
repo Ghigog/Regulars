@@ -46,14 +46,14 @@ func test_a_sponge_on_a_counter_is_not_food():
 
 func test_a_helper_washes_faster_with_a_sponge_beside_the_sink():
 	var sink: Station = game.world.find_station("sink")
-	var tr: CrewTaskRun = game.crew.task_run
-	assert_false(tr._sponge_near(sink))
+	var tr = game.clean_kit
+	assert_false(tr.sponge_near(sink))
 	sink.set_item("tool:sponge", 1.0)
-	assert_true(tr._sponge_near(sink))
+	assert_true(tr.sponge_near(sink))
 	sink.set_item("")
 	var side: Station = game.world.add_station("counter", sink.cell + Vector2i(1, 0))
 	side.set_item("tool:sponge", 1.0)
-	assert_true(tr._sponge_near(sink))
+	assert_true(tr.sponge_near(sink))
 
 
 func test_a_sponge_on_a_dirty_sink_does_not_block_the_chefs_wash():
@@ -111,3 +111,36 @@ func test_the_put_down_prompt_is_the_same_at_a_shelf_and_a_counter():
 	var p: String = game.cooking.use_station(shelf, true, game.player)
 	assert_eq(p, "Put sponge down")
 	assert_false("back" in p)
+
+
+func _wash_for(sink: Station, secs: float) -> void:
+	sink.dirty = 2
+	_chef_facing(sink)
+	game.cooking.use_station(sink)
+	var t := 0.0
+	while t < secs:
+		game.cooking._tick_wash(game.player, true, 0.1)
+		t += 0.1
+
+
+func test_a_sponge_on_the_sink_speeds_the_chefs_wash():
+	var sink: Station = game.world.find_station("sink")
+	sink.set_item("tool:sponge", 1.0)
+	_wash_for(sink, game.cooking.WASH_HOLD * CleanTools.SPONGE_WASH + 0.1)
+	assert_eq(game.player.held, "dishes")
+	assert_eq(sink.dirty, 1)
+
+
+func test_a_sponge_on_a_counter_beside_the_sink_speeds_the_chefs_wash():
+	var sink: Station = game.world.find_station("sink")
+	var side: Station = game.world.add_station("counter", sink.cell + Vector2i(1, 0))
+	side.set_item("tool:sponge", 1.0)
+	_wash_for(sink, game.cooking.WASH_HOLD * CleanTools.SPONGE_WASH + 0.1)
+	assert_eq(game.player.held, "dishes")
+
+
+func test_without_a_sponge_the_chefs_wash_takes_the_full_hold():
+	var sink: Station = game.world.find_station("sink")
+	_wash_for(sink, game.cooking.WASH_HOLD * CleanTools.SPONGE_WASH + 0.1)
+	assert_ne(game.player.held, "dishes")
+	assert_true(game.cooking.prompt_for(sink).begins_with("Washing "))
