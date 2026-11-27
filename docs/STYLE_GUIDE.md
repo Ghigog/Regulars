@@ -277,6 +277,10 @@ all, and why. Screenshots: see `CLAUDE.md` for the `REGULARS_SHOT` and `REGULARS
   the slip icon at its left end, over the table, so the two never read as one another.
 - The bill screen is plain paper, a coral "THE BILL" ribbon and paper buttons; a table
   picked and an item ticked get a coral border, a table whose slip is out is greyed.
+  As built (T-89): the slip is small (400 px wide, courses stacked, ribbon 20, items 16) in the
+  top-right corner, 22 px from the edge like the cork board and guest card, over them while
+  open. There is no dim layer and the room takes input around it, so other chefs keep playing.
+  It pops in from its top-right corner and scrolls its item list if the screen is short.
 - Leaving without paying stamps an open coin purse (coral, the gold clasp swung apart)
   beside the receipt's LEFT UNPAID line, one per party up to five, never a strike mark.
 - Screenshots: `pay_call` (8), `pay_till` (8), `pay_bill` (3), `pay_hand` (3), `pay_wrong`
