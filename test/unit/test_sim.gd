@@ -467,8 +467,9 @@ func test_higher_tiers_cost_more_and_need_more_levels():
 
 
 func test_catalog_search_by_word_and_category():
-	assert_eq(Catalog.search().size(), _roots(Catalog.search()).size(), "only roots: a step up a tree is bought on the piece, lifted")
-	assert_eq(_roots(Catalog.search()).size(), 68, "one entry a piece, the cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); seven boxes of PRD 8.6; two cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6); the window")
+	var no_nodes := Catalog.search().filter(func(bp: Dictionary) -> bool: return not Catalog.is_box_node(bp.id))
+	assert_eq(no_nodes.size(), _roots(no_nodes).size(), "only roots, bar the food boxes' Prepared and Marinated nodes: a step up a tree is bought on the piece, lifted")
+	assert_eq(_roots(Catalog.search()).size(), 62, "one entry a piece, the cup and tray stacks and the till; no stove or fridge, which grow from a counter: higher tiers and later tree nodes are bought in upgrade trees (PRD 8.3); seven boxes of PRD 8.6; two cleaning pieces (PRD 9.4; the robot is in the wringer bucket's tree, 9.5); the floor cleaner's box (9.5); the desk (PRD 10.6); the window")
 	var ferns := _roots(Catalog.search("FERN"))
 	assert_eq(ferns.size(), 1)
 	assert_eq(int(ferns[0].tier), 1, "cheapest first")
@@ -482,7 +483,7 @@ func test_catalog_search_by_word_and_category():
 	assert_eq(Catalog.search("", "Kitchen", "diner", 1).filter(func(bp: Dictionary) -> bool:
 		return Catalog.bp_level(bp) > 1).size(), 0, "a level hides what needs a higher one")
 	var pantry := Catalog.search("", "Pantry", "diner")
-	assert_eq(pantry.size(), 15, "a box per boxed diner food kind and four ready-made (PRD 8.4, 8.6); the floor cleaner is parked")
+	assert_eq(pantry.size(), 27, "a box per boxed diner food kind and its Prepared and Marinated nodes (PRD 8.4, 8.6, EPIC-132); the floor cleaner is parked")
 	assert_eq(pantry[0].id, "box_bun", "boxes are free to take: by name")
 	assert_eq(Catalog.search("", "Kitchen", "seaside").filter(func(bp: Dictionary) -> bool:
 		return Catalog.ITEMS[bp.id].get("theme", "seaside") != "seaside").size(), 0, "only the run's theme")

@@ -37,6 +37,11 @@ static func streak_rep(streak: int) -> float:
 	return STREAK_REP if streak >= STREAK_REP_FROM else 0.0
 
 
+## An ingredient's quality from a Marinated box: the bonus on top, never above 1.0.
+static func marinate(q: float) -> float:
+	return minf(q + Pantry.MARINATE_BONUS, 1.0)
+
+
 static func quality_of(result: String) -> float:
 	return {"good": GOOD, "plain": PLAIN, "bad": BAD}.get(result, 0.0)
 
