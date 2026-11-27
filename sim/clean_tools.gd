@@ -5,7 +5,7 @@ extends RefCounted
 ## a FloorMess and plain cells; the scene side is game/clean_kit.gd. The tools' trees
 ## (PRD 9.5) are Kitchen.NODES: each home node there names the tool it keeps ("tool").
 
-## Each hand tool: the home it is kept in ("bucket" or "hook"),
+## Each hand tool: the home it is kept in ("bucket", or "store": a wall shelf or cabinet),
 ## levels cleared a press (MAX_LEVEL: the whole cell), seconds a press takes (held E
 ## repeats at this pace), and how many presses it cleans before it is dirty (0: never).
 ## "grease": kitchen grease only. "uses": presses a day, each taking a level 4 cell to
@@ -21,12 +21,12 @@ const TOOLS := {
 	"cleaner_mop": {"name": "Mop with cleaner", "home": "bucket", "levels": FloorMess.MAX_LEVEL, "time": 0.6, "dirty_after": 4},
 	"strong_mop": {"name": "Mop with strong cleaner", "home": "bucket", "levels": FloorMess.MAX_LEVEL, "time": 0.6,
 		"dirty_after": 0},
-	"sponge": {"name": "Sponge", "home": "hook", "levels": 1, "time": 0.3, "dirty_after": 2,
+	"sponge": {"name": "Sponge", "home": "store", "levels": 1, "time": 0.3, "dirty_after": 2,
 		"counter": true},
-	"scourer": {"name": "Scourer", "home": "hook", "levels": 1, "time": 0.3, "dirty_after": 4},
-	"grease_scraper": {"name": "Grease scraper", "home": "hook", "levels": FloorMess.MAX_LEVEL, "time": 0.3,
+	"scourer": {"name": "Scourer", "home": "store", "levels": 1, "time": 0.3, "dirty_after": 4},
+	"grease_scraper": {"name": "Grease scraper", "home": "store", "levels": FloorMess.MAX_LEVEL, "time": 0.3,
 		"dirty_after": 0, "grease": true},
-	"spill_kit": {"name": "Spill kit", "home": "hook", "levels": 2, "time": 0.6, "dirty_after": 0,
+	"spill_kit": {"name": "Spill kit", "home": "store", "levels": 2, "time": 0.6, "dirty_after": 0,
 		"uses": 3, "help": 0.5},
 }
 ## Bare hands (no tool held): holding E scrubs the cell, a level every HAND_TIME seconds.
@@ -38,11 +38,11 @@ const HAND_LEVELS := 1
 const SPONGE_WASH := 0.5
 
 ## The pieces that are homes, and the kind of home each is (a catalog type).
-const HOMES := {"mop_bucket": "bucket", "hook": "hook", "sponge": "hook"}
+const HOMES := {"mop_bucket": "bucket", "shelf": "store", "wide_shelf": "store", "cabinet": "store"}
 const SPILL_LEVEL := 4   # the spill kit works on a cell this dirty only
-## Where a home starts with its tool when bought: the bucket comes with a mop, and a
-## sponge is sold hanging on its own hook.
-const COMES_WITH := {"mop_bucket": "mop", "sponge": "sponge"}
+## Where a home starts with its tool when bought: the bucket comes with a mop. (The
+## sponge is a tool in the chef's hands, kept on a shelf or in a cabinet.)
+const COMES_WITH := {"mop_bucket": "mop"}
 ## Rinsed here: a dirty tool comes back clean.
 const RINSE_AT: Array[String] = ["mop_bucket", "sink"]
 
@@ -84,7 +84,7 @@ static func name_of(tool: String) -> String:
 	return str(TOOLS[tool].name) if TOOLS.has(tool) else ""
 
 
-## The kind of home a piece is ("bucket", "hook"), or "" for none.
+## The kind of home a piece is ("bucket", "store"), or "" for none.
 static func home_kind(piece: String) -> String:
 	return str(HOMES.get(piece, ""))
 

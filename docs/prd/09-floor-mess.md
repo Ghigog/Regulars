@@ -102,8 +102,10 @@ or high, and no cleaning kind goes in a fridge.
   cleaning cupboard.
 - **Hand tools** (mop, sponge, scraper, spill kit) each have a home they are taken from
   and put back in with E: the **mop bucket** (a one-cell floor piece, also where a mop is
-  rinsed) holds a mop; a **wall hook** (a cheap high-layer piece, a wall cell only) holds
-  one small tool (sponge, scraper, spill kit); a closet holds either. A tool put down
+  rinsed) holds a mop; a **wall shelf** or **wall cabinet** (bought and placed separately, a wall
+  cell, high layer) keeps one small tool (sponge, scourer, scraper, spill kit) in one of its
+  slots; a closet holds either. A cell that keeps a tool counts as holding cleaning things:
+  food boxes are refused there, and a tool is refused where the cell holds food. A tool put down
   anywhere else lies on the floor and is in the way.
 - **The robot sweeper** has a **dock** (a one-cell floor piece). It goes back to charge
   when its run is done and when the day ends.
@@ -120,7 +122,7 @@ Mop bucket + mop $20  clears 1 level a press, dirty after 4
 │                           level every few seconds, during service and at night; anyone
 │                           can trip on it (it counts as level 2 where it is)
 
-Sponge $15  (lives on a wall hook) clears 1 level fast, dirty after 2; quick spot cleaning
+Sponge $15  (a hand tool, kept on a shelf or in a cabinet) clears 1 level fast, dirty after 2; quick spot cleaning
 ├─E Scourer $25  clears 1 level fast, dirty after 4
 ├─S Grease scraper $40  kitchen grease only, whole cell a press, never dirty; no use on guest mess
 └─S Spill kit $30  a level 4 cell becomes level 2 at once, three uses a day; helps a fallen guest up faster
@@ -146,9 +148,9 @@ light up when 8.3 and 8.5 merge.
 2. **9.2** Dirt in the room: drawn by level, footprints, slowing for chefs and guests,
    sources from prep and meals, disgust and the critic. *Needs 9.1.*
 3. **9.3** Slipping: down, helped up, witnesses, the walkout chance. *Needs 9.2.*
-4. **9.4** Mop bucket, wall hook, sponge and mop, in service and at night, uncovering
+4. **9.4** Mop bucket, wall shelf, sponge and mop, in service and at night, uncovering
    cells by moving furniture; the robot sweeper and its dock. *Needs 9.3 and 8.5* (the
-   wall hook is a high-layer piece; the closet is PRD 8 storage).
+   wall shelf is a high-layer piece; the closet is PRD 8 storage).
 5. **9.5** Treatments (boxes in storage, the no-chemicals-with-food rule, re-laid
    nightly on the restock note) and the cleaning and hood trees. *Needs 9.4, 8.3 (tree
    screen) and 8.4 (Pantry tab and slots).*

@@ -598,7 +598,7 @@ func test_the_new_tools_list_their_duties_in_the_room():
 
 
 func test_cleaning_pieces_bring_their_duty():
-	var room := Staff.room_duties([], ["mop_bucket", "sponge", "hook", "robot_dock"])
+	var room := Staff.room_duties([], ["mop_bucket", "sponge", "robot_dock"])
 	assert_eq(room.clean, ["mop", "sponge", "wash_up", "empty_bin"] as Array[String])
 
 
@@ -997,7 +997,7 @@ func test_the_cleaning_trees_bring_their_line_s_duty():
 	assert_eq(Staff.clean_duty("grease_scraper"), "scraper")
 	assert_eq(Staff.clean_duty("spill_kit"), "spill_kit")
 	assert_eq(Staff.clean_duty("robot_dock"), "")
-	var room := Staff.room_duties([], ["flat_mop", "hook", "scourer", "grease_scraper", "spill_kit", "robot_dock"])
+	var room := Staff.room_duties([], ["flat_mop", "scourer", "grease_scraper", "spill_kit", "robot_dock"])
 	assert_eq(room.clean, ["mop", "sponge", "scraper", "spill_kit", "wash_up", "empty_bin"] as Array[String])
 	assert_eq(Staff.room_duties([], ["wringer_bucket"]).clean, ["mop", "wash_up", "empty_bin"] as Array[String])
 
