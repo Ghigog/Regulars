@@ -96,3 +96,35 @@ func test_floor_dirt_is_attributed_to_the_worst_cell():
 	game.floor_dirt.mess.dirt[b] = 3
 	assert_eq(game.floor_dirt._worst_of([a, b]), b)
 	assert_eq(game.floor_dirt._worst_of([b, a]), b)
+
+
+func _expect_named_cause(g: Guest, st: Station, kind: String) -> void:
+	var cell := st.cell
+	game.stations[cell] = st
+	for i in 100:
+		game.seating._collect_gross()
+		game.seating.apply_surroundings(g, 0.1)
+	game.stations.erase(cell)
+	st.free()
+	assert_eq(g.disgust_from.get("kind"), kind)
+	assert_eq(g.disgust_from.get("cell"), cell)
+
+
+func test_a_burning_stove_is_named_as_the_cause():
+	var g := _seated()
+	var st := Station.new()
+	st.type = "stove"
+	st.cell = _beside(g)
+	st.item = "burnt:meat"
+	st.cook = Station.BURN_TIME + 600.0
+	_expect_named_cause(g, st, "burning")
+
+
+func test_an_overflowing_bin_is_named_as_the_cause():
+	var g := _seated()
+	var st := Station.new()
+	st.type = "bin"
+	st.cell = _beside(g)
+	st.count = Station.BIN_HOLDS
+	st.dirty_age = 600.0
+	_expect_named_cause(g, st, "overflow")
